@@ -7,17 +7,20 @@ Verified on 29 October 2026 on macOS 26.4.1, Apple Silicon, using Xcode's Swift 
 | Check | Result |
 | --- | --- |
 | Unmodified upstream at 927a2fa9f1401e365d975536bd704819ada1f1f4 | 963 unit tests, 1,924 corpus programs, 11 end-to-end programs passed |
-| Modified runtime | 966 unit tests, 1,924 corpus programs, 11 end-to-end programs passed |
+| Modified runtime | 968 unit tests, 1,924 corpus programs, 11 end-to-end programs passed |
 | Swift integration | 6 tests passed, including actual bundled runtime execution |
 | Packaged-runtime integration | 13 tests passed, including parameterized negative cases |
 | Binary architecture | Both app and helper are Mach-O ARM64 |
 | Bundle signature | Ad-hoc signature passes codesign --verify --deep --strict |
+| Alpha package | Versioned ARM64 ZIP extracts cleanly; app signature, bundle version, helper version, architecture and SHA-256 generation pass |
 
 The modified ODS corpus fixture intentionally expects an error instead of silent destination substitution. Other upstream expectations remain unchanged.
 
 Swift checks exercise unsaved snapshots, filenames/working directories containing spaces, relative includes, clean WORK state between runs, both large output streams, diagnostic coordinate parsing, aligned listings, launch/exit/crash classification, cancellation, and overlapping-run rejection. A ready-file handshake ensures the signal-ignoring cancellation fixture has installed its handler before cancellation; the test verifies SIGKILL after at least 1.9 seconds.
 
 Regression checks cover analytical coefficients, standard errors and t/F probabilities, multiple predictors, scaling/pivot permutation, complete-case filtering, singular/insufficient data, constant responses, perfect fits, nonnumeric/unknown variables, syntax/unsupported options, macros and titles, explicit file persistence, ODS rejection, and CLI input failures.
+
+Security regression coverage rejects SAS catalog files with cyclic block chains, impossible physical page counts, and entry counts that would otherwise drive disproportionate allocation.
 
 The published comparison uses the public US population observations and rounded estimates from [SAS/STAT 13.2, PROC REG, Figure 85.5](https://support.sas.com/documentation/cdl/en/statug/67523/HTML/default/statug_reg_gettingstarted02.htm). Its tolerance is half the last printed decimal plus 1e-7. Analytical checks use absolute tolerances down to 1e-12 (1e-20 for scaled coefficients) and 1e-9 for parsed text results. No direct execution against an installed SAS engine was performed; no feature is labeled SAS-verified on that basis.
 

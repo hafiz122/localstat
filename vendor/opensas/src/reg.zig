@@ -1,4 +1,5 @@
 //! LocalStat's bounded PROC REG: numeric OLS with an intercept and one MODEL.
+//! Added by LocalStat to the vendored OpenSAS source snapshot.
 const std = @import("std");
 const diag = @import("diag.zig");
 const proc = @import("proc.zig");

@@ -1,4 +1,4 @@
-# LocalStat 0.1 compatibility
+# LocalStat 0.1.0-alpha compatibility
 
 This is an independent SAS-language implementation based on OpenSAS, not SAS Institute's runtime. It is not a drop-in SAS replacement and is not validated for clinical or regulated work.
 
@@ -17,6 +17,7 @@ This is an independent SAS-language implementation based on OpenSAS, not SAS Ins
 | ODS | Text listing only. Other destinations and controls error; LISTING open/close are inert with a note |
 | Datasets | OpenSAS readers/writers for CSV, SAS7BDAT and XPT; limitations remain upstream |
 | Runtime session | WORK and macro state reset each run; explicit filesystem outputs persist |
+| Security boundary | Programs are executable content: filesystem access and `%SYSGET` use the app process's permissions and environment; the alpha is not sandboxed |
 | Diagnostics | Original source positions navigate only when the editor still matches the executed snapshot; expanded macro positions never navigate |
 | Output timing | Runtime buffers output until execution finishes. Stop can discard buffered output. |
 
@@ -37,4 +38,4 @@ The implementation uses column scaling and Householder QR with column pivoting. 
 
 OpenSAS implements subsets of SAS statements and procedure options. The upstream test corpus is evidence for those fixtures only. Some inherited statements are deliberately inert: for example X does not execute shell commands and PROC PRINTTO does not redirect output. Text PUT output and procedure listings share stdout. This app preserves raw stdout/stderr and the process exit code; diagnostics are not the full SAS log format. ABORT can explicitly return an exit code, including 1 or 2, so the text log remains authoritative when interpreting those statuses.
 
-No persistent interactive session, selection execution, dataset grid, HTML/PDF/RTF results or graphics are included in 0.1. A successful exit is not proof of numerical equivalence to SAS.
+No persistent interactive session, selection execution, dataset grid, HTML/PDF/RTF results or graphics are included in 0.1.0-alpha. A successful exit is not proof of numerical equivalence to SAS.

@@ -8,3 +8,5 @@ vendor/opensas/zig-out/
 test-results/
 *.log
 __pycache__/
+*.zip
+*.sha256

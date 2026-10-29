@@ -1,5 +1,6 @@
 //! SAS interpreter — public module root. Re-exports the pieces the CLI and the
 //! test runner reach. Each track appends its module here as it lands.
+//! Modified by LocalStat to expose the bounded PROC REG implementation.
 pub const Value = @import("value.zig").Value;
 pub const diag = @import("diag.zig");
 pub const ast = @import("ast.zig");

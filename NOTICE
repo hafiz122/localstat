@@ -1,0 +1,16 @@
+LocalStat
+
+LocalStat is licensed under the Apache License, Version 2.0. See LICENSE.
+
+This distribution includes a modified source snapshot of OpenSAS
+(https://github.com/kirha-ai/opensas), pinned to commit
+927a2fa9f1401e365d975536bd704819ada1f1f4 and licensed under the Apache
+License, Version 2.0. The upstream license is retained at
+vendor/opensas/LICENSE. Local modifications are documented in
+docs/RUNTIME_CHANGES.md.
+
+The LocalStat logo is original project artwork and is distributed under the
+same Apache-2.0 license as this repository.
+
+SAS is a trademark of SAS Institute Inc. LocalStat is an independent project
+and is not affiliated with, endorsed by, or sponsored by SAS Institute Inc.

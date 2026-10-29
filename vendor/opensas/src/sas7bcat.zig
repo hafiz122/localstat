@@ -1,4 +1,7 @@
 //! sas7bcat (`.sas7bcat`) reader — the native SAS *format catalog*: the user
+//! Modified by LocalStat to bound physical pages, reject cyclic block chains,
+//! and validate attacker-controlled entry counts before allocation.
+//!
 //! VALUE-format DEFINITIONS a program installs via `libname` + `OPTIONS
 //! FMTSEARCH=`, so `put(x, YESNO.)` decodes to a label instead of failing loud
 //! (GH#34). Same undocumented container family as sas7bdat (magic, header,
@@ -57,11 +60,12 @@ pub fn read(a: std.mem.Allocator, bytes: []const u8) Error![]const format.UserFm
     const header_size = rd32(bytes, 196 + pad1);
     const page_size = rd32(bytes, 200 + pad1);
     const page_count = rd32(bytes, 204 + pad1);
-    if (page_size == 0 or header_size == 0) return error.NotSas7bcat;
-
     const xlsr_size: usize = 212 + pad1;
     const xlsr_offset: usize = 856 + 2 * pad1;
     const xlsr_o_off: usize = 50 + pad1;
+    if (page_size < xlsr_offset or header_size == 0 or header_size > bytes.len) return error.NotSas7bcat;
+    const physical_pages = (bytes.len - header_size) / page_size;
+    if (page_count == 0 or page_count > physical_pages) return error.NotSas7bcat;
 
     // Collect block pointers ((page<<32)|pos) from the XLSR index. The index
     // lives on page 1; later pages (from index 3) may hold more (marked "XLSR"
@@ -82,10 +86,11 @@ pub fn read(a: std.mem.Allocator, bytes: []const u8) Error![]const format.UserFm
 
     var cats: std.ArrayList(format.UserFmt) = .empty;
     defer cats.deinit(a);
+    var catalog_work_bytes: usize = 0;
     for (bptrs.items) |bp| {
         const start_page: usize = @intCast(bp >> 32);
         const start_pos: usize = @intCast(bp & 0xFFFF);
-        const block = try readBlock(a, bytes, header_size, page_size, page_count, start_page, start_pos);
+        const block = try readBlock(a, bytes, header_size, page_size, page_count, start_page, start_pos, &catalog_work_bytes);
         if (parseBlock(a, block) catch |e| switch (e) {
             error.OutOfMemory => return error.OutOfMemory,
             else => return error.Unsupported, // malformed block — fail loud
@@ -113,23 +118,38 @@ fn augment(a: std.mem.Allocator, b: []const u8, off: usize, len: usize, xlsr_siz
 
 /// Follow a block's segment chain, concatenating each segment's payload (after
 /// its 16-byte link header) into one buffer.
-fn readBlock(a: std.mem.Allocator, b: []const u8, header_size: usize, page_size: usize, page_count: usize, start_page: usize, start_pos: usize) Error![]const u8 {
+fn readBlock(a: std.mem.Allocator, b: []const u8, header_size: usize, page_size: usize, page_count: usize, start_page: usize, start_pos: usize, catalog_work_bytes: *usize) Error![]const u8 {
     var buf: std.ArrayList(u8) = .empty;
+    var seen: std.AutoHashMapUnmanaged(u64, void) = .empty;
+    defer seen.deinit(a);
     var np = start_page;
     var npp = start_pos;
     var link: usize = 0;
     while (np > 0 and npp > 0 and np <= page_count and link < page_count) : (link += 1) {
+        const key = (@as(u64, np) << 32) | @as(u64, @intCast(npp));
+        const prior = try seen.getOrPut(a, key);
+        if (prior.found_existing) return error.Unsupported;
+        if (npp > page_size or page_size - npp < 16) return error.Unsupported;
         const seek = header_size + (np - 1) * page_size + npp;
-        if (seek + 16 > b.len) break;
+        const page_end = header_size + np * page_size;
+        if (page_end > b.len or seek > page_end - 16) return error.Unsupported;
         const next_page = rd32(b, seek);
         const next_pos = rd16(b, seek + 4);
         const seg_len = rd16(b, seek + 6);
         const s = seek + 16;
-        if (s + seg_len > b.len) break;
+        if (seg_len > page_end - s or seg_len > b.len - s) return error.Unsupported;
+        if (buf.items.len > b.len - seg_len) return error.Unsupported;
+        // Charge the link header as well as its payload. This makes even a
+        // zero-length or shared segment consume a finite catalog-wide budget,
+        // preventing many XLSR pointers from re-walking the same chain.
+        const work_bytes = 16 + seg_len;
+        if (catalog_work_bytes.* > b.len - work_bytes) return error.Unsupported;
+        catalog_work_bytes.* += work_bytes;
         try buf.appendSlice(a, b[s .. s + seg_len]);
         np = next_page;
         npp = next_pos;
     }
+    if (np != 0 or npp != 0) return error.Unsupported;
     return buf.toOwnedSlice(a);
 }
 
@@ -165,8 +185,13 @@ fn parseValueLabels(a: std.mem.Allocator, vs: []const u8, used: usize, cap: usiz
     const is_char = name.len > 0 and name[0] == '$';
     const base_name = if (is_char) name[1..] else name; // UserFmt name has no `$`
 
+    // Every value entry is at least six bytes. Validate counts before allocating
+    // or iterating so a tiny catalog cannot request attacker-chosen memory.
+    if (used > cap or cap > vs.len / 6) return error.Unsupported;
+
     // Pass 1: record each value entry's byte offset, keyed by its label index.
     const value_off = try a.alloc(usize, used);
+    @memset(value_off, std.math.maxInt(usize));
     var p: usize = 0;
     for (0..cap) |i| {
         if (p + 4 > vs.len) return error.Unsupported;
@@ -174,15 +199,19 @@ fn parseValueLabels(a: std.mem.Allocator, vs: []const u8, used: usize, cap: usiz
             if (p + 14 + 4 > vs.len) return error.Unsupported;
             const lpos = rd32(vs, p + 14); // 10 + pad1(=4)
             if (lpos >= used) return error.Unsupported;
+            if (value_off[lpos] != std.math.maxInt(usize)) return error.Unsupported;
             value_off[lpos] = p;
         }
-        p += 6 + rd16(vs, p + 2);
+        const entry_len = 6 + rd16(vs, p + 2);
+        if (entry_len > vs.len - p) return error.Unsupported;
+        p += entry_len;
     }
     var lbp2 = p; // labels region begins where the value entries end
 
     var entries: std.ArrayList(format.UserFmtEntry) = .empty;
     for (0..used) |i| {
         const p1 = value_off[i];
+        if (p1 == std.math.maxInt(usize)) return error.Unsupported;
         var e: format.UserFmtEntry = .{ .label = "" };
         if (is_char) {
             if (p1 + 4 > vs.len) return error.Unsupported;
@@ -214,9 +243,11 @@ fn parseValueLabels(a: std.mem.Allocator, vs: []const u8, used: usize, cap: usiz
         // Paired label: [len16 @ +8][string @ +10].
         if (lbp2 + 10 > vs.len) return error.Unsupported;
         const llen = rd16(vs, lbp2 + 8);
-        if (lbp2 + 10 + llen > vs.len) return error.Unsupported;
+        if (llen > vs.len - (lbp2 + 10)) return error.Unsupported;
         e.label = try a.dupe(u8, vs[lbp2 + 10 .. lbp2 + 10 + llen]);
-        lbp2 += 8 + 2 + llen + 1;
+        const label_len = 11 + llen;
+        if (label_len > vs.len - lbp2) return error.Unsupported;
+        lbp2 += label_len;
         try entries.append(a, e);
     }
     return .{ .name = try a.dupe(u8, base_name), .is_char = is_char, .entries = try entries.toOwnedSlice(a) };
@@ -270,6 +301,52 @@ test "rejects non-catalog and u64 layout" {
     @memcpy(hdr[0..32], &magic);
     hdr[32] = 0x33; // u64 marker
     try t.expectError(error.Unsupported, read(t.allocator, &hdr));
+
+    hdr[32] = 0;
+    hdr[37] = 0x01;
+    std.mem.writeInt(u32, hdr[196..200], 288, .little);
+    std.mem.writeInt(u32, hdr[200..204], 1024, .little);
+    std.mem.writeInt(u32, hdr[204..208], 1, .little);
+    try t.expectError(error.NotSas7bcat, read(t.allocator, &hdr));
+}
+
+test "rejects cyclic block chains and impossible entry counts" {
+    const t = std.testing;
+    var arena = std.heap.ArenaAllocator.init(t.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var pages = [_]u8{0} ** 128;
+    const seek: usize = 16;
+    std.mem.writeInt(u32, pages[seek..][0..4], 1, .little);
+    std.mem.writeInt(u16, pages[seek + 4 ..][0..2], 16, .little);
+    std.mem.writeInt(u16, pages[seek + 6 ..][0..2], 1, .little);
+    pages[seek + 16] = 'x';
+    var reconstructed: usize = 0;
+    try t.expectError(error.Unsupported, readBlock(a, &pages, 0, 64, 2, 1, 16, &reconstructed));
+
+    var values = [_]u8{0} ** 64;
+    try t.expectError(error.Unsupported, parseValueLabels(a, &values, 2, 1, "BAD"));
+    try t.expectError(error.Unsupported, parseValueLabels(a, &values, 1, 20, "BAD"));
+}
+
+test "bounds aggregate catalog block work including empty segments" {
+    const t = std.testing;
+    var arena = std.heap.ArenaAllocator.init(t.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var page = [_]u8{0} ** 128;
+    const seek: usize = 16;
+    std.mem.writeInt(u16, page[seek + 6 ..][0..2], 64, .little);
+    var work_bytes: usize = 0;
+    _ = try readBlock(a, &page, 0, 128, 1, 1, 16, &work_bytes);
+    try t.expectError(error.Unsupported, readBlock(a, &page, 0, 128, 1, 1, 16, &work_bytes));
+
+    std.mem.writeInt(u16, page[seek + 6 ..][0..2], 0, .little);
+    work_bytes = 112;
+    _ = try readBlock(a, &page, 0, 128, 1, 1, 16, &work_bytes);
+    try t.expectError(error.Unsupported, readBlock(a, &page, 0, 128, 1, 1, 16, &work_bytes));
 }
 
 test "NOTE-sas7bcatspecialmiss: a special-missing numeric key decodes to its missing Value (was silently dropped)" {

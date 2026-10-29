@@ -20,6 +20,7 @@ import SASCore
     var diagnostics: [Diagnostic] = []
     var lastResult: RunResult?
     var lastRunDocument: EditorDocument?
+    private var pendingOpenURLs: [URL] = []
     var projectURL = FileManager.default.homeDirectoryForCurrentUser
     lazy var runner = LocalRuntimeRunner(executable: Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/opensas"))
     var current: EditorDocument? {
@@ -31,6 +32,8 @@ import SASCore
         buildMenu()
         buildWindow()
         loadProject()
+        pendingOpenURLs.forEach { open($0) }
+        pendingOpenURLs.removeAll()
         if documents.isEmpty { newDocument(nil) }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -256,6 +259,15 @@ import SASCore
         let panel = NSOpenPanel(); panel.allowsMultipleSelection = true; panel.directoryURL = projectURL
         if panel.runModal() == .OK { panel.urls.forEach { open($0) } }
     }
+    func application(_ sender: NSApplication, openFiles filenames: [String]) {
+        let urls = filenames.map { URL(fileURLWithPath: $0) }
+        if window == nil {
+            pendingOpenURLs.append(contentsOf: urls)
+        } else {
+            urls.forEach { open($0) }
+        }
+        sender.reply(toOpenOrPrint: .success)
+    }
     @objc func openSelectedFile() {
         let row = fileTable.clickedRow
         if files.indices.contains(row) { open(files[row]) }
@@ -413,9 +425,11 @@ import SASCore
     }
     func showError(_ error: Error) { NSAlert(error: error).runModal() }
     @objc func about() {
-        let version = (try? String(contentsOf: Bundle.main.resourceURL!.appendingPathComponent("runtime-version.txt"), encoding: .utf8)) ?? "Runtime version unavailable"
-        let alert = NSAlert(); alert.messageText = "LocalStat 0.1"
-        alert.informativeText = "Native SAS-language editor\n\(version)\n\nIndependent SAS-compatible subset. Not affiliated with SAS Institute. See Help for tested coverage and limitations."
+        let runtimeVersion = (try? String(contentsOf: Bundle.main.resourceURL!.appendingPathComponent("runtime-version.txt"), encoding: .utf8)) ?? "Runtime version unavailable"
+        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Unknown"
+        let alert = NSAlert(); alert.messageText = "LocalStat \(appVersion) alpha"
+        alert.informativeText = "Build \(build)\nNative SAS-language editor\n\(runtimeVersion)\n\nIndependent SAS-language subset. Not affiliated with SAS Institute. See Help for tested coverage and limitations."
         alert.runModal()
     }
     @objc func showCompatibility() {

@@ -1,4 +1,7 @@
 //! CLI — the whole pipeline, wired end to end: read a `.sas` file, split it into
+//! Modified by LocalStat: PROC REG dispatch, explicit ODS rejection, and CLI
+//! input-failure exit behavior. See docs/RUNTIME_CHANGES.md.
+//!
 //! DATA/PROC steps, and for each run lexer → parser → executor, printing the SAS
 //! log (`put` output) and any `proc print` table to stdout.
 //!

@@ -1,5 +1,7 @@
 # LocalStat
 
+[![CI](https://github.com/hafiz122/localstat/actions/workflows/ci.yml/badge.svg)](https://github.com/hafiz122/localstat/actions/workflows/ci.yml)
+
 <p align="center">
   <img src="assets/localstat-logo.png" alt="LocalStat logo" width="180">
 </p>
@@ -12,15 +14,15 @@ A native AppKit editor that runs a local ARM64 SAS-language interpreter. The run
 
 ## Project status
 
-LocalStat 0.1 is a runnable local prototype for Apple Silicon Macs. It is not a full SAS implementation and is not ready for public distribution.
+LocalStat `0.1.0-alpha` is a source-ready developer preview for Apple Silicon Macs. It is not a full SAS implementation. The current downloadable artifact is ad-hoc signed and not notarized, so it is not yet a consumer-ready macOS distribution.
 
 | Area | Current status |
 | --- | --- |
 | Native IDE | Editor tabs, project sidebar, syntax highlighting, line numbers, file operations, Run/Stop, diagnostics, output and export are implemented. |
 | Local runtime | The app bundles an ARM64 build of OpenSAS pinned to `927a2fa9f1401e365d975536bd704819ada1f1f4`. Each run starts a fresh local process. |
 | Statistical modeling | A bounded numeric ordinary-least-squares subset of `PROC REG` is implemented. |
-| Verification | 966 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 6 Swift integration tests and 13 packaged-runtime checks pass. |
-| Distribution | The local app is ad-hoc signed. Notarization and public release packaging are not included. |
+| Verification | 968 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 6 Swift integration tests and 13 packaged-runtime checks pass. |
+| Distribution | Reproducible alpha packaging and prerelease automation are included. The artifact remains ad-hoc signed and unnotarized. |
 | Compatibility | Coverage is documented and intentionally limited. No feature is labeled SAS-verified without output from an installed SAS engine. |
 
 ## Build and run
@@ -32,7 +34,17 @@ Requires an Apple Silicon Mac, macOS 14 or newer, Xcode with its command-line to
 open 'dist/LocalStat.app'
 ```
 
-The app is ad-hoc signed for local use. It is not notarized or prepared for public distribution. Both executables are ARM64; there is no VM, translation service, Python backend, or hosted SAS dependency.
+The app is ad-hoc signed for local use. It is not Developer ID signed or notarized. Both executables are ARM64; there is no VM, translation service, Python backend, or hosted SAS dependency.
+
+## Build an alpha artifact
+
+The release-candidate command requires a clean Git working tree, runs the full verification suite, and writes a versioned ZIP plus SHA-256 checksum under `dist/release`:
+
+```sh
+./scripts/release-alpha.sh
+```
+
+The resulting app uses an ad-hoc signature. Gatekeeper may reject the ZIP on another Mac because it has no Developer ID signature or notarization ticket. Tagging an approved clean commit as `v0.1.0-alpha` triggers the GitHub prerelease workflow; do not create that tag until the public-history and release checklist is complete.
 
 ## Use
 
@@ -47,6 +59,8 @@ On first launch, example programs are copied to `~/Library/Application Support/L
 - Help > Compatibility and Limitations opens the supported-subset document in a native read-only window.
 
 Every run starts a fresh process: WORK datasets and macro definitions do not persist between submissions. Files explicitly written by your program persist. Output is buffered by OpenSAS until the run finishes, so cancellation may lose that buffered output. Output and diagnostics are kept in memory; very large results require corresponding memory.
+
+SAS programs are executable content. The alpha is not sandboxed: programs can access files allowed to LocalStat and `%SYSGET` can read inherited environment variables. Run only programs and project folders you trust, and do not launch the app from a shell containing sensitive environment variables.
 
 ## First modeling feature
 
@@ -76,3 +90,9 @@ This builds the app, runs OpenSAS unit/conformance/end-to-end suites, Swift proc
 - `scripts`: compiler bootstrap, app packaging and verification.
 
 [Runtime changes](docs/RUNTIME_CHANGES.md) distinguish our modifications from upstream. The upstream Apache-2.0 license is retained and bundled with the app. SAS is a trademark of SAS Institute Inc.; this project is independent and unaffiliated.
+
+## Project policy
+
+LocalStat is licensed under [Apache License 2.0](LICENSE). See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a change and [SECURITY.md](SECURITY.md) for private vulnerability-reporting guidance and the runtime trust boundary. Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
+
+The maintainer runbook for the first prerelease is [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md). In particular, the repository must not be made public until the earlier Patrick Jane image has been removed from all Git history and verified absent from a fresh clone.
