@@ -11,6 +11,8 @@ All notable changes to LocalStat are recorded here.
 - Bundled Apple Silicon OpenSAS runtime pinned to an upstream source revision.
 - Fresh local runtime process for each run, cancellation, result export, and
   working-directory support.
+- Searchable, paginated PDF run reports containing execution metadata, the
+  executed source snapshot, output, and diagnostics.
 - Bounded `PROC REG` ordinary-least-squares implementation using pivoted
   Householder QR, with estimates, inference, ANOVA, and model statistics.
 - Automated runtime, compatibility, process-integration, and packaging tests.

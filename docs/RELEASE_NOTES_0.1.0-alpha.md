@@ -8,6 +8,11 @@ execution, text results, and the documented `PROC REG` subset. It is not a
 complete SAS implementation and must not be used for clinical, regulated, or
 production-critical work.
 
+Completed runs can be saved as exact raw text or exported as searchable,
+paginated PDF reports containing the executed source snapshot, run metadata,
+output, and diagnostics. PDF report export is an IDE feature, not an ODS
+destination.
+
 The downloadable app is ARM64-only, ad-hoc signed, and not notarized. It is a
 developer preview rather than a consumer-ready macOS distribution. Build from
 source for the clearest trust path. See `docs/COMPATIBILITY.md` for tested

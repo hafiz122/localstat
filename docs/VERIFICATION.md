@@ -8,7 +8,7 @@ Verified on 29 October 2026 on macOS 26.4.1, Apple Silicon, using Xcode's Swift 
 | --- | --- |
 | Unmodified upstream at 927a2fa9f1401e365d975536bd704819ada1f1f4 | 963 unit tests, 1,924 corpus programs, 11 end-to-end programs passed |
 | Modified runtime | 968 unit tests, 1,924 corpus programs, 11 end-to-end programs passed |
-| Swift integration | 6 tests passed, including actual bundled runtime execution |
+| Swift integration | 8 tests passed, including actual bundled runtime execution and searchable, multipage PDF generation |
 | Packaged-runtime integration | 13 tests passed, including parameterized negative cases |
 | Binary architecture | Both app and helper are Mach-O ARM64 |
 | Bundle signature | Ad-hoc signature passes codesign --verify --deep --strict |
@@ -16,7 +16,7 @@ Verified on 29 October 2026 on macOS 26.4.1, Apple Silicon, using Xcode's Swift 
 
 The modified ODS corpus fixture intentionally expects an error instead of silent destination substitution. Other upstream expectations remain unchanged.
 
-Swift checks exercise unsaved snapshots, filenames/working directories containing spaces, relative includes, clean WORK state between runs, both large output streams, diagnostic coordinate parsing, aligned listings, launch/exit/crash classification, cancellation, and overlapping-run rejection. A ready-file handshake ensures the signal-ignoring cancellation fixture has installed its handler before cancellation; the test verifies SIGKILL after at least 1.9 seconds.
+Swift checks exercise unsaved snapshots, filenames/working directories containing spaces, relative includes, clean WORK state between runs, both large output streams, diagnostic coordinate parsing, aligned listings, report metadata, searchable multipage PDF generation, launch/exit/crash classification, cancellation, and overlapping-run rejection. A ready-file handshake ensures the signal-ignoring cancellation fixture has installed its handler before cancellation; the test verifies SIGKILL after at least 1.9 seconds.
 
 Regression checks cover analytical coefficients, standard errors and t/F probabilities, multiple predictors, scaling/pivot permutation, complete-case filtering, singular/insufficient data, constant responses, perfect fits, nonnumeric/unknown variables, syntax/unsupported options, macros and titles, explicit file persistence, ODS rejection, and CLI input failures.
 
@@ -37,7 +37,8 @@ Verified through the packaged app:
 - Run a long calculation, click Stop, and observe Cancelled with Run enabled again.
 - Close an unsaved tab and observe the save/cancel/discard prompt.
 - Choose a different project directory and verify the sidebar and working-directory label.
-- Export the last run through the native save dialog; compare the saved stdout/stderr exactly with a direct execution of the bundled runtime.
+- Export the last run as text through the native save dialog; compare the saved stdout/stderr exactly with a direct execution of the bundled runtime.
+- Export the last run as a PDF report; verify the generated document is searchable, paginated, and includes run metadata, source, output, and diagnostics.
 - Open Compatibility and Limitations in its native read-only window; close it with Command-W and verify the program remains open and runnable.
 - Close the last program, verify Run is disabled and the empty-state message appears, then create a new program and verify Ready and Run are restored.
 - Resize to the 760 × 540 minimum window size; verify controls, editor, output tabs, and status remain visible and the text panes scroll.

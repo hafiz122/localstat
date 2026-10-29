@@ -1,4 +1,5 @@
 import XCTest
+import PDFKit
 @testable import SASCore
 
 final class RuntimeRunnerTests: XCTestCase {
@@ -25,6 +26,71 @@ final class RuntimeRunnerTests: XCTestCase {
     func testReadableListingKeepsTableColumnsAligned() {
         let raw = "Heading\nName\tValue\nx\t12\nlong\t3\n\nTail\n"
         XCTAssertEqual(ListingFormatter.aligned(raw), "Heading\nName  Value\nx     12\nlong  3\n\nTail\n")
+    }
+    func testRunReportIncludesExecutionContextAndCompleteRunContents() {
+        let request = RunRequest(
+            source: "data work.demo; x=1; run;\n",
+            sourceURL: URL(fileURLWithPath: "/tmp/My Project/analysis.sas"),
+            workingDirectory: URL(fileURLWithPath: "/tmp/My Project")
+        )
+        let result = RunResult(
+            request: request,
+            output: "x\n1\n",
+            diagnosticText: "NOTE: finished\n",
+            status: .success,
+            exitCode: 0
+        )
+        let report = RunReport(
+            result: result,
+            generatedAt: Date(timeIntervalSince1970: 0),
+            appVersion: "0.1.0-alpha",
+            runtimeVersion: "localstat-0.1.0-alpha+test"
+        )
+
+        XCTAssertEqual(report.programName, "analysis.sas")
+        XCTAssertEqual(report.suggestedPDFName, "analysis-report.pdf")
+        XCTAssertTrue(report.text.contains("LocalStat Run Report"))
+        XCTAssertTrue(report.text.contains("Status: Completed"))
+        XCTAssertTrue(report.text.contains("Exit code: 0"))
+        XCTAssertTrue(report.text.contains("Working directory: /tmp/My Project"))
+        XCTAssertTrue(report.text.contains("data work.demo; x=1; run;"))
+        XCTAssertTrue(report.text.contains("NOTE: finished"))
+        XCTAssertTrue(report.text.contains("x\n1"))
+    }
+    @MainActor func testPDFReportIsSearchableAndPaginatesLongRuns() throws {
+        let source = (1...350).map { "/* source line \($0) */" }.joined(separator: "\n")
+        let request = RunRequest(
+            source: source,
+            sourceURL: URL(fileURLWithPath: "/tmp/long-report.sas"),
+            workingDirectory: URL(fileURLWithPath: "/tmp")
+        )
+        let result = RunResult(
+            request: request,
+            output: "REPORT_SENTINEL\n",
+            diagnosticText: "NOTE: PDF_TEST_DIAGNOSTIC\n",
+            status: .success,
+            exitCode: 0
+        )
+        let report = RunReport(
+            result: result,
+            generatedAt: Date(timeIntervalSince1970: 0),
+            appVersion: "0.1.0-alpha",
+            runtimeVersion: "localstat-test"
+        )
+        let directory = try workspace()
+        let destination = directory.appendingPathComponent("report.pdf")
+
+        try PDFReportRenderer.write(report, to: destination)
+
+        let data = try Data(contentsOf: destination)
+        XCTAssertTrue(data.starts(with: Data("%PDF".utf8)))
+        let document = try XCTUnwrap(PDFDocument(url: destination))
+        XCTAssertGreaterThan(document.pageCount, 1)
+        let text = document.string ?? ""
+        XCTAssertTrue(text.contains("LocalStat Run Report"), text)
+        XCTAssertTrue(text.contains("REPORT_SENTINEL"), text)
+        XCTAssertTrue(text.contains("PDF_TEST_DIAGNOSTIC"), text)
+        XCTAssertTrue(text.contains("source line 350"), text)
     }
     @MainActor func testSnapshotsPathsAndLargeConcurrentStreams() async throws {
         let directory = try workspace()

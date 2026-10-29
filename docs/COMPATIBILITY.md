@@ -15,6 +15,7 @@ This is an independent SAS-language implementation based on OpenSAS, not SAS Ins
 | REG options, WEIGHT, FREQ, BY, OUTPUT, selection, plots | Unsupported; explicit error |
 | Other modeling procedures | GLM, LOGISTIC, MIXED, GLIMMIX, PHREG, LIFETEST and others remain unsupported |
 | ODS | Text listing only. Other destinations and controls error; LISTING open/close are inert with a note |
+| IDE report export | Searchable, paginated PDF containing run metadata, executed source, text output and diagnostics; this is an IDE report, not an ODS destination |
 | Datasets | OpenSAS readers/writers for CSV, SAS7BDAT and XPT; limitations remain upstream |
 | Runtime session | WORK and macro state reset each run; explicit filesystem outputs persist |
 | Security boundary | Programs are executable content: filesystem access and `%SYSGET` use the app process's permissions and environment; the alpha is not sandboxed |
@@ -38,4 +39,4 @@ The implementation uses column scaling and Householder QR with column pivoting. 
 
 OpenSAS implements subsets of SAS statements and procedure options. The upstream test corpus is evidence for those fixtures only. Some inherited statements are deliberately inert: for example X does not execute shell commands and PROC PRINTTO does not redirect output. Text PUT output and procedure listings share stdout. This app preserves raw stdout/stderr and the process exit code; diagnostics are not the full SAS log format. ABORT can explicitly return an exit code, including 1 or 2, so the text log remains authoritative when interpreting those statuses.
 
-No persistent interactive session, selection execution, dataset grid, HTML/PDF/RTF results or graphics are included in 0.1.0-alpha. A successful exit is not proof of numerical equivalence to SAS.
+No persistent interactive session, selection execution, dataset grid, HTML/RTF results, ODS PDF destination or graphics are included in 0.1.0-alpha. The IDE can export its text results and executed source as a PDF report after a run. A successful exit is not proof of numerical equivalence to SAS.

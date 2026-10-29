@@ -1,5 +1,6 @@
 import AppKit
 import SASCore
+import UniformTypeIdentifiers
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     NSTableViewDataSource, NSTableViewDelegate, NSTabViewDelegate, NSMenuItemValidation {
@@ -67,7 +68,9 @@ import SASCore
         item(file, "Save", #selector(saveCurrent), "s", target: self)
         item(file, "Save As…", #selector(saveAs), "s", modifiers: [.command, .shift], target: self)
         item(file, "Close Program", #selector(closeCurrent), "w", target: self)
-        item(file, "Export Last Run…", #selector(exportResult), target: self)
+        file.addItem(.separator())
+        item(file, "Export Last Run as Text…", #selector(exportResult), target: self)
+        item(file, "Export Report as PDF…", #selector(exportPDFReport), target: self)
         let edit = section("Edit")
         item(edit, "Undo", Selector(("undo:")), "z")
         item(edit, "Redo", Selector(("redo:")), "z", modifiers: [.command, .shift])
@@ -386,10 +389,36 @@ import SASCore
     }
     @objc func exportResult() {
         guard let result = lastResult else { return }
-        let panel = NSSavePanel(); panel.nameFieldStringValue = "run-results.txt"
+        let panel = NSSavePanel()
+        panel.directoryURL = projectURL
+        panel.allowedContentTypes = [.plainText]
+        panel.nameFieldStringValue = "run-results.txt"
         if panel.runModal() == .OK, let url = panel.url {
-            do { try "\(result.status.description)\n\nDIAGNOSTICS\n\(result.diagnosticText)\nOUTPUT\n\(result.output)".write(to: url, atomically: true, encoding: .utf8) }
+            do {
+                try "\(result.status.description)\n\nDIAGNOSTICS\n\(result.diagnosticText)\nOUTPUT\n\(result.output)".write(to: url, atomically: true, encoding: .utf8)
+                statusLabel.stringValue = "Exported raw run text to \(url.lastPathComponent)"
+            }
             catch { showError(error) }
+        }
+    }
+    @objc func exportPDFReport() {
+        guard let result = lastResult else { return }
+        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+        let runtimeVersion = Bundle.main.resourceURL
+            .flatMap { try? String(contentsOf: $0.appendingPathComponent("runtime-version.txt"), encoding: .utf8) }
+            ?? "Runtime version unavailable"
+        let report = RunReport(result: result, appVersion: appVersion, runtimeVersion: runtimeVersion)
+        let panel = NSSavePanel()
+        panel.directoryURL = projectURL
+        panel.allowedContentTypes = [.pdf]
+        panel.nameFieldStringValue = report.suggestedPDFName
+        panel.title = "Export Run Report"
+        panel.prompt = "Export"
+        if panel.runModal() == .OK, let url = panel.url {
+            do {
+                try PDFReportRenderer.write(report, to: url)
+                statusLabel.stringValue = "Exported PDF report to \(url.lastPathComponent)"
+            } catch { showError(error) }
         }
     }
     func updateControls() {
@@ -419,7 +448,7 @@ import SASCore
         case #selector(stopProgram): return runner.isRunning
         case #selector(saveCurrent), #selector(saveAs): return current != nil
         case #selector(closeCurrent): return current != nil || (compatibilityWindow != nil && NSApp.keyWindow === compatibilityWindow)
-        case #selector(exportResult): return lastResult != nil
+        case #selector(exportResult), #selector(exportPDFReport): return lastResult != nil
         default: return true
         }
     }
