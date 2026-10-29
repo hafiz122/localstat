@@ -1,0 +1,24 @@
+.zig-cache
+zig-out
+style
+.claude/worktrees/
+dist/
+output/
+
+web/opensas.wasm
+
+# macOS Finder metadata
+.DS_Store
+
+# pi-subagents local run metadata
+.pi-subagents/
+
+# local reference material
+/docs/findings/
+/docs/*.pdf
+/docs/*.txt
+
+# bug_filenamemidstep fixture outputs (regenerated every corpus run)
+/tests/corpus/includes/fmid_old.txt
+/tests/corpus/includes/fmid_new.txt
+/tests/corpus/includes/fmid2.txt

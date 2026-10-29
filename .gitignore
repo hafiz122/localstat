@@ -1,0 +1,10 @@
+.build/
+.toolchain/
+dist/
+.DS_Store
+vendor/opensas/.zig-cache/
+vendor/opensas/zig-out/
+.swiftpm/
+test-results/
+*.log
+__pycache__/
