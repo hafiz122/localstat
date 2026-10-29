@@ -18,10 +18,10 @@ LocalStat `0.1.0-alpha` is a source-ready developer preview for Apple Silicon Ma
 
 | Area | Current status |
 | --- | --- |
-| Native IDE | Editor tabs, project sidebar, syntax highlighting, line numbers, file operations, Run/Stop, diagnostics, output, raw-text export and paginated PDF report export are implemented. |
+| Native IDE | Editor tabs, project sidebar, syntax highlighting, line numbers, auto-indentation, bracket pairing, file operations, Run/Stop, diagnostics, output, raw-text export and paginated PDF report export are implemented. |
 | Local runtime | The app bundles an ARM64 build of OpenSAS pinned to `927a2fa9f1401e365d975536bd704819ada1f1f4`. Each run starts a fresh local process. |
 | Statistical modeling | A bounded numeric ordinary-least-squares subset of `PROC REG` is implemented. |
-| Verification | 968 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 8 Swift integration tests and 13 packaged-runtime checks pass. |
+| Verification | 968 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 19 Swift tests and 13 packaged-runtime checks pass. |
 | Distribution | Reproducible alpha packaging and prerelease automation are included. The artifact remains ad-hoc signed and unnotarized. |
 | Compatibility | Coverage is documented and intentionally limited. No feature is labeled SAS-verified without output from an installed SAS engine. |
 
@@ -52,6 +52,8 @@ On first launch, example programs are copied to `~/Library/Application Support/L
 
 - Command-S saves; Shift-Command-S saves as another file.
 - Command-F opens the native find bar; normal Mac editing/undo shortcuts work.
+- Return preserves indentation and adds two spaces after SAS `DATA`, `PROC`, `DO`, and `SELECT` block openings. Tab and Shift-Tab indent or outdent by two spaces.
+- Typing `(`, `[`, or `{` inserts its closing bracket. Selections are wrapped, existing closing brackets are skipped, and Backspace removes an empty pair together.
 - Command-R runs the **entire current editor buffer**, including unsaved changes.
 - Command-period stops the current run, escalating to SIGKILL after two seconds if required.
 - Double-click an original-source diagnostic to navigate. Navigation is disabled if its editor buffer has changed, or if the position belongs to macro-expanded text.

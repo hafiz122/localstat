@@ -8,6 +8,8 @@ All notable changes to LocalStat are recorded here.
 
 - Native AppKit editor with project navigation, tabs, SAS highlighting, line
   numbers, find, undo, diagnostics, output, and whole-program execution.
+- SAS-aware auto-indentation, Tab/Shift-Tab line indentation, bracket pairing,
+  selection wrapping, closing-bracket skipping, and paired deletion.
 - Bundled Apple Silicon OpenSAS runtime pinned to an upstream source revision.
 - Fresh local runtime process for each run, cancellation, result export, and
   working-directory support.

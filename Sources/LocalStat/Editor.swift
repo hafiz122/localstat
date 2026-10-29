@@ -1,4 +1,5 @@
 import AppKit
+import SASCore
 
 final class LineRuler: NSRulerView {
     weak var editor: NSTextView?
@@ -44,9 +45,68 @@ final class LineRuler: NSRulerView {
 
 final class CodeTextView: NSTextView {
     var appearanceChanged: (() -> Void)?
+
+    override func insertText(_ insertString: Any, replacementRange: NSRange) {
+        guard !hasMarkedText(), let text = insertString as? String,
+              (text as NSString).length == 1 else {
+            super.insertText(insertString, replacementRange: replacementRange)
+            return
+        }
+        let range = effectiveRange(replacementRange)
+        if let edit = EditorTextEditing.openingBracket(text, in: string, selection: range) {
+            apply(edit)
+        } else if let edit = EditorTextEditing.closingBracket(text, in: string, selection: range) {
+            apply(edit)
+        } else {
+            super.insertText(insertString, replacementRange: replacementRange)
+        }
+    }
+
+    override func insertNewline(_ sender: Any?) {
+        guard let edit = EditorTextEditing.newline(in: string, selection: selectedRange()) else {
+            super.insertNewline(sender)
+            return
+        }
+        apply(edit)
+    }
+
+    override func insertTab(_ sender: Any?) {
+        guard let edit = EditorTextEditing.indent(in: string, selection: selectedRange()) else {
+            super.insertTab(sender)
+            return
+        }
+        apply(edit)
+    }
+
+    override func insertBacktab(_ sender: Any?) {
+        guard let edit = EditorTextEditing.outdent(in: string, selection: selectedRange()) else {
+            return
+        }
+        apply(edit)
+    }
+
+    override func deleteBackward(_ sender: Any?) {
+        guard let edit = EditorTextEditing.deleteBackward(in: string, selection: selectedRange()) else {
+            super.deleteBackward(sender)
+            return
+        }
+        apply(edit)
+    }
+
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         appearanceChanged?()
+    }
+
+    private func effectiveRange(_ replacementRange: NSRange) -> NSRange {
+        replacementRange.location == NSNotFound ? selectedRange() : replacementRange
+    }
+
+    private func apply(_ edit: EditorTextEdit) {
+        if edit.replacementRange.length != 0 || !edit.replacement.isEmpty {
+            super.insertText(edit.replacement, replacementRange: edit.replacementRange)
+        }
+        setSelectedRange(edit.selectedRange)
     }
 }
 
