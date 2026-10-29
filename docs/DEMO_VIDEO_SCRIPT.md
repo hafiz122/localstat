@@ -48,20 +48,33 @@
   What is the probability that their sum is 7?
 */
 
+/* Create a dataset containing the complete sample space. */
 data dice_rolls;
+  /* Cycle through the six possible values of the first die. */
   do die1 = 1 to 6;
+    /* Pair each first-die value with every value of the second die. */
     do die2 = 1 to 6;
+      /* Add the two dice to get the outcome's total. */
       total = die1 + die2;
+      /* Store 1 for a total of 7 and 0 for every other total. */
       sum_is_7 = (total = 7);
+      /* Write the current dice combination to the dataset. */
       output;
+    /* Finish the loop for the second die. */
     end;
+  /* Finish the loop for the first die. */
   end;
+/* Execute the DATA step after generating all 36 combinations. */
 run;
 
+/* Label the statistical output shown in the results pane. */
 title 'Probability That Two Dice Sum to 7';
 
+/* Calculate the count, number of successes, and probability estimate. */
 proc means data=dice_rolls n sum mean;
+  /* Analyze the binary indicator created for each dice combination. */
   var sum_is_7;
+/* Execute PROC MEANS and print its results. */
 run;
 ```
 
