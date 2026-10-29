@@ -1,5 +1,7 @@
 # LocalStat
 
+<img src="assets/localstat-logo.png" alt="LocalStat logo" width="180">
+
 A native AppKit editor that runs a local ARM64 SAS-language interpreter. The runtime is an extended, pinned copy of [OpenSAS](https://github.com/kirha-ai/opensas), not SAS Institute's engine.
 
 ## Build and run

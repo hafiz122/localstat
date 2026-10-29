@@ -11,6 +11,8 @@ app="$root/dist/LocalStat.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Helpers" "$app/Contents/Resources/Examples"
 cp .build/arm64-apple-macosx/release/LocalStat "$app/Contents/MacOS/LocalStat"
 cp vendor/opensas/zig-out/bin/opensas "$app/Contents/Helpers/opensas"
+cp assets/LocalStat.icns "$app/Contents/Resources/LocalStat.icns"
+cp assets/localstat-logo.png "$app/Contents/Resources/localstat-logo.png"
 cp examples/*.sas "$app/Contents/Resources/Examples/"
 cp docs/COMPATIBILITY.md "$app/Contents/Resources/COMPATIBILITY.md"
 cp vendor/opensas/LICENSE "$app/Contents/Resources/OpenSAS-LICENSE.txt"
@@ -24,6 +26,7 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>io.github.hafiz122.localstat</string>
 <key>CFBundleName</key><string>LocalStat</string>
 <key>CFBundleDisplayName</key><string>LocalStat</string>
+<key>CFBundleIconFile</key><string>LocalStat.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>0.1.0</string>
 <key>CFBundleVersion</key><string>1</string>
