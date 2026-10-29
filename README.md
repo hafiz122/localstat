@@ -1,8 +1,27 @@
 # LocalStat
 
-<img src="assets/localstat-logo.png" alt="LocalStat logo" width="180">
+<p align="center">
+  <img src="assets/localstat-logo.png" alt="LocalStat logo" width="180">
+</p>
 
 A native AppKit editor that runs a local ARM64 SAS-language interpreter. The runtime is an extended, pinned copy of [OpenSAS](https://github.com/kirha-ai/opensas), not SAS Institute's engine.
+
+<p align="center">
+  <img src="assets/localstat-ide.png" alt="LocalStat running a PROC REG example and displaying its results" width="1000">
+</p>
+
+## Project status
+
+LocalStat 0.1 is a runnable local prototype for Apple Silicon Macs. It is not a full SAS implementation and is not ready for public distribution.
+
+| Area | Current status |
+| --- | --- |
+| Native IDE | Editor tabs, project sidebar, syntax highlighting, line numbers, file operations, Run/Stop, diagnostics, output and export are implemented. |
+| Local runtime | The app bundles an ARM64 build of OpenSAS pinned to `927a2fa9f1401e365d975536bd704819ada1f1f4`. Each run starts a fresh local process. |
+| Statistical modeling | A bounded numeric ordinary-least-squares subset of `PROC REG` is implemented. |
+| Verification | 966 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 6 Swift integration tests and 13 packaged-runtime checks pass. |
+| Distribution | The local app is ad-hoc signed. Notarization and public release packaging are not included. |
+| Compatibility | Coverage is documented and intentionally limited. No feature is labeled SAS-verified without output from an installed SAS engine. |
 
 ## Build and run
 
