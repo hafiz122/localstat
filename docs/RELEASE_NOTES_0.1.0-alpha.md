@@ -12,3 +12,7 @@ The downloadable app is ARM64-only, ad-hoc signed, and not notarized. It is a
 developer preview rather than a consumer-ready macOS distribution. Build from
 source for the clearest trust path. See `docs/COMPATIBILITY.md` for tested
 coverage and known gaps.
+
+The Patrick Jane photographic logo is not licensed under Apache-2.0 and blocks
+public redistribution unless separate permission is documented. See
+`ASSET_LICENSES.md`.

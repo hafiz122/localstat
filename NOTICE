@@ -9,8 +9,9 @@ License, Version 2.0. The upstream license is retained at
 vendor/opensas/LICENSE. Local modifications are documented in
 docs/RUNTIME_CHANGES.md.
 
-The LocalStat logo is original project artwork and is distributed under the
-same Apache-2.0 license as this repository.
+The photographic LocalStat logo and its derived ICNS file are excluded from the
+repository's Apache-2.0 license. See ASSET_LICENSES.md. They must not be publicly
+redistributed without separate permission or a suitable license.
 
 SAS is a trademark of SAS Institute Inc. LocalStat is an independent project
 and is not affiliated with, endorsed by, or sponsored by SAS Institute Inc.

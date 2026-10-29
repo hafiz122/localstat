@@ -93,6 +93,6 @@ This builds the app, runs OpenSAS unit/conformance/end-to-end suites, Swift proc
 
 ## Project policy
 
-LocalStat is licensed under [Apache License 2.0](LICENSE). See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a change and [SECURITY.md](SECURITY.md) for private vulnerability-reporting guidance and the runtime trust boundary. Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
+LocalStat's source code is licensed under [Apache License 2.0](LICENSE). The photographic logo and derived app icon are excluded; see [ASSET_LICENSES.md](ASSET_LICENSES.md). See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a change and [SECURITY.md](SECURITY.md) for private vulnerability-reporting guidance and the runtime trust boundary. Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-The maintainer runbook for the first prerelease is [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md). In particular, the repository must not be made public until the earlier Patrick Jane image has been removed from all Git history and verified absent from a fresh clone.
+The maintainer runbook for the first prerelease is [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md). The repository and binary release must remain private while the Patrick Jane logo is used unless documented redistribution permission is obtained.

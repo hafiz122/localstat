@@ -13,10 +13,12 @@
 
 ## Repository publication
 
-- [ ] Remove the Patrick Jane image from all Git history before changing the
-  repository to public. Verify with a fresh clone and an object/history scan.
-- [ ] Confirm the current logo, screenshot, examples, and every bundled asset
-  have redistribution rights.
+- [ ] Obtain and record redistribution permission or a suitable license for the
+  Patrick Jane/Simon Baker logo before changing the repository to public or
+  publishing a binary. If permission cannot be obtained, replace it and remove
+  it from all Git history, then verify with a fresh clone and object scan.
+- [ ] Confirm the screenshot, examples, and every other bundled asset have
+  redistribution rights.
 - [ ] Enable GitHub private vulnerability reporting.
 - [ ] Add branch protection for `main` and require the CI check.
 - [ ] Review repository topics, description, license detection, and public issue
