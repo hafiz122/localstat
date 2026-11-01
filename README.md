@@ -14,14 +14,14 @@ A native AppKit editor that runs a local ARM64 SAS-language interpreter. The run
 
 ## Project status
 
-LocalStat `0.1.0-alpha` is a source-ready developer preview for Apple Silicon Macs. It is not a full SAS implementation. The current downloadable artifact is ad-hoc signed and not notarized, so it is not yet a consumer-ready macOS distribution.
+LocalStat `0.1.0-alpha` is a developer preview for Apple Silicon Macs. It is not a full SAS implementation. The candidate is ad-hoc signed and not notarized. See [installation and known issues](docs/INSTALL.md); draft downloads currently require private repository access.
 
 | Area | Current status |
 | --- | --- |
 | Native IDE | Editor tabs, project sidebar, syntax highlighting, line numbers, auto-indentation, bracket pairing, file operations, Run/Stop, diagnostics, output, raw-text export and paginated PDF report export are implemented. |
 | Local runtime | The app bundles an ARM64 build of OpenSAS pinned to `927a2fa9f1401e365d975536bd704819ada1f1f4`. Each run starts a fresh local process. |
 | Statistical modeling | A bounded numeric ordinary-least-squares subset of `PROC REG` is implemented. |
-| Verification | 968 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 19 Swift tests and 13 packaged-runtime checks pass. |
+| Verification | 968 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 27 Swift tests and 13 packaged-runtime checks. See the dated verification record for results. |
 | Distribution | Reproducible alpha packaging and prerelease automation are included. The artifact remains ad-hoc signed and unnotarized. |
 | Compatibility | Coverage is documented and intentionally limited. No feature is labeled SAS-verified without output from an installed SAS engine. |
 
@@ -44,7 +44,7 @@ The release-candidate command requires a clean Git working tree, runs the full v
 ./scripts/release-alpha.sh
 ```
 
-The resulting app uses an ad-hoc signature. Gatekeeper may reject the ZIP on another Mac because it has no Developer ID signature or notarization ticket. Tagging an approved clean commit as `v0.1.0-alpha` triggers the GitHub prerelease workflow; do not create that tag until the public-history and release checklist is complete.
+The resulting app uses an ad-hoc signature. Gatekeeper may block it on another Mac because it has no Developer ID signature or notarization ticket. The release workflow creates a draft prerelease. It can be dispatched with a full candidate commit SHA before creating a final tag. It refuses to overwrite an existing release. Do not publish the draft or create the final tag until the release checklist is complete. A candidate verification record is generated at `dist/CANDIDATE_VERIFICATION.md`.
 
 ## Use
 
@@ -98,4 +98,4 @@ This builds the app, runs OpenSAS unit/conformance/end-to-end suites, Swift proc
 
 LocalStat's source code is licensed under [Apache License 2.0](LICENSE). The photographic logo and derived app icon are excluded; see [ASSET_LICENSES.md](ASSET_LICENSES.md). See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a change and [SECURITY.md](SECURITY.md) for private vulnerability-reporting guidance and the runtime trust boundary. Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-The maintainer runbook for the first prerelease is [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md). The repository and binary release must remain private while the Patrick Jane logo is used unless documented redistribution permission is obtained.
+The maintainer runbook is [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md). The owner has confirmed permission to retain the Patrick Jane logo. Its grant reference and attribution remain pending; the repository and draft stay private until publication review. See [the publication audit](docs/PUBLICATION_AUDIT.md).

@@ -35,3 +35,11 @@ All notable changes to LocalStat are recorded here.
 - Hardened SAS catalog parsing against forged physical page counts, cyclic or
   repeatedly referenced block chains, disproportionate catalog work, and
   attacker-controlled entry-count allocations.
+
+### Release preparation
+
+- Draft-only prerelease workflow with explicit candidate commit dispatch,
+  source commit metadata, extracted-bundle validation, and verification record.
+- Installation guide, issue forms, publication audit, and third-party notices.
+- Editor assistance avoids changing strings, comments, and DATALINES text;
+  Unicode selection and native paste/Undo checks cover both system appearances.

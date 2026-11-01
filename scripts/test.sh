@@ -8,3 +8,5 @@ swift test
 python3 Tests/test_runtime.py
 codesign --verify --deep --strict 'dist/LocalStat.app'
 file 'dist/LocalStat.app/Contents/MacOS/LocalStat' 'dist/LocalStat.app/Contents/Helpers/opensas'
+test "$(lipo -archs 'dist/LocalStat.app/Contents/MacOS/LocalStat')" = arm64
+test "$(lipo -archs 'dist/LocalStat.app/Contents/Helpers/opensas')" = arm64

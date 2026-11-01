@@ -6,8 +6,9 @@ root="$PWD"
 zig="$root/.toolchain/zig-aarch64-macos-0.16.0/zig"
 revision=$(cut -c1-12 vendor/opensas/UPSTREAM_COMMIT)
 release_version=$(tr -d '[:space:]' < "$root/VERSION")
-bundle_version=${LOCALSTAT_BUNDLE_VERSION:-0.1.0}
+bundle_version=${release_version%%-*}
 build_number=${LOCALSTAT_BUILD_NUMBER:-1}
+source_commit=$(git rev-parse HEAD)
 if [[ ! "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
   printf 'Invalid release version in VERSION: %s\n' "$release_version" >&2
   exit 1
@@ -31,6 +32,8 @@ cp LICENSE "$app/Contents/Resources/LocalStat-LICENSE.txt"
 cp NOTICE "$app/Contents/Resources/NOTICE.txt"
 cp ASSET_LICENSES.md "$app/Contents/Resources/ASSET_LICENSES.md"
 cp vendor/opensas/LICENSE "$app/Contents/Resources/OpenSAS-LICENSE.txt"
+cp THIRD_PARTY_NOTICES.md "$app/Contents/Resources/THIRD_PARTY_NOTICES.md"
+cp -R licenses "$app/Contents/Resources/licenses"
 cp vendor/opensas/UPSTREAM_COMMIT "$app/Contents/Resources/UPSTREAM_COMMIT"
 "$app/Contents/Helpers/opensas" --version > "$app/Contents/Resources/runtime-version.txt"
 cat > "$app/Contents/Info.plist" <<PLIST
@@ -52,6 +55,8 @@ cat > "$app/Contents/Info.plist" <<PLIST
 </dict></array>
 <key>CFBundleShortVersionString</key><string>$bundle_version</string>
 <key>CFBundleVersion</key><string>$build_number</string>
+<key>LocalStatReleaseVersion</key><string>$release_version</string>
+<key>LocalStatSourceCommit</key><string>$source_commit</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
 <key>NSHighResolutionCapable</key><true/>

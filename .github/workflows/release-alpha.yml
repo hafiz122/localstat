@@ -4,28 +4,61 @@ on:
   push:
     tags:
       - "v*-alpha*"
+  workflow_dispatch:
+    inputs:
+      candidate_commit:
+        description: Full 40-character source commit SHA to test and package
+        required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: alpha-candidate
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: macos-14
     timeout-minutes: 60
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
+          ref: ${{ inputs.candidate_commit || github.sha }}
           persist-credentials: false
       - name: Verify release identity
-        run: test "$GITHUB_REF_NAME" = "v$(tr -d '[:space:]' < VERSION)"
+        env:
+          CANDIDATE_COMMIT: ${{ inputs.candidate_commit }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="v$(tr -d '[:space:]' < VERSION)"
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            [[ "$CANDIDATE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+            test "$(git rev-parse HEAD)" = "$CANDIDATE_COMMIT"
+          else
+            test "$GITHUB_REF_NAME" = "$tag"
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --slurp > "$RUNNER_TEMP/releases.json"
+          python3 - "$RUNNER_TEMP/releases.json" "$tag" <<'PY'
+          import json, sys
+          releases = [r for page in json.load(open(sys.argv[1])) for r in page]
+          if any(r['tag_name'] == sys.argv[2] for r in releases):
+              sys.exit('Release already exists; refusing to replace its assets')
+          PY
       - name: Test and package
         run: ./scripts/release-alpha.sh
-      - name: Create GitHub prerelease
+      - name: Create draft prerelease
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "$GITHUB_REF_NAME"
-          dist/release/*.zip dist/release/*.sha256
-          --verify-tag --prerelease
-          --title "LocalStat $GITHUB_REF_NAME"
-          --notes-file docs/RELEASE_NOTES_0.1.0-alpha.md
+        run: |
+          set -euo pipefail
+          version=$(tr -d '[:space:]' < VERSION)
+          archive="dist/release/LocalStat-$version-arm64.zip"
+          cat docs/RELEASE_NOTES_0.1.0-alpha.md dist/CANDIDATE_VERIFICATION.md > "$RUNNER_TEMP/release-notes.md"
+          gh release create "v$version" "$archive" "$archive.sha256" \
+            --target "$(git rev-parse HEAD)" --draft --prerelease \
+            --title "LocalStat v$version" --notes-file "$RUNNER_TEMP/release-notes.md"

@@ -1,0 +1,16 @@
+name: App bug
+description: Report an editor, execution, or export problem
+body:
+  - type: textarea
+    id: versions
+    attributes:
+      label: LocalStat version/build, macOS version, and Mac chip
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps and smallest non-sensitive example
+      description: Include expected behavior, actual behavior, and relevant diagnostics. Use synthetic data.
+    validations:
+      required: true

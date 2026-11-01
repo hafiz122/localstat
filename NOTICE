@@ -10,8 +10,12 @@ vendor/opensas/LICENSE. Local modifications are documented in
 docs/RUNTIME_CHANGES.md.
 
 The photographic LocalStat logo and its derived ICNS file are excluded from the
-repository's Apache-2.0 license. See ASSET_LICENSES.md. They must not be publicly
-redistributed without separate permission or a suitable license.
+repository's Apache-2.0 license. The owner has confirmed permission; the grant
+reference and attribution remain pending. See ASSET_LICENSES.md.
+
+Portions of the vendored readers derive from ReadStat (MIT, Evan Miller).
+See THIRD_PARTY_NOTICES.md and licenses/ReadStat-MIT.txt. Source test fixtures
+include haven (MIT) and pandas (BSD) data with notices in licenses/.
 
 SAS is a trademark of SAS Institute Inc. LocalStat is an independent project
 and is not affiliated with, endorsed by, or sponsored by SAS Institute Inc.

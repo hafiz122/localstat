@@ -17,7 +17,8 @@ public enum EditorTextEditing {
     private static let bracketPairs = ["(": ")", "[": "]", "{": "}"]
 
     public static func openingBracket(_ bracket: String, in source: String, selection: NSRange) -> EditorTextEdit? {
-        guard let closing = bracketPairs[bracket], isValid(selection, in: source) else { return nil }
+        guard let closing = bracketPairs[bracket], isValid(selection, in: source),
+              isCode(in: source, at: selection.location) else { return nil }
         let selected = (source as NSString).substring(with: selection)
         return EditorTextEdit(
             replacementRange: selection,
@@ -29,7 +30,7 @@ public enum EditorTextEditing {
     public static func closingBracket(_ bracket: String, in source: String, selection: NSRange) -> EditorTextEdit? {
         let text = source as NSString
         guard bracketPairs.values.contains(bracket), selection.length == 0,
-              isValid(selection, in: source), selection.location < text.length,
+              isValid(selection, in: source), isCode(in: source, at: selection.location), selection.location < text.length,
               text.substring(with: NSRange(location: selection.location, length: 1)) == bracket else { return nil }
         return EditorTextEdit(
             replacementRange: selection,
@@ -40,7 +41,7 @@ public enum EditorTextEditing {
 
     public static func deleteBackward(in source: String, selection: NSRange) -> EditorTextEdit? {
         let text = source as NSString
-        guard selection.length == 0, isValid(selection, in: source), selection.location > 0,
+        guard selection.length == 0, isValid(selection, in: source), isCode(in: source, at: selection.location), selection.location > 0,
               selection.location < text.length else { return nil }
         let opening = text.substring(with: NSRange(location: selection.location - 1, length: 1))
         let closing = text.substring(with: NSRange(location: selection.location, length: 1))
@@ -61,10 +62,11 @@ public enum EditorTextEditing {
         let linePrefix = text.substring(with: NSRange(location: lineStart, length: selection.location - lineStart))
         let leading = leadingWhitespace(in: linePrefix)
         let statement = linePrefix.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let code = isCode(in: source, at: selection.location)
         var nextIndent = leading
-        if opensIndentedBlock(statement) {
+        if code && opensIndentedBlock(statement) {
             nextIndent += indentUnit
-        } else if closesIndentedBlock(statement) {
+        } else if code && closesIndentedBlock(statement) {
             nextIndent = removingOneIndent(from: leading)
         }
 
@@ -74,7 +76,7 @@ public enum EditorTextEditing {
         let preceding = selection.location > 0
             ? text.substring(with: NSRange(location: selection.location - 1, length: 1))
             : ""
-        let closesPair = bracketPairs[preceding] == following
+        let closesPair = code && selection.length == 0 && bracketPairs[preceding] == following
         let replacement = closesPair
             ? "\n" + leading + indentUnit + "\n" + leading
             : "\n" + nextIndent
@@ -165,5 +167,55 @@ public enum EditorTextEditing {
     private static func isValid(_ range: NSRange, in source: String) -> Bool {
         range.location != NSNotFound && range.location >= 0 && range.length >= 0 &&
             NSMaxRange(range) <= (source as NSString).length
+    }
+
+    private static func isCode(in source: String, at offset: Int) -> Bool {
+        let units = Array(source.utf16.prefix(offset))
+        var quote: UInt16?
+        var blockComment = false
+        var statementComment = false
+        var statement = ""
+        var rawTerminator: String?
+        var rawLine = ""
+        var index = 0
+        while index < units.count {
+            let c = units[index]
+            let next = index + 1 < units.count ? units[index + 1] : 0
+            if let terminator = rawTerminator {
+                if c == 10 {
+                    if rawLine.trimmingCharacters(in: .whitespacesAndNewlines) == terminator {
+                        rawTerminator = nil
+                    }
+                    rawLine = ""
+                } else { rawLine += String(decoding: [c], as: UTF16.self) }
+            } else if blockComment {
+                if c == 42 && next == 47 { blockComment = false; index += 1 }
+            } else if statementComment {
+                if c == 59 { statementComment = false; statement = "" }
+            } else if let delimiter = quote {
+                if c == delimiter {
+                    if next == delimiter { index += 1 } else { quote = nil }
+                }
+            } else if c == 47 && next == 42 {
+                blockComment = true; index += 1
+            } else if (c == 42 && statement.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) ||
+                        (c == 37 && next == 42) {
+                statementComment = true
+            } else if c == 39 || c == 34 {
+                quote = c
+                statement += "?"
+            } else if c == 59 {
+                let keyword = statement.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if ["datalines", "cards", "lines", "datalines4", "cards4", "lines4"].contains(keyword) {
+                    rawTerminator = keyword.hasSuffix("4") ? ";;;;" : ";"
+                    rawLine = ""
+                }
+                statement = ""
+            } else {
+                statement += String(decoding: [c], as: UTF16.self)
+            }
+            index += 1
+        }
+        return quote == nil && !blockComment && !statementComment && rawTerminator == nil
     }
 }

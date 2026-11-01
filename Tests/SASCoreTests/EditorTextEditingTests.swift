@@ -3,6 +3,35 @@ import XCTest
 @testable import SASCore
 
 final class EditorTextEditingTests: XCTestCase {
+    func testAssistanceDoesNotChangeLiteralTextOrComments() {
+        for source in ["title 'a", "title \"a", "/* comment", "* comment", "%* comment", "data d;\ndatalines;\ntext"] {
+            let caret = NSRange(location: (source as NSString).length, length: 0)
+            XCTAssertNil(EditorTextEditing.openingBracket("(", in: source, selection: caret), source)
+        }
+    }
+
+    func testCloserInsideStringIsInsertedNormally() {
+        XCTAssertNil(EditorTextEditing.closingBracket(")", in: "title '()';", selection: NSRange(location: 8, length: 0)))
+    }
+
+    func testUnicodeSelectionWrapsUsingUTF16Coordinates() throws {
+        let source = "x = 😀 + café;"
+        let selection = (source as NSString).range(of: "😀 + café")
+        let edit = try XCTUnwrap(EditorTextEditing.openingBracket("(", in: source, selection: selection))
+        XCTAssertEqual(applying(edit, to: source), "x = (😀 + café);")
+        XCTAssertEqual(edit.selectedRange.length, selection.length)
+    }
+
+    func testReturnDoesNotTreatCommentContentAsSASBlock() throws {
+        let source = "/*\n  do;"
+        let edit = try XCTUnwrap(EditorTextEditing.newline(in: source, selection: NSRange(location: (source as NSString).length, length: 0)))
+        XCTAssertEqual(applying(edit, to: source), source + "\n  ")
+    }
+
+    func testAssistanceResumesAfterDatalinesTerminator() throws {
+        let source = "data d;\ndatalines;\nabc\n;\nrun;\nx = "
+        XCTAssertNotNil(EditorTextEditing.openingBracket("(", in: source, selection: NSRange(location: (source as NSString).length, length: 0)))
+    }
     private func applying(_ edit: EditorTextEdit, to source: String) -> String {
         (source as NSString).replacingCharacters(in: edit.replacementRange, with: edit.replacement)
     }

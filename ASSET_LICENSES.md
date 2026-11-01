@@ -7,11 +7,23 @@ third-party photographic artwork:
 - `assets/localstat-logo.png`
 - `assets/LocalStat.icns`, which is derived from that image
 
-These files depict actor Simon Baker as the character Patrick Jane. They are
-retained for private development at the project owner's request. No copyright,
-publicity, trademark, or redistribution rights are granted for them by this
-repository.
+These files depict actor Simon Baker as the character Patrick Jane. On
+1 November 2026 the project owner confirmed that they have permission and
+requested that this artwork remain in the public-alpha candidate.
 
-Do not include these files in a public release unless the project has documented
-permission or a suitable redistribution license. Otherwise replace them with
-licensed artwork before publication.
+The permission document/reference, rights holder, covered uses (public Git
+history, PNG, derived icon, and downloadable binaries), and required attribution
+have not yet been supplied. This records the owner's confirmation; it does not
+invent or grant a license to downstream users. Document those details before
+public publication. The repository and candidate release remain private.
+
+## Other assets
+
+`assets/localstat-ide.png` is a screenshot produced from LocalStat during project
+development. It shows the synthetic regression example and system interface;
+the visible text was reviewed for personal information. The photographic icon,
+where displayed, remains subject to the permission above.
+
+Project-authored examples use synthetic observations or enumerate mathematical
+outcomes. External binary test fixtures and inherited code notices are listed
+in `THIRD_PARTY_NOTICES.md`.

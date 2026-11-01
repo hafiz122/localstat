@@ -1,0 +1,23 @@
+name: SAS compatibility gap
+description: Report unsupported or differing SAS-language behavior
+body:
+  - type: textarea
+    id: versions
+    attributes:
+      label: LocalStat/runtime versions, macOS version, and Mac chip
+    validations:
+      required: true
+  - type: textarea
+    id: program
+    attributes:
+      label: Minimal program with synthetic data
+      render: sas
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Actual output/diagnostics and expected behavior
+      description: If you have SAS reference output, include its version and how it was produced. Remove private data and paths.
+    validations:
+      required: true

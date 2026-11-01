@@ -8,6 +8,7 @@ let package = Package(
     targets: [
         .target(name: "SASCore"),
         .executableTarget(name: "LocalStat", dependencies: ["SASCore"]),
-        .testTarget(name: "SASCoreTests", dependencies: ["SASCore"])
+        .testTarget(name: "SASCoreTests", dependencies: ["SASCore"]),
+        .testTarget(name: "LocalStatEditorTests", dependencies: ["LocalStat"])
     ]
 )

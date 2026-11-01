@@ -8,7 +8,9 @@ if [[ "$version" != *-alpha* ]]; then
   exit 1
 fi
 
-./scripts/build.sh
+if [[ "${LOCALSTAT_USE_TESTED_APP:-0}" != 1 ]]; then
+    ./scripts/build.sh
+fi
 
 release_dir="$root/dist/release"
 archive="$release_dir/LocalStat-$version-arm64.zip"
@@ -24,10 +26,19 @@ trap 'rm -rf "$scratch"' EXIT
 ditto -x -k "$archive" "$scratch"
 candidate="$scratch/LocalStat.app"
 codesign --verify --deep --strict "$candidate"
-test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$candidate/Contents/Info.plist")" = "0.1.0"
+test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$candidate/Contents/Info.plist")" = "${version%%-*}"
+test "$(/usr/libexec/PlistBuddy -c 'Print :LocalStatReleaseVersion' "$candidate/Contents/Info.plist")" = "$version"
+test "$(/usr/libexec/PlistBuddy -c 'Print :LocalStatSourceCommit' "$candidate/Contents/Info.plist")" = "$(git rev-parse HEAD)"
 [[ "$(file "$candidate/Contents/MacOS/LocalStat")" == *arm64* ]]
 [[ "$(file "$candidate/Contents/Helpers/opensas")" == *arm64* ]]
 [[ "$("$candidate/Contents/Helpers/opensas" --version)" == localstat-"$version"+* ]]
+for resource in LocalStat-LICENSE.txt OpenSAS-LICENSE.txt NOTICE.txt ASSET_LICENSES.md THIRD_PARTY_NOTICES.md COMPATIBILITY.md runtime-version.txt UPSTREAM_COMMIT LocalStat.icns localstat-logo.png; do
+    test -s "$candidate/Contents/Resources/$resource"
+done
+for notice in ReadStat-MIT.txt haven-MIT.txt pandas-LICENSE.txt; do
+    cmp "licenses/$notice" "$candidate/Contents/Resources/licenses/$notice"
+done
+test "$(find "$release_dir" -maxdepth 1 -type f | wc -l | tr -d ' ')" = 2
 
 printf 'Packaged %s\n' "$archive"
 printf 'Checksum %s\n' "$checksum"

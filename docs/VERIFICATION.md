@@ -1,6 +1,6 @@
 # Verification record
 
-Verified on 29 October 2026 on macOS 26.4.1, Apple Silicon, using Xcode's Swift 6.3.3 and pinned Zig 0.16.0. The app declares macOS 14 as its deployment target; it has not been exercised on a macOS 14 installation.
+Baseline verified on 29 October 2026 on macOS 26.4.1, Apple Silicon, with Swift 6.3.3 and Zig 0.16.0. Public-alpha preparation checks were extended on 1 November 2026. Exact candidate commit, toolchains, archive hash, and fresh-run results are recorded by scripts/release-alpha.sh in dist/CANDIDATE_VERIFICATION.md and the GitHub draft release body. macOS 14 is the deployment target and CI runner; no second physical Mac has been tested.
 
 ## Automated results
 
@@ -8,7 +8,7 @@ Verified on 29 October 2026 on macOS 26.4.1, Apple Silicon, using Xcode's Swift 
 | --- | --- |
 | Unmodified upstream at 927a2fa9f1401e365d975536bd704819ada1f1f4 | 963 unit tests, 1,924 corpus programs, 11 end-to-end programs passed |
 | Modified runtime | 968 unit tests, 1,924 corpus programs, 11 end-to-end programs passed |
-| Swift | 19 tests passed, including editor transformations, actual bundled runtime execution, and searchable multipage PDF generation |
+| Swift candidate suite | 27 tests, including editor transformations, native AppKit workflows in both appearances, bundled runtime execution, and searchable multipage PDF generation; see candidate record for the final run |
 | Packaged-runtime integration | 13 tests passed, including parameterized negative cases |
 | Binary architecture | Both app and helper are Mach-O ARM64 |
 | Bundle signature | Ad-hoc signature passes codesign --verify --deep --strict |
@@ -46,8 +46,10 @@ Verified through the packaged app:
 
 The first visual pass found collapsed split panes; that was corrected and visually rechecked. Text regression tables are padded for readability while raw exported output remains unchanged.
 
-The resumed UI pass verified the output-tab padding and corrected a stale empty-state status. Help now displays bundled documentation inside LocalStat rather than depending on an external Markdown viewer. The final rebuild passed all six Swift integration tests again. The inspected appearance was dark/system; light appearance has not been visually exercised.
+The 1 November preparation pass visually inspected the packaged editor and results in both light and dark system appearance, and restored the original dark setting afterward. Native AppKit integration tests exercise open/edit/save, unsaved source, relative includes, diagnostics, a 5,000-line run, cancellation, and PDF generation in both appearances. Separate native editor tests verify paste preservation and bracket Undo in both appearances. Packaged File-menu PDF and text exports were exercised and produced files; PDF structure and pagination also have automated coverage.
+
+Strings, comments, DATALINES text, and Unicode selections have focused editor regression tests. New tests first reproduced unintended bracket pairing in literal text, then passed after correction. The indentation logic remains heuristic and is not a full SAS parser.
 
 ## UI review against the approved direction
 
-The approved native AppKit direction is implemented: standard controls, system appearance, editor focus, file navigation and local run status. No fabricated metrics, decorative media, animation or marketing elements are present. All functional interactions listed above passed, including the resumed Help/Export checks and minimum-size layout. Light-appearance review remains outstanding; the record does not claim that appearance was checked.
+The approved native AppKit direction is retained: standard controls, system appearance, editor focus, file navigation, and local run status. Both system appearances were inspected during preparation. Second-Mac installation and user approval of the public draft remain outstanding; CI and local tests do not replace that manual check.

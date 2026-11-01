@@ -23,6 +23,11 @@ developer preview rather than a consumer-ready macOS distribution. Build from
 source for the clearest trust path. See `docs/COMPATIBILITY.md` for tested
 coverage and known gaps.
 
-The Patrick Jane photographic logo is not licensed under Apache-2.0 and blocks
-public redistribution unless separate permission is documented. See
-`ASSET_LICENSES.md`.
+The owner has confirmed permission for the Patrick Jane photographic logo;
+it remains excluded from Apache-2.0. Grant reference and attribution are still
+pending in ASSET_LICENSES.md. This candidate is a private draft pending review.
+
+Editor assistance now respects strings, comments, and DATALINES content.
+See docs/INSTALL.md for installation, checksum verification, and known issues.
+The bundle records the release version and source commit. Third-party notices
+include the ReadStat-derived readers and external source test fixtures.

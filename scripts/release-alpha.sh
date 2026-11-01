@@ -12,4 +12,5 @@ if [[ "$version" != *-alpha* ]]; then
   exit 1
 fi
 ./scripts/test.sh
-./scripts/package-alpha.sh
+LOCALSTAT_USE_TESTED_APP=1 ./scripts/package-alpha.sh
+./scripts/record-candidate.sh
