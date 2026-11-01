@@ -14,7 +14,7 @@ A native AppKit editor that runs a local ARM64 SAS-language interpreter. The run
 
 ## Project status
 
-LocalStat `0.1.0-alpha` is a developer preview for Apple Silicon Macs. It is not a full SAS implementation. The candidate is ad-hoc signed and not notarized. See [installation and known issues](docs/INSTALL.md); draft downloads currently require private repository access.
+LocalStat `0.1.0-alpha` is a public developer preview for Apple Silicon Macs. It is not a full SAS implementation. The app is ad-hoc signed and not notarized. [Download v0.1.0-alpha](https://github.com/hafiz122/localstat/releases/tag/v0.1.0-alpha) and see [installation and known issues](docs/INSTALL.md).
 
 | Area | Current status |
 | --- | --- |
@@ -98,4 +98,4 @@ This builds the app, runs OpenSAS unit/conformance/end-to-end suites, Swift proc
 
 LocalStat's source code is licensed under [Apache License 2.0](LICENSE). The photographic logo and derived app icon are excluded; see [ASSET_LICENSES.md](ASSET_LICENSES.md). See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a change and [SECURITY.md](SECURITY.md) for private vulnerability-reporting guidance and the runtime trust boundary. Changes are tracked in [CHANGELOG.md](CHANGELOG.md).
 
-The maintainer runbook is [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md). The owner has confirmed permission to retain the Patrick Jane logo. Its grant reference and attribution remain pending; the repository and draft stay private until publication review. See [the publication audit](docs/PUBLICATION_AUDIT.md).
+The maintainer runbook is [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md). The owner confirmed permission to retain the Patrick Jane logo and authorized public publication on 1 November 2026. The grant reference and attribution remain pending. See [the publication audit](docs/PUBLICATION_AUDIT.md).

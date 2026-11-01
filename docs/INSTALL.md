@@ -4,8 +4,8 @@ Requires an Apple Silicon Mac and macOS 14 or later. The alpha app contains its
 runtime; Zig, Xcode, Python, and SAS are not needed to run the downloaded app.
 
 Download `LocalStat-0.1.0-alpha-arm64.zip` and its `.zip.sha256` file from the
-same GitHub release. While the candidate is a private draft, repository access
-is required. From the directory containing both files, verify:
+same [public GitHub release](https://github.com/hafiz122/localstat/releases/tag/v0.1.0-alpha).
+From the directory containing both files, verify:
 
 ```sh
 shasum -a 256 -c LocalStat-0.1.0-alpha-arm64.zip.sha256

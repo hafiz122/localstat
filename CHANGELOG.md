@@ -2,7 +2,7 @@
 
 All notable changes to LocalStat are recorded here.
 
-## [0.1.0-alpha] - Unreleased
+## [0.1.0-alpha] - 2026-11-01
 
 ### Added
 

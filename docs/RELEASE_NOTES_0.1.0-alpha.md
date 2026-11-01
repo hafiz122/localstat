@@ -25,7 +25,8 @@ coverage and known gaps.
 
 The owner has confirmed permission for the Patrick Jane photographic logo;
 it remains excluded from Apache-2.0. Grant reference and attribution are still
-pending in ASSET_LICENSES.md. This candidate is a private draft pending review.
+pending in ASSET_LICENSES.md. The owner authorized public publication on
+1 November 2026. A second physical Mac installation test remains outstanding.
 
 Editor assistance now respects strings, comments, and DATALINES content.
 See docs/INSTALL.md for installation, checksum verification, and known issues.

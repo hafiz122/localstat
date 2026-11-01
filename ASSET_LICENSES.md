@@ -14,8 +14,9 @@ requested that this artwork remain in the public-alpha candidate.
 The permission document/reference, rights holder, covered uses (public Git
 history, PNG, derived icon, and downloadable binaries), and required attribution
 have not yet been supplied. This records the owner's confirmation; it does not
-invent or grant a license to downstream users. Document those details before
-public publication. The repository and candidate release remain private.
+invent or grant a license to downstream users. Those details remain outstanding.
+On 1 November 2026 the owner explicitly authorized making the repository public
+and publishing v0.1.0-alpha with this artwork retained.
 
 ## Other assets
 

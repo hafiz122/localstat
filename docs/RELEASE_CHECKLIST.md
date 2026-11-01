@@ -1,5 +1,12 @@
 # 0.1.0-alpha release checklist
 
+Publication status (1 November 2026): the owner authorized public publication
+of the verified candidate at 107d2bf2880e4987935a518d4d0b84b2deb9bc98.
+The annotated tag and public prerelease are published. Private vulnerability
+reporting is enabled; required CI branch protection is applied during publication.
+The unchecked items below retain the preparation record and remaining follow-up.
+Artwork grant details and a second physical Mac test remain outstanding.
+
 ## Candidate source
 
 - [ ] Working tree is clean and the release commit is reviewed.
@@ -17,7 +24,7 @@
 - [ ] Record the grant reference, covered uses and attribution before public publication.
 - [ ] Confirm the screenshot, examples, and every other bundled asset have
   redistribution rights.
-- [ ] Enable GitHub private vulnerability reporting.
+- [x] Enable GitHub private vulnerability reporting.
 - [ ] Add branch protection for `main` and require the CI check.
 - [ ] Review repository topics, description, license detection, and public issue
   settings.
@@ -36,10 +43,10 @@
 ## Later publication (not performed during candidate preparation)
 
 - [ ] Resolve the pending asset-permission details and second-Mac results.
-- [ ] Approve repository visibility and final release publication.
+- [x] Approve repository visibility and final release publication.
 - [ ] Enable private vulnerability reporting and apply .github/main-protection.json
   when the repository plan permits it; see PUBLICATION_AUDIT.md.
-- [ ] Create the final annotated `v0.1.0-alpha` tag on the verified candidate
+- [x] Create the final annotated `v0.1.0-alpha` tag on the verified candidate
   commit, then publish the already-reviewed draft as a prerelease. The tag
   workflow will refuse to replace an existing draft/release and its assets.
 

@@ -47,4 +47,18 @@ gh api --method PUT repos/hafiz122/localstat/private-vulnerability-reporting
 
 It requires the `test` CI check and an up-to-date branch, applies to admins, and
 prevents force pushes and deletion. Issue forms are included in this candidate.
-No visibility change, final tag, or published release is part of preparation.
+No visibility change, final tag, or published release was part of preparation.
+
+## Publication addendum: 1 November 2026
+
+The owner subsequently authorized public visibility and publication of
+v0.1.0-alpha. The repository is public, and the existing verified assets were
+published as a prerelease at https://github.com/hafiz122/localstat/releases/tag/v0.1.0-alpha.
+The annotated tag resolves to 107d2bf2880e4987935a518d4d0b84b2deb9bc98.
+Private vulnerability reporting has been enabled. The prepared branch-protection
+configuration is applied during publication, with its result verified through GitHub.
+
+The release workflow was temporarily disabled while pushing the already-tested
+tag to avoid a duplicate draft build, then re-enabled. No assets were replaced.
+Artwork grant details and the second physical Mac smoke test remain outstanding;
+publication authorization does not assert those checks were completed.
