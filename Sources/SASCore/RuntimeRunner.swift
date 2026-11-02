@@ -58,7 +58,19 @@ public struct RunResult {
     public let diagnosticText: String
     public let status: RunStatus
     public let exitCode: Int32?
+    public let tables: [ResultTable]
+    public let tableIssue: String?
     public var diagnostics: [Diagnostic] { Diagnostic.parse(diagnosticText) }
+
+    public init(request: RunRequest, output: String, diagnosticText: String, status: RunStatus, exitCode: Int32?, tables: [ResultTable] = [], tableIssue: String? = nil) {
+        self.request = request
+        self.output = output
+        self.diagnosticText = diagnosticText
+        self.status = status
+        self.exitCode = exitCode
+        self.tables = tables
+        self.tableIssue = tableIssue
+    }
 }
 
 @MainActor public protocol RuntimeRunner: AnyObject {
@@ -91,10 +103,11 @@ public struct RunResult {
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let snapshot = directory.appendingPathComponent("program.sas")
+            let tableFile = directory.appendingPathComponent("tables.json")
             try request.source.write(to: snapshot, atomically: true, encoding: .utf8)
             let child = Process()
             child.executableURL = executable
-            child.arguments = [snapshot.path]
+            child.arguments = [snapshot.path, "--tables-json", tableFile.path]
             child.currentDirectoryURL = request.workingDirectory
             let stdout = Pipe(), stderr = Pipe()
             child.standardOutput = stdout
@@ -121,8 +134,18 @@ public struct RunResult {
                 default: status = .exited(termination.0)
                 }
             }
+            let tables: [ResultTable]
+            let tableIssue: String?
+            do {
+                let data = try Data(contentsOf: tableFile)
+                tables = try JSONDecoder().decode(TableFile.self, from: data).validated()
+                tableIssue = nil
+            } catch {
+                tables = []
+                tableIssue = "Formatted tables are unavailable: \(error.localizedDescription)"
+            }
             return RunResult(request: request, output: output, diagnosticText: errors,
-                             status: status, exitCode: termination.0)
+                             status: status, exitCode: termination.0, tables: tables, tableIssue: tableIssue)
         } catch {
             return RunResult(request: request, output: "", diagnosticText: error.localizedDescription,
                              status: .launchFailure(error.localizedDescription), exitCode: nil)

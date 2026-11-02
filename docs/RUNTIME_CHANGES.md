@@ -11,6 +11,9 @@ Local changes:
 - `src/reg.zig`: bounded PROC REG parser, scaled pivoted Householder QR solver, text statistical output and analytical unit tests.
 - `src/root.zig`, `src/main.zig`: module/dispatch registration and report-title integration.
 - `src/main.zig`: nonzero CLI exit on missing/unreadable input; unsupported ODS destinations produce explicit diagnostic errors.
+- `src/table_result.zig`, `src/main.zig`, `src/proc.zig`: optional versioned
+  `--tables-json <path>` sidecar for displayed PRINT, FREQ, and TABULATE tables.
+  It does not alter stdout, stderr, or procedure calculations.
 - `src/sas7bcat.zig`: catalog parsing validates physical page counts, rejects cyclic block chains, bounds reconstructed data, and validates entry counts before allocation.
 - ODS destination unit/corpus expectations deliberately differ from upstream. This implements the user's requested error behavior and overrides upstream decision D-022's destination no-op policy. ODS LISTING controls remain inert and now emit a note.
 

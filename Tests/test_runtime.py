@@ -1,5 +1,6 @@
 """End-to-end checks against the exact bundled binary, using synthetic/public data."""
 import math
+import json
 import pathlib
 import subprocess
 import tempfile
@@ -23,6 +24,70 @@ def table(output, name):
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_formatted_table_sidecar_preserves_stdout_and_order(self):
+        source = ("data d; input group $ response $ value; datalines;\n"
+                  "A yes 10\nA no 20\nB yes 30\n;\nrun;\n"
+                  "proc print data=d noobs label; label value='Value \"USD\"'; sum value; run;\n"
+                  "proc freq data=d; tables group response group*response; run;\n"
+                  "proc tabulate data=d; class group response; var value; "
+                  "table group all, response*value*sum all*value*sum; run;\n")
+        with tempfile.TemporaryDirectory() as folder:
+            path = pathlib.Path(folder)
+            program = path / "program.sas"
+            sidecar = path / "tables.json"
+            program.write_text(source)
+            baseline = subprocess.run([str(RUNTIME), str(program)], cwd=folder,
+                                      capture_output=True, text=True, timeout=15)
+            formatted = subprocess.run([str(RUNTIME), str(program), "--tables-json", str(sidecar)],
+                                       cwd=folder, capture_output=True, text=True, timeout=15)
+            self.assertEqual((formatted.returncode, formatted.stdout, formatted.stderr),
+                             (baseline.returncode, baseline.stdout, baseline.stderr))
+            document = json.loads(sidecar.read_text())
+            self.assertEqual(document["version"], 1)
+            tables = document["tables"]
+            self.assertEqual([t["procedure"] for t in tables],
+                             ["PRINT", "FREQ", "FREQ", "FREQ", "TABULATE"])
+            for item in tables:
+                columns = sum(cell["span"] for cell in item["headers"][-1]["cells"])
+                self.assertGreater(columns, 0)
+                for row in item["headers"] + item["rows"]:
+                    self.assertEqual(sum(cell["span"] for cell in row["cells"]), columns)
+            self.assertIn('Value "USD"', str(tables[0]["headers"]))
+            self.assertTrue(any(r["kind"] == "total" for r in tables[0]["rows"]))
+            self.assertTrue(any("Frequency:" in cell["text"] for row in tables[3]["rows"]
+                                for cell in row["cells"]))
+            self.assertGreater(len(tables[-1]["headers"]), 2)
+
+    def test_table_sidecar_suppression_empty_and_partial_error(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = pathlib.Path(folder)
+            program = path / "program.sas"
+            sidecar = path / "tables.json"
+            program.write_text("data d; x=1; run; proc freq data=d noprint; tables x; run; "
+                               "proc print data=d; run; proc print data=missing; run;")
+            result = subprocess.run([str(RUNTIME), str(program), "--tables-json", str(sidecar)],
+                                    cwd=folder, capture_output=True, text=True, timeout=15)
+            self.assertNotEqual(result.returncode, 0)
+            tables = json.loads(sidecar.read_text())["tables"]
+            self.assertEqual([t["procedure"] for t in tables], ["PRINT"])
+            self.assertIn("1", str(tables[0]["rows"]))
+
+    def test_freq_nlevels_and_tabulate_by_sections(self):
+        source = ("data d; input g $ x; datalines;\nA 1\nA 2\nB 3\n;\nrun;\n"
+                  "proc freq data=d nlevels; tables g; run;\n"
+                  "proc tabulate data=d; class g; var x; by g; table g, x*sum; run;\n")
+        with tempfile.TemporaryDirectory() as folder:
+            path = pathlib.Path(folder)
+            program = path / "program.sas"
+            sidecar = path / "tables.json"
+            program.write_text(source)
+            result = subprocess.run([str(RUNTIME), str(program), "--tables-json", str(sidecar)],
+                                    cwd=folder, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            tables = json.loads(sidecar.read_text())["tables"]
+            self.assertEqual([t["procedure"] for t in tables], ["FREQ", "FREQ", "TABULATE", "TABULATE"])
+            self.assertEqual([t["section"] for t in tables[-2:]], ["g=A", "g=B"])
+
     def test_analytic_regression(self):
         result = run(DATA + "proc reg data=d; model y=x; run; quit;")
         self.assertEqual(result.returncode, 0, result.stderr)

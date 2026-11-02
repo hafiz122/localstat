@@ -11,6 +11,7 @@ import UniformTypeIdentifiers
     let tabs = NSTabView()
     let results = NSTabView()
     let outputView = NSTextView()
+    let tableScroll = NSScrollView()
     let statusLabel = NSTextField(labelWithString: "Open a program or create a new one.")
     let projectLabel = NSTextField(labelWithString: "Project")
     let projectHint = NSTextField(wrappingLabelWithString: "Double-click a program to open it. Paths are relative to this project folder.")
@@ -71,6 +72,7 @@ import UniformTypeIdentifiers
         file.addItem(.separator())
         item(file, "Export Last Run as Text…", #selector(exportResult), target: self)
         item(file, "Export Report as PDF…", #selector(exportPDFReport), target: self)
+        item(file, "Print Tables…", #selector(printTables), "p", target: self)
         let edit = section("Edit")
         item(edit, "Undo", Selector(("undo:")), "z")
         item(edit, "Redo", Selector(("redo:")), "z", modifiers: [.command, .shift])
@@ -165,6 +167,11 @@ import UniformTypeIdentifiers
         outputView.string = "Run a program to see its text output here. Each run starts a fresh session."
         outputView.setAccessibilityLabel("Program output")
         let outItem = NSTabViewItem(identifier: "output"); outItem.label = "Output"; outItem.view = scroll(outputView)
+        tableScroll.hasVerticalScroller = true
+        tableScroll.hasHorizontalScroller = true
+        tableScroll.autohidesScrollers = true
+        setTableMessage("Run a program to see formatted tables here.")
+        let tableItem = NSTabViewItem(identifier: "tables"); tableItem.label = "Tables"; tableItem.view = tableScroll
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("diagnostic"))
         column.title = "Runtime diagnostics · double-click an original-source line to navigate"
         column.width = 800
@@ -174,7 +181,7 @@ import UniformTypeIdentifiers
         diagnosticTable.setAccessibilityLabel("Runtime diagnostics")
         diagnosticTable.rowHeight = 23
         let diagItem = NSTabViewItem(identifier: "diagnostics"); diagItem.label = "Diagnostics"; diagItem.view = scroll(diagnosticTable)
-        results.addTabViewItem(outItem); results.addTabViewItem(diagItem)
+        results.addTabViewItem(outItem); results.addTabViewItem(tableItem); results.addTabViewItem(diagItem)
         // Native tab bezels extend above their nominal bounds on newer macOS.
         // Reserve that space so the split view doesn't clip their labels.
         let resultContainer = NSView()
@@ -359,21 +366,41 @@ import UniformTypeIdentifiers
         let request = RunRequest(source: doc.textView.string, sourceURL: doc.url, workingDirectory: projectURL)
         lastRunDocument = doc; lastResult = nil; diagnostics = []; diagnosticTable.reloadData()
         outputView.string = "Running locally. Output is buffered by the runtime until execution completes."
+        setTableMessage("Running locally…")
         statusLabel.stringValue = "Running \(doc.url?.lastPathComponent ?? "Untitled.sas") · fresh session"
         runButton.isEnabled = false; stopButton.isEnabled = true
         Task {
             let result = await runner.run(request)
             lastResult = result; diagnostics = result.diagnostics
             outputView.string = result.output.isEmpty ? "No text output was produced." : ListingFormatter.aligned(result.output)
+            if !result.tables.isEmpty {
+                tableScroll.documentView = TableDocumentView(tables: result.tables)
+            } else {
+                setTableMessage(result.tableIssue ?? "This run produced no formatted PRINT, FREQ, or TABULATE tables.")
+            }
             diagnosticTable.reloadData()
-            results.tabViewItems[1].label = "Diagnostics (\(diagnostics.count))"
-            if result.status != .success { results.selectTabViewItem(at: 1) }
+            results.tabViewItems[1].label = "Tables (\(result.tables.count))"
+            results.tabViewItems[2].label = "Diagnostics (\(diagnostics.count))"
+            if result.status != .success { results.selectTabViewItem(at: 2) }
+            else if !result.tables.isEmpty { results.selectTabViewItem(at: 1) }
             else { results.selectTabViewItem(at: 0) }
             statusLabel.stringValue = "\(result.status.description) · \(doc.url?.lastPathComponent ?? "Untitled.sas") · fresh session"
             updateControls(); refreshProject()
         }
     }
     @objc func stopProgram() { runner.cancel(); statusLabel.stringValue = "Stopping runtime…" }
+    private func setTableMessage(_ message: String) {
+        let label = NSTextView(frame: NSRect(x: 0, y: 0, width: 612, height: 180))
+        label.isEditable = false
+        label.isSelectable = true
+        label.drawsBackground = false
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = .secondaryLabelColor
+        label.textContainerInset = NSSize(width: 16, height: 16)
+        label.string = message
+        label.setAccessibilityLabel("Formatted tables status")
+        tableScroll.documentView = label
+    }
     @objc func goToDiagnostic() {
         let row = diagnosticTable.selectedRow
         guard diagnostics.indices.contains(row), let result = lastResult else { return }
@@ -421,6 +448,11 @@ import UniformTypeIdentifiers
             } catch { showError(error) }
         }
     }
+    @objc func printTables() {
+        guard let tables = lastResult?.tables, !tables.isEmpty else { return }
+        let operation = TablePrintRenderer.operation(for: tables)
+        operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+    }
     func updateControls() {
         runButton.isEnabled = current != nil && !runner.isRunning
         stopButton.isEnabled = runner.isRunning
@@ -449,6 +481,7 @@ import UniformTypeIdentifiers
         case #selector(saveCurrent), #selector(saveAs): return current != nil
         case #selector(closeCurrent): return current != nil || (compatibilityWindow != nil && NSApp.keyWindow === compatibilityWindow)
         case #selector(exportResult), #selector(exportPDFReport): return lastResult != nil
+        case #selector(printTables): return !(lastResult?.tables.isEmpty ?? true)
         default: return true
         }
     }

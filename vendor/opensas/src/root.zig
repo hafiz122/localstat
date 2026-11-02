@@ -21,6 +21,7 @@ pub const reg = @import("reg.zig");
 pub const proc = @import("proc.zig");
 pub const macro = @import("macro.zig");
 pub const sql = @import("sql.zig");
+pub const table_result = @import("table_result.zig");
 
 test {
     // Pull every module's `test` blocks into `zig build test`. Append imports
@@ -45,4 +46,5 @@ test {
     _ = @import("reg.zig");
     _ = @import("macro.zig");
     _ = @import("sql.zig");
+    _ = @import("table_result.zig");
 }

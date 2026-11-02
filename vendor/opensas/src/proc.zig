@@ -37,6 +37,7 @@ const eval = @import("eval.zig"); // …and its evaluator, for per-row computed 
 const ast = @import("ast.zig");
 const io = @import("io.zig"); // reuse the DATA-step WHERE / dataset-option evaluator
 const dsfns = @import("dsfns.zig"); // libref→dir map for on-disk member deletes
+const table_result = @import("table_result.zig");
 
 const Token = lex.Token;
 
@@ -44,7 +45,7 @@ const Token = lex.Token;
 /// of `(arena, lib, diags)` threaded through all 15 run* signatures. `out` stays
 /// an explicit param on the listing PROCs — its presence self-documents "this
 /// PROC emits listing text".
-pub const ProcCtx = struct { arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics };
+pub const ProcCtx = struct { arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, tables: ?*table_result.Collector = null };
 
 const SortKey = struct { idx: usize, desc: bool };
 
@@ -3237,7 +3238,7 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
             } else try nlvars.append(arena, vn);
         };
         if (nlvars.items.len > 0) {
-            try freqNLevels(arena, out, ds, nlvars.items, order, wcol, weight_zeros, fmt_levels.items);
+            try freqNLevels(arena, out, ds, nlvars.items, order, wcol, weight_zeros, fmt_levels.items, cx.tables);
             rendered = true;
         }
     }
@@ -3268,9 +3269,9 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
             return failGap(diags, 0, "PROC FREQ: TABLES option list (n-way list layout) is not yet supported — refusing to emit the crosstab grid in its place", .{});
         if (rendered) try out.append(arena, '\n');
         switch (req.vars.items.len) {
-            1 => try oneWayFreq(arena, out, ds, req.vars.items[0], req.nocum, wcol, weight_zeros, req.missing, order, req.disp.nopercent, fmt_levels.items),
-            2 => try twoWayFreq(arena, out, ds, req.vars.items[0], req.vars.items[1], order, wcol, weight_zeros, 0, null, req.disp, req.missing, fmt_levels.items),
-            else => try nWayFreq(arena, out, ds, req.vars.items, vcols, order, wcol, weight_zeros, req.disp, req.missing, fmt_levels.items),
+            1 => try oneWayFreq(arena, out, ds, req.vars.items[0], req.nocum, wcol, weight_zeros, req.missing, order, req.disp.nopercent, fmt_levels.items, cx.tables),
+            2 => try twoWayFreq(arena, out, ds, req.vars.items[0], req.vars.items[1], order, wcol, weight_zeros, 0, null, req.disp, req.missing, fmt_levels.items, cx.tables),
+            else => try nWayFreq(arena, out, ds, req.vars.items, vcols, order, wcol, weight_zeros, req.disp, req.missing, fmt_levels.items, cx.tables),
         }
         rendered = true;
     }
@@ -3284,7 +3285,9 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
 /// ponytail: layout follows the tick255 doc reference (title/subtitle centering,
 /// Variable left @col12 | Levels right-edge @col29, no header rule); exact
 /// LINESIZE-derived centering and any header rule are best-effort pending live SAS.
-fn freqNLevels(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, vars: []const []const u8, order: FreqOrder, wcol: ?usize, zeros: bool, fmt_levels: []const FmtLevels) !void {
+fn freqNLevels(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, vars: []const []const u8, order: FreqOrder, wcol: ?usize, zeros: bool, fmt_levels: []const FmtLevels, tables: ?*table_result.Collector) !void {
+    var table = table_result.Table{ .procedure = "FREQ", .title = "Number of Variable Levels" };
+    if (tables != null) try table.header(arena, try table_result.cells(arena, &.{ "Variable", "Levels" }));
     try out.appendSlice(arena, NLEVELS_TITLE);
     try out.append(arena, '\n');
     { // "Number of Variable Levels" subtitle
@@ -3306,7 +3309,9 @@ fn freqNLevels(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, 
         putLeft(b, 12, vn);
         putRight(b, 29, try std.fmt.allocPrint(arena, "{d}", .{cats.len}));
         try flush(arena, out, b);
+        if (tables != null) try table.row(arena, "data", try table_result.cells(arena, &.{ vn, try std.fmt.allocPrint(arena, "{d}", .{cats.len}) }));
     }
+    if (tables) |sink| try sink.add(table);
 }
 
 /// PROC FREQ crosstab display-suppression options (FREQ-crosstabpct). Each is an
@@ -3325,7 +3330,7 @@ const FreqDisp = struct {
 /// combination of the leading n-2 variables, headed `Table N of y by z` and
 /// `Controlling for a=… …`. Strata honor the proc's ORDER= (BUG-freqstrataorder);
 /// an obs missing in a controlling variable belongs to no stratum (SAS default).
-fn nWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, vars: []const []const u8, vcols: []const usize, order: FreqOrder, wcol: ?usize, zeros: bool, disp: FreqDisp, keep_missing: bool, fmt_levels: []const FmtLevels) !void {
+fn nWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, vars: []const []const u8, vcols: []const usize, order: FreqOrder, wcol: ?usize, zeros: bool, disp: FreqDisp, keep_missing: bool, fmt_levels: []const FmtLevels, tables: ?*table_result.Collector) !void {
     const scols = vcols[0 .. vcols.len - 2];
     // Strata walk in the requested ORDER= (FREQ → descending stratum size, DATA
     // → first appearance); FORMATTED folds to ascending as in oneWayLevels (the
@@ -3367,7 +3372,7 @@ fn nWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, var
         var ctl: std.ArrayList(u8) = .empty;
         try ctl.appendSlice(arena, "Controlling for");
         for (scols, 0..) |ci, k| try ctl.appendSlice(arena, try std.fmt.allocPrint(arena, " {s}={s}", .{ vars[k], try cellText(arena, st.rep[ci]) }));
-        try twoWayFreq(arena, out, sub, vars[vars.len - 2], vars[vars.len - 1], order, wcol, zeros, tno, ctl.items, disp, keep_missing, fmt_levels);
+        try twoWayFreq(arena, out, sub, vars[vars.len - 2], vars[vars.len - 1], order, wcol, zeros, tno, ctl.items, disp, keep_missing, fmt_levels, tables);
     }
 }
 
@@ -3561,7 +3566,7 @@ fn freqText(arena: std.mem.Allocator, x: f64) ![]const u8 {
     return format.bestNum(arena, x);
 }
 
-fn oneWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, varname: []const u8, nocum: bool, wcol: ?usize, zeros: bool, keep_missing: bool, order: FreqOrder, nopercent: bool, fmt_levels: []const FmtLevels) !void {
+fn oneWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, varname: []const u8, nocum: bool, wcol: ?usize, zeros: bool, keep_missing: bool, order: FreqOrder, nopercent: bool, fmt_levels: []const FmtLevels, tables: ?*table_result.Collector) !void {
     const col = ds.indexOf(varname) orelse {
         unsupported("PROC FREQ: TABLES variable not found");
         return;
@@ -3603,6 +3608,35 @@ fn oneWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, v
     if (total == 0) {
         if (!keep_missing) try appendFreqMissing(arena, out, freqMissingWeight(ds, &.{col}, wcol));
         return;
+    }
+
+    if (tables) |sink| {
+        var table = table_result.Table{ .procedure = "FREQ", .title = try std.fmt.allocPrint(arena, "Frequency of {s}", .{varname}) };
+        var header: std.ArrayList(table_result.Cell) = .empty;
+        try header.append(arena, .{ .text = varname });
+        try header.append(arena, .{ .text = "Frequency" });
+        if (!nopercent) try header.append(arena, .{ .text = "Percent" });
+        if (!nocum) {
+            try header.append(arena, .{ .text = "Cumulative Frequency" });
+            if (!nopercent) try header.append(arena, .{ .text = "Cumulative Percent" });
+        }
+        try table.header(arena, header.items);
+        var cumulative: f64 = 0;
+        for (cats) |cat| {
+            cumulative += cat.w;
+            var row: std.ArrayList(table_result.Cell) = .empty;
+            try row.append(arena, .{ .text = try cellText(arena, cat.v) });
+            try row.append(arena, .{ .text = try freqText(arena, cat.w) });
+            if (!nopercent) try row.append(arena, .{ .text = try pctText(arena, ratioF(cat.w, total)) });
+            if (!nocum) {
+                try row.append(arena, .{ .text = try freqText(arena, cumulative) });
+                if (!nopercent) try row.append(arena, .{ .text = try pctText(arena, ratioF(cumulative, total)) });
+            }
+            try table.row(arena, "data", row.items);
+        }
+        const missing = if (keep_missing) 0 else freqMissingWeight(ds, &.{col}, wcol);
+        if (missing != 0) try table.note(arena, try std.fmt.allocPrint(arena, "Frequency Missing = {s}", .{try freqText(arena, missing)}));
+        try sink.add(table);
     }
 
     // NOPERCENT drops the Percent columns (and, with NOCUM, everything but
@@ -3731,7 +3765,7 @@ fn oneWayFreqNoPercent(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *D
 /// `disp` suppression options, with a legend box and marginal totals
 /// (FREQ-crosstabpct). Row/Col percents are blank in the Total column, and the
 /// marginal Total row carries only Frequency + Percent (SAS layout).
-fn twoWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, v1: []const u8, v2: []const u8, order: FreqOrder, wcol: ?usize, zeros: bool, table_no: usize, control: ?[]const u8, disp: FreqDisp, keep_missing: bool, fmt_levels: []const FmtLevels) !void {
+fn twoWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, v1: []const u8, v2: []const u8, order: FreqOrder, wcol: ?usize, zeros: bool, table_no: usize, control: ?[]const u8, disp: FreqDisp, keep_missing: bool, fmt_levels: []const FmtLevels, tables: ?*table_result.Collector) !void {
     const c1 = ds.indexOf(v1) orelse {
         unsupported("PROC FREQ: TABLES row variable not found");
         return;
@@ -3845,6 +3879,80 @@ fn twoWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, v
             };
         }
     }.f;
+
+    if (tables) |sink| {
+        var table = table_result.Table{
+            .procedure = "FREQ",
+            .title = if (table_no == 0)
+                try std.fmt.allocPrint(arena, "Table of {s} by {s}", .{ v1, v2 })
+            else
+                try std.fmt.allocPrint(arena, "Table {d} of {s} by {s}", .{ table_no, v1, v2 }),
+            .section = control orelse "",
+        };
+        var group: std.ArrayList(table_result.Cell) = .empty;
+        try group.append(arena, .{ .text = v1 });
+        try group.append(arena, .{ .text = v2, .span = nc });
+        try group.append(arena, .{ .text = "Total" });
+        try table.header(arena, group.items);
+        var header: std.ArrayList(table_result.Cell) = .empty;
+        try header.append(arena, .{ .text = v1 });
+        for (cols) |cv| try header.append(arena, .{ .text = try cellText(arena, cv) });
+        try header.append(arena, .{ .text = "Total" });
+        try table.header(arena, header.items);
+        for (rows, 0..) |rv, ri| {
+            var row: std.ArrayList(table_result.Cell) = .empty;
+            try row.append(arena, .{ .text = try cellText(arena, rv) });
+            for (0..nc) |ci| {
+                const count = cells.get((@as(u64, @intCast(ri)) << 32) | @as(u64, @intCast(ci))) orelse 0;
+                var lines: std.ArrayList(u8) = .empty;
+                for (stats, 0..) |stat, si| {
+                    if (si > 0) try lines.append(arena, '\n');
+                    const value = switch (stat) {
+                        .freq => try freqText(arena, count),
+                        .pct => try pctText(arena, ratioF(count, grand)),
+                        .row => try pctText(arena, ratioF(count, rowTot[ri])),
+                        .col => try pctText(arena, ratioF(count, colTot[ci])),
+                    };
+                    try lines.appendSlice(arena, legendLabel(stat));
+                    try lines.appendSlice(arena, ": ");
+                    try lines.appendSlice(arena, value);
+                }
+                try row.append(arena, .{ .text = lines.items });
+            }
+            var margin_text: std.ArrayList(u8) = .empty;
+            if (!disp.nofreq) try margin_text.appendSlice(arena, try freqText(arena, rowTot[ri]));
+            if (!disp.nopercent) {
+                if (margin_text.items.len > 0) try margin_text.append(arena, '\n');
+                try margin_text.appendSlice(arena, try pctText(arena, ratioF(rowTot[ri], grand)));
+            }
+            try row.append(arena, .{ .text = margin_text.items });
+            try table.row(arena, "data", row.items);
+        }
+        if (!disp.nofreq or !disp.nopercent) {
+            var total_row: std.ArrayList(table_result.Cell) = .empty;
+            try total_row.append(arena, .{ .text = "Total" });
+            for (colTot) |count| {
+                var margin_text: std.ArrayList(u8) = .empty;
+                if (!disp.nofreq) try margin_text.appendSlice(arena, try freqText(arena, count));
+                if (!disp.nopercent) {
+                    if (margin_text.items.len > 0) try margin_text.append(arena, '\n');
+                    try margin_text.appendSlice(arena, try pctText(arena, ratioF(count, grand)));
+                }
+                try total_row.append(arena, .{ .text = margin_text.items });
+            }
+            var grand_text: std.ArrayList(u8) = .empty;
+            if (!disp.nofreq) try grand_text.appendSlice(arena, try freqText(arena, grand));
+            if (!disp.nopercent) {
+                if (grand_text.items.len > 0) try grand_text.append(arena, '\n');
+                try grand_text.appendSlice(arena, try pctText(arena, 100));
+            }
+            try total_row.append(arena, .{ .text = grand_text.items });
+            try table.row(arena, "total", total_row.items);
+        }
+        const missing = if (keep_missing) 0 else freqMissingWeight(ds, &.{ c1, c2 }, wcol);
+        if (missing != 0) try table.note(arena, try std.fmt.allocPrint(arena, "Frequency Missing = {s}", .{try freqText(arena, missing)}));
+        try sink.add(table);
+    }
 
     try out.appendSlice(arena, TWOWAY_TITLE);
     try out.append(arena, '\n');
@@ -8603,7 +8711,9 @@ pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
         }
     }
     for (try bySlices(arena, ds.rows.items, obcols.items)) |bs| {
+        const by_start = out.items.len;
         if (bs.rep) |r| try appendByLine(arena, out, ds, r, obcols.items);
+        const section = try arena.dupe(u8, std.mem.trim(u8, out.items[by_start..], " \r\n"));
         const gds = if (obcols.items.len == 0) ds else try subsetRows(arena, ds, bs.rows);
         for (specs.items) |*spec| {
             const rname: ?[]const u8 = spec.row_var; // null = an ALL-only row dimension (GAP-tabulateforms #8)
@@ -8622,9 +8732,9 @@ pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
             const dress = TabOpts{ .order = class_order, .var_labels = mvar.items, .key_labels = mkey.items, .box_text = spec.box_text, .class_orders = class_orders.items };
             const cell_fmt = spec.table_fmt orelse proc_fmt;
             if (spec.col_class) |cc|
-                try runTabulateCross(arena, out, gds, rname, ridx, cc, spec.blocks.items, spec.row_all, cell_fmt, dress)
+                try runTabulateCross(arena, out, gds, rname, ridx, cc, spec.blocks.items, spec.row_all, cell_fmt, dress, cx.tables, section)
             else
-                try runTabulateSingle(arena, out, gds, rname, ridx, spec.blocks.items, spec.row_all, cell_fmt, dress);
+                try runTabulateSingle(arena, out, gds, rname, ridx, spec.blocks.items, spec.row_all, cell_fmt, dress, cx.tables, section);
         }
     }
 }
@@ -8645,7 +8755,7 @@ fn subsetRows(arena: std.mem.Allocator, ds: *Dataset, rows: []const []const Valu
 /// own analysis variable and statistics (GAP-tabulateforms #7), plus at most
 /// one ALL subtotal block. Split out of runTabulate so BUG-tabulatebyfreq can
 /// render it once per BY group.
-fn runTabulateSingle(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, rname: ?[]const u8, ridx: ?usize, blocks: []const TabBlock, row_all: bool, cell_fmt: ?[]const u8, dress: TabOpts) diag.Error!void {
+fn runTabulateSingle(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, rname: ?[]const u8, ridx: ?usize, blocks: []const TabBlock, row_all: bool, cell_fmt: ?[]const u8, dress: TabOpts, tables: ?*table_result.Collector, section: []const u8) diag.Error!void {
     const rname_d: []const u8 = if (rname) |rn| labelFor(dress.var_labels, rn) orelse rn else "";
     const all_text = labelFor(dress.key_labels, "all") orelse "All"; // KEYLABEL all='…'
 
@@ -8764,6 +8874,26 @@ fn runTabulateSingle(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dat
             wcol[f] = w + 2;
             f += 1;
         };
+    }
+    if (tables) |sink| {
+        var table = table_result.Table{ .procedure = "TABULATE", .title = "The TABULATE Procedure", .section = section };
+        if (any_heading) {
+            var grouped: std.ArrayList(table_result.Cell) = .empty;
+            try grouped.append(arena, .{ .text = dress.box_text orelse rname_d });
+            for (blocks, 0..) |block, bi| try grouped.append(arena, .{ .text = blabel[bi], .span = block.stats.items.len });
+            try table.header(arena, grouped.items);
+        }
+        var header: std.ArrayList(table_result.Cell) = .empty;
+        try header.append(arena, .{ .text = rname_d });
+        for (labels) |label| try header.append(arena, .{ .text = label });
+        try table.header(arena, header.items);
+        for (keys.items, vals.items, 0..) |key, rowv, ri| {
+            var data: std.ArrayList(table_result.Cell) = .empty;
+            try data.append(arena, .{ .text = key });
+            for (rowv) |value| try data.append(arena, .{ .text = try tabCell(arena, value, cell_fmt) });
+            try table.row(arena, if (row_all and ridx != null and ri == keys.items.len - 1) "total" else "data", data.items);
+        }
+        try sink.add(table);
     }
     var data_w: usize = ncols - 1; // the internal `|` separators
     for (wcol) |w| data_w += w;
@@ -8916,7 +9046,7 @@ const CICtx = struct {
 /// carrying its OWN statistics (GAP-tabulateforms #7 — the old shared stat
 /// list unioned `all*v*(…)`'s statistics into every class-level block and
 /// rendered extra columns). Populates every cell — BUG-tabulatecross.
-fn runTabulateCross(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, rname: ?[]const u8, ridx: ?usize, ccname: []const u8, blocks: []const TabBlock, row_all: bool, cell_fmt: ?[]const u8, dress: TabOpts) diag.Error!void {
+fn runTabulateCross(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, rname: ?[]const u8, ridx: ?usize, ccname: []const u8, blocks: []const TabBlock, row_all: bool, cell_fmt: ?[]const u8, dress: TabOpts, tables: ?*table_result.Collector, section: []const u8) diag.Error!void {
     const ccidx = ds.indexOf(ccname) orelse return unsupported("PROC TABULATE: column class variable not found");
     // parseTable's shape constraints guarantee exactly one crossing block plus
     // at most one ALL block here.
@@ -9121,6 +9251,33 @@ fn runTabulateCross(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Data
         var w = labels[f].len;
         for (0..nr) |ri| w = @max(w, (try tabCell(arena, vals[ri][f], cell_fmt)).len);
         wcol[f] = w + 2;
+    }
+    if (tables) |sink| {
+        var table = table_result.Table{ .procedure = "TABULATE", .title = "The TABULATE Procedure", .section = section };
+        try table.header(arena, &.{ .{ .text = dress.box_text orelse rname_d }, .{ .text = ccname_d, .span = ndata } });
+        var levels: std.ArrayList(table_result.Cell) = .empty;
+        try levels.append(arena, .{ .text = "" });
+        for (ckeys.items) |key| try levels.append(arena, .{ .text = key, .span = nstats });
+        if (allb != null) try levels.append(arena, .{ .text = all_text, .span = astats });
+        try table.header(arena, levels.items);
+        if (an_d != null or an_all_d != null) {
+            var analysis: std.ArrayList(table_result.Cell) = .empty;
+            try analysis.append(arena, .{ .text = "" });
+            for (0..nc) |_| try analysis.append(arena, .{ .text = an_d orelse "", .span = nstats });
+            if (allb != null) try analysis.append(arena, .{ .text = an_all_d orelse "", .span = astats });
+            try table.header(arena, analysis.items);
+        }
+        var header: std.ArrayList(table_result.Cell) = .empty;
+        try header.append(arena, .{ .text = rname_d });
+        for (labels) |label| try header.append(arena, .{ .text = label });
+        try table.header(arena, header.items);
+        for (rkeys.items, vals, 0..) |key, rowv, ri| {
+            var data: std.ArrayList(table_result.Cell) = .empty;
+            try data.append(arena, .{ .text = key });
+            for (rowv) |value| try data.append(arena, .{ .text = try tabCell(arena, value, cell_fmt) });
+            try table.row(arena, if (row_all_appended and ri == rkeys.items.len - 1) "total" else "data", data.items);
+        }
+        try sink.add(table);
     }
     // per-level block must fit the level label and (if any) the analysis-var name
     const need_block = if (an_d) |an| @max(an.len, blk: {

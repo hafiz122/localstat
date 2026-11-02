@@ -34,6 +34,9 @@ final class EditorIntegrationTests: XCTestCase {
             }
             XCTAssertEqual(app.lastResult?.status, .success)
             XCTAssertTrue(app.outputView.string.contains("42"))
+            let tableView = try XCTUnwrap(app.tableScroll.documentView as? TableDocumentView)
+            XCTAssertEqual(tableView.tables.count, 1)
+            XCTAssertTrue((tableView.accessibilityValue() as? String)?.contains("42") ?? false)
             XCTAssertTrue(app.save(document))
             XCTAssertFalse(document.isDirty)
             XCTAssertEqual(try String(contentsOf: file), document.textView.string)

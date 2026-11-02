@@ -1,4 +1,6 @@
-# LocalStat 0.1.0-alpha compatibility
+# LocalStat source-build compatibility
+
+The downloadable `0.1.0-alpha` predates the formatted Tables view described below.
 
 This is an independent SAS-language implementation based on OpenSAS, not SAS Institute's runtime. It is not a drop-in SAS replacement and is not validated for clinical or regulated work.
 
@@ -15,7 +17,9 @@ This is an independent SAS-language implementation based on OpenSAS, not SAS Ins
 | REG options, WEIGHT, FREQ, BY, OUTPUT, selection, plots | Unsupported; explicit error |
 | Other modeling procedures | GLM, LOGISTIC, MIXED, GLIMMIX, PHREG, LIFETEST and others remain unsupported |
 | ODS | Text listing only. Other destinations and controls error; LISTING open/close are inert with a note |
-| IDE report export | Searchable, paginated PDF containing run metadata, executed source, text output and diagnostics; this is an IDE report, not an ODS destination |
+| Formatted tables | PROC PRINT, PROC FREQ TABLES/NLEVELS, and PROC TABULATE results in the native Tables tab; SAS-style presentation, not exact ODS rendering |
+| Printing | Print all formatted tables from the latest run through the macOS print dialog |
+| IDE report export | Searchable, paginated PDF containing run metadata, executed source, formatted tables, raw text output and diagnostics; this is an IDE report, not an ODS destination |
 | Datasets | OpenSAS readers/writers for CSV, SAS7BDAT and XPT; limitations remain upstream |
 | Runtime session | WORK and macro state reset each run; explicit filesystem outputs persist |
 | Security boundary | Programs are executable content: filesystem access and `%SYSGET` use the app process's permissions and environment; the alpha is not sandboxed |
@@ -39,4 +43,4 @@ The implementation uses column scaling and Householder QR with column pivoting. 
 
 OpenSAS implements subsets of SAS statements and procedure options. The upstream test corpus is evidence for those fixtures only. Some inherited statements are deliberately inert: for example X does not execute shell commands and PROC PRINTTO does not redirect output. Text PUT output and procedure listings share stdout. This app preserves raw stdout/stderr and the process exit code; diagnostics are not the full SAS log format. ABORT can explicitly return an exit code, including 1 or 2, so the text log remains authoritative when interpreting those statuses.
 
-No persistent interactive session, selection execution, dataset grid, HTML/RTF results, ODS PDF destination or graphics are included in 0.1.0-alpha. The IDE can export its text results and executed source as a PDF report after a run. A successful exit is not proof of numerical equivalence to SAS.
+No persistent interactive session, selection execution, dataset grid, HTML/RTF results, ODS PDF destination or graphics are included in the current source build. Other procedures remain in the text Output tab. A successful exit is not proof of numerical equivalence to SAS.

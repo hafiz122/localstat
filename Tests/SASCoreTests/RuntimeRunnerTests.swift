@@ -27,6 +27,48 @@ final class RuntimeRunnerTests: XCTestCase {
         let raw = "Heading\nName\tValue\nx\t12\nlong\t3\n\nTail\n"
         XCTAssertEqual(ListingFormatter.aligned(raw), "Heading\nName  Value\nx     12\nlong  3\n\nTail\n")
     }
+    @MainActor func testTablePageLayoutAndPDFReport() throws {
+        _ = NSApplication.shared
+        let headers = [ResultRow(cells: [ResultCell("Group"), ResultCell("Analysis", span: 8)]),
+                       ResultRow(cells: [ResultCell("Group")] + (1...8).map { ResultCell("Value \($0)") })]
+        let rows: [ResultRow] = (1...110).map { index in
+            let values: [ResultCell] = (1...8).map { column in
+                let value = index == 110 && column == 8 ? "café & <value>" : "\(index * column).00"
+                return ResultCell(value)
+            }
+            return ResultRow(cells: [ResultCell("Group \(index)")] + values)
+        }
+        let table = ResultTable(procedure: "TABULATE", title: "The TABULATE Procedure", headers: headers, rows: rows)
+        let view = TableDocumentView(tables: [table], forPrinting: true)
+        XCTAssertGreaterThan(view.pageCount, 2)
+        let request = RunRequest(source: "proc tabulate; run;", sourceURL: nil, workingDirectory: URL(fileURLWithPath: "/tmp"))
+        let result = RunResult(request: request, output: "raw listing", diagnosticText: "", status: .success, exitCode: 0, tables: [table])
+        let folder = try workspace()
+        let destination = folder.appendingPathComponent("tables-report.pdf")
+        try PDFReportRenderer.write(RunReport(result: result, appVersion: "test", runtimeVersion: "test"), to: destination)
+        let pdf = try XCTUnwrap(PDFDocument(url: destination))
+        XCTAssertGreaterThan(pdf.pageCount, view.pageCount)
+        let text = pdf.string ?? ""
+        XCTAssertTrue(text.contains("Group 110"), text)
+        XCTAssertTrue(text.contains("café & <value>"), text)
+        XCTAssertGreaterThan(text.components(separatedBy: "Value 1").count, 2)
+        XCTAssertTrue(text.contains("RAW OUTPUT APPENDIX"), text)
+        XCTAssertTrue(text.contains("raw listing"), text)
+        for index in 0..<pdf.pageCount {
+            XCTAssertFalse((pdf.page(at: index)?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                           "Blank PDF page \(index + 1)")
+        }
+    }
+    @MainActor func testMalformedTableFileDoesNotChangeRunStatus() async throws {
+        let folder = try workspace()
+        let script = try executable("printf '{invalid' > \"$3\"\nprintf 'ordinary output\\n'\n", in: folder)
+        let request = RunRequest(source: "", sourceURL: nil, workingDirectory: folder)
+        let result = await LocalRuntimeRunner(executable: script).run(request)
+        XCTAssertEqual(result.status, .success)
+        XCTAssertEqual(result.output, "ordinary output\n")
+        XCTAssertTrue(result.tables.isEmpty)
+        XCTAssertNotNil(result.tableIssue)
+    }
     func testRunReportIncludesExecutionContextAndCompleteRunContents() {
         let request = RunRequest(
             source: "data work.demo; x=1; run;\n",

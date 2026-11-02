@@ -38,11 +38,15 @@ pub fn main(init: std.process.Init) !void {
     // Parse `--sasautos <dir>` (autocall library) anywhere in the args; the first
     // non-flag arg is the input `.sas`. `$SASAUTOS` is the fallback.
     var file: ?[]const u8 = null;
+    var tables_path: ?[]const u8 = null;
     var sasautos: ?[]const u8 = init.environ_map.get("SASAUTOS");
     var ai: usize = 1;
     while (ai < args.len) : (ai += 1) {
         if (std.mem.eql(u8, args[ai], "--sasautos") and ai + 1 < args.len) {
             sasautos = args[ai + 1];
+            ai += 1;
+        } else if (std.mem.eql(u8, args[ai], "--tables-json") and ai + 1 < args.len) {
+            tables_path = args[ai + 1];
             ai += 1;
         } else if (std.mem.eql(u8, args[ai], "--version") or std.mem.eql(u8, args[ai], "-V")) {
             // GH#10 ISS-versionflag: SHORT-CIRCUIT before the input file is even
@@ -79,7 +83,8 @@ pub fn main(init: std.process.Init) !void {
 
     var diags = sas.diag.Diagnostics.init(a);
     var out: std.ArrayList(u8) = .empty;
-    interpret(a, &out, &diags, src, io) catch |e| {
+    var tables = sas.table_result.Collector{ .arena = a };
+    interpretWithTables(a, &out, &diags, src, io, if (tables_path != null) &tables else null) catch |e| {
         // A propagated lex/parse/exec error already recorded a located diagnostic
         // via diags.fail() — render() below prints `ERROR(Ln): …`. Only emit the
         // bare error-name line when NO diagnostic carries the detail (e.g.
@@ -88,6 +93,13 @@ pub fn main(init: std.process.Init) !void {
         // diags.hasErrors().
         if (!diags.hasErrors()) failLoud("{t}", .{e});
     };
+
+    if (tables_path) |path| {
+        const data = try tables.json();
+        Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = data }) catch |e| {
+            std.debug.print("LocalStat could not write table results ({t})\n", .{e});
+        };
+    }
 
     // stdout carries the program's output only (log + print); diagnostics and
     // NOTEs go to stderr, SAS-style, so they never pollute a corpus diff.
@@ -178,6 +190,10 @@ fn userErr(diags: *sas.diag.Diagnostics, comptime fmt: []const u8, args: anytype
 /// null for the pure-in-memory path (unit tests, corpus programs); with an `Io`,
 /// CSV-backed LIBNAME datasets are read before and written after the run.
 pub fn interpret(a: std.mem.Allocator, out: *std.ArrayList(u8), diags: *sas.diag.Diagnostics, src: []const u8, io: ?Io) !void {
+    return interpretWithTables(a, out, diags, src, io, null);
+}
+
+fn interpretWithTables(a: std.mem.Allocator, out: *std.ArrayList(u8), diags: *sas.diag.Diagnostics, src: []const u8, io: ?Io, tables: ?*sas.table_result.Collector) !void {
     // Drop any user format catalog from a prior run — it points into that run's
     // (now-freed) arena, and `format.apply` reads the global catalog (PROC FORMAT
     // reinstalls its own this run) — plus format.zig's other run-scoped globals
@@ -262,6 +278,7 @@ pub fn interpret(a: std.mem.Allocator, out: *std.ArrayList(u8), diags: *sas.diag
         .session = &session,
         .loaded_ro = &loaded_ro,
         .damaged = &damaged,
+        .tables = tables,
     };
     // NOTE-chunkrelativelineno: chunks tile src contiguously, so track the
     // source line each chunk starts at (1 + newlines before it).
@@ -296,6 +313,7 @@ const StepCtx = struct {
     // unreadable (already reported once, naming the real cause) — later
     // loadLibInputs passes skip the re-read AND the re-report.
     damaged: *std.StringHashMap(void),
+    tables: ?*sas.table_result.Collector = null,
     ended: bool = false, // ENDSAS seen: stop reading input, exit normally (BUG-endsasexit)
     // NOTE-chunkrelativelineno (QA tick312 F3): the current raw chunk's start
     // line in src, minus 1 — tokenize restarts line numbering per chunk, so a
@@ -466,7 +484,7 @@ fn runExpanded(ctx: *StepCtx, text: []const u8, allow_anon: bool) sas.diag.Error
             // bindings and Io to write through them eagerly (GAP-proccopy).
             if (step_toks.len > 1 and eqi(step_toks[0].text, "proc") and eqi(step_toks[1].text, "copy")) {
                 try runProcCopy(ctx, step_toks);
-            } else try runStep(a, ctx.out, ctx.lib, ctx.diags, step_toks, ctx.globals, ctx.io);
+            } else try runStep(a, ctx.out, ctx.lib, ctx.diags, step_toks, ctx.globals, ctx.io, ctx.tables);
             // NOTE parity (GH#3 ISS-steperrhalt): real SAS ends the FAILING step
             // ITSELF with the same NOTE the later skipped steps get (Language
             // Reference: Concepts Ch.8 Examples 8.2/8.4/8.8) — opensas used to
@@ -1990,7 +2008,7 @@ fn dataName(a: std.mem.Allocator, toks: []const Token, pos: *usize) sas.diag.Err
     return name;
 }
 
-fn runStep(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library, diags: *sas.diag.Diagnostics, toks: []const Token, g: *Globals, io: ?Io) sas.diag.Error!void {
+fn runStep(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library, diags: *sas.diag.Diagnostics, toks: []const Token, g: *Globals, io: ?Io, tables: ?*sas.table_result.Collector) sas.diag.Error!void {
     if (eqi(toks[0].text, "data")) {
         // header: `data [name] ;`  — a name, else an anonymous output dataset.
         var pos: usize = 1;
@@ -2059,7 +2077,7 @@ fn runStep(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
             };
         }
     } else {
-        try runProc(a, out, lib, diags, toks, g);
+        try runProc(a, out, lib, diags, toks, g, tables);
     }
 }
 
@@ -2582,13 +2600,14 @@ fn sortInPlaceTarget(toks: []const Token) ?[]const u8 {
 
 /// Dispatch a `proc <name> …; … run;` step by name. Each proc hand-parses its
 /// own tokens (parser.zig is A2's) — SORT lives in proc.zig; PRINT is below.
-fn runProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library, diags: *sas.diag.Diagnostics, toks: []const Token, g: *Globals) sas.diag.Error!void {
+fn runProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library, diags: *sas.diag.Diagnostics, toks: []const Token, g: *Globals, tables: ?*sas.table_result.Collector) sas.diag.Error!void {
     if (toks.len < 2 or toks[1].tag != .name) {
         failLoud("PROC name missing or unrecognized", .{});
         return;
     }
     const proc = toks[1].text;
-    const pcx: sas.proc.ProcCtx = .{ .arena = a, .lib = lib, .diags = diags };
+    const pcx: sas.proc.ProcCtx = .{ .arena = a, .lib = lib, .diags = diags, .tables = tables };
+    const first_table = if (tables) |sink| sink.tables.items.len else 0;
     // TITLE/FOOTNOTE print with the report procs (a listing), not with SORT or
     // TRANSPOSE (which produce a dataset, no page). Titles atop, footnotes below.
     // SUMMARY inverts MEANS: it lists (and so prints titles) only when PRINT is
@@ -2601,7 +2620,9 @@ fn runProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
     // per BY group, so PROC PRINT then owns its title/footnote emission
     // (substituted per group in printTable); otherwise titles stamp once here.
     const print_bysubst = eqi(proc, "print") and g.hasBySubst();
+    const titles_start = out.items.len;
     if (listing and !print_bysubst) try g.emitTitles(a, out);
+    const displayed_titles = try a.dupe(u8, std.mem.trim(u8, out.items[titles_start..], " \r\n"));
 
     if (eqi(proc, "sort")) {
         // GH#15: PROC SORT with no OUT= (or OUT= the source) sorts the source
@@ -2611,7 +2632,7 @@ fn runProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
         if (sortInPlaceTarget(toks)) |src| if (lib.readonlyOut(src)) return lib.failReadonly(src);
         try sas.proc.runSort(pcx, toks);
     } else if (eqi(proc, "print")) {
-        try printProc(a, out, lib, diags, toks, if (print_bysubst) g else null);
+        try printProc(a, out, lib, diags, toks, if (print_bysubst) g else null, tables);
     } else if (eqi(proc, "reg")) {
         try sas.reg.run(pcx, out, toks);
     } else if (eqi(proc, "means") or eqi(proc, "summary")) {
@@ -2659,7 +2680,13 @@ fn runProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
         failLoud("PROC {s} is not supported", .{proc});
     }
 
+    const footnotes_start = out.items.len;
     if (listing and !print_bysubst) try g.emitFootnotes(a, out);
+    const displayed_footnotes = std.mem.trim(u8, out.items[footnotes_start..], " \r\n");
+    if (tables) |sink| for (sink.tables.items[first_table..]) |*table| {
+        if (displayed_titles.len > 0) table.section = try std.fmt.allocPrint(a, "{s}{s}{s}", .{ displayed_titles, if (table.section.len > 0) "\n" else "", table.section });
+        if (displayed_footnotes.len > 0) try table.note(a, try a.dupe(u8, displayed_footnotes));
+    };
 }
 
 const PrintOpts = struct {
@@ -2701,7 +2728,7 @@ const gutter = 3; // blank columns between fields
 
 /// PROC PRINT: `proc print [data=NAME] [noobs]; [var a b;] [sum x;] run;`.
 /// ponytail: only these options/statements; anything else on the line is skipped.
-fn printProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library, diags: *sas.diag.Diagnostics, toks: []const Token, g: ?*const Globals) !void {
+fn printProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library, diags: *sas.diag.Diagnostics, toks: []const Token, g: ?*const Globals, tables: ?*sas.table_result.Collector) !void {
     var target: ?[]const u8 = null;
     var opts: PrintOpts = .{};
     var vlist: std.ArrayList([]const u8) = .empty;
@@ -2925,7 +2952,7 @@ fn printProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Libra
     const per_group = g != null and opts.by != null;
     if (g != null and !per_group) try g.?.emitTitles(a, out);
     const pin = try sas.proc.procInputObs(a, ds.?, toks, diags);
-    try printTable(a, out, pin.ds, pin.srcobs, opts, diags, if (per_group) g.? else null);
+    try printTable(a, out, pin.ds, pin.srcobs, opts, diags, if (per_group) g.? else null, tables);
     if (g != null and !per_group) try g.?.emitFootnotes(a, out);
 }
 
@@ -3019,7 +3046,7 @@ fn lastDataset(lib: *sas.exec.Library) ?*sas.dataset.Dataset {
 /// Aligned listing: an optional `Obs` column then the selected variables, char
 /// left-justified, numeric right-justified, `gutter` blanks between, a blank
 /// line under the header, and an `====`/total footer per summed column.
-fn printTable(a: std.mem.Allocator, out: *std.ArrayList(u8), ds: *sas.dataset.Dataset, srcobs: ?[]const usize, opts_in: PrintOpts, diags: *sas.diag.Diagnostics, titles: ?*const Globals) !void {
+fn printTable(a: std.mem.Allocator, out: *std.ArrayList(u8), ds: *sas.dataset.Dataset, srcobs: ?[]const usize, opts_in: PrintOpts, diags: *sas.diag.Diagnostics, titles: ?*const Globals, tables: ?*sas.table_result.Collector) !void {
     var opts = opts_in; // mutable: `id` suppresses the Obs column below
     const cols = ds.columns.items;
     const nrows = ds.rowCount();
@@ -3144,6 +3171,7 @@ fn printTable(a: std.mem.Allocator, out: *std.ArrayList(u8), ds: *sas.dataset.Da
                 try g.emitFootnotes(a, out);
             }
         }
+        if (nrows > 0) if (tables) |sink| try collectPrintTable(a, sink, ds, srcobs, opts, sidx, totals, bcols.items);
         var start: usize = 0;
         var first = true;
         while (start < nrows) {
@@ -3171,6 +3199,7 @@ fn printTable(a: std.mem.Allocator, out: *std.ArrayList(u8), ds: *sas.dataset.Da
         return;
     }
 
+    if (tables) |sink| try collectPrintTable(a, sink, ds, srcobs, opts, sidx, totals, &.{});
     try printHeader(a, out, cols, sidx, colw, w_obs, opts);
     r = 0;
     while (r < nrows) : (r += 1) try printDataRow(a, out, ds, r, srcobs, cols, sidx, colw, w_obs, opts);
@@ -3179,6 +3208,68 @@ fn printTable(a: std.mem.Allocator, out: *std.ArrayList(u8), ds: *sas.dataset.Da
     // `= 0` grand total is suppressed.
     if (opts.sums != null and nrows > 0)
         try printTotalsRow(a, out, totals, cols, sidx, colw, w_obs, opts);
+}
+
+fn collectPrintTable(a: std.mem.Allocator, sink: *sas.table_result.Collector, ds: *sas.dataset.Dataset, srcobs: ?[]const usize, opts: PrintOpts, sidx: []const usize, totals: []const ?f64, bcols: []const usize) !void {
+    const tr = sas.table_result;
+    const cols = ds.columns.items;
+    var table = tr.Table{ .procedure = "PRINT", .title = try std.fmt.allocPrint(a, "Data Set {s}", .{ds.name}) };
+    const header = try a.alloc(tr.Cell, sidx.len + @as(usize, @intFromBool(!opts.noobs)));
+    var offset: usize = 0;
+    if (!opts.noobs) {
+        header[0] = .{ .text = "Obs" };
+        offset = 1;
+    }
+    for (sidx, 0..) |ci, k| {
+        const h = opts.header(cols[ci]);
+        header[k + offset] = .{ .text = if (opts.split) |split| blk: {
+            const copy = try a.dupe(u8, h);
+            for (copy) |*ch| if (ch.* == split) { ch.* = '\n'; };
+            break :blk copy;
+        } else h };
+    }
+    try table.header(a, header);
+    var start: usize = 0;
+    while (start < ds.rowCount()) {
+        var end = ds.rowCount();
+        if (bcols.len > 0) {
+            end = start + 1;
+            while (end < ds.rowCount() and byRowsEqual(ds, start, end, bcols)) end += 1;
+            var label: std.ArrayList(u8) = .empty;
+            for (bcols, 0..) |ci, k| {
+                if (k > 0) try label.appendSlice(a, "  ");
+                try label.appendSlice(a, cols[ci].name);
+                try label.append(a, '=');
+                try label.appendSlice(a, try fmtCell(a, ds.row(start)[ci], opts.fmtFor(cols[ci])));
+            }
+            try table.row(a, "section", &.{.{ .text = label.items, .span = header.len }});
+        }
+        for (start..end) |r| {
+            const cells = try a.alloc(tr.Cell, header.len);
+            if (!opts.noobs) cells[0] = .{ .text = try std.fmt.allocPrint(a, "{d}", .{obsNum(srcobs, r)}) };
+            for (sidx, 0..) |ci, k| cells[k + offset] = .{ .text = try fmtCell(a, ds.row(r)[ci], opts.fmtFor(cols[ci])) };
+            try table.row(a, "data", cells);
+        }
+        if (opts.sums) |sums| {
+            const group_totals = if (bcols.len == 0) totals else try rangeTotals(a, ds, cols, sidx, sums, start, end);
+            try appendPrintTotal(a, &table, cols, sidx, opts, group_totals, if (bcols.len == 0) "Total" else "Subtotal");
+        }
+        start = end;
+    }
+    if (bcols.len > 0 and opts.sums != null and ds.rowCount() > 0)
+        try appendPrintTotal(a, &table, cols, sidx, opts, totals, "Grand Total");
+    try sink.add(table);
+}
+
+fn appendPrintTotal(a: std.mem.Allocator, table: *sas.table_result.Table, cols: []const Column, sidx: []const usize, opts: PrintOpts, totals: []const ?f64, label: []const u8) !void {
+    const offset: usize = @intFromBool(!opts.noobs);
+    const cells = try a.alloc(sas.table_result.Cell, sidx.len + offset);
+    for (cells) |*c| c.* = .{ .text = "" };
+    if (cells.len > 0 and (offset > 0 or totals.len == 0 or totals[0] == null)) cells[0].text = label;
+    for (sidx, 0..) |ci, k| if (totals[k]) |value| {
+        cells[k + offset].text = try fmtCell(a, .{ .num = value }, opts.fmtFor(cols[ci]));
+    };
+    try table.row(a, "total", cells);
 }
 
 const Column = sas.dataset.Column;
