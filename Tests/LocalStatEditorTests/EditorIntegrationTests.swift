@@ -4,6 +4,68 @@ import SASCore
 @testable import LocalStat
 
 final class EditorIntegrationTests: XCTestCase {
+    @MainActor func testAppearanceSelectorPersistsLightAndDark() throws {
+        _ = NSApplication.shared
+        let originalAppearance = NSApp.appearance
+        let suiteName = "LocalStatAppearanceTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let app = AppDelegate()
+        app.appearanceDefaults = defaults
+        app.restoreAppearance()
+        app.buildWindow()
+        let editor = EditorDocument(url: nil, source: "data demo; x=1; run;")
+        app.addDocument(editor)
+        let table = ResultTable(procedure: "PRINT", title: "Demo",
+                                headers: [ResultRow(kind: "header", cells: [ResultCell("x")])],
+                                rows: [ResultRow(cells: [ResultCell("1")])])
+        let tableView = TableDocumentView(tables: [table])
+        app.tableScroll.documentView = tableView
+        app.results.selectTabViewItem(at: 1)
+        var reopened: AppDelegate?
+        defer {
+            reopened?.window.delegate = nil
+            reopened?.window.close()
+            app.window.delegate = nil
+            app.window.close()
+            NSApp.appearance = originalAppearance
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        XCTAssertEqual(app.appearancePreference, .system)
+        XCTAssertNil(NSApp.appearance)
+        XCTAssertEqual(app.appearancePopup.selectedItem?.title, "System")
+
+        app.appearancePopup.selectItem(withTitle: "Dark")
+        app.changeAppearance()
+        XCTAssertEqual(app.appearancePreference, .dark)
+        XCTAssertEqual(NSApp.appearance?.name, .darkAqua)
+        XCTAssertEqual(defaults.string(forKey: "appearancePreference"), "dark")
+        XCTAssertEqual(editor.textView.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]), .darkAqua)
+        XCTAssertEqual(tableView.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]), .darkAqua)
+
+        let reopenedApp = AppDelegate()
+        reopened = reopenedApp
+        reopenedApp.appearanceDefaults = defaults
+        reopenedApp.restoreAppearance()
+        reopenedApp.buildWindow()
+        XCTAssertEqual(reopenedApp.appearancePreference, .dark)
+        XCTAssertEqual(reopenedApp.appearancePopup.selectedItem?.title, "Dark")
+
+        app.results.selectTabViewItem(at: 0)
+        app.appearancePopup.selectItem(withTitle: "Light")
+        app.changeAppearance()
+        app.results.selectTabViewItem(at: 1)
+        XCTAssertEqual(NSApp.appearance?.name, .aqua)
+        XCTAssertEqual(defaults.string(forKey: "appearancePreference"), "light")
+        XCTAssertEqual(editor.textView.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]), .aqua)
+        XCTAssertEqual(tableView.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]), .aqua)
+
+        app.appearancePopup.selectItem(withTitle: "System")
+        app.changeAppearance()
+        XCTAssertNil(NSApp.appearance)
+        XCTAssertEqual(defaults.string(forKey: "appearancePreference"), "system")
+    }
+
     @MainActor func testAppOpenSaveRunAndDiagnosticsInBothAppearances() async throws {
         _ = NSApplication.shared
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

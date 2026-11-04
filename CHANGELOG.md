@@ -6,11 +6,18 @@ All notable changes to LocalStat are recorded here.
 
 ### Added
 
+- Toolbar Appearance control with System, Light, and Dark choices that persist
+  between launches.
 - Formatted Tables tab for PROC PRINT, PROC FREQ, and PROC TABULATE, with grouped
   headings, totals, and BY sections where supported by the runtime.
 - Native Print Tables command and formatted table pages in PDF run reports.
 - Optional versioned `--tables-json <path>` runtime output for the IDE; the
   existing text listing and text export stay unchanged.
+
+### Fixed
+
+- Reject malformed table files with overflowing cell spans instead of crashing
+  while validating their layout.
 
 ## [0.1.0-alpha] - 2026-11-01
 

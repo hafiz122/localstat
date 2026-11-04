@@ -37,7 +37,15 @@ public struct ResultTable: Codable, Equatable {
         self.notes = notes
     }
 
-    public var columnCount: Int { headers.last?.cells.reduce(0) { $0 + $1.span } ?? 0 }
+    public var columnCount: Int {
+        var count = 0
+        for cell in headers.last?.cells ?? [] {
+            let (sum, overflow) = count.addingReportingOverflow(cell.span)
+            if overflow { return 0 }
+            count = sum
+        }
+        return count
+    }
 }
 
 public struct TableFile: Codable {
@@ -50,8 +58,12 @@ public struct TableFile: Codable {
             let count = table.columnCount
             guard count > 0, count <= 100_000, !table.headers.isEmpty else { throw TableFileError.invalidShape }
             for row in table.headers + table.rows {
-                guard row.cells.allSatisfy({ $0.span > 0 && $0.span <= count }),
-                      row.cells.reduce(0, { $0 + $1.span }) == count else { throw TableFileError.invalidShape }
+                var width = 0
+                for cell in row.cells {
+                    guard cell.span > 0, cell.span <= count - width else { throw TableFileError.invalidShape }
+                    width += cell.span
+                }
+                guard width == count else { throw TableFileError.invalidShape }
             }
         }
         return tables

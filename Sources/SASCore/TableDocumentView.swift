@@ -30,6 +30,10 @@ import AppKit
 
     required init?(coder: NSCoder) { nil }
     public override var isFlipped: Bool { true }
+    public override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
     public override func isAccessibilityElement() -> Bool { true }
     public override func accessibilityRole() -> NSAccessibility.Role? { .staticText }
     public override func accessibilityValue() -> Any? {

@@ -149,7 +149,10 @@ final class EditorDocument: NSObject, NSTextViewDelegate {
         textView.setAccessibilityLabel("SAS source editor")
         textView.string = source
         textView.delegate = self
-        textView.appearanceChanged = { [weak self] in self?.highlight() }
+        textView.appearanceChanged = { [weak self] in
+            self?.highlight()
+            self?.ruler?.needsDisplay = true
+        }
         scrollView.documentView = textView
         ruler = LineRuler(scrollView: scrollView, editor: textView)
         scrollView.verticalRulerView = ruler

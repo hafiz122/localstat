@@ -2,6 +2,26 @@ import AppKit
 import SASCore
 import UniformTypeIdentifiers
 
+enum AppearancePreference: String, CaseIterable {
+    case system, light, dark
+
+    var title: String {
+        switch self {
+        case .system: "System"
+        case .light: "Light"
+        case .dark: "Dark"
+        }
+    }
+
+    var appearance: NSAppearance? {
+        switch self {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     NSTableViewDataSource, NSTableViewDelegate, NSTabViewDelegate, NSMenuItemValidation {
     var window: NSWindow!
@@ -17,6 +37,9 @@ import UniformTypeIdentifiers
     let projectHint = NSTextField(wrappingLabelWithString: "Double-click a program to open it. Paths are relative to this project folder.")
     let runButton = NSButton(title: "Run Program", target: nil, action: nil)
     let stopButton = NSButton(title: "Stop", target: nil, action: nil)
+    let appearancePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    var appearanceDefaults = UserDefaults.standard
+    private(set) var appearancePreference: AppearancePreference = .system
     var documents: [EditorDocument] = []
     var files: [URL] = []
     var diagnostics: [Diagnostic] = []
@@ -31,6 +54,7 @@ import UniformTypeIdentifiers
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        restoreAppearance()
         buildMenu()
         buildWindow()
         loadProject()
@@ -121,7 +145,18 @@ import UniformTypeIdentifiers
         let folderButton = NSButton(title: "Open Project…", target: self, action: #selector(openProject))
         folderButton.bezelStyle = .rounded
         let spacer = NSView(); spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let toolbar = NSStackView(views: [folderButton, runButton, stopButton, spacer])
+        let appearanceLabel = NSTextField(labelWithString: "Appearance")
+        appearanceLabel.font = .systemFont(ofSize: 12)
+        for preference in AppearancePreference.allCases {
+            appearancePopup.addItem(withTitle: preference.title)
+        }
+        appearancePopup.selectItem(withTitle: appearancePreference.title)
+        appearancePopup.target = self
+        appearancePopup.action = #selector(changeAppearance)
+        appearancePopup.setAccessibilityLabel("Appearance")
+        appearancePopup.toolTip = "Choose System, Light, or Dark appearance"
+        appearancePopup.widthAnchor.constraint(equalToConstant: 100).isActive = true
+        let toolbar = NSStackView(views: [folderButton, runButton, stopButton, spacer, appearanceLabel, appearancePopup])
         toolbar.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
         toolbar.heightAnchor.constraint(equalToConstant: 44).isActive = true
         root.addArrangedSubview(toolbar)
@@ -219,6 +254,24 @@ import UniformTypeIdentifiers
         scroll.hasVerticalScroller = true; scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true; scroll.documentView = view
         return scroll
+    }
+
+    func restoreAppearance() {
+        let saved = appearanceDefaults.string(forKey: "appearancePreference")
+        applyAppearance(AppearancePreference(rawValue: saved ?? "") ?? .system, persist: false)
+    }
+
+    func applyAppearance(_ preference: AppearancePreference, persist: Bool = true) {
+        appearancePreference = preference
+        NSApp.appearance = preference.appearance
+        appearancePopup.selectItem(withTitle: preference.title)
+        if persist { appearanceDefaults.set(preference.rawValue, forKey: "appearancePreference") }
+    }
+
+    @objc func changeAppearance() {
+        guard let title = appearancePopup.selectedItem?.title,
+              let preference = AppearancePreference.allCases.first(where: { $0.title == title }) else { return }
+        applyAppearance(preference)
     }
 
     func loadProject() {

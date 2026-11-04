@@ -27,6 +27,17 @@ final class RuntimeRunnerTests: XCTestCase {
         let raw = "Heading\nName\tValue\nx\t12\nlong\t3\n\nTail\n"
         XCTAssertEqual(ListingFormatter.aligned(raw), "Heading\nName  Value\nx     12\nlong  3\n\nTail\n")
     }
+    func testTableValidationRejectsOverflowingCellSpans() {
+        let overflowingHeader = ResultTable(procedure: "PRINT", title: "Invalid",
+                                            headers: [ResultRow(cells: [ResultCell("a", span: Int.max), ResultCell("b")])],
+                                            rows: [])
+        XCTAssertThrowsError(try TableFile(version: 1, tables: [overflowingHeader]).validated())
+
+        let overflowingRow = ResultTable(procedure: "PRINT", title: "Invalid",
+                                         headers: [ResultRow(cells: [ResultCell("a", span: 2)])],
+                                         rows: [ResultRow(cells: [ResultCell("a", span: 2), ResultCell("b", span: 2)])])
+        XCTAssertThrowsError(try TableFile(version: 1, tables: [overflowingRow]).validated())
+    }
     @MainActor func testTablePageLayoutAndPDFReport() throws {
         _ = NSApplication.shared
         let headers = [ResultRow(cells: [ResultCell("Group"), ResultCell("Analysis", span: 8)]),
