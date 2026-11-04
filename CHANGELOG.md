@@ -8,6 +8,8 @@ All notable changes to LocalStat are recorded here.
 
 - Toolbar Appearance control with System, Light, and Dark choices that persist
   between launches.
+- Code-first IDE layout with saved pane sizes, a collapsible project navigator,
+  and a compact results header with an expansion control.
 - Formatted Tables tab for PROC PRINT, PROC FREQ, and PROC TABULATE, with grouped
   headings, totals, and BY sections where supported by the runtime.
 - Native Print Tables command and formatted table pages in PDF run reports.

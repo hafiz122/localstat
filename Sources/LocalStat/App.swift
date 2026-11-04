@@ -23,13 +23,19 @@ enum AppearancePreference: String, CaseIterable {
 }
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
-    NSTableViewDataSource, NSTableViewDelegate, NSTabViewDelegate, NSMenuItemValidation {
+    NSTableViewDataSource, NSTableViewDelegate, NSTabViewDelegate, NSSplitViewDelegate, NSMenuItemValidation {
     var window: NSWindow!
     private var compatibilityWindow: NSWindow?
     let fileTable = NSTableView()
     let diagnosticTable = NSTableView()
     let tabs = NSTabView()
     let results = NSTabView()
+    let navigatorSplit = NSSplitView()
+    let editorResultsSplit = NSSplitView()
+    let navigatorPane = NSStackView()
+    let resultsContainer = NSStackView()
+    let resultsSelector = NSSegmentedControl()
+    let expandResultsButton = NSButton(title: "Expand Results", target: nil, action: nil)
     let outputView = NSTextView()
     let tableScroll = NSScrollView()
     let statusLabel = NSTextField(labelWithString: "Open a program or create a new one.")
@@ -39,7 +45,14 @@ enum AppearancePreference: String, CaseIterable {
     let stopButton = NSButton(title: "Stop", target: nil, action: nil)
     let appearancePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     var appearanceDefaults = UserDefaults.standard
+    var layoutDefaults = UserDefaults.standard
     private(set) var appearancePreference: AppearancePreference = .system
+    private(set) var navigatorVisible = true
+    private(set) var resultsExpanded = false
+    private var navigatorWidth: CGFloat = 215
+    private var normalResultsFraction: CGFloat = 0.30
+    private var navigatorMinimumWidth: NSLayoutConstraint?
+    private var applyingLayout = false
     var documents: [EditorDocument] = []
     var files: [URL] = []
     var diagnostics: [Diagnostic] = []
@@ -108,6 +121,9 @@ enum AppearancePreference: String, CaseIterable {
         let find = NSMenuItem(title: "Find…", action: #selector(NSTextView.performFindPanelAction(_:)), keyEquivalent: "f")
         find.tag = NSTextFinder.Action.showFindInterface.rawValue
         edit.addItem(find)
+        let view = section("View")
+        item(view, "Hide Project Navigator", #selector(toggleNavigator), "0", target: self)
+        item(view, "Expand Results", #selector(toggleResultsExpansion), "2", target: self)
         let program = section("Program")
         item(program, "Run Program", #selector(runProgram), "r", target: self)
         item(program, "Stop", #selector(stopProgram), ".", target: self)
@@ -118,6 +134,8 @@ enum AppearancePreference: String, CaseIterable {
     }
 
     func buildWindow() {
+        restoreLayoutPreferences()
+        applyingLayout = true
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1120, height: 780),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "LocalStat"
@@ -160,10 +178,10 @@ enum AppearancePreference: String, CaseIterable {
         toolbar.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
         toolbar.heightAnchor.constraint(equalToConstant: 44).isActive = true
         root.addArrangedSubview(toolbar)
-        let split = NSSplitView()
-        split.isVertical = true; split.dividerStyle = .thin
-        split.setContentHuggingPriority(.defaultLow, for: .vertical)
-        let sidebar = NSStackView()
+        navigatorSplit.isVertical = true; navigatorSplit.dividerStyle = .thin
+        navigatorSplit.delegate = self
+        navigatorSplit.setContentHuggingPriority(.defaultLow, for: .vertical)
+        let sidebar = navigatorPane
         sidebar.orientation = .vertical; sidebar.spacing = 8; sidebar.distribution = .fill
         sidebar.edgeInsets = NSEdgeInsets(top: 10, left: 8, bottom: 8, right: 8)
         projectLabel.font = .systemFont(ofSize: 12, weight: .semibold)
@@ -182,9 +200,11 @@ enum AppearancePreference: String, CaseIterable {
         projectHint.font = .systemFont(ofSize: 11); projectHint.textColor = .secondaryLabelColor
         sidebar.addArrangedSubview(projectHint)
         projectHint.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -16).isActive = true
-        sidebar.widthAnchor.constraint(greaterThanOrEqualToConstant: 150).isActive = true
-        let vertical = NSSplitView()
+        navigatorMinimumWidth = sidebar.widthAnchor.constraint(greaterThanOrEqualToConstant: 150)
+        navigatorMinimumWidth?.isActive = true
+        let vertical = editorResultsSplit
         vertical.isVertical = false; vertical.dividerStyle = .thin
+        vertical.delegate = self
         tabs.delegate = self
         tabs.tabViewType = .topTabsBezelBorder
         tabs.setAccessibilityLabel("Open programs")
@@ -201,6 +221,8 @@ enum AppearancePreference: String, CaseIterable {
         outputView.textContainer?.widthTracksTextView = false
         outputView.string = "Run a program to see its text output here. Each run starts a fresh session."
         outputView.setAccessibilityLabel("Program output")
+        results.tabViewType = .noTabsNoBorder
+        results.delegate = self
         let outItem = NSTabViewItem(identifier: "output"); outItem.label = "Output"; outItem.view = scroll(outputView)
         tableScroll.hasVerticalScroller = true
         tableScroll.hasHorizontalScroller = true
@@ -217,22 +239,36 @@ enum AppearancePreference: String, CaseIterable {
         diagnosticTable.rowHeight = 23
         let diagItem = NSTabViewItem(identifier: "diagnostics"); diagItem.label = "Diagnostics"; diagItem.view = scroll(diagnosticTable)
         results.addTabViewItem(outItem); results.addTabViewItem(tableItem); results.addTabViewItem(diagItem)
-        // Native tab bezels extend above their nominal bounds on newer macOS.
-        // Reserve that space so the split view doesn't clip their labels.
-        let resultContainer = NSView()
-        results.translatesAutoresizingMaskIntoConstraints = false
-        resultContainer.addSubview(results)
-        NSLayoutConstraint.activate([
-            results.leadingAnchor.constraint(equalTo: resultContainer.leadingAnchor),
-            results.trailingAnchor.constraint(equalTo: resultContainer.trailingAnchor),
-            results.topAnchor.constraint(equalTo: resultContainer.topAnchor, constant: 12),
-            results.bottomAnchor.constraint(equalTo: resultContainer.bottomAnchor)
-        ])
-        vertical.addArrangedSubview(resultContainer)
+        resultsSelector.segmentCount = 3
+        for (index, title) in ["Output", "Tables (0)", "Diagnostics (0)"].enumerated() {
+            resultsSelector.setLabel(title, forSegment: index)
+        }
+        resultsSelector.trackingMode = .selectOne
+        resultsSelector.selectedSegment = 0
+        resultsSelector.target = self
+        resultsSelector.action = #selector(changeResultsView)
+        resultsSelector.setAccessibilityLabel("Results view")
+        expandResultsButton.target = self
+        expandResultsButton.action = #selector(toggleResultsExpansion)
+        expandResultsButton.bezelStyle = .rounded
+        let resultsTitle = NSTextField(labelWithString: "Results")
+        resultsTitle.font = .systemFont(ofSize: 12, weight: .semibold)
+        let headerSpacer = NSView(); headerSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let resultsHeader = NSStackView(views: [resultsTitle, resultsSelector, headerSpacer, expandResultsButton])
+        resultsHeader.edgeInsets = NSEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)
+        resultsHeader.spacing = 8
+        resultsHeader.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        resultsContainer.orientation = .vertical
+        resultsContainer.spacing = 0
+        resultsContainer.addArrangedSubview(resultsHeader)
+        resultsContainer.addArrangedSubview(results)
+        resultsHeader.widthAnchor.constraint(equalTo: resultsContainer.widthAnchor).isActive = true
+        results.widthAnchor.constraint(equalTo: resultsContainer.widthAnchor).isActive = true
+        vertical.addArrangedSubview(resultsContainer)
         tabs.heightAnchor.constraint(greaterThanOrEqualToConstant: 160).isActive = true
-        results.heightAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
-        split.addArrangedSubview(sidebar); split.addArrangedSubview(vertical)
-        root.addArrangedSubview(split)
+        resultsContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: 140).isActive = true
+        navigatorSplit.addArrangedSubview(sidebar); navigatorSplit.addArrangedSubview(vertical)
+        root.addArrangedSubview(navigatorSplit)
         statusLabel.font = .systemFont(ofSize: 11)
         statusLabel.lineBreakMode = .byTruncatingMiddle
         statusLabel.setAccessibilityLabel("Run status")
@@ -240,13 +276,13 @@ enum AppearancePreference: String, CaseIterable {
         status.edgeInsets = NSEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
         status.heightAnchor.constraint(equalToConstant: 29).isActive = true
         root.addArrangedSubview(status)
-        for view in [toolbar, split, status] {
+        for view in [toolbar, navigatorSplit, status] {
             view.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
         }
-        DispatchQueue.main.async {
-            split.setPosition(215, ofDividerAt: 0)
-            vertical.setPosition(420, ofDividerAt: 0)
-        }
+        window.contentView?.layoutSubtreeIfNeeded()
+        applyNavigatorLayout()
+        applyResultsLayout()
+        applyingLayout = false
     }
 
     func scroll(_ view: NSView) -> NSScrollView {
@@ -254,6 +290,90 @@ enum AppearancePreference: String, CaseIterable {
         scroll.hasVerticalScroller = true; scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true; scroll.documentView = view
         return scroll
+    }
+
+    private func restoreLayoutPreferences() {
+        if layoutDefaults.object(forKey: "navigatorWidth") != nil {
+            let saved = layoutDefaults.double(forKey: "navigatorWidth")
+            if saved.isFinite { navigatorWidth = CGFloat(saved) }
+        }
+        if layoutDefaults.object(forKey: "resultsFraction") != nil {
+            let saved = layoutDefaults.double(forKey: "resultsFraction")
+            if saved.isFinite, (0...1).contains(saved) { normalResultsFraction = CGFloat(saved) }
+        }
+        if layoutDefaults.object(forKey: "navigatorVisible") != nil {
+            navigatorVisible = layoutDefaults.bool(forKey: "navigatorVisible")
+        }
+    }
+
+    private func applyNavigatorLayout() {
+        if navigatorVisible {
+            navigatorPane.isHidden = false
+            navigatorMinimumWidth?.isActive = true
+            navigatorSplit.adjustSubviews()
+            let maximum = max(150, navigatorSplit.bounds.width - 400)
+            navigatorSplit.setPosition(min(max(navigatorWidth, 150), maximum), ofDividerAt: 0)
+        } else {
+            navigatorMinimumWidth?.isActive = false
+            navigatorPane.isHidden = true
+            navigatorSplit.adjustSubviews()
+        }
+    }
+
+    private func applyResultsLayout() {
+        let available = editorResultsSplit.bounds.height - editorResultsSplit.dividerThickness
+        guard available >= 300 else { return }
+        let fraction = resultsExpanded ? 0.60 : normalResultsFraction
+        let resultsHeight = min(max(available * fraction, 140), available - 160)
+        editorResultsSplit.setPosition(available - resultsHeight, ofDividerAt: 0)
+    }
+
+    func splitViewDidResizeSubviews(_ notification: Notification) {
+        guard !applyingLayout, let split = notification.object as? NSSplitView else { return }
+        if split === navigatorSplit, navigatorVisible, navigatorPane.frame.width >= 150 {
+            navigatorWidth = navigatorPane.frame.width
+            layoutDefaults.set(Double(navigatorWidth), forKey: "navigatorWidth")
+        } else if split === editorResultsSplit, !resultsExpanded {
+            let available = split.bounds.height - split.dividerThickness
+            guard available >= 300 else { return }
+            normalResultsFraction = resultsContainer.frame.height / available
+            layoutDefaults.set(Double(normalResultsFraction), forKey: "resultsFraction")
+        }
+    }
+
+    @objc func toggleNavigator() {
+        guard window != nil else { return }
+        if navigatorVisible, navigatorPane.frame.width >= 150 { navigatorWidth = navigatorPane.frame.width }
+        navigatorVisible.toggle()
+        layoutDefaults.set(navigatorVisible, forKey: "navigatorVisible")
+        applyingLayout = true
+        applyNavigatorLayout()
+        applyingLayout = false
+    }
+
+    @objc func toggleResultsExpansion() {
+        guard window != nil else { return }
+        if !resultsExpanded {
+            let available = editorResultsSplit.bounds.height - editorResultsSplit.dividerThickness
+            if available >= 300 { normalResultsFraction = resultsContainer.frame.height / available }
+            layoutDefaults.set(Double(normalResultsFraction), forKey: "resultsFraction")
+        }
+        resultsExpanded.toggle()
+        expandResultsButton.title = resultsExpanded ? "Restore Editor" : "Expand Results"
+        applyingLayout = true
+        applyResultsLayout()
+        applyingLayout = false
+    }
+
+    @objc func changeResultsView() {
+        let index = resultsSelector.selectedSegment
+        guard (0..<results.numberOfTabViewItems).contains(index) else { return }
+        results.selectTabViewItem(at: index)
+    }
+
+    private func selectResults(at index: Int) {
+        results.selectTabViewItem(at: index)
+        resultsSelector.selectedSegment = index
     }
 
     func restoreAppearance() {
@@ -302,9 +422,8 @@ enum AppearancePreference: String, CaseIterable {
         files.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
         projectLabel.stringValue = projectURL.lastPathComponent
         projectLabel.toolTip = projectURL.path
-        projectHint.stringValue = files.isEmpty
-            ? "No SAS programs in this folder. Choose File > New Program to create one."
-            : "Double-click a program to open it. Paths are relative to this project folder."
+        projectHint.stringValue = "No SAS programs in this folder. Choose File > New Program to create one."
+        projectHint.isHidden = !files.isEmpty
         fileTable.reloadData()
         updateControls()
     }
@@ -432,11 +551,11 @@ enum AppearancePreference: String, CaseIterable {
                 setTableMessage(result.tableIssue ?? "This run produced no formatted PRINT, FREQ, or TABULATE tables.")
             }
             diagnosticTable.reloadData()
-            results.tabViewItems[1].label = "Tables (\(result.tables.count))"
-            results.tabViewItems[2].label = "Diagnostics (\(diagnostics.count))"
-            if result.status != .success { results.selectTabViewItem(at: 2) }
-            else if !result.tables.isEmpty { results.selectTabViewItem(at: 1) }
-            else { results.selectTabViewItem(at: 0) }
+            resultsSelector.setLabel("Tables (\(result.tables.count))", forSegment: 1)
+            resultsSelector.setLabel("Diagnostics (\(diagnostics.count))", forSegment: 2)
+            if result.status != .success { selectResults(at: 2) }
+            else if !result.tables.isEmpty { selectResults(at: 1) }
+            else { selectResults(at: 0) }
             statusLabel.stringValue = "\(result.status.description) · \(doc.url?.lastPathComponent ?? "Untitled.sas") · fresh session"
             updateControls(); refreshProject()
         }
@@ -517,7 +636,13 @@ enum AppearancePreference: String, CaseIterable {
             statusLabel.stringValue = "Ready · fresh session"
         }
     }
-    func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) { updateControls() }
+    func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
+        if tabView === results, let tabViewItem {
+            resultsSelector.selectedSegment = results.indexOfTabViewItem(tabViewItem)
+        } else {
+            updateControls()
+        }
+    }
     func numberOfRows(in tableView: NSTableView) -> Int { tableView === fileTable ? files.count : diagnostics.count }
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let label = NSTextField(labelWithString: tableView === fileTable
@@ -529,6 +654,12 @@ enum AppearancePreference: String, CaseIterable {
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
+        case #selector(toggleNavigator):
+            menuItem.title = navigatorVisible ? "Hide Project Navigator" : "Show Project Navigator"
+            return true
+        case #selector(toggleResultsExpansion):
+            menuItem.title = resultsExpanded ? "Restore Editor" : "Expand Results"
+            return true
         case #selector(runProgram): return current != nil && !runner.isRunning
         case #selector(stopProgram): return runner.isRunning
         case #selector(saveCurrent), #selector(saveAs): return current != nil
