@@ -38,6 +38,16 @@ extension AppDelegate {
         settingsController?.window?.makeKeyAndOrderFront(nil)
     }
 
+    @objc func showEditorFontSettings() {
+        showSettings()
+        settingsController?.selectSection(.editor)
+    }
+
+    @objc func showOutputFontSettings() {
+        showSettings()
+        settingsController?.selectSection(.outputAndTables)
+    }
+
     @objc func showHelp() { showHelpArticle(nil) }
 
     func showHelpArticle(_ id: String?) {

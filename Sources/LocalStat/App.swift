@@ -11,6 +11,8 @@ import UniformTypeIdentifiers
     let fileTable = NSTableView()
     let diagnosticTable = NSTableView()
     let tabs = NSTabView()
+    let programTabStrip = ProgramTabStrip()
+    let editorContainer = NSStackView()
     let results = NSTabView()
     let navigatorSplit = NSSplitView()
     let editorResultsSplit = NSSplitView()
@@ -128,6 +130,8 @@ import UniformTypeIdentifiers
         item(view, "Highlight Current Line", #selector(toggleCurrentLine), target: self)
         item(view, "Syntax Highlighting", #selector(toggleSyntax), target: self)
         view.addItem(.separator())
+        item(view, "Editor Font…", #selector(showEditorFontSettings), target: self)
+        item(view, "Output Font…", #selector(showOutputFontSettings), target: self)
         item(view, "Increase Size", #selector(increaseSize), "+", target: self)
         item(view, "Decrease Size", #selector(decreaseSize), "-", target: self)
         item(view, "Reset Size", #selector(resetSize), "0", modifiers: [.command, .shift], target: self)
@@ -214,9 +218,18 @@ import UniformTypeIdentifiers
         vertical.isVertical = false; vertical.dividerStyle = .thin
         vertical.delegate = self
         tabs.delegate = self
-        tabs.tabViewType = .topTabsBezelBorder
-        tabs.setAccessibilityLabel("Open programs")
-        vertical.addArrangedSubview(tabs)
+        tabs.tabViewType = .noTabsNoBorder
+        programTabStrip.selectDocument = { [weak self] id in
+            self?.tabs.selectTabViewItem(withIdentifier: id)
+            self?.window.makeFirstResponder(self?.current?.textView)
+        }
+        programTabStrip.closeDocument = { [weak self] id in self?.closeDocument(id) }
+        editorContainer.orientation = .vertical; editorContainer.spacing = 0
+        editorContainer.addArrangedSubview(programTabStrip)
+        editorContainer.addArrangedSubview(tabs)
+        programTabStrip.widthAnchor.constraint(equalTo: editorContainer.widthAnchor).isActive = true
+        tabs.widthAnchor.constraint(equalTo: editorContainer.widthAnchor).isActive = true
+        vertical.addArrangedSubview(editorContainer)
         outputView.isEditable = false
         outputView.isRichText = false
         outputView.isSelectable = true
@@ -335,9 +348,10 @@ import UniformTypeIdentifiers
 
     private func applyResultsLayout() {
         let available = editorResultsSplit.bounds.height - editorResultsSplit.dividerThickness
-        guard available >= 300 else { return }
+        let minimumEditorHeight = 160 + ProgramTabStrip.stripHeight
+        guard available >= minimumEditorHeight + 140 else { return }
         let fraction = resultsExpanded ? 0.60 : normalResultsFraction
-        let resultsHeight = min(max(available * fraction, 140), available - 160)
+        let resultsHeight = min(max(available * fraction, 140), available - minimumEditorHeight)
         editorResultsSplit.setPosition(available - resultsHeight, ofDividerAt: 0)
     }
 
@@ -534,8 +548,25 @@ import UniformTypeIdentifiers
             activeWindow.close()
             return
         }
-        guard let doc = current, confirmClose(doc), let item = tabs.selectedTabViewItem else { return }
-        tabs.removeTabViewItem(item); documents.removeAll { $0.id == doc.id }; updateControls()
+        if let id = current?.id { closeDocument(id) }
+    }
+    func closeDocument(_ id: UUID) {
+        guard let doc = documents.first(where: { $0.id == id }),
+              let item = tabs.tabViewItems.first(where: { ($0.identifier as? UUID) == id }) else { return }
+        let previousID = current?.id
+        guard confirmClose(doc) else {
+            if let previousID { tabs.selectTabViewItem(withIdentifier: previousID) }
+            window.makeFirstResponder(current?.textView)
+            return
+        }
+        guard let index = documents.firstIndex(where: { $0.id == id }) else { return }
+        let nextID = previousID != id ? previousID
+            : (index + 1 < documents.count ? documents[index + 1].id : (index > 0 ? documents[index - 1].id : nil))
+        documents.remove(at: index)
+        tabs.removeTabViewItem(item)
+        if let nextID { tabs.selectTabViewItem(withIdentifier: nextID) }
+        window.makeFirstResponder(current?.textView)
+        updateControls()
     }
     func windowShouldClose(_ sender: NSWindow) -> Bool { NSApp.terminate(nil); return false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -649,6 +680,7 @@ import UniformTypeIdentifiers
         operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
     }
     func updateControls() {
+        programTabStrip.synchronize(documents: documents, selectedID: current?.id)
         runButton.isEnabled = current != nil && !runner.isRunning
         stopButton.isEnabled = runner.isRunning
         window?.isDocumentEdited = documents.contains { $0.isDirty }
