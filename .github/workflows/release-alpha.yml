@@ -37,6 +37,7 @@ jobs:
           xcodebuild -version
           swift --version
       - name: Verify release identity
+        id: release_identity
         env:
           CANDIDATE_COMMIT: ${{ inputs.candidate_commit }}
           GH_TOKEN: ${{ github.token }}
@@ -50,15 +51,19 @@ jobs:
             test "$GITHUB_REF_NAME" = "$tag"
           fi
           gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --slurp > "$RUNNER_TEMP/releases.json"
-          python3 - "$RUNNER_TEMP/releases.json" "$tag" <<'PY'
+          python3 - "$RUNNER_TEMP/releases.json" "$tag" "$GITHUB_OUTPUT" <<'PY'
           import json, sys
           releases = [r for page in json.load(open(sys.argv[1])) for r in page]
-          if any(r['tag_name'] == sys.argv[2] for r in releases):
-              sys.exit('Release already exists; refusing to replace its assets')
+          exists = any(r['tag_name'] == sys.argv[2] for r in releases)
+          with open(sys.argv[3], 'a') as output:
+              print(f'release_exists={str(exists).lower()}', file=output)
+          if exists:
+              print(f'Release {sys.argv[2]} already exists; validating without replacing its assets')
           PY
       - name: Test and package
         run: ./scripts/release-alpha.sh
       - name: Create draft prerelease
+        if: steps.release_identity.outputs.release_exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
