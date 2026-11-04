@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Macros and includes</title><link rel="stylesheet" href="style.css"></head><body>
+<h1>Macros and includes</h1><p>Macro processing builds SAS source before or during step execution. Use %LET for a macro variable and an ampersand to substitute it. A macro can accept parameters and emit repeated code.</p>
+<pre><code>%let count=3;
+%macro make(name);
+data &amp;name;
+  do i=1 to &amp;count;
+    square=i*i;
+    output;
+  end;
+run;
+%mend;
+%make(squares);
+proc print data=squares; run;</code></pre>
+<p>The inherited subset includes nested definitions, positional and keyword parameters, local and global variables, conditional and loop directives, %EVAL, %SYSEVALF, %SYSFUNC, and parts of macro quoting. Quoting and deferred expansion have limits; a macro accepted elsewhere may require changes.</p>
+<h2>Include files</h2><p><code>%include 'shared code.sas';</code> reads a source file using the current project directory for relative paths. Macro definitions from earlier LocalStat runs do not persist. Include or define everything needed in the submitted buffer.</p>
+<h2>CALL SYMPUT and SYMPUTX</h2><p>These routines communicate DATA-step values to macro variables at step boundaries. Substituting a macro variable before it has been created can produce unexpected source. Inspect Diagnostics and keep the distinction between macro-time text and DATA-step values clear.</p></body></html>

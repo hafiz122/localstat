@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>SQL queries</title><link rel="stylesheet" href="style.css"></head><body>
+<h1>SQL queries</h1><p>PROC SQL provides a subset for querying and manipulating datasets. Finish the procedure with QUIT. Start with simple projections, filters, ordering, grouping, and supported joins before porting a large query.</p>
+<pre><code>data sales;
+  input group $ amount;
+  datalines;
+A 10
+A 20
+B 7
+;
+run;
+proc sql;
+  select group, sum(amount) as total
+  from sales
+  group by group
+  order by group;
+quit;</code></pre>
+<p>The expected totals are A=30 and B=7. SQL output currently appears in the text Output view. SQL syntax, aggregate behavior, supported expressions, and dataset options have boundaries inherited from the local runtime. A successful query is not a guarantee of identical behavior to every SAS SQL feature.</p>
+<p><a href="localstat-help:reference">Browse the reference index</a> for the procedure inventory and <a href="localstat-help:compatibility">compatibility notes</a>.</p></body></html>

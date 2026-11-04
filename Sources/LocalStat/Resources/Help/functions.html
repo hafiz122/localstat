@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Functions, dates, and formats</title><link rel="stylesheet" href="style.css"></head><body>
+<h1>Functions, dates, and formats</h1><p>Functions return values inside expressions. CALL routines can update arguments or runtime state. The <a href="localstat-help:reference">complete index</a> distinguishes implemented entries from partial or unavailable ones.</p>
+<h2>Common groups</h2><ul><li>Numeric: ABS, ROUND, SQRT, LOG, EXP, MOD, and arithmetic/statistical functions.</li><li>Character: STRIP, UPCASE, LOWCASE, SUBSTR, SCAN, CATS, and CATX.</li><li>Missing values: MISSING, NMISS, CMISS, COALESCE, and COALESCEC.</li><li>Dates: MDY, DAY, MONTH, YEAR, INTCK, INTNX, and supported date/time functions.</li><li>Probability: CDF, PDF, QUANTILE, distribution functions, and random-number routines with supported parameters.</li></ul>
+<p>SAS-style dates count days from 1 January 1960; datetimes count seconds. A numeric format changes presentation, not the stored value. INPUT converts character data using an informat; PUT creates formatted character output. FORMAT attaches presentation metadata.</p>
+<pre><code>data demo;
+  length name $20;
+  name=upcase(strip('  Ana  '));
+  magnitude=abs(-3);
+  date=mdy(1,15,2026);
+  format date date9.;
+run;
+proc print data=demo; run;</code></pre>
+<p>Supported signatures, missing values, encodings, and numerical edge cases can differ from the original SAS engine. Use a small known example when depending on a specialized function. An indexed name does not imply universal support for related operating-system, catalog, database, or external-service behavior.</p></body></html>

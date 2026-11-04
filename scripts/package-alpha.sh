@@ -35,6 +35,8 @@ test "$(/usr/libexec/PlistBuddy -c 'Print :LocalStatSourceCommit' "$candidate/Co
 for resource in LocalStat-LICENSE.txt OpenSAS-LICENSE.txt NOTICE.txt ASSET_LICENSES.md THIRD_PARTY_NOTICES.md COMPATIBILITY.md runtime-version.txt UPSTREAM_COMMIT LocalStat.icns localstat-logo.png; do
     test -s "$candidate/Contents/Resources/$resource"
 done
+test -s "$candidate/Contents/Resources/Help/contents.json"
+test -s "$candidate/Contents/Resources/Help/reference.html"
 for notice in ReadStat-MIT.txt haven-MIT.txt pandas-LICENSE.txt; do
     cmp "licenses/$notice" "$candidate/Contents/Resources/licenses/$notice"
 done

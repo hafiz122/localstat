@@ -53,7 +53,8 @@ public enum EditorTextEditing {
         )
     }
 
-    public static func newline(in source: String, selection: NSRange) -> EditorTextEdit? {
+    public static func newline(in source: String, selection: NSRange, indentWidth: Int = 2) -> EditorTextEdit? {
+        let indentUnit = String(repeating: " ", count: min(max(indentWidth, 1), 8))
         guard isValid(selection, in: source) else { return nil }
         let text = source as NSString
         let prefix = text.substring(to: selection.location) as NSString
@@ -67,7 +68,7 @@ public enum EditorTextEditing {
         if code && opensIndentedBlock(statement) {
             nextIndent += indentUnit
         } else if code && closesIndentedBlock(statement) {
-            nextIndent = removingOneIndent(from: leading)
+            nextIndent = removingOneIndent(from: leading, width: indentUnit.count)
         }
 
         let following = selection.location < text.length
@@ -90,7 +91,8 @@ public enum EditorTextEditing {
         )
     }
 
-    public static func indent(in source: String, selection: NSRange) -> EditorTextEdit? {
+    public static func indent(in source: String, selection: NSRange, indentWidth: Int = 2) -> EditorTextEdit? {
+        let indentUnit = String(repeating: " ", count: min(max(indentWidth, 1), 8))
         guard isValid(selection, in: source) else { return nil }
         if selection.length == 0 {
             return EditorTextEdit(
@@ -110,7 +112,7 @@ public enum EditorTextEditing {
         )
     }
 
-    public static func outdent(in source: String, selection: NSRange) -> EditorTextEdit? {
+    public static func outdent(in source: String, selection: NSRange, indentWidth: Int = 2) -> EditorTextEdit? {
         guard isValid(selection, in: source) else { return nil }
         let text = source as NSString
         let lines = text.lineRange(for: selection)
@@ -118,7 +120,7 @@ public enum EditorTextEditing {
         var removedFromFirstLine = 0
         var lineIndex = 0
         let replacement = mapLines(original) { line in
-            let result = removingOneIndent(from: line)
+            let result = removingOneIndent(from: line, width: min(max(indentWidth, 1), 8))
             if lineIndex == 0 { removedFromFirstLine = (line as NSString).length - (result as NSString).length }
             lineIndex += 1
             return result
@@ -151,9 +153,9 @@ public enum EditorTextEditing {
         String(line.prefix { $0 == " " || $0 == "\t" })
     }
 
-    private static func removingOneIndent(from line: String) -> String {
+    private static func removingOneIndent(from line: String, width: Int) -> String {
         if line.hasPrefix("\t") { return String(line.dropFirst()) }
-        let spaces = min(indentUnit.count, line.prefix { $0 == " " }.count)
+        let spaces = min(width, line.prefix { $0 == " " }.count)
         return String(line.dropFirst(spaces))
     }
 

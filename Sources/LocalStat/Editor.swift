@@ -3,6 +3,8 @@ import SASCore
 
 final class LineRuler: NSRulerView {
     weak var editor: NSTextView?
+    var palette = EditorTheme.native.palette
+    var labelSize: CGFloat = 11
 
     init(scrollView: NSScrollView, editor: NSTextView) {
         self.editor = editor
@@ -13,14 +15,14 @@ final class LineRuler: NSRulerView {
     required init(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 
     override func drawHashMarksAndLabels(in rect: NSRect) {
-        NSColor.controlBackgroundColor.setFill()
+        palette.background.setFill()
         bounds.fill()
         guard let editor, let layout = editor.layoutManager, let container = editor.textContainer else { return }
         let visible = scrollView?.contentView.bounds ?? .zero
         let text = editor.string as NSString
         let attrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular),
-            .foregroundColor: NSColor.secondaryLabelColor
+            .font: NSFont.monospacedDigitSystemFont(ofSize: labelSize, weight: .regular),
+            .foregroundColor: palette.comment
         ]
         var offset = 0, line = 1
         while offset < text.length {
@@ -45,9 +47,13 @@ final class LineRuler: NSRulerView {
 
 final class CodeTextView: NSTextView {
     var appearanceChanged: (() -> Void)?
+    var automaticIndentation = true
+    var bracketPairing = true
+    var indentWidth = 2
+    var currentLineColor: NSColor?
 
     override func insertText(_ insertString: Any, replacementRange: NSRange) {
-        guard !hasMarkedText(), let text = insertString as? String,
+        guard bracketPairing, !hasMarkedText(), let text = insertString as? String,
               (text as NSString).length == 1 else {
             super.insertText(insertString, replacementRange: replacementRange)
             return
@@ -63,7 +69,7 @@ final class CodeTextView: NSTextView {
     }
 
     override func insertNewline(_ sender: Any?) {
-        guard let edit = EditorTextEditing.newline(in: string, selection: selectedRange()) else {
+        guard automaticIndentation, let edit = EditorTextEditing.newline(in: string, selection: selectedRange(), indentWidth: indentWidth) else {
             super.insertNewline(sender)
             return
         }
@@ -71,7 +77,7 @@ final class CodeTextView: NSTextView {
     }
 
     override func insertTab(_ sender: Any?) {
-        guard let edit = EditorTextEditing.indent(in: string, selection: selectedRange()) else {
+        guard let edit = EditorTextEditing.indent(in: string, selection: selectedRange(), indentWidth: indentWidth) else {
             super.insertTab(sender)
             return
         }
@@ -79,14 +85,14 @@ final class CodeTextView: NSTextView {
     }
 
     override func insertBacktab(_ sender: Any?) {
-        guard let edit = EditorTextEditing.outdent(in: string, selection: selectedRange()) else {
+        guard let edit = EditorTextEditing.outdent(in: string, selection: selectedRange(), indentWidth: indentWidth) else {
             return
         }
         apply(edit)
     }
 
     override func deleteBackward(_ sender: Any?) {
-        guard let edit = EditorTextEditing.deleteBackward(in: string, selection: selectedRange()) else {
+        guard bracketPairing, let edit = EditorTextEditing.deleteBackward(in: string, selection: selectedRange()) else {
             super.deleteBackward(sender)
             return
         }
@@ -96,6 +102,22 @@ final class CodeTextView: NSTextView {
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         appearanceChanged?()
+    }
+
+    override func drawBackground(in rect: NSRect) {
+        super.drawBackground(in: rect)
+        guard let color = currentLineColor, let layout = layoutManager, let container = textContainer else { return }
+        layout.ensureLayout(for: container)
+        let offset = min(selectedRange().location, (string as NSString).length)
+        let line: NSRect
+        if offset == (string as NSString).length && (string.isEmpty || string.hasSuffix("\n")) {
+            line = layout.extraLineFragmentRect
+        } else {
+            let glyph = layout.glyphIndexForCharacter(at: min(offset, max(0, (string as NSString).length - 1)))
+            line = layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+        }
+        color.setFill()
+        NSRect(x: bounds.minX, y: line.minY + textContainerInset.height, width: bounds.width, height: line.height).intersection(rect).fill()
     }
 
     private func effectiveRange(_ replacementRange: NSRange) -> NSRange {
@@ -119,6 +141,7 @@ final class EditorDocument: NSObject, NSTextViewDelegate {
     let scrollView = NSScrollView()
     var ruler: LineRuler!
     private var highlightWork: DispatchWorkItem?
+    private var preferences = PreferenceValues()
     var isDirty: Bool { textView.string != savedSource }
     var title: String { (url?.lastPathComponent ?? "Untitled.sas") + (isDirty ? " •" : "") }
 
@@ -165,6 +188,38 @@ final class EditorDocument: NSObject, NSTextViewDelegate {
 
     @objc private func scrolled() { ruler.needsDisplay = true }
 
+    func textViewDidChangeSelection(_ notification: Notification) { textView.needsDisplay = true }
+
+    func applyPreferences(_ value: PreferenceValues) {
+        let undo = textView.undoManager
+        let registrationEnabled = undo?.isUndoRegistrationEnabled == true
+        if registrationEnabled { undo?.disableUndoRegistration() }
+        defer { if registrationEnabled { undo?.enableUndoRegistration() } }
+        preferences = value
+        let selected = textView.selectedRanges
+        let origin = scrollView.contentView.bounds.origin
+        let palette = value.theme.palette
+        if scrollView.appearance?.name != value.theme.appearance?.name { scrollView.appearance = value.theme.appearance }
+        textView.backgroundColor = palette.background
+        textView.insertionPointColor = palette.text
+        textView.selectedTextAttributes = [.backgroundColor: palette.selection, .foregroundColor: palette.selectedText]
+        textView.automaticIndentation = value.automaticIndentation
+        textView.bracketPairing = value.bracketPairing
+        textView.indentWidth = value.indentWidth
+        textView.currentLineColor = value.currentLineHighlight ? palette.currentLine : nil
+        textView.layoutManager?.showsInvisibleCharacters = value.invisibleCharacters
+        scrollView.rulersVisible = value.lineNumbers
+        configureWrapping(textView, in: scrollView, enabled: value.editorWrap)
+        ruler.palette = palette
+        ruler.labelSize = max(10, CGFloat(value.editorFontSize) - 2)
+        highlight()
+        textView.selectedRanges = selected
+        scrollView.contentView.scroll(to: origin)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        ruler.needsDisplay = true
+        textView.needsDisplay = true
+    }
+
     func textDidChange(_ notification: Notification) {
         ruler.needsDisplay = true
         changed?()
@@ -176,25 +231,32 @@ final class EditorDocument: NSObject, NSTextViewDelegate {
 
     func highlight() {
         guard let storage = textView.textStorage else { return }
+        let undo = textView.undoManager
+        let registrationEnabled = undo?.isUndoRegistrationEnabled == true
+        if registrationEnabled { undo?.disableUndoRegistration() }
+        defer { if registrationEnabled { undo?.enableUndoRegistration() } }
         let source = textView.string
         let range = NSRange(source.startIndex..., in: source)
+        let palette = preferences.theme.palette
+        let font = preferences.editorFont
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = (preferences.lineSpacing - 1) * Double(font.ascender - font.descender + font.leading)
+        textView.defaultParagraphStyle = paragraph
         storage.beginEditing()
-        storage.addAttributes([.foregroundColor: NSColor.textColor,
-                               .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)], range: range)
+        storage.addAttributes([.foregroundColor: palette.text, .font: font, .paragraphStyle: paragraph], range: range)
         let patterns: [(String, NSColor)] = [
-            (#"(?i)\b(data|proc|run|quit|model|input|datalines|set|merge|by|if|then|else|do|end|output|retain|length|format|libname|filename|where|var|class|tables|keep|drop|rename|options|title|footnote)\b|%[a-zA-Z_]+|&[a-zA-Z_][a-zA-Z_0-9]*"#, .systemPurple),
-            (#"'([^']|'')*'|\"([^\"]|\"\")*\""#, .systemBrown),
-            (#"/\*[\s\S]*?\*/|(?m)^\s*\*[^;]*;"#, .secondaryLabelColor)
+            (#"(?i)\b(data|proc|run|quit|model|input|datalines|set|merge|by|if|then|else|do|end|output|retain|length|format|libname|filename|where|var|class|tables|keep|drop|rename|options|title|footnote)\b|%[a-zA-Z_]+|&[a-zA-Z_][a-zA-Z_0-9]*"#, palette.keyword),
+            (#"'([^']|'')*'|\"([^\"]|\"\")*\""#, palette.string),
+            (#"/\*[\s\S]*?\*/|(?m)^\s*\*[^;]*;"#, palette.comment)
         ]
-        for (pattern, color) in patterns {
+        for (pattern, color) in preferences.syntaxHighlighting ? patterns : [] {
             guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
             for match in regex.matches(in: source, range: range) {
                 storage.addAttribute(.foregroundColor, value: color, range: match.range)
             }
         }
         storage.endEditing()
-        textView.typingAttributes = [.foregroundColor: NSColor.textColor,
-                                     .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)]
+        textView.typingAttributes = [.foregroundColor: palette.text, .font: font, .paragraphStyle: paragraph]
     }
 
     func goTo(line: Int) {

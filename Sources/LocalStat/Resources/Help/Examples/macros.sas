@@ -1,0 +1,11 @@
+%let count=3;
+%macro make(name);
+data &name;
+  do i=1 to &count;
+    square=i*i;
+    output;
+  end;
+run;
+%mend;
+%make(squares);
+proc print data=squares; run;

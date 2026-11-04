@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>CSV files and libraries</title><link rel="stylesheet" href="style.css"></head><body>
+<h1>CSV files and libraries</h1><p>PROC IMPORT and EXPORT handle CSV and supported delimited formats. Quoted filenames can contain spaces. The following complete example writes a small CSV in the project folder, imports it, and prints its values.</p>
+<pre><code>data _null_;
+  file 'localstat-help-demo.csv';
+  put 'name,value';
+  put 'Ana,10';
+  put 'Bo,20';
+run;
+proc import datafile='localstat-help-demo.csv'
+  out=work.imported dbms=csv replace;
+  getnames=yes;
+run;
+proc print data=work.imported; run;</code></pre>
+<p>This example intentionally creates a file named localstat-help-demo.csv in the working directory. Use a temporary project folder if you are experimenting. Files explicitly created by a program persist after a run.</p>
+<h2>Libraries</h2><p>WORK is temporary to the current run. LIBNAME associates a supported library with a directory or supported file format. Two-level names such as <code>out.saved</code> identify a library member. Readers and writers for SAS7BDAT and XPORT are inherited from OpenSAS and have compatibility limits.</p>
+<p>Filename access uses your account's permissions. LocalStat is not a sandbox for arbitrary programs. See <a href="localstat-help:compatibility">Compatibility and limitations</a>.</p></body></html>

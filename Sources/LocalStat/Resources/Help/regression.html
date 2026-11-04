@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Linear regression</title><link rel="stylesheet" href="style.css"></head><body>
+<h1>Linear regression with PROC REG</h1><p>LocalStat adds a bounded numeric ordinary-least-squares REG implementation. Use one numeric response and one or more explicit numeric predictor names. An intercept is included.</p>
+<pre><code>data measurements;
+  input x y;
+  datalines;
+1 2
+2 4
+3 5
+4 4
+5 5
+;
+run;
+proc reg data=measurements;
+  model y=x;
+run;
+quit;</code></pre>
+<p>The example estimates an intercept of 2.2 and slope of 0.6. Output includes ANOVA, coefficients, standard errors, t and F probabilities, Root MSE, R-square, and adjusted R-square.</p>
+<h2>Input and numerical limits</h2><p>Rows missing any model variable are excluded. Positive residual degrees of freedom are required. Unknown, nonnumeric, duplicate, and numerically rank-deficient predictors fail. Very ill-conditioned designs can be rejected. Perfect fits and constant responses have explicit missing inference values where the statistic is undefined.</p>
+<p>Multiple responses or models, predictor-list shorthand, transformations inside MODEL, WEIGHT, FREQ, BY, OUTPUT, selection, plots, and most procedure options are unsupported. Do not assume behavior of other SAS modeling procedures is present.</p>
+<p>Validation uses analytical checks and a published example, not a new comparison against an installed SAS engine. Read <a href="localstat-help:compatibility">the compatibility policy</a> before interpreting a ported analysis.</p></body></html>

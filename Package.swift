@@ -7,7 +7,7 @@ let package = Package(
     products: [.executable(name: "LocalStat", targets: ["LocalStat"])],
     targets: [
         .target(name: "SASCore"),
-        .executableTarget(name: "LocalStat", dependencies: ["SASCore"]),
+        .executableTarget(name: "LocalStat", dependencies: ["SASCore"], resources: [.copy("Resources/Help")]),
         .testTarget(name: "SASCoreTests", dependencies: ["SASCore"]),
         .testTarget(name: "LocalStatEditorTests", dependencies: ["LocalStat"])
     ]

@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>DATA steps and variables</title><link rel="stylesheet" href="style.css"></head><body>
+<h1>DATA steps and variables</h1><p>A DATA step creates or transforms observations. End each statement with a semicolon, and finish the step with RUN. Numeric and character variables have different types. Establish character lengths before assigning values when needed.</p>
+<pre><code>data scores;
+  input name $ score;
+  passed = (score &gt;= 50);
+  datalines;
+Ana 72
+Bo 45
+Cy 91
+;
+run;
+proc print data=scores; run;</code></pre>
+<h2>Control flow and output</h2><p>Assignment, IF/THEN/ELSE, SELECT, indexed and conditional DO loops, arrays, RETAIN, and explicit OUTPUT are included in the inherited subset. An explicit OUTPUT controls which observations are stored. DATA _NULL_ processes observations without creating a normal output dataset.</p>
+<h2>Missing values</h2><p>A numeric period denotes a missing value; blank character values are missing character data. Functions such as MISSING, NMISS, and CMISS help test them. Summary procedures and models have specific missing-data rules. REG excludes rows missing any model variable.</p>
+<h2>Existing data and BY groups</h2><p>SET reads a dataset, and multiple inputs can concatenate observations. MERGE and BY processing support subsets of SAS behavior, including FIRST.variable and LAST.variable indicators. Sort input by the same BY keys before grouped processing unless using a specifically supported NOTSORTED form.</p>
+<p>KEEP, DROP, RENAME, WHERE, LENGTH, LABEL, and dataset options control columns, filtering, and metadata. Dataset options and statements can act at different points in execution. Check small examples before porting complex programs.</p></body></html>

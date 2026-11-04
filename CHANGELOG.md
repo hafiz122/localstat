@@ -6,6 +6,10 @@ All notable changes to LocalStat are recorded here.
 
 ### Added
 
+- Offline searchable Help with a user guide, language guides, procedure/function
+  index, and runnable examples that open as unsaved editor tabs.
+- Native Settings with editor themes, separate source/output fonts, viewing
+  controls, screen-only table zoom, and configurable editing assistance.
 - Toolbar Appearance control with System, Light, and Dark choices that persist
   between launches.
 - Code-first IDE layout with saved pane sizes, a collapsible project navigator,

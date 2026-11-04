@@ -2,30 +2,12 @@ import AppKit
 import SASCore
 import UniformTypeIdentifiers
 
-enum AppearancePreference: String, CaseIterable {
-    case system, light, dark
-
-    var title: String {
-        switch self {
-        case .system: "System"
-        case .light: "Light"
-        case .dark: "Dark"
-        }
-    }
-
-    var appearance: NSAppearance? {
-        switch self {
-        case .system: nil
-        case .light: NSAppearance(named: .aqua)
-        case .dark: NSAppearance(named: .darkAqua)
-        }
-    }
-}
-
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     NSTableViewDataSource, NSTableViewDelegate, NSTabViewDelegate, NSSplitViewDelegate, NSMenuItemValidation {
     var window: NSWindow!
-    private var compatibilityWindow: NSWindow?
+    let preferences = IDEPreferences()
+    var helpController: HelpWindowController?
+    var settingsController: SettingsWindowController?
     let fileTable = NSTableView()
     let diagnosticTable = NSTableView()
     let tabs = NSTabView()
@@ -44,9 +26,15 @@ enum AppearancePreference: String, CaseIterable {
     let runButton = NSButton(title: "Run Program", target: nil, action: nil)
     let stopButton = NSButton(title: "Stop", target: nil, action: nil)
     let appearancePopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    var appearanceDefaults = UserDefaults.standard
-    var layoutDefaults = UserDefaults.standard
-    private(set) var appearancePreference: AppearancePreference = .system
+    var appearanceDefaults: UserDefaults {
+        get { preferences.defaults }
+        set { preferences.useDefaults(newValue) }
+    }
+    var layoutDefaults: UserDefaults {
+        get { preferences.defaults }
+        set { preferences.useDefaults(newValue) }
+    }
+    var appearancePreference: AppearancePreference { preferences.values.appearance }
     private(set) var navigatorVisible = true
     private(set) var resultsExpanded = false
     private var navigatorWidth: CGFloat = 215
@@ -64,6 +52,11 @@ enum AppearancePreference: String, CaseIterable {
     var current: EditorDocument? {
         guard let id = tabs.selectedTabViewItem?.identifier as? UUID else { return nil }
         return documents.first { $0.id == id }
+    }
+
+    override init() {
+        super.init()
+        preferences.onChange = { [weak self] in self?.applyPreferences() }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -95,6 +88,7 @@ enum AppearancePreference: String, CaseIterable {
         }
         let app = section("LocalStat")
         item(app, "About LocalStat", #selector(about), target: self)
+        item(app, "Settings…", #selector(showSettings), ",", target: self)
         app.addItem(.separator())
         item(app, "Quit LocalStat", #selector(NSApplication.terminate(_:)), "q")
         let file = section("File")
@@ -118,17 +112,31 @@ enum AppearancePreference: String, CaseIterable {
         item(edit, "Copy", #selector(NSText.copy(_:)), "c")
         item(edit, "Paste", #selector(NSText.paste(_:)), "v")
         item(edit, "Select All", #selector(NSText.selectAll(_:)), "a")
-        let find = NSMenuItem(title: "Find…", action: #selector(NSTextView.performFindPanelAction(_:)), keyEquivalent: "f")
+        let find = NSMenuItem(title: "Find…", action: #selector(findInActiveWindow(_:)), keyEquivalent: "f")
+        find.target = self
         find.tag = NSTextFinder.Action.showFindInterface.rawValue
         edit.addItem(find)
         let view = section("View")
         item(view, "Hide Project Navigator", #selector(toggleNavigator), "0", target: self)
         item(view, "Expand Results", #selector(toggleResultsExpansion), "2", target: self)
+        item(view, "Restore Default Layout", #selector(restoreDefaultLayout), target: self)
+        view.addItem(.separator())
+        item(view, "Wrap Source Lines", #selector(toggleWordWrap), target: self)
+        item(view, "Wrap Text Output", #selector(toggleOutputWrap), target: self)
+        item(view, "Line Numbers", #selector(toggleLineNumbers), target: self)
+        item(view, "Visible Whitespace", #selector(toggleWhitespace), target: self)
+        item(view, "Highlight Current Line", #selector(toggleCurrentLine), target: self)
+        item(view, "Syntax Highlighting", #selector(toggleSyntax), target: self)
+        view.addItem(.separator())
+        item(view, "Increase Size", #selector(increaseSize), "+", target: self)
+        item(view, "Decrease Size", #selector(decreaseSize), "-", target: self)
+        item(view, "Reset Size", #selector(resetSize), "0", modifiers: [.command, .shift], target: self)
         let program = section("Program")
         item(program, "Run Program", #selector(runProgram), "r", target: self)
         item(program, "Stop", #selector(stopProgram), ".", target: self)
         item(program, "Go to Selected Diagnostic", #selector(goToDiagnostic), "l", target: self)
         let help = section("Help")
+        item(help, "LocalStat Help", #selector(showHelp), target: self)
         item(help, "Compatibility and Limitations", #selector(showCompatibility), target: self)
         NSApp.mainMenu = menu
     }
@@ -283,6 +291,7 @@ enum AppearancePreference: String, CaseIterable {
         applyNavigatorLayout()
         applyResultsLayout()
         applyingLayout = false
+        applyPreferences()
     }
 
     func scroll(_ view: NSView) -> NSScrollView {
@@ -292,18 +301,22 @@ enum AppearancePreference: String, CaseIterable {
         return scroll
     }
 
+    @objc func restoreDefaultLayout() {
+        preferences.reset("Layout")
+        restoreLayoutPreferences()
+        resultsExpanded = false
+        expandResultsButton.title = "Expand Results"
+        applyingLayout = true
+        applyNavigatorLayout()
+        applyResultsLayout()
+        applyingLayout = false
+        settingsController?.refresh()
+    }
+
     private func restoreLayoutPreferences() {
-        if layoutDefaults.object(forKey: "navigatorWidth") != nil {
-            let saved = layoutDefaults.double(forKey: "navigatorWidth")
-            if saved.isFinite { navigatorWidth = CGFloat(saved) }
-        }
-        if layoutDefaults.object(forKey: "resultsFraction") != nil {
-            let saved = layoutDefaults.double(forKey: "resultsFraction")
-            if saved.isFinite, (0...1).contains(saved) { normalResultsFraction = CGFloat(saved) }
-        }
-        if layoutDefaults.object(forKey: "navigatorVisible") != nil {
-            navigatorVisible = layoutDefaults.bool(forKey: "navigatorVisible")
-        }
+        navigatorWidth = CGFloat(preferences.values.navigatorWidth)
+        normalResultsFraction = CGFloat(preferences.values.resultsFraction)
+        navigatorVisible = preferences.values.navigatorVisible
     }
 
     private func applyNavigatorLayout() {
@@ -332,12 +345,12 @@ enum AppearancePreference: String, CaseIterable {
         guard !applyingLayout, let split = notification.object as? NSSplitView else { return }
         if split === navigatorSplit, navigatorVisible, navigatorPane.frame.width >= 150 {
             navigatorWidth = navigatorPane.frame.width
-            layoutDefaults.set(Double(navigatorWidth), forKey: "navigatorWidth")
+            preferences.update(notify: false) { $0.navigatorWidth = Double(navigatorWidth) }
         } else if split === editorResultsSplit, !resultsExpanded {
             let available = split.bounds.height - split.dividerThickness
             guard available >= 300 else { return }
             normalResultsFraction = resultsContainer.frame.height / available
-            layoutDefaults.set(Double(normalResultsFraction), forKey: "resultsFraction")
+            preferences.update(notify: false) { $0.resultsFraction = Double(normalResultsFraction) }
         }
     }
 
@@ -345,10 +358,11 @@ enum AppearancePreference: String, CaseIterable {
         guard window != nil else { return }
         if navigatorVisible, navigatorPane.frame.width >= 150 { navigatorWidth = navigatorPane.frame.width }
         navigatorVisible.toggle()
-        layoutDefaults.set(navigatorVisible, forKey: "navigatorVisible")
+        preferences.update(notify: false) { $0.navigatorVisible = navigatorVisible }
         applyingLayout = true
         applyNavigatorLayout()
         applyingLayout = false
+        settingsController?.refresh()
     }
 
     @objc func toggleResultsExpansion() {
@@ -356,19 +370,25 @@ enum AppearancePreference: String, CaseIterable {
         if !resultsExpanded {
             let available = editorResultsSplit.bounds.height - editorResultsSplit.dividerThickness
             if available >= 300 { normalResultsFraction = resultsContainer.frame.height / available }
-            layoutDefaults.set(Double(normalResultsFraction), forKey: "resultsFraction")
+            preferences.update(notify: false) { $0.resultsFraction = Double(normalResultsFraction) }
         }
         resultsExpanded.toggle()
         expandResultsButton.title = resultsExpanded ? "Restore Editor" : "Expand Results"
         applyingLayout = true
         applyResultsLayout()
         applyingLayout = false
+        settingsController?.refresh()
     }
 
     @objc func changeResultsView() {
         let index = resultsSelector.selectedSegment
         guard (0..<results.numberOfTabViewItems).contains(index) else { return }
         results.selectTabViewItem(at: index)
+        switch index {
+        case 0: window.makeFirstResponder(outputView)
+        case 1: window.makeFirstResponder(tableScroll.documentView)
+        default: window.makeFirstResponder(diagnosticTable)
+        }
     }
 
     private func selectResults(at index: Int) {
@@ -377,15 +397,12 @@ enum AppearancePreference: String, CaseIterable {
     }
 
     func restoreAppearance() {
-        let saved = appearanceDefaults.string(forKey: "appearancePreference")
-        applyAppearance(AppearancePreference(rawValue: saved ?? "") ?? .system, persist: false)
+        preferences.reload()
+        applyPreferences()
     }
 
     func applyAppearance(_ preference: AppearancePreference, persist: Bool = true) {
-        appearancePreference = preference
-        NSApp.appearance = preference.appearance
-        appearancePopup.selectItem(withTitle: preference.title)
-        if persist { appearanceDefaults.set(preference.rawValue, forKey: "appearancePreference") }
+        preferences.update(persist: persist) { $0.appearance = preference }
     }
 
     @objc func changeAppearance() {
@@ -463,6 +480,7 @@ enum AppearancePreference: String, CaseIterable {
     }
     @objc func newDocument(_ sender: Any?) { addDocument(EditorDocument(url: nil, source: "")) }
     func addDocument(_ doc: EditorDocument) {
+        doc.applyPreferences(preferences.values)
         documents.append(doc)
         let item = NSTabViewItem(identifier: doc.id); item.label = doc.title; item.view = doc.scrollView
         doc.changed = { [weak self, weak doc, weak item] in
@@ -509,8 +527,11 @@ enum AppearancePreference: String, CaseIterable {
         }
     }
     @objc func closeCurrent() {
-        if let compatibilityWindow, NSApp.keyWindow === compatibilityWindow {
-            compatibilityWindow.close()
+        closeWindowOrDocument(NSApp.keyWindow)
+    }
+    func closeWindowOrDocument(_ activeWindow: NSWindow?) {
+        if let activeWindow, activeWindow === helpController?.window || activeWindow === settingsController?.window {
+            activeWindow.close()
             return
         }
         guard let doc = current, confirmClose(doc), let item = tabs.selectedTabViewItem else { return }
@@ -547,10 +568,12 @@ enum AppearancePreference: String, CaseIterable {
             outputView.string = result.output.isEmpty ? "No text output was produced." : ListingFormatter.aligned(result.output)
             if !result.tables.isEmpty {
                 tableScroll.documentView = TableDocumentView(tables: result.tables)
+                (tableScroll.documentView as? TableDocumentView)?.setScreenZoom(CGFloat(preferences.values.tableZoom))
             } else {
                 setTableMessage(result.tableIssue ?? "This run produced no formatted PRINT, FREQ, or TABULATE tables.")
             }
             diagnosticTable.reloadData()
+            applyOutputPreferences()
             resultsSelector.setLabel("Tables (\(result.tables.count))", forSegment: 1)
             resultsSelector.setLabel("Diagnostics (\(diagnostics.count))", forSegment: 2)
             if result.status != .success { selectResults(at: 2) }
@@ -647,12 +670,17 @@ enum AppearancePreference: String, CaseIterable {
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let label = NSTextField(labelWithString: tableView === fileTable
             ? String(files[row].path.dropFirst(projectURL.path.count + 1)) : diagnostics[row].message)
-        label.font = tableView === fileTable ? .systemFont(ofSize: 12) : .monospacedSystemFont(ofSize: 11, weight: .regular)
+        label.font = tableView === fileTable ? .systemFont(ofSize: 12) : preferences.values.outputFont
         label.lineBreakMode = .byTruncatingTail; label.toolTip = label.stringValue
         if tableView === diagnosticTable, diagnostics[row].message.hasPrefix("ERROR") { label.textColor = .systemRed }
         return label
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        let value = preferences.values
+        let toggles: [Selector: Bool] = [#selector(toggleWordWrap): value.editorWrap, #selector(toggleOutputWrap): value.outputWrap, #selector(toggleLineNumbers): value.lineNumbers,
+                                       #selector(toggleWhitespace): value.invisibleCharacters, #selector(toggleCurrentLine): value.currentLineHighlight,
+                                       #selector(toggleSyntax): value.syntaxHighlighting]
+        if let action = menuItem.action, let state = toggles[action] { menuItem.state = state ? .on : .off; return true }
         switch menuItem.action {
         case #selector(toggleNavigator):
             menuItem.title = navigatorVisible ? "Hide Project Navigator" : "Show Project Navigator"
@@ -663,7 +691,11 @@ enum AppearancePreference: String, CaseIterable {
         case #selector(runProgram): return current != nil && !runner.isRunning
         case #selector(stopProgram): return runner.isRunning
         case #selector(saveCurrent), #selector(saveAs): return current != nil
-        case #selector(closeCurrent): return current != nil || (compatibilityWindow != nil && NSApp.keyWindow === compatibilityWindow)
+        case #selector(closeCurrent):
+            menuItem.title = activeAuxiliaryWindow == nil ? "Close Program" : "Close Window"
+            return current != nil || activeAuxiliaryWindow != nil
+        case #selector(increaseSize), #selector(decreaseSize), #selector(resetSize), #selector(findInActiveWindow(_:)):
+            return settingsController == nil || NSApp.keyWindow !== settingsController?.window
         case #selector(exportResult), #selector(exportPDFReport): return lastResult != nil
         case #selector(printTables): return !(lastResult?.tables.isEmpty ?? true)
         default: return true
@@ -679,37 +711,6 @@ enum AppearancePreference: String, CaseIterable {
         alert.runModal()
     }
     @objc func showCompatibility() {
-        if let compatibilityWindow {
-            compatibilityWindow.makeKeyAndOrderFront(nil)
-            return
-        }
-        guard let url = Bundle.main.resourceURL?.appendingPathComponent("COMPATIBILITY.md") else { return }
-        do {
-            let source = try String(contentsOf: url, encoding: .utf8)
-            let help = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 860, height: 600),
-                                styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-            help.title = "Compatibility and Limitations"
-            help.minSize = NSSize(width: 520, height: 360)
-            help.isReleasedWhenClosed = false
-            let text = NSTextView()
-            text.isEditable = false
-            text.isSelectable = true
-            text.isRichText = false
-            text.usesFindBar = true
-            text.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-            text.textColor = .textColor
-            text.textContainerInset = NSSize(width: 16, height: 16)
-            text.isVerticallyResizable = true
-            text.autoresizingMask = [.width]
-            text.textContainer?.widthTracksTextView = true
-            text.string = source
-            text.setAccessibilityLabel("Compatibility documentation")
-            let scroller = scroll(text)
-            scroller.hasHorizontalScroller = false
-            help.contentView = scroller
-            compatibilityWindow = help
-            help.center()
-            help.makeKeyAndOrderFront(nil)
-        } catch { showError(error) }
+        showHelpArticle("compatibility")
     }
 }

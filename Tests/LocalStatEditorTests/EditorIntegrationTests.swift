@@ -155,6 +155,10 @@ final class EditorIntegrationTests: XCTestCase {
         try "data d; x=42; run;".write(to: folder.appendingPathComponent("include file.sas"), atomically: true, encoding: .utf8)
         for name in [NSAppearance.Name.aqua, .darkAqua] {
             let app = AppDelegate()
+            let suiteName = "LocalStatRunTests.\(UUID().uuidString)"
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+            app.appearanceDefaults = defaults
+            defer { defaults.removePersistentDomain(forName: suiteName) }
             app.projectURL = folder
             app.runner = LocalRuntimeRunner(executable: binary)
             app.buildMenu()

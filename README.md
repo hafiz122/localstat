@@ -20,10 +20,10 @@ Current source builds add a **Tables** results tab for `PROC PRINT`, `PROC FREQ`
 
 | Area | Current status |
 | --- | --- |
-| Native IDE | Editor tabs, project sidebar, light/dark appearance control, syntax highlighting, line numbers, auto-indentation, bracket pairing, file operations, Run/Stop, diagnostics, text output, formatted Tables, printing, raw-text export and paginated PDF report export are implemented in current source. |
+| Native IDE | Editor tabs, project sidebar, saved viewing and editing settings, five editor themes, separate source/output fonts, offline searchable Help, file operations, Run/Stop, diagnostics, text output, formatted Tables, printing, raw-text export and paginated PDF report export are implemented in current source. |
 | Local runtime | The app bundles an ARM64 build of OpenSAS pinned to `927a2fa9f1401e365d975536bd704819ada1f1f4`. Each run starts a fresh local process. |
 | Statistical modeling | A bounded numeric ordinary-least-squares subset of `PROC REG` is implemented. |
-| Verification | Current source: 969 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 32 Swift tests and 16 packaged-runtime checks. See the dated verification record for the alpha baseline. |
+| Verification | Current source: 969 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 39 Swift tests, 16 packaged-runtime checks and 3 offline Help checks. See the dated verification record for the alpha baseline. |
 | Distribution | Reproducible alpha packaging and prerelease automation are included. The artifact remains ad-hoc signed and unnotarized. |
 | Compatibility | Coverage is documented and intentionally limited. No feature is labeled SAS-verified without output from an installed SAS engine. |
 
@@ -59,6 +59,8 @@ On first launch, example programs are copied to `~/Library/Application Support/L
 - Command-R runs the **entire current editor buffer**, including unsaved changes.
 - Command-period stops the current run, escalating to SIGKILL after two seconds if required.
 - Use the toolbar's Appearance menu to follow the Mac setting or choose Light or Dark. LocalStat remembers the choice between launches.
+- LocalStat > Settings (Command-comma) controls editor themes, separate source/output fonts, sizes, wrapping, line spacing, line numbers, whitespace, current-line highlighting, table zoom, and editing assistance. View > Increase/Decrease/Reset Size follows the focused content.
+- Help > LocalStat Help opens an offline searchable manual and language index. Examples can be copied or opened in a new unsaved editor tab. Command-F finds text in the current article; Command-W closes Help or Settings without closing source.
 - Drag the project and results dividers to set pane sizes. View > Hide Project Navigator (Command-0) and View > Expand Results (Command-2) provide keyboard alternatives. Pane sizes and navigator visibility are remembered.
 - Double-click an original-source diagnostic to navigate. Navigation is disabled if its editor buffer has changed, or if the position belongs to macro-expanded text.
 - File > Export Last Run as Text saves complete raw output and diagnostics.

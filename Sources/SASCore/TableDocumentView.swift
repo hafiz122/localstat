@@ -18,18 +18,32 @@ import AppKit
     private let titleFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
     private var fragments: [Fragment] = []
     public let tables: [ResultTable]
+    private let forPrinting: Bool
+    private var pageSize = NSSize.zero
+    public private(set) var screenZoom: CGFloat = 1
 
     public init(tables: [ResultTable], forPrinting: Bool = false) {
         self.tables = tables
+        self.forPrinting = forPrinting
         gap = forPrinting ? 0 : 16
         super.init(frame: .zero)
         buildPages()
         frame = NSRect(origin: .zero, size: NSSize(width: paper.width, height: CGFloat(max(1, fragments.count)) * paper.height + CGFloat(max(0, fragments.count - 1)) * gap - (forPrinting ? 1 : 0)))
+        pageSize = frame.size
         setAccessibilityLabel("Formatted tables")
     }
 
     required init?(coder: NSCoder) { nil }
     public override var isFlipped: Bool { true }
+    public override var acceptsFirstResponder: Bool { true }
+    public override func mouseDown(with event: NSEvent) { window?.makeFirstResponder(self) }
+    public func setScreenZoom(_ zoom: CGFloat) {
+        guard !forPrinting, zoom.isFinite else { return }
+        screenZoom = min(max(zoom, 0.5), 2)
+        frame.size = NSSize(width: pageSize.width * screenZoom, height: pageSize.height * screenZoom)
+        bounds.size = pageSize
+        needsDisplay = true
+    }
     public override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         needsDisplay = true

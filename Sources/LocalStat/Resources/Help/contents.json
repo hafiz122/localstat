@@ -1,0 +1,19 @@
+[
+  {"id":"getting-started","title":"Getting started","section":"User guide","file":"getting-started.html","example":"first-program.sas"},
+  {"id":"projects","title":"Projects and files","section":"User guide","file":"projects.html"},
+  {"id":"editing","title":"Editing SAS programs","section":"User guide","file":"editing.html"},
+  {"id":"shortcuts","title":"Keyboard shortcuts","section":"User guide","file":"shortcuts.html"},
+  {"id":"running","title":"Running and diagnostics","section":"User guide","file":"running.html"},
+  {"id":"results","title":"Results, printing, and exports","section":"User guide","file":"results.html"},
+  {"id":"preferences","title":"Settings and viewing controls","section":"User guide","file":"preferences.html"},
+  {"id":"troubleshooting","title":"Troubleshooting","section":"User guide","file":"troubleshooting.html"},
+  {"id":"compatibility","title":"Compatibility and limitations","section":"Reference","file":"compatibility.html"},
+  {"id":"data-steps","title":"DATA steps and variables","section":"Language guide","file":"data-steps.html","example":"data-steps.sas"},
+  {"id":"files","title":"CSV files and libraries","section":"Language guide","file":"files.html","example":"csv.sas"},
+  {"id":"macros","title":"Macros and includes","section":"Language guide","file":"macros.html","example":"macros.sas"},
+  {"id":"sql","title":"SQL queries","section":"Language guide","file":"sql.html","example":"sql.sas"},
+  {"id":"procedures","title":"Reporting and statistics","section":"Language guide","file":"procedures.html","example":"reporting.sas"},
+  {"id":"regression","title":"Linear regression","section":"Language guide","file":"regression.html","example":"regression.sas"},
+  {"id":"functions","title":"Functions, dates, and formats","section":"Language guide","file":"functions.html","example":"functions.sas"},
+  {"id":"reference","title":"Procedure and function index","section":"Reference","file":"reference.html"}
+]
