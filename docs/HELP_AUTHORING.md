@@ -20,7 +20,8 @@ python3 scripts/generate-help.py
 ```
 
 The tests reject stale generated pages, missing internal links, remote assets,
-duplicate or missing inventory entries, and em dashes in bundled articles.
-They also run all documented example files in temporary project directories.
+duplicate or missing inventory entries, and em dashes in tracked text files.
+They also run both the article code blocks and the Open Example programs in
+temporary project directories.
 Keep prose original, concise, and aligned with the behavior exercised by tests.
-Use no em dashes in app text or bundled documentation.
+Use no em dashes in source, fixtures, app text, or documentation.

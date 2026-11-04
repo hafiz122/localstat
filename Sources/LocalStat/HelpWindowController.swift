@@ -162,9 +162,13 @@ private final class HelpWebView: WKWebView {
         loadedArticleID = nil
         loadingLabel.stringValue = "Loading article…"; loadingLabel.isHidden = false
         findField.stringValue = ""; findStatus.stringValue = ""; findBar.isHidden = true
-        if !filtered.contains(article) { searchField.stringValue = ""; filtered = library.articles; contents.reloadData() }
         selecting = true
-        if let index = filtered.firstIndex(of: article) { contents.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false) }
+        if !filtered.contains(article) { searchField.stringValue = ""; filtered = library.articles; contents.reloadData() }
+        emptyLabel.isHidden = !filtered.isEmpty
+        if let index = filtered.firstIndex(of: article) {
+            contents.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+            contents.scrollRowToVisible(index)
+        }
         selecting = false
         webView.loadFileURL(library.root.appendingPathComponent(article.file), allowingReadAccessTo: library.root)
         window?.title = "\(article.title) | LocalStat Help"

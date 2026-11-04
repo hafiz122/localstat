@@ -16,10 +16,21 @@ class Links(HTMLParser):
     def __init__(self):
         super().__init__()
         self.links = []
+        self.code_blocks = []
+        self.in_pre = False
     def handle_starttag(self, tag, attrs):
+        if tag == "pre":
+            self.in_pre = True
+            self.code_blocks.append("")
         for key, value in attrs:
             if key in ("href", "src"):
                 self.links.append(value)
+    def handle_endtag(self, tag):
+        if tag == "pre":
+            self.in_pre = False
+    def handle_data(self, data):
+        if self.in_pre:
+            self.code_blocks[-1] += data
 
 
 class HelpTests(unittest.TestCase):
@@ -64,12 +75,23 @@ class HelpTests(unittest.TestCase):
         expected = {"first-program.sas": "20", "data-steps.sas": "Ana", "csv.sas": "20",
                     "macros.sas": "9", "sql.sas": "30", "reporting.sas": "91",
                     "regression.sas": "0.6000000000", "functions.sas": "ANA"}
-        for file, marker in expected.items():
-            with self.subTest(file=file), tempfile.TemporaryDirectory(prefix="localstat-help-") as folder:
-                source = HELP / "Examples" / file
-                result = subprocess.run([str(BINARY), str(source)], cwd=folder, capture_output=True, text=True, timeout=15)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertIn(marker, result.stdout)
+        articles = json.loads((HELP / "contents.json").read_text())
+        for article in articles:
+            if "example" not in article:
+                continue
+            file = article["example"]
+            parser = Links(); parser.feed((HELP / article["file"]).read_text())
+            with self.subTest(file=file):
+                self.assertTrue(parser.code_blocks, "Show a complete program that readers can copy")
+            sources = {"Open Example": (HELP / "Examples" / file).read_text(),
+                       "Article code": "\n".join(parser.code_blocks)}
+            for action, text in sources.items():
+                with self.subTest(file=file, action=action), tempfile.TemporaryDirectory(prefix="localstat-help-") as folder:
+                    source = Path(folder) / file
+                    source.write_text(text)
+                    result = subprocess.run([str(BINARY), str(source)], cwd=folder, capture_output=True, text=True, timeout=15)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn(expected[file], result.stdout)
 
 
 if __name__ == "__main__":

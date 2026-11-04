@@ -22,6 +22,12 @@ All notable changes to LocalStat are recorded here.
 
 ### Fixed
 
+- Keep the Settings table-zoom selector accurate after repeated size changes.
+- Clear Help's empty-search message when navigation restores the contents list.
+- Show the complete input data and program in the reporting guide, and verify
+  both article code and Open Example programs in fresh projects.
+- Replace em dashes throughout tracked source, diagnostics, fixtures, and
+  documentation, with a repository text check to prevent reintroduction.
 - Reject malformed table files with overflowing cell spans instead of crashing
   while validating their layout.
 

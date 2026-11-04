@@ -23,7 +23,7 @@ Current source builds add a **Tables** results tab for `PROC PRINT`, `PROC FREQ`
 | Native IDE | Editor tabs, project sidebar, saved viewing and editing settings, five editor themes, separate source/output fonts, offline searchable Help, file operations, Run/Stop, diagnostics, text output, formatted Tables, printing, raw-text export and paginated PDF report export are implemented in current source. |
 | Local runtime | The app bundles an ARM64 build of OpenSAS pinned to `927a2fa9f1401e365d975536bd704819ada1f1f4`. Each run starts a fresh local process. |
 | Statistical modeling | A bounded numeric ordinary-least-squares subset of `PROC REG` is implemented. |
-| Verification | Current source: 969 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 39 Swift tests, 16 packaged-runtime checks and 3 offline Help checks. See the dated verification record for the alpha baseline. |
+| Verification | Current source: 969 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 44 Swift tests, 16 packaged-runtime checks, 3 offline Help checks and 1 repository text check. See the dated verification record for the alpha baseline. |
 | Distribution | Reproducible alpha packaging and prerelease automation are included. The artifact remains ad-hoc signed and unnotarized. |
 | Compatibility | Coverage is documented and intentionally limited. No feature is labeled SAS-verified without output from an installed SAS engine. |
 

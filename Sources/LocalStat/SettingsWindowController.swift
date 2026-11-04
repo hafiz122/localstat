@@ -129,7 +129,7 @@ import AppKit
         choose("outputFontSize", Int(value.outputFontSize) - 8)
         choose("helpFontSize", Int(value.helpFontSize) - 10)
         choose("lineSpacing", Int((value.lineSpacing - 1) * 4))
-        choose("tableZoom", Int((value.tableZoom * 100 - 50) / 10))
+        choose("tableZoom", Int(((value.tableZoom * 100 - 50) / 10).rounded()))
         choose("indentWidth", [2, 4, 8].firstIndex(of: value.indentWidth) ?? 0)
         for (id, state) in ["editorWrap": value.editorWrap, "outputWrap": value.outputWrap,
                             "lineNumbers": value.lineNumbers, "syntaxHighlighting": value.syntaxHighlighting,

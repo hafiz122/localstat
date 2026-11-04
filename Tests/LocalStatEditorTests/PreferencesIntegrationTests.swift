@@ -5,6 +5,82 @@ import XCTest
 import SASCore
 
 final class PreferencesIntegrationTests: XCTestCase {
+    @MainActor func testSettingsShowsRoundedTableZoom() throws {
+        _ = NSApplication.shared
+        let preferences = try isolatedPreferences()
+        let app = AppDelegate(); app.appearanceDefaults = preferences.defaults; app.buildWindow(); app.showSettings()
+        defer { app.settingsController?.close(); app.window.delegate = nil; app.window.close() }
+        let settings = try XCTUnwrap(app.settingsController)
+        settings.sections.selectTabViewItem(at: 2)
+        func zoomPopup(in view: NSView) -> NSPopUpButton? {
+            if view.identifier?.rawValue == "tableZoom" { return view as? NSPopUpButton }
+            return view.subviews.lazy.compactMap { zoomPopup(in: $0) }.first
+        }
+        app.preferences.update { $0.tableZoom = 2 }
+        for _ in 0..<2 { app.preferences.update { $0.tableZoom -= 0.1 } }
+        XCTAssertEqual(try XCTUnwrap(zoomPopup(in: settings.sections)).titleOfSelectedItem, "180%")
+    }
+
+    @MainActor func testHelpClearsEmptySearchStateWhenNavigating() throws {
+        _ = NSApplication.shared
+        let help = try HelpWindowController(preferences: isolatedPreferences())
+        defer { help.close() }
+        help.searchField.stringValue = "impossibleword-123"
+        help.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: help.searchField))
+        XCTAssertEqual(help.contents.numberOfRows, 0)
+        help.showArticle("projects")
+        XCTAssertEqual(help.searchField.stringValue, "")
+        XCTAssertEqual(help.contents.numberOfRows, help.library.articles.count)
+        func visibleEmptyMessage(in view: NSView) -> Bool {
+            if let text = view as? NSTextField, text.stringValue == "No matching articles.", !text.isHidden { return true }
+            return view.subviews.contains { visibleEmptyMessage(in: $0) }
+        }
+        XCTAssertFalse(visibleEmptyMessage(in: try XCTUnwrap(help.window?.contentView)))
+    }
+
+    @MainActor func testHelpNavigationKeepsTheRequestedArticleAfterFilteredSelection() throws {
+        _ = NSApplication.shared
+        let help = try HelpWindowController(preferences: isolatedPreferences())
+        defer { help.close() }
+        help.searchField.stringValue = "STREAMINIT"
+        help.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: help.searchField))
+        help.contents.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        XCTAssertEqual(help.currentArticle?.id, "reference")
+        help.showArticle("compatibility")
+        XCTAssertEqual(help.currentArticle?.id, "compatibility")
+        XCTAssertEqual(help.contents.selectedRow, help.library.articles.firstIndex { $0.id == "compatibility" })
+    }
+
+    @MainActor func testAppearanceChangePreservesHorizontalScroll() throws {
+        _ = NSApplication.shared
+        let preferences = try isolatedPreferences()
+        let app = AppDelegate(); app.appearanceDefaults = preferences.defaults; app.buildWindow()
+        defer { app.window.delegate = nil; app.window.close() }
+        let source = "title '" + String(repeating: "long source text ", count: 50) + "';"
+        let document = EditorDocument(url: nil, source: source); app.addDocument(document)
+        let editor = document.textView
+        editor.layoutManager?.ensureLayout(for: try XCTUnwrap(editor.textContainer))
+        editor.sizeToFit()
+        editor.scrollRangeToVisible(NSRange(location: (source as NSString).length, length: 0))
+        let origin = document.scrollView.contentView.bounds.origin
+        XCTAssertGreaterThan(origin.x, 100)
+        app.preferences.update { $0.theme = .paper }
+        XCTAssertEqual(document.scrollView.contentView.bounds.origin.x, origin.x, accuracy: 1)
+    }
+
+    @MainActor func testIncreaseSizeKeyboardEquivalent() throws {
+        _ = NSApplication.shared
+        let preferences = try isolatedPreferences()
+        let app = AppDelegate(); app.appearanceDefaults = preferences.defaults; app.buildMenu(); app.buildWindow()
+        app.addDocument(EditorDocument(url: nil, source: "data d; run;"))
+        defer { app.window.delegate = nil; app.window.close() }
+        let menu = try XCTUnwrap(NSApp.mainMenu)
+        let event = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.command, .shift], timestamp: 0,
+                                                 windowNumber: app.window.windowNumber, context: nil, characters: "+", charactersIgnoringModifiers: "+", isARepeat: false, keyCode: 24))
+        XCTAssertTrue(menu.performKeyEquivalent(with: event))
+        XCTAssertEqual(app.preferences.values.editorFontSize, 14)
+    }
+
     @MainActor func testThemeTextContrastInBothAppearances() throws {
         _ = NSApplication.shared
         for name in [NSAppearance.Name.aqua, .darkAqua] {

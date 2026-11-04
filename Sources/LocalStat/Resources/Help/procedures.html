@@ -1,5 +1,18 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Reporting and statistics</title><link rel="stylesheet" href="style.css"></head><body>
 <h1>Reporting and statistics</h1><p>A PROC step uses an existing dataset. Procedure names in the index indicate implemented subsets, not support for every option.</p>
+<h2>Complete reporting example</h2><p>Create the input data before running the procedures. This program defines the name, group, and score columns used below and produces PRINT, MEANS, FREQ, and TABULATE results.</p>
+<pre><code>data scores;
+  input name $ group $ score;
+  datalines;
+Ana A 72
+Bo A 45
+Cy B 91
+;
+run;
+proc print data=scores; run;
+proc means data=scores n mean; var score; run;
+proc freq data=scores; tables group; run;
+proc tabulate data=scores; class group; var score; table group, score*mean; run;</code></pre>
 <h2>PRINT</h2><p><code>proc print data=scores; var name score; run;</code> lists observations. Supported options and statements include common NOOBS, LABEL, VAR, ID, SUM, and BY forms. It produces formatted Tables results as well as text output.</p>
 <h2>MEANS and SUMMARY</h2><p><code>proc means data=scores n mean min max; var score; run;</code> summarizes numeric data. SUMMARY belongs to the same family. Statistic keywords, grouping, output datasets, and weights have supported subsets. Results appear in Output.</p>
 <h2>FREQ</h2><p><code>proc freq data=scores; tables group; run;</code> counts categories. TABLES accepts supported one-way and cross-tabulation forms. NLEVELS reports levels. FREQ produces formatted Tables for the supported result forms.</p>
