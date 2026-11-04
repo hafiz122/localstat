@@ -89,7 +89,11 @@ final class PreferencesIntegrationTests: XCTestCase {
                 func rgb(_ color: NSColor, on background: NSColor) -> [Double] {
                     let c = color.usingColorSpace(.sRGB)!, b = background.usingColorSpace(.sRGB)!
                     let a = Double(c.alphaComponent)
-                    return zip([c.redComponent, c.greenComponent, c.blueComponent], [b.redComponent, b.greenComponent, b.blueComponent]).map { Double($0) * a + Double($1) * (1 - a) }
+                    let foreground: [Double] = [Double(c.redComponent), Double(c.greenComponent), Double(c.blueComponent)]
+                    let backdrop: [Double] = [Double(b.redComponent), Double(b.greenComponent), Double(b.blueComponent)]
+                    return zip(foreground, backdrop).map { foreground, background in
+                        foreground * a + background * (1 - a)
+                    }
                 }
                 func luminance(_ channels: [Double]) -> Double {
                     let linear = channels.map { $0 <= 0.04045 ? $0 / 12.92 : pow(($0 + 0.055) / 1.055, 2.4) }
