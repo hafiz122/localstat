@@ -16,7 +16,7 @@ data _null_;
   if '  7  ' then put "pad7 T";   else put "pad7 F";
   if '0x10'  then put "hex T";    else put "hex F";
   if '3abc'  then put "junk T";   else put "junk F";
-  /* numeric path — must stay byte-identical (no regression) */
+  /* numeric path - must stay byte-identical (no regression) */
   x = 5;   if x > 1 then put "numgt T"; else put "numgt F";
   x = 5;   if x     then put "numx T";  else put "numx F";
   x = .;   if x     then put "nummiss T"; else put "nummiss F";

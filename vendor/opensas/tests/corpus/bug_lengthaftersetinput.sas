@@ -1,9 +1,9 @@
-/* BUG-lengthaftersetinput (QA tick356 F3): Language Reference: Concepts p.49 note 1 — "You cannot
+/* BUG-lengthaftersetinput (QA tick356 F3): Language Reference: Concepts p.49 note 1 - "You cannot
    change the length of a character variable with a subsequent LENGTH or ATTRIB
    statement within the same DATA step." All three establishment paths pinned
    side by side so they can never silently disagree again: a char LENGTH/ATTRIB
    placed AFTER the statement that established the variable is IGNORED (the
-   first length stands — no truncation) and warns; stdout below pins the data.
+   first length stands - no truncation) and warns; stdout below pins the data.
    The warning arms fire in src/main.zig's test block (captured diags).
    Controls: a NEW var declared after SET/INPUT still gets its declared length,
    and a LENGTH placed FIRST still pins the schema (before-set truncates). */

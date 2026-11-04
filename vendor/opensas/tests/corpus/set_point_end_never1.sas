@@ -1,4 +1,4 @@
-/* ORACLE-unblocked-batch item 3 — SET's END= under random access. Pinned
+/* ORACLE-unblocked-batch item 3 - SET's END= under random access. Pinned
    CONFORMANT against SAS 9.4 DATA Step Statements: Reference, SET Statement,
    printed p.332 (marker "=== pdf 343 ===", the preceding footer reads
    "SET Statement 331" and belongs to pdf 342):
@@ -14,7 +14,7 @@
    Note what the second sentence of that Restriction does: it spells out that
    "cannot be used with" means THE FLAG STAYS 0, not "SAS raises an error".
    That is the same volume's own gloss on the same word for the same option, so
-   it also fixes the reading of INFILE END='s parallel Restriction on p.130 —
+   it also fixes the reading of INFILE END='s parallel Restriction on p.130 -
    see docs/findings/oracle-unblocked-readings.md item 3.
 
    Pinned: end= is 0 on every direct-access read INCLUDING the one that reads

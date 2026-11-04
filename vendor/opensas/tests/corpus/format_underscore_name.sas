@@ -1,5 +1,5 @@
 /* QA-svvisnum: a format NAME with underscores (a CNTLIN codelist format like
-   VISNUM_ALL_PERIOD) was truncated at the first `_` by parseSpec — read as
+   VISNUM_ALL_PERIOD) was truncated at the first `_` by parseSpec - read as
    "format not found". Trailing digits are the width; underscores are part of the
    name, so both numeric and char underscore-named formats must resolve. */
 proc format;

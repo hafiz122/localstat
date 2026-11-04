@@ -17,7 +17,7 @@ proc sql;
     from (select usubjid, avg(aval) as subj_mean from lb group by usubjid);
   /* per-arm count of subjects via a derived per-subject table.
      NOTE: the inner GROUP BY has no summary function, so SAS treats it as an
-     ORDER BY (all rows pass through — BUG-sqlgroupnoagg): n_subj counts ROWS
+     ORDER BY (all rows pass through - BUG-sqlgroupnoagg): n_subj counts ROWS
      per arm, not distinct subjects. Use DISTINCT in the inner select to dedup. */
   create table arm_n as
     select trt, count(*) as n_subj

@@ -1,5 +1,5 @@
 /* PREFIX= with ID: the prefix is ATTACHED to the ID value (dt_1), it is NOT
-   ignored — a real EPOCH macro's six transposes (prefix=dt_/dt2_/dtm_/...)
+   ignored - a real EPOCH macro's six transposes (prefix=dt_/dt2_/dtm_/...)
    are distinguished only by it, and identical _1.._N names silently collide
    in the downstream MERGE (QA-transprefixid). Numeric-ID-without-prefix (_1)
    stays covered by transpose_numid. */

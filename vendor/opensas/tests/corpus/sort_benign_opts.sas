@@ -1,5 +1,5 @@
 /* GAP-sortlow-tick282 F6: THREADS/NOTHREADS/OVERWRITE/DATECOPY are accepted as
-   benign no-ops (like TAGSORT/EQUALS) — none can change the sort RESULT. */
+   benign no-ops (like TAGSORT/EQUALS) - none can change the sort RESULT. */
 data d; input x; datalines;
 3
 1

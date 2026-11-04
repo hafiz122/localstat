@@ -2,7 +2,7 @@
    was never substituted. The raw `(` stopped parser_expr at the inner `select`, so
    evalSpan's `catch return Value.missing` turned the whole arm into a MISSING and the
    step printed plausible-but-WRONG rows to stdout BEFORE the "expected ')'" error
-   fired — the worst failure class (D-002/CLIN-failloud), because a reader who looks
+   fired - the worst failure class (D-002/CLIN-failloud), because a reader who looks
    at stdout sees an answer, not a failure.
 
    SAS 9.4 SQL Procedure Reference is unambiguous that this is legal: a CASE
@@ -15,7 +15,7 @@
    This fixture pins ALL FOUR broken SELECT-list shapes (uncorrelated WHEN,
    correlated WHEN, subquery as the THEN/ELSE value, and `select … into:`) plus the
    GROUP BY / remerge / CALCULATED variants of the same item, AND the WHERE-clause
-   shapes that were ALREADY correct — the WHERE and SELECT paths share
+   shapes that were ALREADY correct - the WHERE and SELECT paths share
    substituteSubqueries, so the already-working half is pinned here too and a future
    refactor of the shared pipeline cannot silently regress it (D-021). */
 
@@ -40,7 +40,7 @@ P03 30
 ;
 run;
 
-/* avg(qty) = 20, min(qty) = 10, max(qty) = 30 — every expected value below
+/* avg(qty) = 20, min(qty) = 10, max(qty) = 30 - every expected value below
    derives from those three, so a wrong substitution cannot look plausible. */
 
 /* ---- SELECT list, shape 1: UNCORRELATED subquery in the CASE WHEN.
@@ -73,7 +73,7 @@ quit;
 /* ---- SELECT list, shape 4: `select … into:`. ORDER BY puts qty=30 first, and INTO
    without SEPARATED BY takes the FIRST row (SQL Procedure Reference, "Creating Macro
    Variables from the First Row of a Query Result", printed p.166), so the correct
-   answer is 'over' — distinct from the 'under' the broken path produced, which is why
+   answer is 'over' - distinct from the 'under' the broken path produced, which is why
    the rows are ordered rather than left in input order. The wrong value was BOUND
    into the macro symbol table and survived the step error. */
 proc sql;
@@ -85,7 +85,7 @@ proc sql; select "&band" as into_band length=5 from part(obs=1); quit;
 
 /* ---- same item under GROUP BY: the subquery must be collapsed BEFORE this query's
    aggregates are substituted, or substituteAggs folds the SUBQUERY's own avg(qty)
-   over the OUTER group and leaves `(select 20 from part)` — a >1-row scalar error.
+   over the OUTER group and leaves `(select 20 from part)` - a >1-row scalar error.
    grp=0 is P01 alone (max 10, not > 20 -> 'lo'); grp=1 is P02/P03 (max 30 -> 'hi'). */
 data part2; set part; grp = (qty > 15); run;
 proc sql;

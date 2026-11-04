@@ -8,7 +8,7 @@ run;
 data t2;
   k = 2; output; k = 2; output; k = 4; output; k = 6; output; k = 6; output;
 run;
-/* t3 shares no key with t1 — the empty-match case */
+/* t3 shares no key with t1 - the empty-match case */
 data t3;
   k = 100; output; k = 200; output;
 run;

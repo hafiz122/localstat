@@ -1,4 +1,4 @@
-/* BUG-symputxwidth: CALL SYMPUTX of a NUMERIC converts via BEST32. — values
+/* BUG-symputxwidth: CALL SYMPUTX of a NUMERIC converts via BEST32. - values
    past 12 significant digits keep full precision (no BEST12. truncation, no
    E-notation). CALL SYMPUT keeps BEST12. + leading blanks (BUG-symputnumfmt). */
 data _null_;

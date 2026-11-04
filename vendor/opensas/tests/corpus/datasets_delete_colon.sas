@@ -1,5 +1,5 @@
 /* GAP-datasetsdeletecolon: PROC DATASETS `DELETE tmp_:;` is a name-prefix
-   wildcard — delete every WORK member of the family, not a literal member
+   wildcard - delete every WORK member of the family, not a literal member
    named "tmp_" (a real EPOCH macro clears its TMP_ scratch family this way).
    Previously: "DELETE member not found", family left behind. */
 data tmp_1; v = 1; run;

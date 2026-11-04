@@ -2,7 +2,7 @@
    input (here a where= that matches nothing) indexed row 0 of the empty table
    and the process ABORTED (SIGABRT, 21/4000 fuzz hits). A crash is never
    acceptable: the output must be the same one all-missing row the no-COPY
-   empty case already emits — _NAME_ plus the COPY columns, char and numeric
+   empty case already emits - _NAME_ plus the COPY columns, char and numeric
    both missing. */
 data e; input c $ k v; datalines;
 a 2 3

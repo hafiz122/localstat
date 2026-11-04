@@ -1,8 +1,8 @@
-/* Language Reference: Concepts Ch.23 "Reading, Combining, and Modifying SAS Data Sets" — the stated
+/* Language Reference: Concepts Ch.23 "Reading, Combining, and Modifying SAS Data Sets" - the stated
    rules of the chapter that opensas already gets RIGHT and that nothing else in
    the corpus pinned (doc-finder tick296).  Deliberately excludes the chapter's
    concatenate/interleave PDV-reset rule (p.562 Step 2 / p.566 Step 1) and the
-   MODIFY-with-BY iteration model (p.596) — those are the pass's HIGH findings,
+   MODIFY-with-BY iteration model (p.596) - those are the pass's HIGH findings,
    and pinning today's output would DEFEND the bug. */
 
 data animal;  input Common $ Animal $; datalines;
@@ -59,7 +59,7 @@ proc print data=mm2 noobs; run;
    group, the program data vector contains missing values for the variables
    UNIQUE to that data set."  A COMMON variable is not unique to either source,
    so in a group only the FIRST source contributes to, the first source's value
-   stands (c=A2) — it is not blanked and not overwritten. */
+   stands (c=A2) - it is not blanked and not overwritten. */
 data ca; input k c $ ua $; datalines;
 1 A1 X1
 2 A2 X2

@@ -1,6 +1,6 @@
 /* BUG-doindexchar: a value-list DO index compiles to the FIRST do-list
    value's type. `do a1="NONE";` in a DEAD branch must leave a1 CHAR missing
-   (blank), not numeric missing — gen2 AE's AEACNOTH1/2/3 are assigned exactly
+   (blank), not numeric missing - gen2 AE's AEACNOTH1/2/3 are assigned exactly
    this way, and the numeric guess rendered "Z.." trailing dots on every
    non-MULTIPLE row. */
 data t;

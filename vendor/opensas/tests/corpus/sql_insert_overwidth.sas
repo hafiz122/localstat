@@ -1,7 +1,7 @@
-/* BUG-sqlinsertoverwidth — INSERT ... SELECT must not store a value wider than
+/* BUG-sqlinsertoverwidth - INSERT ... SELECT must not store a value wider than
    the target column's declared char(n) width. The VALUES form already clipped
    via coerceToColumn (GAP-sqldatatypewidth); the SELECT form appended raw
-   cells, so the descriptor said Char 3 while the cell held 8 bytes — PROC
+   cells, so the descriptor said Char 3 while the cell held 8 bytes - PROC
    PRINT and EXPORT render the raw cell, the DATA-step read clips to the
    descriptor (1dcc5b51), and one stored table disagreed with itself by reader.
    The SQL volume's INSERT section (pp.290-292) is silent on truncation, but a
@@ -30,7 +30,7 @@ data chk; set t;             /* read-back surface: agrees with PRINT          */
   put 'READBACK=[' k +0 '] len=' l;
 run;
 
-/* EXPORT reads the raw cells (io.writeCsvExport) — read the file back RAW so
+/* EXPORT reads the raw cells (io.writeCsvExport) - read the file back RAW so
    the stored bytes are pinned, not a round-trip that could re-clip on import */
 proc export data=t outfile="tests/corpus/includes/siov_rt.csv" dbms=csv replace; run;
 data raw;

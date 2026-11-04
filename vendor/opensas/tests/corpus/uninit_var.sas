@@ -1,5 +1,5 @@
 /* GH#75 ISS-uninitvar: a variable read on a RHS but never assigned / INPUT /
-   retained / SET/MERGE'd is uninitialized — SAS logs
+   retained / SET/MERGE'd is uninitialized - SAS logs
    `NOTE: Variable ghost is uninitialized.` ONCE per step (goes to stderr, not
    this stdout diff; the in-file test block pins the once-per-var NOTE).
 

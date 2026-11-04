@@ -14,7 +14,7 @@ data trans;
 run;
 /* Matched-only MODIFY … BY: the transaction overwrites the matching master
    obs in place (unchanged behavior). An UNMATCHED transaction key is a
-   different case — see modify_nomatch.sas / modify_newkey.sas. */
+   different case - see modify_nomatch.sas / modify_newkey.sas. */
 data master;
   modify master trans;
   by id;

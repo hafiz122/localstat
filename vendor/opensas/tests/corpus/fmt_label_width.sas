@@ -1,5 +1,5 @@
 /* BUG-fmtlabelwidth: an explicit WIDTH on a MATCHED user VALUE-format label was
-   ignored — the label came back verbatim. SAS truncates the matched label to w
+   ignored - the label came back verbatim. SAS truncates the matched label to w
    (keeping the first w chars), left-justifies, and blank-pads a shorter label to
    w. With NO explicit width the label renders at the format's default width
    (the longest label's length). */

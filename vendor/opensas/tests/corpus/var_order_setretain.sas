@@ -1,6 +1,6 @@
 /* BUG-varorder-setretain: a RETAIN (or sum statement `v + expr;`) that textually
    PRECEDES the SET establishes its vars in the PDV BEFORE the input dataset's
-   columns — SAS orders columns by first mention, and RETAIN-before-SET is the
+   columns - SAS orders columns by first mention, and RETAIN-before-SET is the
    canonical column-reorder idiom. Values were already correct; only the ORDER was
    wrong (opensas put SET vars first). SET-first (retain/sum AFTER set) is unchanged.
    corpus-varorder. */

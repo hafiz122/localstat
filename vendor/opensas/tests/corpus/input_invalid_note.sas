@@ -1,12 +1,12 @@
-/* NOTE-inputinvalidnote (Language Reference: Concepts p.518 "How SAS Handles Invalid Data" — FOUR
+/* NOTE-inputinvalidnote (Language Reference: Concepts p.518 "How SAS Handles Invalid Data" - FOUR
    mandated actions): the INPUT statement performed only action 1 (value →
    missing). Now the statement path also performs action 2 (the invalid-data
-   NOTE, with the REAL record line and column — the house text's hardcoded
+   NOTE, with the REAL record line and column - the house text's hardcoded
    0/0 belongs to the no-span expression path) and action 3 (_ERROR_=1 for the
    current observation), so the `if _error_ then …` validation idiom works on
    INPUT again. `?` suppresses the NOTE, `??` also suppresses _ERROR_.
    Action 4's record-echo + printed scale are NOT implemented (the numbers are
-   in the NOTE text, on stderr). The INPUT() function path stays silent —
+   in the NOTE text, on stderr). The INPUT() function path stays silent -
    `input(x, ?? fmt.)` suppression cannot be threaded through the generic
    argument parser yet (reported in the ticket, not claimed closed).
    stdout pins _ERROR_; the NOTE text is asserted by an in-file test. */

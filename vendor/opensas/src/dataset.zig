@@ -1,4 +1,4 @@
-//! A Dataset — an ordered list of observations with a named column schema.
+//! A Dataset - an ordered list of observations with a named column schema.
 //!
 //! Where the PDV (pdv.zig) is the *one* row the executor is currently building,
 //! a `Dataset` is the persisted result: the rows an `output` produced, or the
@@ -6,14 +6,14 @@
 //! + type); every row is a `[]Value` aligned to that schema by index.
 //!
 //! Ownership is the point of this type. A row snapshotted from a PDV must not
-//! alias the PDV's cells — the next iteration overwrites them. So `appendRow`
+//! alias the PDV's cells - the next iteration overwrites them. So `appendRow`
 //! copies: numerics by value, char bytes duped into the Dataset's arena. After
 //! `appendRow` the row is fully independent of whatever produced it.
 //!
 //! Arena-backed and read-mostly: build it by adding columns then appending
 //! rows; read it via `columns`/`rows` (or the `indexOf`/`row` accessors). A
 //! *library* of named datasets (for `set a b;`) is the executor's map, not this
-//! type — one `Dataset` is one table.
+//! type - one `Dataset` is one table.
 
 const std = @import("std");
 const Value = @import("value.zig").Value;
@@ -29,7 +29,7 @@ pub const Dataset = struct {
     name: []const u8,
     columns: std.ArrayList(Column),
     rows: std.ArrayList([]const Value),
-    label: ?[]const u8 = null, // dataset label (PROC DATASETS MODIFY (LABEL=)) — BUG-datasetsstrip
+    label: ?[]const u8 = null, // dataset label (PROC DATASETS MODIFY (LABEL=)) - BUG-datasetsstrip
 
     pub fn init(arena: std.mem.Allocator, name: []const u8) Dataset {
         return .{ .arena = arena, .name = name, .columns = .empty, .rows = .empty };
@@ -43,7 +43,7 @@ pub const Dataset = struct {
     }
 
     /// Append a column copying `src`'s attributes (format/informat/label/len)
-    /// under `name` — which may differ from `src.name` (e.g. a SQL join
+    /// under `name` - which may differ from `src.name` (e.g. a SQL join
     /// requalification). Keeps an output column's attached format alive across
     /// the copy (GH#49). Returns its index.
     pub fn addColumnLike(self: *Dataset, name: []const u8, src: Column) !usize {

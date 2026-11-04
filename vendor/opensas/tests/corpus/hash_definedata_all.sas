@@ -1,7 +1,7 @@
 /* BUG-hashdefinedataall (doc-finder tick164): defineData(all:'yes') on a
-   dataset:-loaded hash must (a) INCLUDE the key variables among the data —
+   dataset:-loaded hash must (a) INCLUDE the key variables among the data -
    SAS: the keys are data too, the documented idiom for keeping the key
-   column on .output() — and (b) enumerate the DATASET's schema, not the
+   column on .output() - and (b) enumerate the DATASET's schema, not the
    live PDV: this _null_ step carries no id/x columns, so a PDV scan would
    define ZERO data vars and silently output nothing. The output dataset
    must carry id (the key) AND x with correct values. */

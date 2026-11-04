@@ -1,7 +1,7 @@
-//! Statement executor — the DATA step loop. Given a parsed statement stream
+//! Statement executor - the DATA step loop. Given a parsed statement stream
 //! (M0.2) it drives the implied loop SAS wraps every DATA step in:
 //!
-//!   compile once:  scan for the declaratives — `retain` (which vars survive
+//!   compile once:  scan for the declaratives - `retain` (which vars survive
 //!                  the top-of-loop reset, plus their one-time inits), `drop`/
 //!                  `keep` (output schema), and the input source (`set`, or
 //!                  `input`+`datalines`).
@@ -18,7 +18,7 @@
 //! Scope is the DATA-step surface the AST names. Declaratives are read at the
 //! top level only; `data a b …;` names several output datasets and a bare /
 //! implicit `output` fans out to all of them (`extra_outs`, BUG-multioutput);
-//! approximate `put` spacing — each marked `ponytail:` where it bites. Grow
+//! approximate `put` spacing - each marked `ponytail:` where it bites. Grow
 //! with the corpus.
 
 const std = @import("std");
@@ -39,19 +39,19 @@ const prx = @import("prx.zig"); // regex engine, for the CALL PRX routines
 const fns = @import("functions.zig"); // shared toInt guard (BUG-combcallcrash)
 const macro = @import("macro.zig"); // CALL EXECUTE macro-processes at call time (GH#13)
 
-// diag.Error (OutOfMemory + Lex/Parse/ExecError) so a step can abort LOUD — e.g.
+// diag.Error (OutOfMemory + Lex/Parse/ExecError) so a step can abort LOUD - e.g.
 // output access to an ACCESS=READONLY libref (GH#15). A superset of the old
 // Allocator.Error, so every existing `try` still type-checks.
 pub const Error = diag.Error;
 
-/// GAP guard (D-009): the construct is valid SAS 9.4 opensas doesn't implement —
+/// GAP guard (D-009): the construct is valid SAS 9.4 opensas doesn't implement -
 /// an opensas gap, exit 2 ("file an opensas issue"), not rc 1 ("fix your SAS").
 /// Flag the gap, then fail with the usual loud ERROR (parser.zig/proc.zig's
-/// `failGap`, same shape — no fourth helper). ONLY for guards matching a
+/// `failGap`, same shape - no fourth helper). ONLY for guards matching a
 /// SPECIFIC recognised valid construct; a catch-all that also swallows a typo
 /// stays a plain `fail` unless it is SPLIT first (audit-exitcodecontract.md §5c).
 /// The `report(.err) catch {}; return error.ExecError` sites in this file call
-/// `diag.markGap()` inline instead — same signal, but they must keep reporting
+/// `diag.markGap()` inline instead - same signal, but they must keep reporting
 /// through the two-line shape (a `fail` would change their OOM path).
 fn failGap(diags: *diag.Diagnostics, comptime fmt: []const u8, args: anytype) Error {
     diag.markGap();
@@ -60,7 +60,7 @@ fn failGap(diags: *diag.Diagnostics, comptime fmt: []const u8, args: anytype) Er
 
 /// Every method/attribute the SAS 9.4 Component Objects reference's own
 /// "Dictionary of Hash and Hash Iterator Object Language Elements" names
-/// (printed p.23, the TOC of the dictionary itself) — so a hash method that is
+/// (printed p.23, the TOC of the dictionary itself) - so a hash method that is
 /// real-but-unimplemented can be told from a typo'd one. Closed by the doc, not
 /// by us; the same shape as proc.zig's `isUnsupportedFreqStat`.
 fn isHashMethod(name: []const u8) bool {
@@ -75,7 +75,7 @@ fn isHashMethod(name: []const u8) bool {
 }
 
 /// Every CALL routine the SAS 9.4 Functions and CALL Routines reference names
-/// (its dictionary's `CALL <NAME> Routine` headings) — the closed set that
+/// (its dictionary's `CALL <NAME> Routine` headings) - the closed set that
 /// splits "a routine we have not written" (gap, rc 2) from "the user misspelled
 /// one" (rc 1). Reaching the catch-all already means unimplemented, so this list
 /// needs no maintenance when a routine lands.
@@ -102,12 +102,12 @@ fn isCallRoutine(name: []const u8) bool {
 const StdizeOptKind = enum { standardization, vardef, miscellaneous };
 
 /// The option keywords CALL STDIZE documents (Functions ref printed p.419-421),
-/// in the reference's own three groups. Callers pass the bare keyword — any
-/// `=value` tail already stripped — so `MEDIAN` and `MULT=2` both resolve here
+/// in the reference's own three groups. Callers pass the bare keyword - any
+/// `=value` tail already stripped - so `MEDIAN` and `MULT=2` both resolve here
 /// while `MEDAIN` does not.
 fn stdizeOptKind(kw: []const u8) ?StdizeOptKind {
     // "standardization-options: specifies how to compute the location and scale
-    // measures" — the ones the Details section itself calls methods ("This
+    // measures" - the ones the Details section itself calls methods ("This
     // option affects only the methods AGK=, IQR, MAD, and SPACING=").
     inline for (.{
         "abw",    "agk",  "ahuber", "awave",    "euclen", "iqr",     "l",   "mad",
@@ -115,7 +115,7 @@ fn stdizeOptKind(kw: []const u8) ?StdizeOptKind {
         "ustd",
     }) |o| if (eqi(kw, o)) return .standardization;
     // "VARDEF-options: specifies the divisor to be used in the calculation of
-    // variances" — a divisor, not a method.
+    // variances" - a divisor, not a method.
     inline for (.{ "df", "n" }) |o| if (eqi(kw, o)) return .vardef;
     inline for (.{ "add", "fuzz", "missing", "mult", "norm", "pstat", "replace", "snorm" }) |o|
         if (eqi(kw, o)) return .miscellaneous;
@@ -123,11 +123,11 @@ fn stdizeOptKind(kw: []const u8) ?StdizeOptKind {
 }
 
 /// BUG-putptroom: ceiling for a PUT `@n` column-pointer target (parser.zig's
-/// max_put_ptr guards +n / #n) — fail loud instead of padding gigabytes.
+/// max_put_ptr guards +n / #n) - fail loud instead of padding gigabytes.
 const max_put_ptr: usize = 32767;
 
 /// Set when an `abort abend [n]` / `abort return n` / `abort n` fires
-/// (BUG-abortreturncode): the session is dead — main halts every later step
+/// (BUG-abortreturncode): the session is dead - main halts every later step
 /// and exits the process with this code (ABEND without n → 1). Reset per run
 /// in main.interpret (wasm runs many programs per load).
 pub var g_abort_rc: ?u8 = null;
@@ -153,9 +153,9 @@ pub const Library = struct {
     /// `&var` (needs per-step re-expansion); the store is populated + queryable.
     macro_vars: std.StringHashMapUnmanaged([]const u8) = .empty,
     /// Full program text queued by CALL EXECUTE, FIFO. exec.zig can't re-enter
-    /// the step driver (it lives in main.zig — circular import), so CALL
+    /// the step driver (it lives in main.zig - circular import), so CALL
     /// EXECUTE only appends here and main.zig's `runExpanded` drains the queue
-    /// after the current step finishes (FEAT-callexecute — same exec-writes/
+    /// after the current step finishes (FEAT-callexecute - same exec-writes/
     /// main-drains split as macro_vars).
     execute_queue: std.ArrayList([]const u8) = .empty,
     /// Variable labels for the CURRENT DATA step (LABEL statement / ATTRIB label=),
@@ -219,15 +219,15 @@ pub const Library = struct {
     }
 
     /// Create or replace a member. Output access to a read-only libref fails loud
-    /// (GH#15) — the choke point for the DATA-step member write, PROC OUT=, and
+    /// (GH#15) - the choke point for the DATA-step member write, PROC OUT=, and
     /// every proc that materializes a result. The disk loader preloads read-only
     /// INPUTS (legal read access) via `putInput`, which skips the guard.
     pub fn put(self: *Library, name: []const u8, ds: *Dataset) Error!void {
         if (self.readonlyOut(name)) return self.failReadonly(name);
         try self.putInput(name, ds);
-        // BUG-syslastrefresh: a member was just CREATED or REPLACED — refresh
+        // BUG-syslastrefresh: a member was just CREATED or REPLACED - refresh
         // &SYSLAST/&SYSNOBS. This is the one place to do it: every producer
-        // routes here (272 call sites — the DATA-step output, all 151 proc.zig
+        // routes here (272 call sites - the DATA-step output, all 151 proc.zig
         // OUT= writes, PROC SORT, SQL CREATE TABLE, IMPORT), so there is no
         // per-PROC rule to get wrong and no sibling producer to miss.
         //
@@ -235,17 +235,17 @@ pub const Library = struct {
         // split: putInput also serves the disk loader's read-only INPUT preload
         // (main.zig, GH#15), and merely READING a data set in must not make it
         // "the most recently created". Same reason this sits AFTER the readonly
-        // guard rather than before it — a write that FAILS creates nothing, so
+        // guard rather than before it - a write that FAILS creates nothing, so
         // it must not advance the pair.
         //
         // `data _null_;` needs no special case and gets none: main.zig already
         // skips the commit for it, so it never reaches here and the pair stays
-        // put — which is the correct SAS behaviour for a step that creates
+        // put - which is the correct SAS behaviour for a step that creates
         // nothing, not an oversight.
         //
         // main.zig's existing drain of `macro_vars` into the macro session runs
         // at the end of each step flush, so a `%put` immediately after `run;`
-        // already sees these — verified against the code rather than assumed,
+        // already sees these - verified against the code rather than assumed,
         // and it is the same channel &SYSERR/&SYSCC already refresh through.
         //
         // &SYSNOBS is tied to the CREATED data set here, and the volume
@@ -258,7 +258,7 @@ pub const Library = struct {
         // clinical `%if &sysnobs = 0` guard means, and "closed" would also count
         // data sets a step only READ. Recorded so nobody mistakes it for settled.
         // The doc's `-1` sentinel ("If the number of observations … was not
-        // calculated") never applies to us — rowCount() is always known.
+        // calculated") never applies to us - rowCount() is always known.
         try self.setMacroVar("syslast", try qualifiedUpper(self.arena, name));
         try self.setMacroVar("sysnobs", try std.fmt.allocPrint(self.arena, "{d}", .{ds.rowCount()}));
     }
@@ -274,7 +274,7 @@ pub const Library = struct {
         // Index miss → a genuinely new member: append and index it (O(1) create).
         // ponytail: an in-place PROC DATASETS rename that hid an existing name from
         // the index could, if that exact name is then re-created, leave a shadowed
-        // duplicate — closed by routing the proc.zig rename through a Library method.
+        // duplicate - closed by routing the proc.zig rename through a Library method.
         const key = try std.ascii.allocLowerString(self.arena, stripWork(name));
         try self.names.append(self.arena, try self.arena.dupe(u8, name));
         try self.sets.append(self.arena, ds);
@@ -306,7 +306,7 @@ pub const Library = struct {
         return null;
     }
 
-    /// Ground-truth linear scan for the WORK-stripped name `s` — the fallback that
+    /// Ground-truth linear scan for the WORK-stripped name `s` - the fallback that
     /// keeps `find` correct across proc.zig's direct renames/deletes (PERF-libscan).
     fn scanSlot(self: *const Library, s: []const u8) ?usize {
         for (self.names.items, 0..) |n, i| if (std.ascii.eqlIgnoreCase(stripWork(n), s)) return i;
@@ -330,13 +330,13 @@ pub const Library = struct {
 /// The parser deliberately serializes `a(where=(x>15))` into ONE string so the AST
 /// can stay a plain name list (parser.serializeParens says so), which means every
 /// consumer has to split it back apart. Until now FIVE sites in this file did that
-/// with their own inline `indexOfScalar(name, '(')` — and the sixth consumer,
+/// with their own inline `indexOfScalar(name, '(')` - and the sixth consumer,
 /// `assertModifyMasterIsOutput`, did not, so it compared `a(where = ( x > 15 ) )`
 /// against the DATA statement's `a` and could never match. The documented spelling
 /// of a subsetted MODIFY was therefore unusable (BUG-modifymasteroptname), which
 /// matters because Statements ref printed p.240 hangs `(data-set-options)` off the
 /// MODIFY statement in all four Syntax Forms and its Notes say to put them there
-/// "and not in the DATA statement" — so that spelling is not merely one option, it
+/// "and not in the DATA statement" - so that spelling is not merely one option, it
 /// is the only documented one.
 ///
 /// This is deliberately ONE OWNER replacing five copies rather than a sixth
@@ -345,8 +345,8 @@ pub const Library = struct {
 ///
 /// ponytail: the real fix is for the PARSER to carry name and options as separate
 /// fields so nothing ever has to re-split. That is a wider change than this
-/// ticket — the four source lists are `[]const []const u8` in ast.zig and ~20
-/// consumers index them as plain names — so the encoding stays and gains a single
+/// ticket - the four source lists are `[]const []const u8` in ast.zig and ~20
+/// consumers index them as plain names - so the encoding stays and gains a single
 /// decoder. Scope reported rather than papered.
 const SourceRef = struct {
     name: []const u8, // bare member, `a` or `lib.a`
@@ -363,7 +363,7 @@ fn splitSourceRef(entry: []const u8) SourceRef {
 
 /// A member name in &SYSLAST's form: two-level and UPPERCASE (`one` → `WORK.ONE`,
 /// `perm.x` → `PERM.X`). SAS reports the qualified name, so a one-level name gets
-/// the default libref — the inverse of `stripWork` below, which removes it for
+/// the default libref - the inverse of `stripWork` below, which removes it for
 /// lookups (BUG-syslastrefresh).
 ///
 /// Macro Language ref printed p.266 (marker `=== pdf 281 ===`, offset -15 and the
@@ -372,18 +372,18 @@ fn splitSourceRef(entry: []const u8) SourceRef {
 /// the value of SYSLAST is _NULL_, with no leading or trailing blanks." The
 /// uppercasing and the period are shown by the printed p.267 example (mixed-case
 /// input `FirstLib.SalesRpt` logs as `FIRSTLIB.SALESRPT`) rather than asserted in
-/// prose. The one-level → `WORK.x` mapping is NOT stated anywhere — it follows
+/// prose. The one-level → `WORK.x` mapping is NOT stated anywhere - it follows
 /// from Language Reference: Concepts printed p.694 ("Data sets with one-level names are automatically
 /// assigned to one of two SAS libraries: Work or User") plus the documented
 /// libref.dataset form, so it is an inference and is recorded as one.
 ///
 /// ponytail: UNPADDED, deliberately. That same p.267 example shows SAS padding the
-/// value with trailing blanks and recommending `%TRIM(&syslast)` — but SYSLAST's
+/// value with trailing blanks and recommending `%TRIM(&syslast)` - but SYSLAST's
 /// FIELD WIDTH is doc-silent (the sibling SYSDSN entry states 8+`_NULL_`+26 for
 /// itself; SYSLAST's is never given), so padding would mean inventing a number
 /// that `%put *&syslast*` renders visibly wrong either way. Unpadded also matches
-/// the one padding fact the doc DOES state — the `_NULL_` seed carries "no leading
-/// or trailing blanks" — and is what the documented `%TRIM` idiom yields. Upgrade
+/// the one padding fact the doc DOES state - the `_NULL_` seed carries "no leading
+/// or trailing blanks" - and is what the documented `%TRIM` idiom yields. Upgrade
 /// if an oracle supplies the width.
 fn qualifiedUpper(a: std.mem.Allocator, name: []const u8) ![]const u8 {
     const two = std.mem.indexOfScalar(u8, name, '.') != null;
@@ -406,12 +406,12 @@ pub const DeclVar = struct {
     type: pdv_mod.VarType,
     len: usize = 0,
     // GH#70: this LENGTH statement is textually AFTER a SET/MERGE that already
-    // brought the variable in — so a char LENGTH on a numeric source var is the
+    // brought the variable in - so a char LENGTH on a numeric source var is the
     // fatal "Character length cannot be used with numeric variable" conflict. A
     // LENGTH placed BEFORE the SET (false) is schema-pinning and coerces leniently.
     after_input: bool = false,
     // BUG-varorder: a RETAIN/FORMAT/INFORMAT/INPUT/assignment statement precedes
-    // this LENGTH/ATTRIB in source (in a step with no SET/MERGE) — SAS establishes
+    // this LENGTH/ATTRIB in source (in a step with no SET/MERGE) - SAS establishes
     // those vars first, so this var is seeded AFTER declareVars, not in the
     // pre-pass. (main.lengthVars decides; SET steps keep the old pre-pass order
     // because seedColumnsOf's GH#69/#70 conflict checks need the pin in place.)
@@ -446,10 +446,10 @@ const MergeState = struct {
     // Per-BY-var truncation width for the group comparison (BUG-mergebyvarlen):
     // a CHAR BY var's output length is the first source's declared length (SAS
     // Language Reference: Concepts p.559), and SAS truncates every source's value to it BEFORE grouping
-    // — so a longer value in a later source collides with the shorter prefix.
+    // - so a longer value in a later source collides with the shorter prefix.
     // 0 = numeric or no declared width → compare raw. Length == nby.
     by_len: []const usize = &.{},
-    prev_g: ?[]Value = null, // last group's BY key — detects unsorted input (BUG-mergeunsorted)
+    prev_g: ?[]Value = null, // last group's BY key - detects unsorted input (BUG-mergeunsorted)
     slots: []const []usize = &.{}, // per-source column→PDV-slot maps for loadRow (PERF-loadrowdual)
     // first./last. BY-flag levels for the current group (BUG-mergefirstlast):
     // level >= first_level is 1 on the group's first obs (where the key first
@@ -462,7 +462,7 @@ const MergeState = struct {
 /// A hash-object entry: the key value tuple and the data value tuple it maps to.
 const HashEntry = struct { keyvals: []const Value, datavals: []const Value };
 
-/// `ordered:` constructor option — the iteration/output order of a hash's
+/// `ordered:` constructor option - the iteration/output order of a hash's
 /// entries. `.none` keeps insertion order (SAS default).
 const HashOrder = enum { none, asc, desc };
 
@@ -516,14 +516,14 @@ const HashObject = struct {
     datas: std.ArrayList([]const u8) = .empty, // defineData variable names
     entries: std.ArrayList(HashEntry) = .empty,
     index: HashIndex = .empty, // key tuple → first entries slot (PERF-hashscan)
-    src: ?[]const u8 = null, // `dataset:"name"` — loaded on defineDone
+    src: ?[]const u8 = null, // `dataset:"name"` - loaded on defineDone
     done: bool = false,
-    iter_of: ?[]const u8 = null, // `declare hiter hi("h")` — the hash this walks
+    iter_of: ?[]const u8 = null, // `declare hiter hi("h")` - the hash this walks
     iter_pos: usize = 0, // current entry index for first()/next()
     iter_on: bool = false, // a first/last/next/prev has POSITIONED the cursor (p.621's "pointing to the key")
-    ordered: HashOrder = .none, // `ordered:` — iteration/output key order (BUG-hashordered)
-    multidata: bool = false, // `multidata:'y'` — allow many records per key (BUG-hashmultidata)
-    duplicate: HashDuplicate = .keep_first, // `duplicate:` — dup-key add policy (BUG-hashduplicate)
+    ordered: HashOrder = .none, // `ordered:` - iteration/output key order (BUG-hashordered)
+    multidata: bool = false, // `multidata:'y'` - allow many records per key (BUG-hashmultidata)
+    duplicate: HashDuplicate = .keep_first, // `duplicate:` - dup-key add policy (BUG-hashduplicate)
     md_key: ?[]const Value = null, // key tuple of the last successful find (find_next cursor)
     md_slot: usize = 0, // entries slot of the last successful find/find_next
 };
@@ -541,10 +541,10 @@ const SetState = struct {
     ri: usize = 0, // concatenate: current row within `di`
     by_cols: ?[]const []const ?usize = null, // per-dataset BY column indices; null → concatenate
     cursors: []usize = &.{}, // interleave: per-dataset next-row index
-    prev_by: ?[]Value = null, // last emitted BY key — detects unsorted input (BUG-setbyunsorted)
-    last_contrib: ?usize = null, // source of the last read — a change resets SET vars (BUG-setsourcereset)
+    prev_by: ?[]Value = null, // last emitted BY key - detects unsorted input (BUG-setbyunsorted)
+    last_contrib: ?usize = null, // source of the last read - a change resets SET vars (BUG-setsourcereset)
     in_vars: []const ?[]const u8 = &.{}, // per-source `in=` flag variable (or null)
-    any_in: bool = false, // any non-null in_vars entry — gates the per-row scan (PERF-setinflagquad)
+    any_in: bool = false, // any non-null in_vars entry - gates the per-row scan (PERF-setinflagquad)
     slots: []const []usize = &.{}, // per-source column→PDV-slot maps for loadRow (PERF-loadrowdual)
 };
 
@@ -561,7 +561,7 @@ const UpdateState = struct {
     t_by: []const ?usize, // transaction's BY column indices
     mi: usize = 0, // master row cursor
     ti: usize = 0, // transaction row cursor
-    prev_g: ?[]Value = null, // last group's BY key — detects unsorted input (BUG-setbyunsorted)
+    prev_g: ?[]Value = null, // last group's BY key - detects unsorted input (BUG-setbyunsorted)
     m_slots: []const usize = &.{}, // master's column→PDV-slot map for loadRow (PERF-loadrowdual)
     t_slots: []const usize = &.{}, // transaction's, for the per-read reset (BUG-prefixmergewipe)
 };
@@ -581,11 +581,11 @@ const ExtraSet = struct {
 };
 
 /// `modify master trans; by k;` input. TRANSACTION-driven (BUG-modifybymasterdriven):
-/// one DATA-step iteration per TRANSACTION observation — Language Reference: Concepts p.596 counts exactly
+/// one DATA-step iteration per TRANSACTION observation - Language Reference: Concepts p.596 counts exactly
 /// 3 REPLACEs + 3 OUTPUTs = the 6 transaction rows of the p.595 program, and p.599
 /// Table 23.4 has NO `_IORC_` code for "a master row with no transaction" because
 /// that iteration does not exist. Each transaction obs is matched to its master
-/// obs (duplicates match in order — Table 23.3 allows duplicate BY in both);
+/// obs (duplicates match in order - Table 23.3 allows duplicate BY in both);
 /// master obs no transaction names are never loaded and are re-emitted untouched
 /// by the rebuild-commit (modifyFlush).
 const ModifyState = struct {
@@ -593,7 +593,7 @@ const ModifyState = struct {
     trans: *Dataset,
     m_by: []const ?usize, // master's BY column indices
     t_by: []const ?usize, // transaction's BY column indices
-    ti: usize = 0, // transaction row cursor — THE driver
+    ti: usize = 0, // transaction row cursor - THE driver
     m_hint: usize = 0, // master scan start (a repeated key continues past the last match)
     cur_m: ?usize = null, // master row of the current matched iteration (REPLACE/REMOVE target)
     prev_key: ?[]Value = null, // previous transaction's BY tuple (first./last. + _DSEMTR)
@@ -606,23 +606,23 @@ const ModifyState = struct {
     // re-emits every row, including the ones the filter hid.
     src_pos: []const usize = &.{},
     // GAP-modifywherestmt: the FILTERED copy the BY driver scans/matches/loads
-    // (filter-then-match — Statements ref printed p.360 "SAS selects observations
+    // (filter-then-match - Statements ref printed p.360 "SAS selects observations
     // from each input data set before it combines them"; printed p.245 "uses
     // dynamic WHERE processing to locate the matching observation"). Null =
     // nothing row-filtered the BY master: scan `master` directly, exactly as
     // before. `flush_slots` are the master's own column→PDV slots for the
-    // flush's untouched-row loads — m_slots stays the SCANNED copy's (the two
+    // flush's untouched-row loads - m_slots stays the SCANNED copy's (the two
     // differ only when a keep=/drop= rides along with a row filter).
     scan: ?*Dataset = null,
     flush_slots: []const usize = &.{},
     repl: std.AutoHashMapUnmanaged(usize, ?[]Value) = .empty, // master row → rebuilt obs (null = REMOVEd)
-    appends: std.ArrayList([]Value) = .empty, // OUTPUT-added obs — land at the END (in-place semantics)
+    appends: std.ArrayList([]Value) = .empty, // OUTPUT-added obs - land at the END (in-place semantics)
     flushed: bool = false,
 };
 
 const Driver = union(enum) {
     once: bool, // true after its one iteration is spent
-    lines, // datalines/infile input — the cursor lives on `Executor.li`; the INPUT
+    lines, // datalines/infile input - the cursor lives on `Executor.li`; the INPUT
     // statement reads at run time (execInput), so several INPUTs per iteration and a
     // trailing `@` line hold compose (PG-atptr). loadNext just gates the iteration.
     sets: SetState,
@@ -641,7 +641,7 @@ const ModifyNomatch = enum { none, first, subsequent };
 const LineInputState = struct {
     // Mutable element slice: `_infile_ = …` writes THROUGH to the held record
     // (BUG-infilevarnoop). Every backing array is arena-built (parser
-    // toOwnedSlice / readInfileLines) — never static memory.
+    // toOwnedSlice / readInfileLines) - never static memory.
     lines: [][]const u8 = &.{},
     cur: usize = 0,
     pos: usize = 0,
@@ -650,22 +650,22 @@ const LineInputState = struct {
     eof: bool = false,
 };
 
-/// One INFILE statement as recorded by scan (BUG-multiinfilelastwins) —
+/// One INFILE statement as recorded by scan (BUG-multiinfilelastwins) -
 /// `stmt` keys the run-time source switch (null only for a unit test's
 /// directly-injected `x.infile`, which has no statement to key on).
 /// `src` is filled by run(): the LineSource index this statement selects.
 const InfileSpec = struct { stmt: ?*const ast.Stmt, spec: ast.Infile, src: usize = 0 };
 
 /// One declared line-input source (BUG-multiinfilelastwins): every INFILE
-/// statement declares its OWN source — its own records, read cursor, and
-/// options — and EXECUTING the statement makes it current (SAS: an INPUT
+/// statement declares its OWN source - its own records, read cursor, and
+/// options - and EXECUTING the statement makes it current (SAS: an INPUT
 /// reads the file of the most recently executed INFILE; Language Reference: Concepts Table 20.4
 /// row 5 stops the step when EOF is first reached on ANY of them). With no
 /// INFILE statement the datalines block is the single implicit source.
 const LineSource = struct {
     spec: ast.Infile, // options (dlm/dsd/overflow/end_var…)
     lines: [][]const u8 = &.{}, // records (file content or the datalines block)
-    li: LineInputState = .{}, // saved cursor — live in `Executor.li` while current
+    li: LineInputState = .{}, // saved cursor - live in `Executor.li` while current
 };
 
 pub const Executor = struct {
@@ -676,7 +676,7 @@ pub const Executor = struct {
     lib: *Library,
     log: std.ArrayList(u8) = .empty, // `put` output, for the CLI to print
     // ISS-errordump: while set, putBuf/putSep route THERE instead of the FILE/log
-    // stdout buffer — the `_ERROR_=1` observation dump reuses putAllVars verbatim
+    // stdout buffer - the `_ERROR_=1` observation dump reuses putAllVars verbatim
     // (same var order, same skip list, same value rendering) but must never land
     // in the listing: a dump is log-class (stderr via the captured diagnostics),
     // and it goes there even when a FILE statement is open (SAS dumps to the log).
@@ -687,12 +687,12 @@ pub const Executor = struct {
     retained: std.ArrayList([]const u8) = .empty,
     array_names: std.ArrayList([]const u8) = .empty, // every ARRAY name this step (bare-name misuse check, BUG-arrayinitvalidate)
     retain_inits: std.ArrayList(RetainInit) = .empty,
-    special_retains: std.ArrayList(SpecialRetain) = .empty, // `retain _numeric_ 0;` — expanded post-declareVars
-    keep_mode: bool = false, // a KEEP stmt was seen — stays on even if `_numeric_` expands to 0 names
+    special_retains: std.ArrayList(SpecialRetain) = .empty, // `retain _numeric_ 0;` - expanded post-declareVars
+    keep_mode: bool = false, // a KEEP stmt was seen - stays on even if `_numeric_` expands to 0 names
     drops: std.ArrayList([]const u8) = .empty,
     keeps: std.ArrayList([]const u8) = .empty,
     // PERF-arraydeclquad: lowercased-name membership sets backing drops/keeps/
-    // retained — a linear nameIn scan per PDV var per row is O(N²) for a
+    // retained - a linear nameIn scan per PDV var per row is O(N²) for a
     // `_temporary_` array of N (and O(C²) for a wide RETAIN reset). Built once
     // by freezeNameLists after buildDriver (the last append site); a list with
     // a `pfx:` wildcard keeps the linear scan (a hash can't prefix-match).
@@ -704,13 +704,13 @@ pub const Executor = struct {
     set_names: ?[]const []const u8 = null,
     extra_sets: std.ArrayList(ExtraSet) = .empty, // MULTISET-impl: 2nd/conditional SET nodes, each with its own cursor
     // BUG-nestedsetopts: non-driver SET nodes with their end=/point= sentinels
-    // already pulled (extractSetOptions walk) — collectExtraSetsStmt resolves
+    // already pulled (extractSetOptions walk) - collectExtraSetsStmt resolves
     // THESE names, never the raw node list (which still holds the sentinel).
     extra_src_names: std.AutoHashMapUnmanaged(*const ast.Stmt, []const []const u8) = .empty,
     dow_set: ?*const ast.Stmt = null, // DOWLOOP-impl: the SET whose reads are driven by an enclosing DO loop
     driver_ptr: ?*Driver = null, // the live driver, so a DOW SET can advance it from runStmt
     // BUG-setstmtorder: the DIRECT top-level source statement each scan arm
-    // registered (set keeps the first, merge/update/modify the last — mirroring
+    // registered (set keeps the first, merge/update/modify the last - mirroring
     // the name lists). Only a direct member of the top-level program slice can
     // split the iteration around its read; a source nested in an IF branch or
     // DO body stays null here and keeps read-first (BUG-nestedsetdriver /
@@ -723,14 +723,14 @@ pub const Executor = struct {
     split_pc: ?usize = null, // op index where driver_stmt's ops begin (compileProgram)
     // BUG-linkacrossset: the LINK return stack is executor-wide (was local to
     // runProgramRange) so a LINK issued in one half of the split op stream can
-    // run its label block in the OTHER half and RETURN — Language Reference: Concepts p.485 Table
+    // run its label block in the OTHER half and RETURN - Language Reference: Concepts p.485 Table
     // 20.3: LINK "return[s] control of the program to the next statement
     // following the LINK statement", so it can never skip or re-run the read.
     link_stack: std.ArrayList(usize) = .empty,
     set_end_var: ?[]const u8 = null, // `set a end=e;` → 1 on the last obs (BUG-setend)
     set_point_var: ?[]const u8 = null, // `set a point=i;` → direct-access obs i (BUG-setpoint)
     // BUG-pointredefinesnobs: ALL the datasets point= reads from, in statement
-    // order, addressed as ONE concatenation — `set a b point=p;` reaches obs
+    // order, addressed as ONE concatenation - `set a b point=p;` reaches obs
     // 1..a+b, not just a's. This used to be a single `*Dataset` bound to the
     // FIRST resolvable name, which is what silently shrank both the read set
     // and NOBS=.
@@ -740,37 +740,37 @@ pub const Executor = struct {
     // direct-access lookup rides a SECOND SET beside a sequential driver
     // (Statements ref p.341 Example 6: `set revenue; … set expense point=_n_;`).
     // null = the point source is the driver list's own SET (a POINT=-only step,
-    // or a lookup beside a MERGE/UPDATE/INPUT driver — BUG-pointmergelookup).
+    // or a lookup beside a MERGE/UPDATE/INPUT driver - BUG-pointmergelookup).
     set_point_node: ?*const ast.Stmt = null,
     // BUG-pointsuppressesalloutput: is POINT= what DRIVES this step, or does a
     // `set ds point=v;` merely READ alongside a MERGE/UPDATE/INPUT driver? Only
     // a POINT=-driven step lacks EOF detection (Language Reference: Concepts p.488) and drops its
     // implicit output; accompanied by a driver, the read is the documented
     // direct-access lookup (SAS 9.4 Statements ref, SET Example 6) and Language Reference: Concepts
-    // p.477 step 5's automatic output stands. Set by buildDriver — the one
+    // p.477 step 5's automatic output stands. Set by buildDriver - the one
     // place that knows which driver won.
     point_driven: bool = false,
     // BUG-pointnoiterate (Language Reference: Concepts p.488): a POINT= step cannot detect EOF, so it
-    // iterates until STOP/ABORT/an out-of-range read — each successful direct
+    // iterates until STOP/ABORT/an out-of-range read - each successful direct
     // read re-arms the .once driver for one more implicit iteration. This map
     // (obs → iteration first read) spots a read REPEATING an obs from an
     // EARLIER iteration: the step is re-reading with no progress, where SAS
-    // loops forever (p.488's "usually requires a STOP") — stop it instead of
+    // loops forever (p.488's "usually requires a STOP") - stop it instead of
     // hanging. Reads are bounded by the obs count, so this always terminates.
     point_reads: std.AutoHashMapUnmanaged(usize, usize) = .empty,
-    nobs_var: ?[]const u8 = null, // `set a nobs=n;` target — set before the loop (BUG-setpoint-doloop)
+    nobs_var: ?[]const u8 = null, // `set a nobs=n;` target - set before the loop (BUG-setpoint-doloop)
     obs_src: ?*const Dataset = null, // source `_setobs_` was last stamped for (PERF-loadrowdual)
     nobs_total: ?usize = null, // multi-source SET nobs= total (GAP-nobsmultisrc); null → current source's count
     nobs_phys: std.AutoHashMapUnmanaged(*const Dataset, usize) = .empty, // resolved copy → PHYSICAL pre-slice row count (BUG-pointnobs)
     // Runtime-populated vars the GH#75 uninit scan must not note (BUG-spuriousnote):
     // SET/MERGE in= flag vars (drivers set them per read) and hash-method
-    // assignment targets (`rc = h.first();` — hashOp writes rc at run time).
+    // assignment targets (`rc = h.first();` - hashOp writes rc at run time).
     uninit_exempt: std.ArrayList([]const u8) = .empty,
     // BUG-declaredobjnamevalue: every name this step declares as a COMPONENT
     // OBJECT (`declare hash h;` / `declare hiter hi;` / `h = _new_ hash();`,
     // all one `.hash_decl`). Collected by the compile walk, not at run time:
-    // Component Objects Ref printed p.12 — "The DECLARE statement tells the
-    // compiler that the object reference myhash is of type hash" — so the name
+    // Component Objects Ref printed p.12 - "The DECLARE statement tells the
+    // compiler that the object reference myhash is of type hash" - so the name
     // is an object for the WHOLE step, before its declare has executed.
     // `run` hands the Evaluator a pointer to this list; a bare object name in
     // any expression then fails LOUD there instead of yielding missing.
@@ -778,7 +778,7 @@ pub const Executor = struct {
     merge_names: ?[]const []const u8 = null, // `merge a b;` match-merge sources
     update_names: ?[]const []const u8 = null, // `update master trans;` master + transaction
     update_nomissingcheck: bool = false, // UPDATEMODE=NOMISSINGCHECK (GAP-updatemode)
-    modify_names: ?[]const []const u8 = null, // `modify master trans;` — transaction-driven stream, in place
+    modify_names: ?[]const []const u8 = null, // `modify master trans;` - transaction-driven stream, in place
     dl_lines: ?[][]const u8 = null,
     in_items: ?[]const ast.InputItem = null,
     li: LineInputState = .{}, // datalines/infile read cursor (run-time INPUT; PG-atptr)
@@ -801,7 +801,7 @@ pub const Executor = struct {
     attrs_applied_at: usize = std.math.maxInt(usize),
 
     has_output: bool = false,
-    // MODIFY REPLACE/REMOVE (FEAT-datamodify-rest): per-iteration flag — an explicit
+    // MODIFY REPLACE/REMOVE (FEAT-datamodify-rest): per-iteration flag - an explicit
     // REPLACE (re-emit) or REMOVE (drop) overrides the implicit end-of-obs REPLACE
     // for THIS obs only. Reset each iteration; unlike step-level has_output, an
     // untouched obs still gets the default implicit REPLACE (keeps the master row).
@@ -809,7 +809,7 @@ pub const Executor = struct {
     // MODIFY-BY `_IORC_` state: `.none` = matched (_SOK); `.first` = a
     // transaction key with no master obs (_DSENMR, BUG-modifybynomatch);
     // `.subsequent` = a CONSECUTIVE repeat of the same unmatched key (_DSEMTR,
-    // p.599 Table 23.4 — NOTE-modifydsemtr). The loop top stamps _IORC_ +
+    // p.599 Table 23.4 - NOTE-modifydsemtr). The loop top stamps _IORC_ +
     // _ERROR_=1 and suppresses the implicit REPLACE for a no-match obs; the
     // iteration end raises the Language Reference: Concepts p.600 ERROR unless the program cleared
     // _ERROR_ itself.
@@ -820,7 +820,7 @@ pub const Executor = struct {
     /// by main.zig before the step runs (so all named datasets EXIST even when
     /// zero observations are written). SAS 9.4 Language Reference: Concepts, DATA statement: when the
     /// DATA statement names multiple output data sets, the implicit output at
-    /// the bottom of the step — and a bare `output;` — writes the current
+    /// the bottom of the step - and a bare `output;` - writes the current
     /// observation to EVERY one; only an explicit `output name;` routes a
     /// single target (BUG-multioutput).
     extra_outs: []const *Dataset = &.{},
@@ -832,12 +832,12 @@ pub const Executor = struct {
     refs_infile: bool = false,
     pending_label: []const u8 = "", // GOTO/LINK target, carried out to runProgram
     // Flattened step body (BUG-controlflownesting): the whole program compiled to
-    // a linear op stream with resolved label offsets — labels at ANY nesting depth
+    // a linear op stream with resolved label offsets - labels at ANY nesting depth
     // are reachable and a LINK return resumes at the op after the link call site,
     // even mid-loop. Compiled once per step by compileProgram (called from run()).
     ops: []const Op = &.{},
     io: ?std.Io = null, // external file I/O for INFILE/FILE; null → no-op (unit tests stay IO-free)
-    // BUG-multiinfilelastwins: the step's line sources — one spec per INFILE
+    // BUG-multiinfilelastwins: the step's line sources - one spec per INFILE
     // statement (scan, program order), one built source per spec (run).
     // `infile`/`infile_end_var` cache the CURRENT source's options for
     // execInput / the .lines gate; `infile` also stays the unit-test
@@ -848,8 +848,8 @@ pub const Executor = struct {
     cur_src: ?usize = null, // sources index owning the live cursor in `li`
     infile: ?ast.Infile = null, // current source's options (or test injection)
     infile_end_var: ?[]const u8 = null, // current source's END= target (FEAT-infileend)
-    where_expr: ?*const ast.Expr = null, // `where expr;` — pre-read input filter (GAP-vtabledisk)
-    file: ?ast.File = null, // `file "path" …;` — external `put` destination + DLM=/DSD options
+    where_expr: ?*const ast.Expr = null, // `where expr;` - pre-read input filter (GAP-vtabledisk)
+    file: ?ast.File = null, // `file "path" …;` - external `put` destination + DLM=/DSD options
     file_out: std.ArrayList(u8) = .empty, // buffered FILE output, flushed at step end
 
     pub fn init(arena: std.mem.Allocator, p: *Pdv, d: *diag.Diagnostics, ev: *eval.Evaluator, lib: *Library) Executor {
@@ -862,8 +862,8 @@ pub const Executor = struct {
         self.cur_out = out;
         self.lib.var_labels.clearRetainingCapacity(); // labels are per-step (like self.formats)
         // BUG-declaredobjnamevalue: register this step's component-object names
-        // FIRST — before `retain` inits or anything else can evaluate an
-        // expression — and point the Evaluator at the list. Both are per-step
+        // FIRST - before `retain` inits or anything else can evaluate an
+        // expression - and point the Evaluator at the list. Both are per-step
         // (main.zig builds an Executor + Evaluator per DATA step), so a name
         // that is an object here is an ordinary variable in the next step.
         for (program) |*s| try self.collectObjectNames(s);
@@ -871,7 +871,7 @@ pub const Executor = struct {
         try self.scan(program, false, true);
 
         // Unit tests inject a bare `x.infile` with no INFILE statement in the
-        // program (ISS-infilemissing / PERF-infilecap) — treat it as the
+        // program (ISS-infilemissing / PERF-infilecap) - treat it as the
         // step's one statement-less source spec.
         if (self.infile_specs.items.len == 0) if (self.infile) |inf|
             try self.infile_specs.append(self.arena, .{ .stmt = null, .spec = inf });
@@ -884,16 +884,16 @@ pub const Executor = struct {
 
         // BUG-controlflownesting: flatten the step body (labels/goto/link/do/if →
         // absolute-PC ops) BEFORE anything runs. An undefined GOTO/LINK target is
-        // a SAS compile-time error — reported here, and the hasStepErrors() gate
+        // a SAS compile-time error - reported here, and the hasStepErrors() gate
         // below halts the step before a single observation is written (F3).
         try self.compileProgram(program);
 
         try self.expandPrefixLists(); // ISS-setdslist: `set a:;` → all a-prefixed members
         try self.extractSetOptions(program); // pull end=/point= sentinels out of every source list
-        try self.assertModifyMasterIsOutput(); // BUG-modifyoutnamemismatch — before ANY row is written
+        try self.assertModifyMasterIsOutput(); // BUG-modifyoutnamemismatch - before ANY row is written
 
         // DOWLOOP-impl (was BUG-dowloop guard): a SET nested in a DO until/while
-        // loop is a "DOW loop" — SAS 9.4 reads the NEXT obs at the inner SET on
+        // loop is a "DOW loop" - SAS 9.4 reads the NEXT obs at the inner SET on
         // each DO iteration, accumulates across the group, and outputs once per
         // outer DATA-step pass (SAS Language Reference: "DO UNTIL/WHILE with SET").
         // detectDowSet marks that SET so its read fires at the node (runStmt) and
@@ -903,20 +903,20 @@ pub const Executor = struct {
 
         // SAS builds the PDV at compile time. Pre-declare the `length` variables
         // (define-only, so no value is wiped) so the output columns come out in
-        // declaration order — SET columns and assignments then fill them in place,
+        // declaration order - SET columns and assignments then fill them in place,
         // and variables SET adds appear after. (main supplies this list.)
         // BUG-varorder: vars whose LENGTH/ATTRIB follows another declaring
-        // statement (`.late`) are NOT seeded here — see the declareVars call below.
+        // statement (`.late`) are NOT seeded here - see the declareVars call below.
         for (self.declared) |dv| if (!dv.late) try self.seedDeclVar(dv);
 
         // GAP-varorder-assignset / BUG-varorder-setretain: every statement BEFORE
         // the step's input statement establishes its variables ahead of the input
-        // dataset's columns — Language Reference: Concepts printed p.47, "position in observation is
+        // dataset's columns - Language Reference: Concepts printed p.47, "position in observation is
         // determined by the order in which the variables are defined in the DATA
         // step". So the declare walk is SPLIT at the input statement rather than
         // run wholly after it: the prefix half here, the rest below in its old
         // place. Every statement is still declared exactly once, by the SAME
-        // declareStmt that models what a statement defines — RETAIN, the sum
+        // declareStmt that models what a statement defines - RETAIN, the sum
         // statement's injected `retain v 0;`, a plain assignment, LENGTH-less
         // FORMAT/INFORMAT, ARRAY, a DO index. The old raw-token scanRetainOrder
         // enumerated statement KINDS in the parser and so knew only RETAIN and the
@@ -927,7 +927,7 @@ pub const Executor = struct {
         const declare_split = firstInputStmt(program) orelse 0;
         try self.declareVars(program[0..declare_split]);
 
-        // Then the SET/MERGE input columns, in schema order — SAS orders output
+        // Then the SET/MERGE input columns, in schema order - SAS orders output
         // variables by first appearance, and the input dataset (which SET names
         // before every statement that follows it) appears next (BUG-varorder).
         try self.seedInputColumns();
@@ -938,7 +938,7 @@ pub const Executor = struct {
         try self.collectExtraSets(program);
 
         // A fatal error while seeding input columns halts the step before any row
-        // runs — a char/numeric type conflict (GH#69/#70) or an INPUT-side
+        // runs - a char/numeric type conflict (GH#69/#70) or an INPUT-side
         // keep/drop/rename of a var that is never referenced (GH#71, DKRICOND=
         // ERROR). Finalize with 0 obs, keeping the compile-time columns
         // (BUG-emptycols parity). Gated HERE (before buildDriver) so a source-
@@ -952,13 +952,13 @@ pub const Executor = struct {
 
         if (self.by_vars) |bys| try self.buildByNames(bys);
 
-        // SAS defines INPUT variables at compile time — pre-declare them (after
+        // SAS defines INPUT variables at compile time - pre-declare them (after
         // any retain_order/sum vars already seeded above, so those keep their lead)
         // so an empty datalines block (0 rows read) still yields a dataset with its
         // columns (BUG-emptycols). Define-only; the driver fills values per row.
         if (self.in_items) |items| for (items) |it| {
             // Pointer / position controls (`@n`, `+n`, `#n`, `/`, `@`, `@@`) carry an
-            // empty name — they move the read cursor, they are NOT variables. Defining
+            // empty name - they move the read cursor, they are NOT variables. Defining
             // them materialized a phantom blank-named column in the output dataset
             // (BUG-inputptrvar). Skip them; only real INPUT variables get a PDV slot.
             if (it.name.len == 0) continue;
@@ -966,7 +966,7 @@ pub const Executor = struct {
         };
         // INFILE END= (FEAT-infileend): pre-declare EVERY infile's flag so a
         // 0-record step's drop-of-it still resolves (validateKeepDropRefs) and
-        // the uninit scan sees it. Only the LAST infile's used to exist — a
+        // the uninit scan sees it. Only the LAST infile's used to exist - a
         // referenced earlier END= var drew a factually false "never been
         // referenced" WARNING plus an uninitialized NOTE (BUG-multiinfilelastwins).
         for (self.infile_specs.items) |sp| {
@@ -974,7 +974,7 @@ pub const Executor = struct {
         }
 
         // SAS builds the WHOLE PDV at compile time: every variable a statement
-        // NAMES exists from iteration 1, even when its statement never executes —
+        // NAMES exists from iteration 1, even when its statement never executes -
         // a var assigned only in a dead branch, or named only by a bare FORMAT
         // statement, still reaches the output as missing (BUG-pdvcompilevars;
         // a real EPOCH-derivation macro's partial-date vars). Types are a static
@@ -984,7 +984,7 @@ pub const Executor = struct {
         // remainder, so nothing is declared twice and no diagnostic is doubled.
         try self.declareVars(program[declare_split..]);
 
-        // BUG-varorder: now seed the `.late` LENGTH/ATTRIB vars — SAS establishes a
+        // BUG-varorder: now seed the `.late` LENGTH/ATTRIB vars - SAS establishes a
         // variable at the first statement that mentions it, so a RETAIN/FORMAT/
         // INFORMAT/assignment BEFORE the LENGTH owns the earlier PDV slots
         // (`retain r1 r2; length l1 $3 l2 $3;` → r1 r2 l1 l2, not l1 l2 r1 r2).
@@ -994,14 +994,14 @@ pub const Executor = struct {
         // BUG-speciallistphantom (GH#79): FORMAT/INFORMAT statement and ATTRIB
         // items whose "name" is `_ALL_`/`_NUMERIC_`/`_CHARACTER_` apply to every
         // PDV member of that class (Statements Ref printed p.24), never to a
-        // column of their own — expand them against the now-complete compile-time
+        // column of their own - expand them against the now-complete compile-time
         // PDV, exactly like expandSpecialVarLists does for RETAIN/KEEP/DROP below.
         // Placed BEFORE the gate so an expanded format's type conflict halts the
         // step like an explicitly-named one (NOTE-fmtnumoncharcoerce).
         try self.expandSpecialFormats();
 
         // The declare pass (declareVars, just above) may have reported a
-        // compile-time ERROR — a mixed num/char ARRAY member list
+        // compile-time ERROR - a mixed num/char ARRAY member list
         // (BUG-mixedtypearray). Gate like the seeding gate above: halt
         // before a single observation runs.
         if (self.diags.hasStepErrors()) {
@@ -1009,44 +1009,44 @@ pub const Executor = struct {
             return;
         }
 
-        // `_ALL_`/`_NUMERIC_`/`_CHARACTER_` in RETAIN/KEEP/DROP lists — expand
+        // `_ALL_`/`_NUMERIC_`/`_CHARACTER_` in RETAIN/KEEP/DROP lists - expand
         // against the now-complete compile-time PDV (BUG-retainspecial /
         // BUG-keepdropspecial).
         try self.expandSpecialVarLists();
 
         // one-time retain inits (`retain total 0;`), before the loop so they
-        // are in place — and, being retained, survive the first reset. They run
+        // are in place - and, being retained, survive the first reset. They run
         // HERE, after the declare pass: every init var is already declared at
         // its statement's textual position (declareStmt's .retain/.array arms),
         // so the set only writes the VALUE. Running it before declareVars let
-        // pdv.set's define-if-missing steal the var's first-mention slot — a
+        // pdv.set's define-if-missing steal the var's first-mention slot - a
         // sum statement after a second-SET POINT= lookup ordered the
         // accumulator AHEAD of the lookup's columns (QA tick377 F2).
-        // GH#27: attrs BEFORE the inits — stampLiteralLen's FORMAT/INFORMAT
+        // GH#27: attrs BEFORE the inits - stampLiteralLen's FORMAT/INFORMAT
         // width guard reads the attached spec, and `format y $8.; retain y "ab";`
         // must see it (these same attaches ran before the first statement anyway;
         // applyAttrs is set-only and idempotent).
         self.maybeApplyAttrs();
         // GH#31 (EPIC-charfixedwidth's textual-vs-executed remainder): with
         // attrs attached, stamp undeclared char widths from the FIRST TEXTUAL
-        // literal — source order, dead branches included — before any store
+        // literal - source order, dead branches included - before any store
         // runs (see stampTextualWidths). Must precede the retain-init loop so
         // a textually-first assignment's width truncates the init's own store.
         self.stampTextualWidths(program);
         for (self.retain_inits.items) |ri| {
             try self.pdv.set(ri.name, try self.ev.eval(ri.expr));
             // GH#27 (EPIC-charfixedwidth-slice1): the retain-store twin of the
-            // assignment arm — a char-literal init fixes an undeclared var's width
+            // assignment arm - a char-literal init fixes an undeclared var's width
             // (`retain y "abcdef";` → $6, and a later loop assignment cannot grow
             // it). Runs before the loop, so the init's width also beats a loop
-            // literal — SAS's first-length rule. NOT for ARRAY member inits
+            // literal - SAS's first-length rule. NOT for ARRAY member inits
             // (from_array): an array member's width comes from the ARRAY
-            // statement's $w (default 8 in SAS), never from an init literal —
+            // statement's $w (default 8 in SAS), never from an init literal -
             // stamping `(5*'')` at $1 truncated a later `tags{5}='q7'` to `q`
             // (GAP-inoperators fixture). With stampTextualWidths (GH#31) the
-            // textually-first literal has already stamped — at the retain
+            // textually-first literal has already stamped - at the retain
             // statement's own SOURCE position, so `y="abcdef"; retain y "ab";`
-            // is $6 — and this no-ops via the `len != 0` guard; it stays only
+            // is $6 - and this no-ops via the `len != 0` guard; it stays only
             // as the runtime fallback for a var whose compile-time type guess
             // the walk could not stamp.
             if (ri.expr.* == .str and !ri.from_array) self.pdv.stampLiteralLen(ri.name, ri.expr.str);
@@ -1054,13 +1054,13 @@ pub const Executor = struct {
 
         // GH#75 ISS-uninitvar: with the PDV now fully seeded, any RHS variable
         // read that resolves to no slot (and is not an automatic) is genuinely
-        // uninitialized — SAS logs the NOTE once per variable per step. Runs
+        // uninitialized - SAS logs the NOTE once per variable per step. Runs
         // here, after seedInputColumns + declareVars, so SET/MERGE/retained/
         // assigned/INPUT vars are all present and excluded by construction.
         try self.noteUninitVars(program);
 
         // Line sources (BUG-multiinfilelastwins): build one per declared
-        // INFILE, or — with no INFILE at all — the single implicit datalines
+        // INFILE, or - with no INFILE at all - the single implicit datalines
         // source. Reading a file needs an Io (main supplies it); with none the
         // source is empty and the step reads no records from it.
         if (self.infile_specs.items.len == 0) {
@@ -1077,14 +1077,14 @@ pub const Executor = struct {
                 try self.sources.append(self.arena, .{ .spec = spec, .lines = lines, .li = .{ .lines = lines } });
             }
         } else {
-            // The DATALINES device is ONE physical instream — every
+            // The DATALINES device is ONE physical instream - every
             // `infile datalines` in the step re-selects the SAME records and
             // cursor, it does not rewind them (Language Reference: Concepts Table 21.5 row 10, pinned
             // by raw_read_ch21_conformant). External paths are independent
-            // opens — one source (and read cursor) each.
+            // opens - one source (and read cursor) each.
             // ponytail: a shared device carries the FIRST inline spec's
             // FIRSTOBS=/OBS=/LINESIZE=; a second inline spec with different
-            // window options is not modelled — split the windows if a program
+            // window options is not modelled - split the windows if a program
             // ever does that.
             var dl_dev: ?usize = null; // sources index of the shared datalines device
             for (self.infile_specs.items, 0..) |*sp, i| {
@@ -1100,7 +1100,7 @@ pub const Executor = struct {
             }
         }
 
-        // BUG-setinputinert: seed the current line source for ANY driver — a
+        // BUG-setinputinert: seed the current line source for ANY driver - a
         // SET/MERGE/UPDATE/MODIFY step with an INPUT reads records alongside
         // the driver (Language Reference: Concepts p.477 step 3 names INPUT a peer of the four
         // dataset readers; p.489 "a combination of some or all of the
@@ -1112,17 +1112,17 @@ pub const Executor = struct {
         var driver = try self.buildDriver();
         self.driver_ptr = &driver; // DOWLOOP-impl: a DOW SET advances this from runStmt
         if (driver == .modify) self.modify_by = &driver.modify; // REPLACE/OUTPUT routing (BUG-modifybymasterdriven)
-        // BUG-setpointtemp: the SET point=/nobs= vars are temporary control vars —
+        // BUG-setpointtemp: the SET point=/nobs= vars are temporary control vars -
         // SAS drops them from the output schema, like SET end= (stripSourceOpts).
         try self.dropSetControlTemp(self.set_point_var);
         try self.dropSetControlTemp(self.nobs_var);
-        // BUG-prefixreadflags: the read-flag automatics — first./last. BY flags,
-        // the end= var, the in= flags — are RETAINED across iterations, never
+        // BUG-prefixreadflags: the read-flag automatics - first./last. BY flags,
+        // the end= var, the in= flags - are RETAINED across iterations, never
         // reset to missing (Language Reference: Concepts p.79: automatics are "retained from one
         // iteration of the DATA step to the next, rather than set to missing";
-        // p.553: LAST. is 0 or 1), and they start at 0. Registering them here —
+        // p.553: LAST. is 0 or 1), and they start at 0. Registering them here -
         // after buildDriver (the in= lists) and buildByNames (the flags), before
-        // freezeNameLists hashes retained — lets the top-of-iteration reset skip
+        // freezeNameLists hashes retained - lets the top-of-iteration reset skip
         // them, so the pre-read prefix sees the previous read's flags (initially
         // 0), not a wiped missing that flips back to 0 after the read.
         for (self.first_names) |nm| try self.keepReadFlag(nm);
@@ -1139,9 +1139,9 @@ pub const Executor = struct {
         }
         // drops/keeps/retained are complete here (scan, extractSetOptions,
         // expandSpecialVarLists, collectExtraSets, buildDriver and the read-flag
-        // registration above all ran) — hash them.
+        // registration above all ran) - hash them.
         try self.freezeNameLists();
-        // nobs= must be known BEFORE the step's loops run (BUG-setpoint-doloop) —
+        // nobs= must be known BEFORE the step's loops run (BUG-setpoint-doloop) -
         // set it to the source row count up front, not at first read.
         if (self.nobs_var) |nv| {
             var n: usize = 0;
@@ -1162,10 +1162,10 @@ pub const Executor = struct {
 
         // Per-iteration scratch (BUG-datastepoom): eval temporaries (every
         // upcase/strip/put/… result) went into the run arena and were never
-        // freed — a wide row-mapping step over a 740k-row table grew past 19GB.
+        // freed - a wide row-mapping step over a 740k-row table grew past 19GB.
         // Evaluate each iteration in a scratch arena, reset at the row boundary.
         // Survivors are moved out first: retained char cells hop to the OTHER
-        // scratch (double buffer — nothing accumulates), lag/RNG state lives in
+        // scratch (double buffer - nothing accumulates), lag/RNG state lives in
         // ev.state_arena, hash entries dupe into the run arena at add/replace.
         var scratch: [2]std.heap.ArenaAllocator = .{
             std.heap.ArenaAllocator.init(std.heap.page_allocator),
@@ -1183,13 +1183,13 @@ pub const Executor = struct {
         }
 
         // BUG-setstmtorder: statements textually BEFORE the driving SET/MERGE/
-        // UPDATE/MODIFY execute BEFORE its read (Language Reference: Concepts Ch.24 — the read happens
+        // UPDATE/MODIFY execute BEFORE its read (Language Reference: Concepts Ch.24 - the read happens
         // where the statement sits; p.616 Example 2's hash priming is the
         // canonical victim). The flattened op stream splits at the driver's
         // statement index: each iteration runs the prefix, then loadNext, then
         // the suffix. Only a DIRECT top-level driver splits (driver_stmt/
-        // split_pc stay null otherwise): a nested one — IF branch, DO body,
-        // DOW, POINT= — keeps read-first (BUG-nestedsetdriver / BUG-setpoint /
+        // split_pc stay null otherwise): a nested one - IF branch, DO body,
+        // DOW, POINT= - keeps read-first (BUG-nestedsetdriver / BUG-setpoint /
         // DOWLOOP depend on it), and the .once/.lines drivers have no read to
         // split around. SET-source vars are auto-retained (buildDriver), so a
         // prefix sees missing on iteration 1 and the last-read values on later
@@ -1207,11 +1207,11 @@ pub const Executor = struct {
                 if (!self.isRetained(v.name)) v.value = missingOf(v.type);
             }
             // The pre-driver prefix runs BEFORE the read, with `_N_`/`_ERROR_`
-            // already live — `if _n_=1 then …` priming blocks are the point of
+            // already live - `if _n_=1 then …` priming blocks are the point of
             // the prefix (p.613/p.616's hash boilerplate). STOP in the prefix
             // ends the step with no read and no output; DELETE/RETURN suppress
             // the suffix like an unsplit runProgramRange, but the read still
-            // happens — SAS halts neither at DELETE/RETURN, and the driver
+            // happens - SAS halts neither at DELETE/RETURN, and the driver
             // must advance or the loop never terminates.
             var prefix_flow: Flow = .normal;
             if (split) |sp| {
@@ -1223,28 +1223,28 @@ pub const Executor = struct {
                 if (prefix_flow == .stop) break;
             }
             if (!try self.loadNext(&driver)) break;
-            // `_N_` — the automatic DATA-step iteration counter (1-based), set
+            // `_N_` - the automatic DATA-step iteration counter (1-based), set
             // after the reset so `if _n_=1 then …` (declare-once idioms) works.
             // (The split path bumped these before the prefix already.)
             if (split == null) {
                 self.n_iter += 1;
                 try self.pdv.set("_n_", .{ .num = @floatFromInt(self.n_iter) });
-                // `_ERROR_` — automatic error flag, reset to 0 at the top of each
+                // `_ERROR_` - automatic error flag, reset to 0 at the top of each
                 // iteration (SAS); pdv.set raises it to 1 the moment an invalid
                 // char→num conversion happens during the step (CHARNUM-errorvar).
                 try self.pdv.set("_error_", .{ .num = 0 });
                 self.obs_handled = false; // MODIFY REPLACE/REMOVE reset (FEAT-datamodify-rest)
             }
             // `_IORC_` (BUG-modifybynomatch / BUG-modifybymasterdriven): MODIFY
-            // return-code automatic — 0 (_SOK) on a matched read, _DSENMR
+            // return-code automatic - 0 (_SOK) on a matched read, _DSENMR
             // (1230015) when modifyNext flagged this obs as a transaction with
             // no master match, and a DISTINCT non-SAS sentinel for _DSEMTR
             // (consecutive repeats of the same unmatched key, p.599 Table 23.4):
-            // _DSEMTR's numeric value is oracle-blocked (NOTE-modifydsemtr —
+            // _DSEMTR's numeric value is oracle-blocked (NOTE-modifydsemtr -
             // %sysrc(_dsemtr) fails loud by design, GAP-sysrcmacro), so a
             // negative stand-in no %SYSRC comparison can silently match is used
             // rather than a guessed number (a wrong code compared against %SYSRC
-            // silently takes the wrong branch — this ticket's failure class).
+            // silently takes the wrong branch - this ticket's failure class).
             // _ERROR_ is re-raised post-reset so the program sees the condition
             // and can clear it (Language Reference: Concepts p.601 revised program); obs_handled blocks
             // the implicit REPLACE from fabricating the unmatched row into the
@@ -1253,7 +1253,7 @@ pub const Executor = struct {
                 const iorc: f64 = switch (self.modify_nomatch) {
                     .none => 0,
                     .first => 1230015,
-                    .subsequent => -1230015, // _DSEMTR sentinel — see above
+                    .subsequent => -1230015, // _DSEMTR sentinel - see above
                 };
                 try self.pdv.set("_iorc_", .{ .num = iorc });
                 if (self.modify_nomatch != .none) {
@@ -1288,16 +1288,16 @@ pub const Executor = struct {
                 // a stray CONTINUE/LEAVE outside a loop just falls through to output too.
                 // GOTO/LINK are consumed inside runProgramRange, so they never reach here.
                 // MODIFY: the implicit REPLACE is per-observation (stmtHasOutput)
-                // — a real OUTPUT statement elsewhere in the step does NOT suppress
+                // - a real OUTPUT statement elsewhere in the step does NOT suppress
                 // it, only handling THIS obs does; otherwise the rebuilt master
                 // would silently drop every row the program didn't explicitly write.
                 // BUG-pointautooutput: a POINT=-DRIVEN step has NO implicit
-                // bottom-of-iteration OUTPUT — only an explicit OUTPUT statement
+                // bottom-of-iteration OUTPUT - only an explicit OUTPUT statement
                 // writes a row (the same p.488 direct-access rule that forces the
                 // explicit STOP). Must not multiply the now-iterating step into a
                 // fabricated row set (BUG-pointnoiterate's other half).
-                // BUG-pointsuppressesalloutput: keyed on point_driven — POINT=
-                // actually DRIVING — not on the step merely mentioning POINT=.
+                // BUG-pointsuppressesalloutput: keyed on point_driven - POINT=
+                // actually DRIVING - not on the step merely mentioning POINT=.
                 // A MERGE/UPDATE/INPUT driver has normal EOF detection (Language Reference: Concepts
                 // Table 20.4), so p.477 step 5's automatic output stands.
                 .normal, .continue_, .leave, .returned, .goto_, .link_ => if ((!self.has_output or self.modify_names != null) and !self.obs_handled and !self.point_driven) {
@@ -1308,7 +1308,7 @@ pub const Executor = struct {
                 },
             }
 
-            // ISS-errordump: end of THIS iteration — _ERROR_ still holds the
+            // ISS-errordump: end of THIS iteration - _ERROR_ still holds the
             // row's value here (the reset is at the TOP of the next one, both
             // split and unsplit), so a flagged row dumps its PDV now, once, even
             // when DELETE dropped the observation (the obs is gone, the flag is
@@ -1319,7 +1319,7 @@ pub const Executor = struct {
             try self.dumpErrorObs();
 
             // Row boundary: the survivors of the top-of-loop reset are exactly
-            // the retained vars — their char cells may point into the current
+            // the retained vars - their char cells may point into the current
             // scratch, so move them to the other one, then drop this row's
             // temporaries. Everything else is reset to missing before any read.
             const nxt = 1 - cur;
@@ -1333,36 +1333,36 @@ pub const Executor = struct {
         }
 
         // MODIFY-BY rebuild-commit (BUG-modifybymasterdriven): emit the rebuilt
-        // master — the rows the transaction-driven driver never visited (untouched),
+        // master - the rows the transaction-driven driver never visited (untouched),
         // the recorded REPLACE overrides (REMOVE tombstones skipped), then the
         // OUTPUT-appended rows. Runs here too so a mid-step `stop;` still leaves a
         // complete master on disk.
         if (self.modify_by) |md| try self.modifyFlush(md);
 
         // The scratch dies with this call; anything a caller might still read
-        // from the PDV (schema seeding, diagnostics) must not dangle — dupe the
+        // from the PDV (schema seeding, diagnostics) must not dangle - dupe the
         // remaining char cells into the run arena once.
         for (self.pdv.vars.items) |*v| {
             if (v.value == .str) v.value = .{ .str = try self.arena.dupe(u8, v.value.str) };
         }
 
         // ISS-keepdropnonexist: a KEEP/DROP/RENAME statement naming a variable
-        // that exists NOWHERE in the step is a typo — SAS ERRORs and halts. The
+        // that exists NOWHERE in the step is a typo - SAS ERRORs and halts. The
         // PDV now holds every var the step ever created (never pruned mid-step),
         // so a var created LATER than the statement stays legal; only a true typo
         // resolves to no slot and fails loud.
         try self.validateKeepDropRefs();
 
-        // A 0-row step never called output(), so the schema was never seeded —
+        // A 0-row step never called output(), so the schema was never seeded -
         // SAS still defines the columns at compile time (BUG-emptycols). Seed now
         // so an empty dataset keeps its columns for PROC PRINT / SORT `by` / SET.
         // Same for every extra `data a b …;` output (BUG-multioutput): all named
-        // datasets are created — with their columns — even at 0 observations.
+        // datasets are created - with their columns - even at 0 observations.
         if (out.columns.items.len == 0) try self.seedSchema(out);
         for (self.extra_outs) |x| if (x.columns.items.len == 0) try self.seedSchema(x);
 
         // Statement-form RENAME (`rename a=b;`): relabel the output columns of EVERY
-        // output dataset — Language Reference: Concepts Table 4.6 (p.72) "Statements: effect all output
+        // output dataset - Language Reference: Concepts Table 4.6 (p.72) "Statements: effect all output
         // data sets" and Table 4.7 (p.73) "RENAME / changes name of variables in
         // all output data sets", like the DROP/KEEP/LABEL/FORMAT siblings already
         // do (BUG-renamestmtmultiout: `data p q; rename a=z;` renamed only p's
@@ -1380,14 +1380,14 @@ pub const Executor = struct {
                 // so without the skip it relabelled columns in place and the
                 // in-place update silently came back under a different name.
                 if (self.modifyFrozenMaster(o) != null) continue;
-                // Build `rename = ( old = new … )` option tokens directly (no lexing —
+                // Build `rename = ( old = new … )` option tokens directly (no lexing -
                 // exec's Error set is OOM-only, so we can't `try` the lexer here).
                 var toks: std.ArrayList(lex.Token) = .empty;
                 try toks.appendSlice(self.arena, &.{
                     .{ .tag = .name, .text = "rename" }, .{ .tag = .eq }, .{ .tag = .lparen },
                 });
                 for (self.renames.items) |p| {
-                    // Only hand renames whose OLD name is an actual output column —
+                    // Only hand renames whose OLD name is an actual output column -
                     // one dropped by a keep/drop statement is gone from this output
                     // but was still referenced (validateKeepDropRefs already vetted
                     // it against the PDV), so skipping it here keeps io's option
@@ -1403,7 +1403,7 @@ pub const Executor = struct {
         }
 
         // FILE: flush the buffered `put` output to the external file. A
-        // print/log keyword destination (GAP-fileprint) writes NO file — its
+        // print/log keyword destination (GAP-fileprint) writes NO file - its
         // PUT output already went to the log via putBuf.
         if (self.file) |f| if (!f.print_log) if (self.io) |io_| {
             Io.Dir.cwd().writeFile(io_, .{ .sub_path = f.path, .data = self.file_out.items }) catch {};
@@ -1429,7 +1429,7 @@ pub const Executor = struct {
     }
 
     /// The first MERGE/UPDATE/MODIFY node reachable from `s` (recursing IF/DO),
-    /// or null — guardInertDow's counterpart to findSetStmt: those sources are
+    /// or null - guardInertDow's counterpart to findSetStmt: those sources are
     /// runtime-inert, so one inside a DO UNTIL/WHILE can never drive the loop.
     fn findInertSourceStmt(s: *const ast.Stmt) ?*const ast.Stmt {
         switch (s.*) {
@@ -1470,29 +1470,29 @@ pub const Executor = struct {
     fn detectDowSet(self: *Executor, program: ast.Program) Error!void {
         for (program) |*s| {
             // BUG-dowinsideifhang (QA tick307 F2): a DO UNTIL/WHILE whose body
-            // holds a MERGE/UPDATE/MODIFY but no SET can NEVER terminate —
+            // holds a MERGE/UPDATE/MODIFY but no SET can NEVER terminate -
             // those sources are runtime-inert (needs-oracle, pinned in
             // BUG-nestedsourceschema), so nothing in the loop drives the end
             // condition and the step spins at 100% CPU growing memory without
             // bound (QA measured ~60 MB/s; an unattended batch OOMs the box).
-            // A SET in that spot DOES drive the loop — its read fires at the
+            // A SET in that spot DOES drive the loop - its read fires at the
             // node via the extra-set cursor (BUG-doblocksourceinert's .do_ arm)
             // and EOF stops the step. Guarded at ANY nesting depth: wrapped in
             // a top-level IF the shape was invisible to the top-level walk
-            // below and hung the same way. Fail LOUD per D-002 — never hang.
+            // below and hung the same way. Fail LOUD per D-002 - never hang.
             try self.guardInertDow(s);
             switch (s.*) {
                 .do_ => {
                     const inner = findSetStmt(s) orelse continue;
                     if (s.do_.header != .until_ and s.do_.header != .while_) {
-                        diag.markGap(); // `do i=1 to n; set a; end;` is valid SAS — our gap, rc 2 (D-009)
+                        diag.markGap(); // `do i=1 to n; set a; end;` is valid SAS - our gap, rc 2 (D-009)
                         self.diags.report(.err, 0, "a SET inside an iterative DO loop (without POINT=) is not supported; use DO UNTIL/WHILE (a DOW loop) or POINT=", .{}) catch {};
                         return error.ExecError;
                     }
                     var total: usize = 0;
                     for (program) |*ps| total += countSetsStmt(ps);
                     if (total != 1) {
-                        diag.markGap(); // several SET statements in one step is valid SAS — our gap, rc 2
+                        diag.markGap(); // several SET statements in one step is valid SAS - our gap, rc 2
                         self.diags.report(.err, 0, "a DOW-loop mixed with another SET statement is not supported", .{}) catch {};
                         return error.ExecError;
                     }
@@ -1533,7 +1533,7 @@ pub const Executor = struct {
 
     /// `direct` is true only for statements that are DIRECT members of the
     /// top-level program slice (BUG-setstmtorder records the driving statement
-    /// for those — only a direct driver can split the iteration around its
+    /// for those - only a direct driver can split the iteration around its
     /// read). IF branches and DO bodies recurse with direct=false; `nested`
     /// itself passes through DO bodies unchanged (BUG-setpoint).
     fn scan(self: *Executor, program: ast.Program, nested: bool, direct: bool) Error!void {
@@ -1541,7 +1541,7 @@ pub const Executor = struct {
             switch (s.*) {
                 .retain => |items| for (items) |it| {
                     // `_ALL_`/`_NUMERIC_`/`_CHARACTER_` are name lists, not var
-                    // names — defer PDV expansion to expandSpecialVarLists.
+                    // names - defer PDV expansion to expandSpecialVarLists.
                     if (specialVarList(it.name)) |kind| {
                         try self.special_retains.append(self.arena, .{ .kind = kind, .init = it.init });
                     } else {
@@ -1558,7 +1558,7 @@ pub const Executor = struct {
                 // The FIRST TOP-LEVEL SET drives the loop; any later SET is an
                 // executable extra (collectExtraSets). Keep the first so `set a;
                 // set b;` drives off a. A NESTED source (inside an IF branch) is a
-                // compile-time declarative only — it must NEVER register as the
+                // compile-time declarative only - it must NEVER register as the
                 // driver, or a conditional `if _n_=1 then set params;` placed
                 // before the driving SET hijacks the loop and silently drops the
                 // driver's observations (BUG-nestedsetdriver).
@@ -1566,13 +1566,13 @@ pub const Executor = struct {
                     self.set_names = names;
                     if (direct) self.drv_set = s;
                 },
-                // Declarative — position-independent, like SAS. But ONLY at the
+                // Declarative - position-independent, like SAS. But ONLY at the
                 // step's top statement level: Language Reference: Concepts p.232 Table 11.6 reserves
                 // "Execute the selection conditionally" for the subsetting IF, so
                 // real SAS refuses `if x>10 then where x<3;` outright (ERROR
                 // 180-322, same for a DO-block body). opensas used to HOIST the
                 // nested statement and filter every row unconditionally
-                // (BUG-whereconditional) — a silent wrong answer. `direct` is
+                // (BUG-whereconditional) - a silent wrong answer. `direct` is
                 // exactly "top-level member": IF branches and DO bodies recurse
                 // with direct=false (see scan's doc comment).
                 .where_ => |e| {
@@ -1594,10 +1594,10 @@ pub const Executor = struct {
                 },
                 .by => |names| try self.decodeBy(names),
                 // @constCast: the parser's datalines array is arena-owned
-                // (toOwnedSlice) — writable, so `_infile_ = …` may edit a record.
+                // (toOwnedSlice) - writable, so `_infile_ = …` may edit a record.
                 .datalines => |lines| self.dl_lines = @constCast(lines),
                 // BUG-inputmultistmt: multiple INPUT statements in one step ACCUMULATE
-                // their var lists — SAS establishes columns at first appearance, so
+                // their var lists - SAS establishes columns at first appearance, so
                 // `input x y; input z;` schemas x y z, not just the last statement's z
                 // (the pre-declare at line 583 reads self.in_items). Runtime value
                 // reading is per-statement (execInput takes its own items), unaffected.
@@ -1607,7 +1607,7 @@ pub const Executor = struct {
                 else
                     items,
                 // BUG-multiinfilelastwins: EVERY INFILE declares its own line
-                // source — the last one used to blindly overwrite `self.infile`
+                // source - the last one used to blindly overwrite `self.infile`
                 // (its two sibling arms knew better: `.set` is first-wins,
                 // `.input` accumulates), so the first file was never opened and
                 // every INPUT read the last file. Record each in program order;
@@ -1620,12 +1620,12 @@ pub const Executor = struct {
                 .file => |f| self.file = f,
                 .format => |items| for (items) |it| {
                     // A LABEL statement / ATTRIB label= rides the `.format` node with a
-                    // NUL-prefixed fmt (parser sentinel) — route those to the label store.
+                    // NUL-prefixed fmt (parser sentinel) - route those to the label store.
                     if (it.fmt.len > 0 and it.fmt[0] == 0) {
                         try self.lib.setVarLabel(it.name, it.fmt[1..]);
                         try self.attrs.append(self.arena, .{ .name = it.name, .fmt = it.fmt });
                     } else if (it.fmt.len > 0 and it.fmt[0] == 1) {
-                        // ATTRIB informat= riding the same node (BUG-attribinformat) —
+                        // ATTRIB informat= riding the same node (BUG-attribinformat) -
                         // attrs only, exactly like the .informat handler below.
                         try self.attrs.append(self.arena, .{ .name = it.name, .fmt = it.fmt });
                     } else {
@@ -1633,7 +1633,7 @@ pub const Executor = struct {
                         try self.attrs.append(self.arena, it);
                     }
                 },
-                // INFORMAT statement — read format; kept for VINFORMAT* + output metadata
+                // INFORMAT statement - read format; kept for VINFORMAT* + output metadata
                 // (EXEC-varattr). Marked with a NUL sentinel so applyAttrs routes it.
                 .informat => |items| for (items) |it| {
                     try self.attrs.append(self.arena, .{
@@ -1641,19 +1641,19 @@ pub const Executor = struct {
                         .fmt = try std.fmt.allocPrint(self.arena, "\x01{s}", .{it.fmt}),
                     });
                 },
-                // `array a{n} … (inits)`: initialized members act like a retain —
+                // `array a{n} … (inits)`: initialized members act like a retain -
                 // set once before the loop and kept across iterations. Temporary
                 // members are anonymous, so keep them out of the output dataset.
                 .array => |decl| {
                     try self.array_names.append(self.arena, decl.name);
                     // BUG-arrayinitvalidate F1: MORE initial values than elements is a
                     // SAS ERROR ("The number of initial values ... exceeds the number
-                    // of array elements") — the excess used to be silently dropped.
+                    // of array elements") - the excess used to be silently dropped.
                     // FEWER stays legal (the rest default to missing/blank). A
                     // special-list array (`array v{*} _numeric_`) has no compile-time
                     // element count, so the check cannot apply there.
                     // BUG-arrayinitvalidate F2: a CHARACTER constant initializing a
-                    // NUMERIC array element is a SAS ERROR — it used to be stored as
+                    // NUMERIC array element is a SAS ERROR - it used to be stored as
                     // a char, corrupting the element's type. (char literal + `$`
                     // array, numeric literal + numeric array: both stay legal.)
                     const too_many = decl.special == null and decl.inits.len > decl.elements.len;
@@ -1669,7 +1669,7 @@ pub const Executor = struct {
                     } else if (bad_char) {
                         self.diags.report(.err, 0, "A character constant is not a valid initial value for the numeric array {s}.", .{decl.name}) catch {};
                     } else {
-                        // A `$` array makes its members character — define them so an
+                        // A `$` array makes its members character - define them so an
                         // unassigned element reads/outputs as a blank char, not numeric.
                         if (decl.type == .char) for (decl.elements) |e| {
                             _ = try self.pdv.define(e, .char);
@@ -1682,7 +1682,7 @@ pub const Executor = struct {
                         if (decl.temporary) {
                             // SAS 9.4: _TEMPORARY_ elements are ALWAYS retained
                             // across iterations, initialized or not
-                            // (BUG-temparray-noretain) — inits above already
+                            // (BUG-temparray-noretain) - inits above already
                             // retained their own elements, so retain the rest.
                             for (decl.elements[@min(decl.inits.len, decl.elements.len)..]) |e|
                                 try self.retained.append(self.arena, e);
@@ -1691,14 +1691,14 @@ pub const Executor = struct {
                     } // an invalid decl seeds nothing; the
                     // hasStepErrors() gate in run() halts the step.
                 },
-                // recurse into a do-loop body so a nested declarative is still seen —
+                // recurse into a do-loop body so a nested declarative is still seen -
                 // notably `do i=…; set ds point=i; …; end;` (BUG-setpoint), where the
                 // SET is never top-level. SAS treats declaratives as compile-time
                 // regardless of nesting. Pass `nested` through UNCHANGED: a SET in a
                 // top-level DO still registers as the driver (BUG-setpoint depends on
-                // it) — only the IF-branch path below suppresses driver registration.
+                // it) - only the IF-branch path below suppresses driver registration.
                 .do_ => |d| try self.scan(d.body, nested, false),
-                // recurse into IF then/else branches too — RETAIN/KEEP/DROP and
+                // recurse into IF then/else branches too - RETAIN/KEEP/DROP and
                 // the other declaratives are compile-time in SAS regardless of the
                 // runtime branch that (never) executes them (BUG-nesteddeclarative).
                 // Each branch is a single statement; slice it to a 1-elem program.
@@ -1711,7 +1711,7 @@ pub const Executor = struct {
                 },
                 // `nobs=n` desugars to `n = _setobs_`; capture n so it can be set to
                 // the row count BEFORE a `do k=1 to n; set … point=k;` loop evaluates
-                // its bound — SAS makes nobs= available up front (BUG-setpoint-doloop).
+                // its bound - SAS makes nobs= available up front (BUG-setpoint-doloop).
                 .assign => |aa| if (aa.value.* == .variable and eqi(aa.value.variable, "_setobs_")) {
                     self.nobs_var = aa.target;
                     try self.retained.append(self.arena, aa.target); // survive the per-iter reset
@@ -1724,18 +1724,18 @@ pub const Executor = struct {
             if (stmtHasOutput(s.*)) self.has_output = true;
         }
         // SET variables are retained too, but `loadRow` rewrites them every
-        // iteration, so the reset never observes them — no need to track.
+        // iteration, so the reset never observes them - no need to track.
         // ponytail: declaratives read at top level only; they are compile-time
         // in SAS regardless of nesting, but corpus programs keep them top-level.
     }
 
     /// Compile-time PDV construction (BUG-pdvcompilevars): declare every variable
     /// a statement NAMES, in source order, recursing into IF branches and DO
-    /// bodies — SAS creates these at compile time, so a var assigned only in a
+    /// bodies - SAS creates these at compile time, so a var assigned only in a
     /// never-executed branch still reaches the output (as missing). All declares
     /// go through `pdv.declare` (guessed type, corrected by the first runtime
     /// write), so nothing here can break an executed path's typing or column slot.
-    /// ponytail: statement TARGETS only — a variable named only on the RHS
+    /// ponytail: statement TARGETS only - a variable named only on the RHS
     /// (SAS: uninitialized-note + a column) is not declared until a program needs it.
     fn declareVars(self: *Executor, program: ast.Program) Error!void {
         for (program) |*s| try self.declareStmt(s);
@@ -1746,7 +1746,7 @@ pub const Executor = struct {
     /// dataset. run() splits the declare walk here so the statements textually
     /// BEFORE the input source own the earlier PDV slots (Language Reference: Concepts printed p.47).
     /// A driver nested in a DO/IF (the DOW idiom) reports its enclosing top-level
-    /// statement, so that whole statement — body included — stays on the input
+    /// statement, so that whole statement - body included - stays on the input
     /// side of the split; the prefix is only ever complete statements that finish
     /// before the read.
     fn firstInputStmt(program: ast.Program) ?usize {
@@ -1769,7 +1769,7 @@ pub const Executor = struct {
     fn declareStmt(self: *Executor, s: *const ast.Stmt) Error!void {
         switch (s.*) {
             // `_infile_ = …` (BUG-infilevarnoop): an automatic, not an ordinary
-            // PDV var — route through the ONE recogniser so refs_infile is set
+            // PDV var - route through the ONE recogniser so refs_infile is set
             // even when the assignment sits on a dead branch.
             .assign => |aa| {
                 if (eqi(aa.target, "_infile_")) try self.useInfileVar() else _ = try self.pdv.declare(aa.target, self.staticType(aa.value));
@@ -1785,7 +1785,7 @@ pub const Executor = struct {
                 switch (d.header) {
                     .iter => |it| _ = try self.pdv.declare(it.name, .num),
                     // a value-list DO index compiles to the FIRST value's type:
-                    // `do a1="NONE"; …` is CHAR — hardcoding .num left a1 as
+                    // `do a1="NONE"; …` is CHAR - hardcoding .num left a1 as
                     // numeric missing on dead-branch rows, so `"Z"||a1` rendered
                     // "Z." instead of "Z" (BUG-doindexchar, gen2 AE AEACNOTH).
                     .list => |l| _ = try self.pdv.declare(l.name, if (l.specs.len > 0) self.staticType(l.specs[0].start) else .num),
@@ -1794,19 +1794,19 @@ pub const Executor = struct {
                 try self.declareVars(d.body);
             },
             // FORMAT/INFORMAT name a variable into existence; `$…` marks it char.
-            // LABEL items ride `.format` with a \x00-sentinel fmt — skipped (label
+            // LABEL items ride `.format` with a \x00-sentinel fmt - skipped (label
             // alone does not settle a type we'd want to guess from). ATTRIB informat=
-            // items ride with a \x01 sentinel (BUG-attribinformat) — unwrap for `$`.
+            // items ride with a \x01 sentinel (BUG-attribinformat) - unwrap for `$`.
             .format, .informat => |items| for (items) |it| {
                 // `_ALL_`/`_NUMERIC_`/`_CHARACTER_` are name lists, not variables
-                // (BUG-speciallistphantom, GH#79) — the same guard the .retain arm
+                // (BUG-speciallistphantom, GH#79) - the same guard the .retain arm
                 // below runs, so no phantom column is declared for the keyword.
                 // scan() kept the item; expandSpecialFormats maps it to the PDV
                 // members once the compile-time PDV is complete.
                 if (specialVarList(it.name) != null) continue;
                 if (it.fmt.len > 0 and it.fmt[0] == 0) continue;
                 const spec = if (it.fmt.len > 0 and it.fmt[0] == 1) it.fmt[1..] else it.fmt;
-                const rides_informat = it.fmt.len > 0 and it.fmt[0] == 1; // ATTRIB informat= — read side, unchecked here
+                const rides_informat = it.fmt.len > 0 and it.fmt[0] == 1; // ATTRIB informat= - read side, unchecked here
                 // NOTE-fmtnumoncharcoerce: a display format whose type
                 // disagrees with the variable's established type is a SAS
                 // compile-time ERROR (Formats & Informats Ref printed p.7:
@@ -1814,15 +1814,15 @@ pub const Executor = struct {
                 // variables with character formats and numeric variables with
                 // numeric formats"; p.5: an incompatible format ERRORs, it
                 // never silently coerces). It used to slip through and render
-                // the char cell as '.' at print time (exit 0). Checked here —
-                // the step's compile pass — so the hasStepErrors() gate halts
+                // the char cell as '.' at print time (exit 0). Checked here -
+                // the step's compile pass - so the hasStepErrors() gate halts
                 // the step BEFORE any observation is written. Covers the
                 // FORMAT statement and ATTRIB format= (which rides `.format`);
                 // both directions. A `length c $3; attrib c format=8.2;`
                 // conflict was already reported by seedDeclVar ("defined as
-                // both character and numeric") — don't double-report it. The
+                // both character and numeric") - don't double-report it. The
                 // removal form `format x;` rides as "$." (BUG-formatremoval's
-                // default-for-both-types sentinel) — not a real char format.
+                // default-for-both-types sentinel) - not a real char format.
                 if (s.* == .format and !rides_informat and spec.len > 0 and !eqi(spec, "$.") and !eqi(spec, ".")) if (self.pdv.indexOf(it.name)) |vi| {
                     const vr = self.pdv.vars.items[vi];
                     const fmt_char = format.specIsChar(spec); // `$` or a char-typed user format, $-less included
@@ -1835,7 +1835,7 @@ pub const Executor = struct {
                 _ = try self.pdv.declare(it.name, if (spec.len > 0 and spec[0] == '$') .char else .num);
             },
             .retain => |items| for (items) |it| {
-                // a special name LIST (`_numeric_` &c.) is not a variable —
+                // a special name LIST (`_numeric_` &c.) is not a variable -
                 // expandSpecialVarLists maps it to PDV members (BUG-retainspecial).
                 if (specialVarList(it.name) != null) continue;
                 _ = try self.pdv.declare(it.name, if (it.init) |e| self.staticType(e) else .num);
@@ -1849,17 +1849,17 @@ pub const Executor = struct {
                 }
             },
             // QA tick377 F2: a POINT= lookup's columns are first-mentioned at the
-            // SET statement that CARRIES the option — seed them here, in program
+            // SET statement that CARRIES the option - seed them here, in program
             // order, at that node. 837590ea defined them at buildDriver (AFTER
             // this walk and after noteUninitVars): LAST under a sequential
             // driver (`set drv; set lk point=_n_; tot+b;` gave a tot b) and
             // behind a false "Variable b is uninitialized." NOTE; beside a
             // MERGE/MODIFY driver seedInputColumns' orelse chain put them FIRST
             // (b k p q). Two shapes: the claimed second-SET lookup
-            // (set_point_node — plain define, mirroring buildDriver's
+            // (set_point_node - plain define, mirroring buildDriver's
             // io.columnSlots) and the first-SET lookup beside a MERGE/UPDATE/
-            // MODIFY driver (drv_set — seedColumnsOf, mirroring the old
-            // seedInputColumns) — so only the POSITION moves, never a type/width.
+            // MODIFY driver (drv_set - seedColumnsOf, mirroring the old
+            // seedInputColumns) - so only the POSITION moves, never a type/width.
             .set => {
                 if (self.set_point_node == s) {
                     for (self.extra_src_names.get(s) orelse &.{}) |name| {
@@ -1879,7 +1879,7 @@ pub const Executor = struct {
         }
     }
 
-    /// True when `name` has a numeric LENGTH/ATTRIB declaration in this step —
+    /// True when `name` has a numeric LENGTH/ATTRIB declaration in this step -
     /// the shape seedDeclVar already reports as "defined as both character and
     /// numeric" when the PDV var is char. declareStmt's format-type check
     /// consults it to avoid double-reporting that one overlapping conflict
@@ -1890,16 +1890,16 @@ pub const Executor = struct {
     }
 
     /// BUG-mixedtypearray: an ARRAY's elements must be ALL numeric or ALL
-    /// character — SAS 9.4 errors at compile time ("Variable X has been
+    /// character - SAS 9.4 errors at compile time ("Variable X has been
     /// defined as both character and numeric."). A mixed member list used to
     /// be silently accepted: the mismatched member kept its own type and a
     /// subscripted write to it silently converted (or was dropped). Runs at
-    /// array-DECLARE time — the declare pass is where member types first meet:
+    /// array-DECLARE time - the declare pass is where member types first meet:
     /// a member already in the PDV carries a type from an earlier LENGTH/SET/
     /// INPUT/assignment; the array creates the REST with its own type. Without
     /// `$` the array is char ONLY when every member was previously defined
     /// character (GH#23 vname_array: `length a $4 b $10; array ch{*} a b;`);
-    /// otherwise numeric — and any already-typed member of the other type is
+    /// otherwise numeric - and any already-typed member of the other type is
     /// an ERROR. Special-list arrays are exempt: their members are a runtime
     /// PDV fact and `_all_` is heterogeneous by design (GH#48).
     fn checkArrayTypes(self: *Executor, decl: ast.ArrayDecl) Error!void {
@@ -1922,7 +1922,7 @@ pub const Executor = struct {
 
     /// GH#75 ISS-uninitvar: emit `NOTE: Variable X is uninitialized.` once per
     /// RHS-read variable that never made it into the PDV (never assigned/INPUT/
-    /// retained/SET/MERGE'd) and is not an automatic. NOTE-only — we do NOT add
+    /// retained/SET/MERGE'd) and is not an automatic. NOTE-only - we do NOT add
     /// a phantom column (see the declareVars ponytail note); the read still
     /// yields missing. The `noted` list is the once-per-var dedup: a var read in
     /// a loop notes once, not per iteration.
@@ -1942,7 +1942,7 @@ pub const Executor = struct {
 
     /// GH#31 (EPIC-charfixedwidth's textual-vs-executed remainder): stamp an
     /// undeclared char variable's width from the FIRST TEXTUAL literal, not
-    /// the first EXECUTED one. SAS fixes lengths at COMPILE time — Language
+    /// the first EXECUTED one. SAS fixes lengths at COMPILE time - Language
     /// Reference: Concepts p.49 ("Creating Variables"): the first reference
     /// that gives the variable a length is its first occurrence in the DATA
     /// step, in SOURCE order, including branches that never run. So
@@ -1951,9 +1951,9 @@ pub const Executor = struct {
     /// (`if 0 then y='abcdefgh';` → $8), and an assignment textually BEFORE a
     /// RETAIN statement outranks its init. The GH#27 slice stamped at the two
     /// runtime store sites, so the executed-first branch won and the width
-    /// was data-order dependent — silent truncation at rc 0. One
-    /// pre-execution walk in SOURCE order — the noteUninitVars precedent,
-    /// "whole-step and order-independent, like SAS's compile" — replaying
+    /// was data-order dependent - silent truncation at rc 0. One
+    /// pre-execution walk in SOURCE order - the noteUninitVars precedent,
+    /// "whole-step and order-independent, like SAS's compile" - replaying
     /// each first-occurrence literal through stampLiteralLen, whose guards
     /// are the single home for the exclusions (first wins, declared
     /// LENGTH/FORMAT/INFORMAT widths outrank, `_infile_`, empty/oversized
@@ -1972,12 +1972,12 @@ pub const Executor = struct {
             // time: a BARE `.str` RHS to a named target. `a{i}='x'` rides
             // .array_assign (an ARRAY member's width comes from the ARRAY
             // statement's $w, never an init literal) and `_infile_`'s width
-            // is the LRECL — both excluded there, both excluded here.
+            // is the LRECL - both excluded there, both excluded here.
             .assign => |a| if (a.value.* == .str and !eqi(a.target, "_infile_"))
                 self.pdv.stampLiteralLen(a.target, a.value.str),
             // A char-literal RETAIN init stamps at its SOURCE position: ahead
             // of any assignment written before the statement (GH#31's p7),
-            // behind any written after it (p5) — first textual occurrence
+            // behind any written after it (p5) - first textual occurrence
             // wins either way. Special name lists (_character_ &c.) are not
             // variables (their inits ride pdv.set in expandSpecialVarLists)
             // and ARRAY member inits ride the .array statement (from_array):
@@ -1986,7 +1986,7 @@ pub const Executor = struct {
                 if (it.init) |e| if (e.* == .str and specialVarList(it.name) == null)
                     self.pdv.stampLiteralLen(it.name, e.str);
             },
-            // then before else — the order the source spells them
+            // then before else - the order the source spells them
             .if_ => |f| {
                 if (f.then_branch) |b| self.stampTextualStmt(b);
                 if (f.else_branch) |b| self.stampTextualStmt(b);
@@ -2019,7 +2019,7 @@ pub const Executor = struct {
         }
     }
 
-    /// `rc = h.method(…);` targets — assigned by hashOp at run time, never seeded
+    /// `rc = h.method(…);` targets - assigned by hashOp at run time, never seeded
     /// by declareStmt. Walks nested if_/do_ so the exemption is order-independent.
     fn collectHashTargets(self: *Executor, s: *const ast.Stmt) Error!void {
         switch (s.*) {
@@ -2071,11 +2071,11 @@ pub const Executor = struct {
                 }
                 for (d.body) |*b| try self.uninitScanStmt(b, noted);
             },
-            // BUG-infileput: scan `.variable`/`.named` names too — a `_INFILE_`
+            // BUG-infileput: scan `.variable`/`.named` names too - a `_INFILE_`
             // referenced ONLY in a PUT must still route through maybeNoteUninit
             // (sets refs_infile so the raw record is published at INPUT time).
             // BUG-putpagenote: skip the PUT directive/list pseudo-names
-            // (_page_/_all_/_numeric_/_character_) — not PDV reads, no NOTE.
+            // (_page_/_all_/_numeric_/_character_) - not PDV reads, no NOTE.
             .put => |items| for (items) |it| switch (it) {
                 .variable => |v| if (specialPutList(v.name) == null and !eqi(v.name, "_page_"))
                     try self.maybeNoteUninit(v.name, noted),
@@ -2095,7 +2095,7 @@ pub const Executor = struct {
     /// GAP-calloutarg-note: vars in PURE-output CALL-arg positions (CALL SCAN's
     /// pos/len, PRXPOSN's position/length, CALL LABEL's out, …) are initialized BY
     /// the routine, so SAS emits no uninitialized NOTE for them anywhere in the
-    /// step — exempt them like the in=/hash-target vars above (whole-step compile,
+    /// step - exempt them like the in=/hash-target vars above (whole-step compile,
     /// so order-independent: walks nested if_/do_). Args the routine also READS
     /// (PRXNEXT's start/stop, SORTN's items, RANUNI's seed) stay scannable.
     fn collectCallOutArgs(self: *Executor, s: *const ast.Stmt) Error!void {
@@ -2128,7 +2128,7 @@ pub const Executor = struct {
         if (eqi(name, "cats") or eqi(name, "catt")) return 0b1;
         if (eqi(name, "catx") or eqi(name, "vname")) return 0b10;
         // last arg = the out var: label (2-arg DATA form + 3-arg SCL form) and the
-        // old seed-by-ref RNGs ran*/normal/uniform(seed, params…, x) — the seed is
+        // old seed-by-ref RNGs ran*/normal/uniform(seed, params…, x) - the seed is
         // read+written, so it stays scannable.
         if (eqi(name, "label") or eqi(name, "ranuni") or eqi(name, "rannor") or
             eqi(name, "ranexp") or eqi(name, "ranpoi") or eqi(name, "ranbin") or
@@ -2143,7 +2143,7 @@ pub const Executor = struct {
             .variable => |name| {
                 // BUG-arrayinitvalidate F3: a bare array NAME where a scalar VALUE
                 // is expected (arithmetic / assignment RHS / comparison) is a SAS
-                // ERROR — it used to fabricate a phantom uninitialized scalar and
+                // ERROR - it used to fabricate a phantom uninitialized scalar and
                 // compute a wrong (missing) result. The legal bare uses never reach
                 // this walk: dim/hbound/lbound fold the arg at parse time, OF-lists
                 // and `do over` expand at token level, and a{i} is an .array_ref.
@@ -2165,14 +2165,14 @@ pub const Executor = struct {
     }
 
     /// `_INFILE_` (BUG-infilebufvar / BUG-infilevarnoop): the raw current input
-    /// record — a CHAR automatic, like `_N_`/`_ERROR_`. ONE place decides the
+    /// record - a CHAR automatic, like `_N_`/`_ERROR_`. ONE place decides the
     /// step uses it, independently of PDV membership: the OLD discovery rode
     /// the uninitialised-variable NOTE pass, whose PDV-membership early-return
-    /// fired whenever a compile-time `_infile_ = …` (even on a DEAD branch —
+    /// fired whenever a compile-time `_infile_ = …` (even on a DEAD branch -
     /// declareVars declares it regardless) had already put the name in the PDV.
     /// `refs_infile` then stayed false, the INPUT-time publish never ran, and
     /// EVERY read in the step came back blank. In a step with no INPUT there
-    /// is no input buffer at all — fail LOUD instead.
+    /// is no input buffer at all - fail LOUD instead.
     fn useInfileVar(self: *Executor) Error!void {
         if (self.in_items == null) {
             self.diags.report(.err, 0, "_INFILE_ is only available in a DATA step with an INPUT statement", .{}) catch {};
@@ -2194,18 +2194,18 @@ pub const Executor = struct {
         if (eqi(name, "_n_") or eqi(name, "_error_") or eqi(name, "_iorc_") or eqi(name, "_setobs_")) return;
         // NOTE-ofvarlistuninit: the reserved variable-LIST names are never PDV
         // variables (Language Reference: Concepts ch.25: "SAS reserves the following three names for
-        // use as variable list names") — `of _numeric_` reaches this pass as a
+        // use as variable list names") - `of _numeric_` reaches this pass as a
         // plain .variable because the parser's expandOf passes the list name
         // through for RUNTIME expansion (eval.zig). A list name can never be
         // an uninitialized variable: no NOTE (the PUT side already exempts
-        // them — BUG-putpagenote).
+        // them - BUG-putpagenote).
         if (specialVarList(name) != null) return;
         // BUG-firstlastnotbyvar: a first./last. flag is an automatic ONLY when
         // its base variable is one of the step's BY variables (Language Reference: Concepts p.534: SAS
         // creates the two temporaries "for each BY variable"). Any other
-        // first./last. reference names nothing — a typo'd flag reads missing
+        // first./last. reference names nothing - a typo'd flag reads missing
         // like any other uninitialized variable and gets the SAME NOTE (SAS's
-        // wording, `Variable first.x is uninitialized.`; SAS CONTINUES — a
+        // wording, `Variable first.x is uninitialized.`; SAS CONTINUES - a
         // NOTE, never a hard ERROR). The wholesale exemption hid the typo:
         // Language Reference: Concepts p.540's payroll program with `first.Departmnt` for
         // `first.Department` silently reported DDG = 1,148,000 instead of
@@ -2301,10 +2301,10 @@ pub const Executor = struct {
 
     /// Pre-declare the SET/MERGE/UPDATE input columns into the PDV, in schema
     /// order, so they take their SAS first-appearance position (ahead of any
-    /// retained/sum variable). Define-only — the driver fills the values.
+    /// retained/sum variable). Define-only - the driver fills the values.
     /// Pull the `\x00end=…`/`\x00point=…` sentinels the parser encoded into the
     /// source lists into set_end_var/set_point_var, leaving only real datasets.
-    /// SET/MERGE/UPDATE share the one end flag (they never stack in one step) —
+    /// SET/MERGE/UPDATE share the one end flag (they never stack in one step) -
     /// BUG-mergeupdateend: MERGE/UPDATE silently dropped END=, and MERGE warned
     /// about the sentinel as a phantom "dataset  end=e not found". POINT= is
     /// SET-only: on MERGE/UPDATE the sentinel stays in the list so it still
@@ -2315,7 +2315,7 @@ pub const Executor = struct {
         self.update_names = try self.stripSourceOpts(self.update_names, false);
         // BUG-nestedsetopts: a NESTED (IF-branch) source never registers in
         // set_names (BUG-nestedsetdriver), so its end=/point= sentinels were
-        // never extracted — `do until(e); if 1 then set a end=e; end;` never
+        // never extracted - `do until(e); if 1 then set a end=e; end;` never
         // set e (an INFINITE LOOP on a 2-row input) and the raw \x00 sentinel
         // leaked into the user-visible "File  end=e does not exist". Walk the
         // whole step and give every non-driver SET node the same strip.
@@ -2327,18 +2327,18 @@ pub const Executor = struct {
         // MODIFY: POINT=/END= direct-access is NOT implemented in the modify
         // driver. Without this guard the parser's `\x00opt=var` sentinel stayed
         // in modify_names, so `modify m point=p;` had len==2 and misrouted to
-        // buildUpdate — a spurious "UPDATE needs a master and a transaction"
+        // buildUpdate - a spurious "UPDATE needs a master and a transaction"
         // warning plus silent-wrong in-place output (the worst failure class for
         // an in-place update). Fail LOUD instead. ponytail: full POINT= modify
         // needs the REPLACE/REMOVE control statements too (unparsed today), so a
-        // clean slice is out of scope here — upgrade once those land.
+        // clean slice is out of scope here - upgrade once those land.
         if (self.modify_names) |names| for (names) |nm| {
             if (nm.len > 0 and nm[0] == 0) {
                 const body = nm[1..];
                 const eq = std.mem.indexOfScalar(u8, body, '=') orelse continue;
                 // Only `end=`/`point=` sentinels can reach here (the parser rejects
                 // any other `name=` at rc 1, and expandPrefixes above already ate
-                // the `\x00prefix=` form) — both are documented MODIFY arguments
+                // the `\x00prefix=` form) - both are documented MODIFY arguments
                 // (Statements ref p.240-241, Forms 1-4), so this is our gap → rc 2.
                 const opt = body[0..eq];
                 // BUG-modifyendmsg: this used to call BOTH options "direct/keyed
@@ -2351,7 +2351,7 @@ pub const Executor = struct {
                 // FORBIDDEN alongside the direct-access form. And the ref
                 // reserves the phrase "direct access" for KEY= ("For direct
                 // access using KEY=") while calling Form 3 "random access using
-                // POINT=" — KEY= never reaches here anyway, since the parser
+                // POINT=" - KEY= never reaches here anyway, since the parser
                 // gaps it out first. So neither label was right.
                 const what = if (eqi(opt, "end")) "end-of-file indicator" else "random access";
                 return failGap(self.diags, "MODIFY {s}= ({s}) is not supported yet", .{ opt, what });
@@ -2360,7 +2360,7 @@ pub const Executor = struct {
     }
 
     /// MODIFY's MASTER must be one of the DATA statement's output data sets.
-    /// DATA Step Statements ref printed p.241 (pdf 252 — the page's own footer
+    /// DATA Step Statements ref printed p.241 (pdf 252 - the page's own footer
     /// reads "MODIFY Statement 241"), the `master-data-set` argument:
     ///
     ///   Restrictions  This data set must also appear in the DATA statement.
@@ -2373,26 +2373,26 @@ pub const Executor = struct {
     /// master through the step's output dataset (Library.putInput replaces the
     /// member), so both drivers write wherever the DATA statement points. With
     /// mismatched names that write landed on the wrong member and nothing said
-    /// so: `data b; modify d;` degraded to `data b; set d;` — the edits appeared
+    /// so: `data b; modify d;` degraded to `data b; set d;` - the edits appeared
     /// in a brand-new `b`, `d` stayed byte-identical, exit 0. BOTH drivers were
     /// wrong, not just the single-dataset one the ticket named: transaction-
     /// driven `data b; modify d t; by id;` merged into `b` and left `d` untouched
     /// too, because modifyFlush's rebuild-commit also goes through outputAll.
     /// One guard here, ahead of buildDriver, covers both.
     ///
-    /// MEMBERSHIP, NOT EQUALITY — the D-014 half. Printed p.260 Example 8 is
+    /// MEMBERSHIP, NOT EQUALITY - the D-014 half. Printed p.260 Example 8 is
     /// `data invty.stock invty.stock95 invty.stock97; modify invty.stock;`, so
     /// extra outputs BESIDE the master are legal SAS and must keep working; only
     /// the master is restricted (the TRANSACTION data set must NOT be an output).
     ///
     /// rc 1, not a gap: the program violates a documented Restriction, so real
-    /// SAS rejects it too — this is "fix your SAS", not an opensas hole (D-009).
+    /// SAS rejects it too - this is "fix your SAS", not an opensas hole (D-009).
     /// The reference does not print the diagnostic TEXT for this condition, and
     /// it does not have to: `outputNamed`'s other caller already answers the very
     /// same relation ("this name is not one of the step's output data sets") with
     /// an ERROR at rc 1 for `output <undeclared>;`, so internal consistency
     /// decides it (D-009b). Hard error rather than report-and-continue so `b` is
-    /// never registered — main.zig's "was not replaced" gate deliberately EXEMPTS
+    /// never registered - main.zig's "was not replaced" gate deliberately EXEMPTS
     /// MODIFY steps (the re-emitted master IS the edit), and that exemption's
     /// premise is exactly what is false here, so a soft error would have left an
     /// empty `b` clobbering a live member of that name.
@@ -2404,19 +2404,19 @@ pub const Executor = struct {
         // `a(where = ( x > 15 ) )`, so the raw comparison could never match the
         // DATA statement's `a` and the only documented way to subset a MODIFY was
         // rejected outright. The options themselves are none of this guard's
-        // business — they say WHICH ROWS to update, not WHICH DATA SET.
+        // business - they say WHICH ROWS to update, not WHICH DATA SET.
         const master = splitSourceRef(names[0]);
         if (self.outputNamed(master.name) == null)
-            return self.diags.fail(error.ExecError, 0, "MODIFY updates {s} in place, but the DATA statement names {s} — the MODIFY data set must also appear in the DATA statement", .{ master.name, if (self.cur_out) |co| co.name else "no data set" });
-        // Row-subsetting on the master — the where=/obs=/firstobs= OPTIONS and
-        // the WHERE STATEMENT alike — USED to be refused LOUDLY here, because
+            return self.diags.fail(error.ExecError, 0, "MODIFY updates {s} in place, but the DATA statement names {s} - the MODIFY data set must also appear in the DATA statement", .{ master.name, if (self.cur_out) |co| co.name else "no data set" });
+        // Row-subsetting on the master - the where=/obs=/firstobs= OPTIONS and
+        // the WHERE STATEMENT alike - USED to be refused LOUDLY here, because
         // honouring either DESTROYED the unselected rows: the rebuild-commit
         // re-emitted the FILTERED copy resolveDataset hands back (`modify
         // a(where=(x>15));` committed 2 of 3; `modify m t; by k; where k>1;`
         // destroyed k=1 at rc 0). Both surfaces are implemented now
         // (BUG-modifywhereopt, GAP-modifywherestmt): the iteration reads the
         // filtered copy while the commit indexes the UNFILTERED member through
-        // ModifyState.src_pos — filter-then-match (Statements ref printed
+        // ModifyState.src_pos - filter-then-match (Statements ref printed
         // p.360/p.245), the statement filtering the transaction too (p.360's
         // WHERE-variable rule), WHEREUP='s default of not re-evaluating
         // written rows falling out of the flush (Language Reference: Concepts p.215). No refusal
@@ -2428,16 +2428,16 @@ pub const Executor = struct {
     /// list was already stripped via set_names). `nested`/`in_dow` mirror scan
     /// and detectDowSet exactly: .do_ bodies pass both through, .if_ branches
     /// are nested, and only a TOP-LEVEL DO UNTIL/WHILE makes in_dow. A nested
-    /// source that must DRIVE the step — a SET inside a top-level DO
+    /// source that must DRIVE the step - a SET inside a top-level DO
     /// UNTIL/WHILE (its read fires at the node via dowRead; the driver only
-    /// gates) or a POINT= read (buildDriver's direct-access path) — is promoted
+    /// gates) or a POINT= read (buildDriver's direct-access path) - is promoted
     /// to set_names when no top-level source exists, so both paths see it.
     /// Anything else is stashed in extra_src_names for collectExtraSetsStmt.
     fn extractNestedSetOpts(self: *Executor, s: *const ast.Stmt, seen_driver: *bool, nested: bool, in_dow: bool) Error!void {
         switch (s.*) {
             .set => |names| {
                 if (!nested and !seen_driver.*) {
-                    seen_driver.* = true; // the driver — already stripped via set_names
+                    seen_driver.* = true; // the driver - already stripped via set_names
                     return;
                 }
                 const expanded = (try self.expandPrefixes(names)).?; // non-null in, non-null out
@@ -2446,14 +2446,14 @@ pub const Executor = struct {
                 var has_point = false;
                 for (expanded) |nm| has_point = has_point or std.mem.startsWith(u8, nm, "\x00point=");
                 if (has_point and self.set_point_var != null)
-                    // Two POINT= SET sources in one step is valid SAS — our
+                    // Two POINT= SET sources in one step is valid SAS - our
                     // one-direct-access-source limit, so rc 2 (D-009).
                     return failGap(self.diags, "POINT= is not supported on a second or nested SET source", .{});
-                // GAP-secondsetstmt — Statements ref p.341 Example 6, verbatim:
+                // GAP-secondsetstmt - Statements ref p.341 Example 6, verbatim:
                 //   data south; set revenue; if region=4; set expense point=_n_; run;
                 // ONE sequential driver + a SECOND SET that is a direct-access
                 // POINT= lookup is the documented table-lookup idiom: the lookup
-                // does NOT drive — iteration, EOF and the implicit output all
+                // does NOT drive - iteration, EOF and the implicit output all
                 // follow the SEQUENTIAL driver (the example has no STOP). Claim
                 // the node: buildDriver resolves its source and runStmt reads at
                 // THIS node. END= on the SAME statement stays illegal (END=
@@ -2479,7 +2479,7 @@ pub const Executor = struct {
         }
     }
 
-    /// Drop a SET point=/nobs= control var from the output schema — SAS treats
+    /// Drop a SET point=/nobs= control var from the output schema - SAS treats
     /// both as temporary, like SET end= (BUG-setpointtemp). NOT dropped when the
     /// name is also a genuine column of a SET source: then it is real input data
     /// and stays (`set have point=p;` where have really carries a p column).
@@ -2516,11 +2516,11 @@ pub const Executor = struct {
     }
 
     /// Return `items` with each bare list-INPUT item's informat filled from an
-    /// `informat name spec;` statement — so `informat a date9.; input a;` reads dates
+    /// `informat name spec;` statement - so `informat a date9.; input a;` reads dates
     /// like the `input a :date9.;` modifier path (BUG-informatstmtdate). The INFORMAT
     /// statement's specs are collected into `self.attrs` (\x01-tagged) by scan();
     /// readNum then applies date/time/comma informats uniformly. Unchanged when
-    /// nothing matches — the common no-INFORMAT-statement path allocates nothing.
+    /// nothing matches - the common no-INFORMAT-statement path allocates nothing.
     fn patchInformats(self: *Executor, items: []const ast.InputItem) Error![]const ast.InputItem {
         if (self.attrs.items.len == 0) return items;
         var patched: ?[]ast.InputItem = null;
@@ -2531,7 +2531,7 @@ pub const Executor = struct {
                     if (patched == null) patched = try self.arena.dupe(ast.InputItem, items);
                     patched.?[idx].informat = a.fmt[1..];
                     // BUG-informatlistinput: SAS's INFORMAT-statement spec behaves
-                    // like the `:` modifier (modified LIST input — a whitespace
+                    // like the `:` modifier (modified LIST input - a whitespace
                     // token), NOT a fixed-width column read. Without list_mod the
                     // io.readList `$w.` branch consumed w columns; a record shorter
                     // than w spilled the NEXT dataline into the following var and
@@ -2548,7 +2548,7 @@ pub const Executor = struct {
         return patched orelse items;
     }
 
-    /// `_INFILE_ = …` writes THROUGH to the input buffer (BUG-infilevarnoop) —
+    /// `_INFILE_ = …` writes THROUGH to the input buffer (BUG-infilevarnoop) -
     /// SAS: the next INPUT re-parses the EDITED record (the Language Reference: Concepts p.517
     /// varying-record-layout look-ahead idiom: `input @;` inspect/edit the
     /// buffer, then a second INPUT parses it). Only a HELD record (trailing
@@ -2568,17 +2568,17 @@ pub const Executor = struct {
     /// writing the partial obs (SAS semantics). Returns .normal or .stop (PG-atptr).
     /// ponytail: hold continuation tracks the whitespace-token cursor; `@col`/`+n`
     /// column reads don't advance it, so mixing a column read with a trailing-@ hold
-    /// across statements can misalign — list/formatted input composes cleanly.
+    /// across statements can misalign - list/formatted input composes cleanly.
     fn execInput(self: *Executor, items: []const ast.InputItem) Error!Flow {
         const full = self.li.lines;
         if (full.len == 0) {
-            // BUG-inputnosourcefabricates: NO INFILE and NO DATALINES at all —
+            // BUG-inputnosourcefabricates: NO INFILE and NO DATALINES at all -
             // INPUT has no source, and the step silently fabricated ONE
             // all-missing observation at exit 0. Every sibling missing-source
             // is loud (`set nosuchds`, `infile 'nosuch.txt'`, an unknown
-            // fileref) — this one is too, per D-002 (SAS: "ERROR: No DATALINES
+            // fileref) - this one is too, per D-002 (SAS: "ERROR: No DATALINES
             // or INFILE statement."; wording needs-oracle, loudness settled
-            // in-house — tick305 F2's own conclusion for this branch). Kept
+            // in-house - tick305 F2's own conclusion for this branch). Kept
             // distinct from BUG-setinputinert: a declared-but-EMPTY source
             // (0-record file / 0-line datalines, dl_lines non-null) still
             // reads 0 observations quietly.
@@ -2603,7 +2603,7 @@ pub const Executor = struct {
         var pos: usize = if (continuing) self.li.pos else 0;
         // Record-boundary control (BUG-infilemissover). SAS 9.4: MISSOVER/TRUNCOVER/
         // STOPOVER "control what happens when an INPUT statement reaches the end of
-        // the current record." Default FLOWOVER pulls values from the next record —
+        // the current record." Default FLOWOVER pulls values from the next record -
         // a short record then silently misaligns all following data. Window the line
         // source to the current record so readList's list-mode spill onto the next
         // line can't fire; absent values read as missing instead. STOPOVER makes a
@@ -2611,14 +2611,14 @@ pub const Executor = struct {
         // field distinction IS modelled: BUG-missovertruncover-partial threads
         // `mode == .missover` into readList.)
         // BUG-inputmultirecmode: the short-record modes govern SHORT-record handling
-        // ONLY — an EXPLICIT record advance (`/`, `#n`) must still move to the
+        // ONLY - an EXPLICIT record advance (`/`, `#n`) must still move to the
         // requested record (Language Reference: Concepts p.497 combines MISSOVER with 27 `/` advances).
         // Clipping the window to the current record blocked the advance, so every
         // obs re-read the SAME record (`b` duplicated `a`) and the obs count
         // doubled. Split the items at each advance and read each segment against
         // its own one-record window: the advance works and the no-spill short-record
         // rule still applies per record. ponytail: PAD under these modes is still
-        // not modelled — add if the corpus hits it. An advance past EOF reads an
+        // not modelled - add if the corpus hits it. An advance past EOF reads an
         // empty record (all missing); the SAS EOF-stop-on-advance is F6's.
         var last: usize = undefined;
         if (mode == .flowover or dlm != null or !hasRecordAdvance(patched)) {
@@ -2629,8 +2629,8 @@ pub const Executor = struct {
             }
             const r = try io.readList(self.pdv, patched, lines, self.li.cur, dlm, dsd, mode == .missover, &pos);
             // GAP-inputeofdegrade: the read wanted a record past the end. Under
-            // FLOWOVER — which was handed the WHOLE file, so "no next record"
-            // really is end-of-file — SAS ends the step here. Statements ref
+            // FLOWOVER - which was handed the WHOLE file, so "no next record"
+            // really is end-of-file - SAS ends the step here. Statements ref
             // printed p.178 (that page's own footer reads "178 Chapter 2 /
             // Dictionary of SAS DATA Step Statements"), the INPUT statement's
             // "End-of-File" section: "End-of-file occurs when an INPUT statement
@@ -2653,7 +2653,7 @@ pub const Executor = struct {
             // MISSOVER/TRUNCOVER are deliberately excluded: they are handed a
             // one-record window (`full[0..cur+1]` above), so they reach the same
             // out-of-data condition on EVERY short record, and setting the
-            // remaining variables to missing is their documented job — printed
+            // remaining variables to missing is their documented job - printed
             // p.133 MISSOVER "variables without any values assigned are set to
             // missing", against p.132 FLOWOVER "causes an INPUT statement to
             // continue to read the NEXT input data record". Applying the missing
@@ -2667,7 +2667,7 @@ pub const Executor = struct {
         } else {
             const base = self.li.cur; // record this INPUT started on (`#n` is relative to it)
             var rec = base;
-            // High-water record index — the SAME value readList returns as `hi`
+            // High-water record index - the SAME value readList returns as `hi`
             // (BUG-inputlinehighwater). A BACKWARD `#n` leaves rec < hi; releasing
             // rec + 1 collapsed the group to one record (sliding window + fabricated
             // EOF row, BUG-backwardhashnrec). A segment can't read past rec (its
@@ -2708,7 +2708,7 @@ pub const Executor = struct {
                         // EOF-stop-on-advance is F6's": an advance target past
                         // the last record used to read an EMPTY record, so every
                         // remaining variable came back missing and the partial
-                        // observation was written. Same p.178 rule — asking for a
+                        // observation was written. Same p.178 rule - asking for a
                         // record after end-of-file stops execution. Reached only
                         // by MISSOVER/TRUNCOVER/STOPOVER with a record advance;
                         // the advance itself is not the short-record condition
@@ -2726,10 +2726,10 @@ pub const Executor = struct {
         }
         // `_INFILE_` (BUG-infilebufvar): publish the raw record this INPUT just
         // consumed (`last` is the record index readList finished on). The slice
-        // borrows the datalines/infile arena text — stable for the whole step.
+        // borrows the datalines/infile arena text - stable for the whole step.
         if (self.refs_infile and last < full.len) try self.pdv.set("_infile_", .{ .str = full[last] });
         // END= from the post-advance position (`last` is the shared high-water
-        // value) — not the iteration-top guess, which went stale the moment
+        // value) - not the iteration-top guess, which went stale the moment
         // this INPUT consumed more than one record (BUG-infileendmultirec).
         try self.setInfileEnd(last);
         if (hold.single or hold.across) {
@@ -2749,7 +2749,7 @@ pub const Executor = struct {
     fn seedInputColumns(self: *Executor) Error!void {
         // QA tick377 F2: a POINT= lookup riding beside a MERGE/UPDATE/MODIFY
         // driver (its SET is the first top-level one, so set_names holds the
-        // LOOKUP's list) is first-mentioned AFTER the driver statement — the
+        // LOOKUP's list) is first-mentioned AFTER the driver statement - the
         // driver owns the early PDV slots and the lookup's columns seed at
         // their own node in declareStmt's program-order walk. Seed the driver
         // here with the SAME plain define buildMerge/slotsOf use today (order
@@ -2773,8 +2773,8 @@ pub const Executor = struct {
         }
     }
 
-    /// Define one LENGTH/ATTRIB-declared var in the PDV (define-only — no value is
-    /// wiped) and stamp its declared char width (VLENGTH — BUG-vlength) / numeric
+    /// Define one LENGTH/ATTRIB-declared var in the PDV (define-only - no value is
+    /// wiped) and stamp its declared char width (VLENGTH - BUG-vlength) / numeric
     /// truncate-on-store byte-length (GH#46). Called from run(): early vars before
     /// seedInputColumns, `.late` vars (BUG-varorder) after declareVars.
     fn seedDeclVar(self: *Executor, dv: DeclVar) Error!void {
@@ -2783,20 +2783,20 @@ pub const Executor = struct {
             // GAP-typerespec (doc-finder tick272 F4): a numeric LENGTH/ATTRIB
             // naming a var already established CHARACTER (a char-literal
             // assignment, char RETAIN init, char FORMAT, or a prior char LENGTH)
-            // is the fatal SAS conflict — "Variable X has been defined as both
+            // is the fatal SAS conflict - "Variable X has been defined as both
             // character and numeric." The step halts 0 obs (gated after this
             // pass), the statement-side twin of the SET conflict (GH#69/#70,
             // seedColumnsOf). Only the char→num direction fires: a char TYPE
             // carries real evidence (staticType/declare returns char only for a
             // char literal/expr), whereas a num type is often just the default
-            // guess — so a char LENGTH correcting a num-default guess
+            // guess - so a char LENGTH correcting a num-default guess
             // (`retain x; length x $8;`) is NOT a conflict and must not error.
             if (vr.type == .char and dv.type == .num) {
                 self.diags.report(.err, 0, "Variable {s} has been defined as both character and numeric.", .{dv.name}) catch {};
                 return;
             }
             // BUG-charlenrespec (F3): a second char-length spec for a var whose
-            // char length is already set is IGNORED — SAS keeps the FIRST length
+            // char length is already set is IGNORED - SAS keeps the FIRST length
             // and warns. This matches the parser's first-wins assignment-truncation
             // width (char_lens), so the descriptor length and the stored value
             // length agree (case c used to disagree: descriptor 20, value 5).
@@ -2824,7 +2824,7 @@ pub const Executor = struct {
 
     /// Per-source column→PDV-slot maps for the loadRow readback loop
     /// (PERF-loadrowdual, docs/findings/perf-findings-tick121.md): one name
-    /// lookup per column HERE (build time), then loadRow writes by slot — zero
+    /// lookup per column HERE (build time), then loadRow writes by slot - zero
     /// `indexOf`/lowerString per cell per row on the hottest loop.
     fn slotsOf(self: *Executor, dss: []*Dataset) Error![]const []usize {
         const out = try self.arena.alloc([]usize, dss.len);
@@ -2834,11 +2834,11 @@ pub const Executor = struct {
 
     /// Stamp `_setobs_` (the `nobs=` backing var) ONCE per distinct row source
     /// rather than per row, and only when the step requested nobs= at all
-    /// (PERF-loadrowdual — io.loadRow used to define+set it on every row of
+    /// (PERF-loadrowdual - io.loadRow used to define+set it on every row of
     /// every read). Retained via scan(), so the stamp survives the
     /// per-iteration reset; a run of rows from one source reuses it. SAS
     /// semantics: a multi-source SET stamps the a+b TOTAL (GAP-nobsmultisrc,
-    /// nobs_total — the old per-source count was the documented ponytail);
+    /// nobs_total - the old per-source count was the documented ponytail);
     /// single-source stamps that source's obs count.
     fn stampObs(self: *Executor, ds: *const Dataset) Error!void {
         if (self.nobs_var == null) return;
@@ -2852,7 +2852,7 @@ pub const Executor = struct {
     fn seedColumnsOf(self: *Executor, ds: *Dataset) Error!void {
         for (ds.columns.items) |c| {
             // GH#69/#70: a variable stacked as CHARACTER in one place and NUMERIC
-            // in another (two CERTAIN, differing types) is a fatal SAS error — the
+            // in another (two CERTAIN, differing types) is a fatal SAS error - the
             // step halts with 0 obs (gated in run() before the row loop). A GUESSED
             // type adopting a certain one stays benign (pdv.define / TRIAGE-gen2values).
             //
@@ -2888,7 +2888,7 @@ pub const Executor = struct {
                 if (L > 0 and self.pdv.vars.items[di].len == 0) {
                     self.pdv.vars.items[di].len = L;
                 } else if (L > 0 and self.pdv.vars.items[di].len > 0 and L != self.pdv.vars.items[di].len) {
-                    // GH#72: sources give the var DIFFERENT lengths — SAS keeps the
+                    // GH#72: sources give the var DIFFERENT lengths - SAS keeps the
                     // FIRST (already carried, unchanged) and warns of possible
                     // truncation (default VARLENCHK=WARN, nonzero RC).
                     self.diags.warn(0, "Multiple lengths were specified for the variable {s} by input data set(s). This may cause truncation of data.", .{c.name}) catch {};
@@ -2896,7 +2896,7 @@ pub const Executor = struct {
             };
             // Same for a NUMERIC source column's declared byte-length (3..7):
             // carry it into the PDV var's numlen so #46's truncate-on-store
-            // (pdv.truncNum) fires for a SET-inherited length — the 0-row
+            // (pdv.truncNum) fires for a SET-inherited length - the 0-row
             // template idiom carrying SDTM var lengths (GH#59). First source
             // wins; a same-step LENGTH (seeded earlier) stays.
             if (c.type == .num) if (c.len) |L| {
@@ -2908,7 +2908,7 @@ pub const Executor = struct {
             };
             // carry a source column's label into the step so it survives to
             // this step's output and is visible to VLABEL (BUG-labelspersist).
-            // FIRST source wins (BUG-setlabellastwins) — the same rule as
+            // FIRST source wins (BUG-setlabellastwins) - the same rule as
             // length/format/informat below; a same-step LABEL statement still
             // overrides (its setVarLabel runs later, unconditional).
             if (c.label) |l| if (self.lib.varLabel(c.name) == null) try self.lib.setVarLabel(c.name, l);
@@ -2922,20 +2922,20 @@ pub const Executor = struct {
         }
     }
 
-    /// MULTISET-impl: find every SET beyond the driver — a 2nd top-level `set b;`
-    /// or an if-guarded `if _n_=1 then set summary;` — and register it as an
+    /// MULTISET-impl: find every SET beyond the driver - a 2nd top-level `set b;`
+    /// or an if-guarded `if _n_=1 then set summary;` - and register it as an
     /// executable node with its own concatenate cursor (runExtraSet). SAS: each
     /// SET has an INDEPENDENT read position, and a SET'd variable is RETAINED
     /// until its next read, so the _n_=1 lookup value persists across iterations.
-    /// The driver SET (self.set_names — the first TOP-LEVEL SET) is skipped. Only
+    /// The driver SET (self.set_names - the first TOP-LEVEL SET) is skipped. Only
     /// for a plain SET-driven step (a POINT= source of the driver list's own,
     /// MERGE / UPDATE / MODIFY keep the old single path; a second-SET POINT=
-    /// lookup — GAP-secondsetstmt — registers extras like the plain case).
+    /// lookup - GAP-secondsetstmt - registers extras like the plain case).
     fn collectExtraSets(self: *Executor, program: ast.Program) Error!void {
         // No set_names gate: when the ONLY source is a nested (conditional) SET
-        // there is no driver at all, but its columns must still seed the PDV —
+        // there is no driver at all, but its columns must still seed the PDV -
         // the `if 0 then set b; … stop;` schema idiom (BUG-nestedsetdriver).
-        // A second-SET POINT= lookup (set_point_node — GAP-secondsetstmt)
+        // A second-SET POINT= lookup (set_point_node - GAP-secondsetstmt)
         // leaves the SEQUENTIAL driver in place, so other extra SETs still
         // register below; the lookup's own node is skipped inside (it reads
         // via the direct-access path, not its own cursor).
@@ -2951,7 +2951,7 @@ pub const Executor = struct {
                 // A top-level DO UNTIL/WHILE's inner SET is the DOW case:
                 // detectDowSet already claimed it (its read fires at the node
                 // via dowRead) and scan/extractSetOptions registered it as the
-                // driver — registering it here too would double-count the one
+                // driver - registering it here too would double-count the one
                 // source as both driver and extra.
                 if (self.dow_set == s) return;
                 // The claimed second-SET POINT= lookup (GAP-secondsetstmt):
@@ -2960,7 +2960,7 @@ pub const Executor = struct {
                 // (QA tick377 F2), not here.
                 if (self.set_point_node == s) return;
                 // The first TOP-LEVEL SET is the driver (loadNext reads it); skip
-                // it. A NESTED set is never the driver — it is an executable extra
+                // it. A NESTED set is never the driver - it is an executable extra
                 // even when textually first (BUG-nestedsetdriver), so only a
                 // non-nested SET may consume the skip.
                 if (!nested and !seen_driver.*) {
@@ -2968,7 +2968,7 @@ pub const Executor = struct {
                     return;
                 }
                 // BUG-nestedsetopts: resolve the sentinel-stripped list from the
-                // extractSetOptions walk — the raw node list still carries
+                // extractSetOptions walk - the raw node list still carries
                 // `\x00end=e`, which leaked into "File  end=e does not exist".
                 const names = self.extra_src_names.get(s) orelse node_names;
                 var dss: std.ArrayList(*Dataset) = .empty;
@@ -2976,7 +2976,7 @@ pub const Executor = struct {
                     if (try self.resolveDataset(name, true, null)) |src| {
                         try dss.append(self.arena, src);
                         try self.seedColumnsOf(src);
-                        // SET'd vars are retained until the next read — keeps the
+                        // SET'd vars are retained until the next read - keeps the
                         // conditional-lookup values alive across the per-iter reset.
                         for (src.columns.items) |c| try self.retained.append(self.arena, c.name);
                     } else {
@@ -2991,7 +2991,7 @@ pub const Executor = struct {
             // so `nested = true` like the IF branches; the single DOW exception
             // is caught by the dow_set guard above. This arm was the ONLY
             // statement walker without one (BUG-doblocksourceinert, QA tick307
-            // F1) — its old justification, "a SET inside a DO body is the DOW
+            // F1) - its old justification, "a SET inside a DO body is the DOW
             // case, already failed loud", is false for a NON-ITERATIVE block:
             // `if 1 then do; set a; end;` fell into `else`, read zero rows,
             // and fabricated one all-missing observation at exit 0.
@@ -3002,7 +3002,7 @@ pub const Executor = struct {
             .do_ => |d| for (d.body) |*b| try self.collectExtraSetsStmt(b, seen_driver, true),
             // BUG-nestedsourceschema: a NESTED MERGE/UPDATE/MODIFY never
             // registers its name list (BUG-nestedsetdriver), and only SET got
-            // the compensating schema seed — a nested one contributed NO PDV
+            // the compensating schema seed - a nested one contributed NO PDV
             // columns, emitting "1 obs with 0 variables" at exit 0 (fabricated
             // output). Seed the compile-time schema like the nested SET; the
             // runtime semantics of a conditional MERGE/UPDATE stay needs-oracle.
@@ -3015,7 +3015,7 @@ pub const Executor = struct {
     /// MODIFY's sources (in statement order, like the drivers do). Also
     /// restores the fail-loud the nested cut-off lost: UPDATE (and MODIFY with
     /// a transaction) still requires BY, and a leftover sentinel that can
-    /// never be a dataset (point= on MERGE/UPDATE/MODIFY) errors CLEAN — the
+    /// never be a dataset (point= on MERGE/UPDATE/MODIFY) errors CLEAN - the
     /// raw \x00 must not reach a user-visible message.
     fn seedNestedSource(self: *Executor, s: *const ast.Stmt) Error!void {
         var names: []const []const u8 = switch (s.*) {
@@ -3045,7 +3045,7 @@ pub const Executor = struct {
 
     /// Read the next observation from an executable (non-driver) SET into the PDV
     /// via its own cursor. Sources concatenate (di/ri). SAS: a SET hitting EOF
-    /// ends the DATA step at once — the current obs is NOT output, so return .stop.
+    /// ends the DATA step at once - the current obs is NOT output, so return .stop.
     fn runExtraSet(self: *Executor, es: *ExtraSet) Error!Flow {
         while (es.di < es.dss.len) {
             const ds = es.dss[es.di];
@@ -3056,7 +3056,7 @@ pub const Executor = struct {
                 // end= (BUG-nestedsetopts): 1 when this read was the last obs.
                 if (self.set_end_var != null) try self.setEndFlag(!extraHasMore(es));
                 // BUG-nestedsetopts: when the nested SET is the step's ONLY source
-                // the driver is the single-pass .once — `if 1 then set d end=e;`
+                // the driver is the single-pass .once - `if 1 then set d end=e;`
                 // must iterate until d is exhausted (2 obs), while `if 0 then
                 // set b;` still runs exactly once (no read → no continuation).
                 // A successful node-driven read buys one more iteration; the
@@ -3074,7 +3074,7 @@ pub const Executor = struct {
     }
 
     /// True while the extra SET's cursor still holds an observation past the one
-    /// just read — end= is 1 exactly when the row just read was the last one.
+    /// just read - end= is 1 exactly when the row just read was the last one.
     fn extraHasMore(es: *const ExtraSet) bool {
         if (es.di < es.dss.len and es.ri < es.dss[es.di].rowCount()) return true;
         var d = es.di + 1;
@@ -3083,16 +3083,16 @@ pub const Executor = struct {
     }
 
     /// The extra-SET cursor state for a given `.set` AST node, or null if this is
-    /// the driver SET (inert at run time — loadNext already read it).
+    /// the driver SET (inert at run time - loadNext already read it).
     fn extraSetFor(self: *Executor, node: *const ast.Stmt) ?*ExtraSet {
         for (self.extra_sets.items) |*es| if (es.node == node) return es;
         return null;
     }
 
-    /// Read one INFILE source's records (BUG-multiinfilelastwins — factored
+    /// Read one INFILE source's records (BUG-multiinfilelastwins - factored
     /// out of run()'s single-file reader, which wrote the one shared dl_lines).
     /// INFILE DATALINES/CARDS reads the embedded block; an external path
-    /// streams line-by-line through a buffered reader (PERF-infilecap — no
+    /// streams line-by-line through a buffered reader (PERF-infilecap - no
     /// whole-file readFileAlloc, no size cap). FIRSTOBS= skips leading records;
     /// OBS=/LINESIZE= apply after (FEAT-infileobslinesize). An OPEN error is a
     /// HARD SAS error ("Physical file does not exist"), reported loud, never a
@@ -3132,14 +3132,14 @@ pub const Executor = struct {
                 lines = list.items;
             } else {
                 // AUDIT-errhaltclass: HALT, matching the two sibling arms just
-                // above (StreamTooLong / ReadFailed) — three error arms in one
+                // above (StreamTooLong / ReadFailed) - three error arms in one
                 // function, two of which already stopped the step. Reporting and
                 // running on with an EMPTY record list is the doc's ERROR class
                 // treated as its CONTINUING class (Language Reference: Concepts printed p.172 vs
                 // p.174-175), and it did real damage two ways: a SET-driven step
                 // (`set src; infile 'nope'; input v $;`) wrote every row with v
                 // MISSING, and `data sc.keeper; infile 'nope'; input i;` REPLACED
-                // an existing 3-obs permanent data set with an empty one — the
+                // an existing 3-obs permanent data set with an empty one - the
                 // "WARNING: Data set … was not replaced because this step was
                 // stopped" clause of Example Code 8.6, inverted into data loss.
                 // Both verified on a clean-rebuilt binary at exit 1, then read
@@ -3166,7 +3166,7 @@ pub const Executor = struct {
         // system options are a documented mechanism for RAW input, not only for
         // data sets. They used to reach dataset reads ONLY, so a raw read
         // ignored them completely and the canonical header-skip idiom
-        // `options firstobs=2;` silently parsed the HEADER AS DATA — measured:
+        // `options firstobs=2;` silently parsed the HEADER AS DATA - measured:
         // the output carried a bogus `name=name age=.` observation at exit 0,
         // and only a downstream PROC re-sliced it away on ITS read, which is
         // what made the bug look from a PROC PRINT like it was working.
@@ -3175,19 +3175,19 @@ pub const Executor = struct {
         // The INFILE dictionary entry's FIRSTOBS=/OBS= carry no Interaction or
         // Restriction block naming the system options (Statements ref printed
         // p.131 and p.135), Language Reference: Concepts has no precedence prose for the pair, and the
-        // SAS System Options: Reference — where the system option's own entry
-        // would live — is not among the volumes we hold. The nearest passage
+        // SAS System Options: Reference - where the system option's own entry
+        // would live - is not among the volumes we hold. The nearest passage
         // points the OTHER way and is why no override rule is claimed here: SQL
         // procedure ref printed p.150 warns that for a VIEW, a system option's
         // limit "is applied first to the underlying table, and then next to the
-        // view, effectively reducing the number of observations twice" — i.e.
+        // view, effectively reducing the number of observations twice" - i.e.
         // COMPOSITION, not override. That is (system vs data set) on views, not
         // INFILE, so it does not transfer; it is recorded so nobody later
         // "restores" an override rule believing the doc backed one.
         //
         // What this change therefore does is the half the doc DOES settle: the
         // system option now reaches a raw read when the INFILE statement is
-        // SILENT on that field. When BOTH are given, the INFILE option wins —
+        // SILENT on that field. When BOTH are given, the INFILE option wins -
         // which is not a new invention but exactly TODAY'S behaviour preserved
         // (the system value is ignored outright right now), so the undecided
         // case moves not at all and stays available for an oracle.
@@ -3218,9 +3218,9 @@ pub const Executor = struct {
 
     /// Make sources[idx] the current line source (BUG-multiinfilelastwins):
     /// the live cursor `li` swaps with the selected source's saved one (each
-    /// file keeps its own read position for the whole step — selecting a
+    /// file keeps its own read position for the whole step - selecting a
     /// source never rewinds it), the INPUT options and END= target follow,
-    /// and the END= flag is preset exactly like the .lines gate does — BEFORE
+    /// and the END= flag is preset exactly like the .lines gate does - BEFORE
     /// the next INPUT, 1 when no record remains past the one it will read.
     fn selectSource(self: *Executor, idx: usize) Error!void {
         if (self.cur_src) |old| self.sources.items[old].li = self.li;
@@ -3247,14 +3247,14 @@ pub const Executor = struct {
 
     fn buildDriver(self: *Executor) Error!Driver {
         // BUG-pointmergelookup: the POINT= guards and the direct-read setup must
-        // hold no matter which driver wins below — with a MERGE/UPDATE driver
+        // hold no matter which driver wins below - with a MERGE/UPDATE driver
         // they used to be skipped, and the `set ds point=v;` then silently never
-        // read (QA tick357 F4 — quietly-missing lookup values, the clinical-
+        // read (QA tick357 F4 - quietly-missing lookup values, the clinical-
         // worst failure class). Statements ref, SET POINT= Restrictions: "You
         // cannot use POINT= with a BY statement, a WHERE statement, or a WHERE=
-        // data set option" — flat, driver-independent. With neither present, a
+        // data set option" - flat, driver-independent. With neither present, a
         // POINT= SET beside a driver is the documented idiom (SET Example 6:
-        // `set revenue; … set expense point=_n_;`) — resolve its source so the
+        // `set revenue; … set expense point=_n_;`) - resolve its source so the
         // executable .set performs the read and the lookup columns land.
         if (self.set_point_var != null) {
             if (self.by_vars != null) return self.diags.fail(error.ExecError, 0, "POINT= cannot be used with BY", .{});
@@ -3263,7 +3263,7 @@ pub const Executor = struct {
                 return .{ .once = true }; // spent driver: no iterations, no output
             }
             // GAP-secondsetstmt: when the lookup rides a SECOND SET (p.341
-            // Example 6), its source names live with that NODE — set_names is
+            // Example 6), its source names live with that NODE - set_names is
             // the SEQUENTIAL driver there. The p.335 WHERE= leg and the source
             // resolution below both scan the lookup's own list.
             const point_names: []const []const u8 = if (self.set_point_node) |pn|
@@ -3271,11 +3271,11 @@ pub const Executor = struct {
             else
                 self.set_names orelse &.{};
             // The third leg of the same p.335 sentence (BUG-pointwheredsopt):
-            // the where= data set OPTION — the WHERE statement's option twin,
+            // the where= data set OPTION - the WHERE statement's option twin,
             // so the same policy as the leg above: loud ERROR, spent driver.
             // It used to be silently DROPPED by resolvePointSource (the
             // BUG-pointnobsbase pin, made before this repo had the Statements
-            // volume) while its statement twin already errored — two legs of
+            // volume) while its statement twin already errored - two legs of
             // one rule enforced, the third ignored.
             for (point_names) |name| if (try self.hasWhereOpt(name)) {
                 self.diags.report(.err, 0, "The WHERE= data set option cannot be used with the POINT= option", .{}) catch {};
@@ -3283,7 +3283,7 @@ pub const Executor = struct {
             };
             // BUG-pointredefinesnobs: bind EVERY named source, not just the first.
             // This loop used to `break` on the first that resolved, so
-            // `set a b point=p;` silently became `set a point=p;` — and because
+            // `set a b point=p;` silently became `set a point=p;` - and because
             // NOBS= then rode that single source, the canonical `do p = 1 to n;`
             // idiom read 3 of 5 observations and stopped, at exit 0, never
             // reaching the loud out-of-range guard that would have exposed it.
@@ -3295,7 +3295,7 @@ pub const Executor = struct {
             // observations in the input data set OR DATA SETS. If more than one
             // data set is listed in the SET statement, the value of the NOBS=
             // variable equals the total number of observations in the data sets
-            // that are listed." No POINT= exception — and the same entry states
+            // that are listed." No POINT= exception - and the same entry states
             // it outright: "Interaction  The NOBS= and POINT= options are
             // INDEPENDENT of each other." So POINT= may not redefine NOBS=, which
             // is exactly what it was doing.
@@ -3308,16 +3308,16 @@ pub const Executor = struct {
             // observations FROM THE DATA SETS, which is not possible unless ALL
             // DATA SETS ARE OPEN." POINT='s own Restrictions list (printed p.335)
             // bars BY, WHERE, WHERE=, KEY=, transport/sequential/view sources and
-            // CAS — a multi-dataset list is NOT among them, so it is legal SAS.
+            // CAS - a multi-dataset list is NOT among them, so it is legal SAS.
             {
                 var pdss: std.ArrayList(*Dataset) = .empty;
                 var pslots: std.ArrayList([]const usize) = .empty;
                 for (point_names) |name| if (try self.resolvePointSource(name)) |ds| {
                     try pdss.append(self.arena, ds);
                     // same compile-time schema rule as the sequential path below
-                    // (define is idempotent — this also resolves the read slots)
+                    // (define is idempotent - this also resolves the read slots)
                     try pslots.append(self.arena, try io.columnSlots(self.pdv, ds));
-                    // SET-read vars auto-retain (Language Reference: Concepts p.495 step 5) — a POINT= read
+                    // SET-read vars auto-retain (Language Reference: Concepts p.495 step 5) - a POINT= read
                     // inside a conditional keeps its last value, like any SET.
                     for (ds.columns.items) |c| try self.retained.append(self.arena, c.name);
                 };
@@ -3325,7 +3325,7 @@ pub const Executor = struct {
                 self.set_point_slots = pslots.items;
                 // NOBS= is the total across the listed sources, exactly as the
                 // sequential multi-source path already computes it
-                // (GAP-nobsmultisrc) — one rule, both spellings, which is the
+                // (GAP-nobsmultisrc) - one rule, both spellings, which is the
                 // internal consistency this ticket was filed on.
                 if (self.nobs_var != null and pdss.items.len > 1) {
                     var total: usize = 0;
@@ -3334,7 +3334,7 @@ pub const Executor = struct {
                 }
             }
             // A POINT= source that resolves to nothing must fail loud like the
-            // sequential path (BUG-setmissingquiet) — a silently-skipped direct
+            // sequential path (BUG-setmissingquiet) - a silently-skipped direct
             // read leaves quietly-missing lookup values (BUG-pointmergelookup's
             // failure class), worse than no read at all.
             if (self.set_point_dss.len == 0) {
@@ -3350,11 +3350,11 @@ pub const Executor = struct {
             // has no _IORC_ code for "a master row with no transaction" because
             // that iteration does not exist). Routing it through UPDATE's
             // master-driven, group-collapsing driver gave every MASTER row a
-            // _SOK iteration — the p.595 error-checking idiom then REPLACEd
+            // _SOK iteration - the p.595 error-checking idiom then REPLACEd
             // every unmatched master row with stale/blank transaction values
             // and silently wiped 7 of 13 obs IN PLACE (BUG-modifybymasterdriven).
             // But single-dataset `modify master;` is a plain sequential in-place
-            // rewrite of the master — each obs → PDV → statements → written back
+            // rewrite of the master - each obs → PDV → statements → written back
             // (BUG-modifysingle).
             if (names.len >= 2) return self.buildModify(names);
             var dss: std.ArrayList(*Dataset) = .empty;
@@ -3363,19 +3363,19 @@ pub const Executor = struct {
             // runs over the filtered copy; the COMMIT must still index the unfiltered
             // master, or every hidden row is destroyed (measured last tick:
             // `where=(x>15)` committed 2 of 3 rows).
-            // GAP-modifywherestmt: where_first=true now — the WHERE STATEMENT filters
+            // GAP-modifywherestmt: where_first=true now - the WHERE STATEMENT filters
             // the iterated copy through the same position channel (it was silently
             // IGNORED here before, updating rows the user excluded). Filter-then-
             // match, and WHEREUP='s default (Language Reference: Concepts p.215) falls out of the flush:
             // modified/appended rows are NOT re-evaluated against the WHERE.
             var msrc: ?[]const usize = null;
             for (names) |name| if (try self.resolveDataset(name, true, &msrc)) |ds| try dss.append(self.arena, ds);
-            // BUG-modifystoptruncates: the sequential path keeps its own driver —
-            // one iteration per MASTER obs — but it must COMMIT the way its
+            // BUG-modifystoptruncates: the sequential path keeps its own driver -
+            // one iteration per MASTER obs - but it must COMMIT the way its
             // MODIFY-BY sibling already does: by re-emitting the WHOLE master with
             // per-row overrides applied, not by accumulating whatever rows the loop
             // happened to output. Without this the stored data set was only as
-            // complete as the loop, so ANY early exit truncated the file — a
+            // complete as the loop, so ANY early exit truncated the file - a
             // `stop;` on the first obs EMPTIED a 5-observation master at exit 0
             // with nothing in the log. Statements ref printed p.240 says MODIFY
             // works "in place but does not create an additional copy"; opensas was
@@ -3385,7 +3385,7 @@ pub const Executor = struct {
             //
             // The FIX IS THE COMMIT, not the statements. QA's asymmetry localises
             // it: a real ERROR mid-step never truncated (rc 1, all rows present),
-            // only the statements that end the loop early did — so a `stop`-shaped
+            // only the statements that end the loop early did - so a `stop`-shaped
             // branch and then an `abort`-shaped branch would have been two patches
             // for one root. Pointing `modify_by` at a state object routes this path
             // through the EXISTING modifyReplace/modifyFlush pair, so STOP, ABORT,
@@ -3394,20 +3394,20 @@ pub const Executor = struct {
             // it never recorded is re-emitted untouched.
             //
             // ponytail: ModifyState is transaction-shaped, so `trans`/`t_by`/
-            // `t_slots`/`ti`/`m_hint`/`prev_*` are INERT here — they are read only
+            // `t_slots`/`ti`/`m_hint`/`prev_*` are INERT here - they are read only
             // by modifyNext, which belongs to the `.modify` driver this path does
             // not use. `trans` is aimed at the master because the field is not
             // optional; splitting the commit half out of ModifyState is the upgrade
             // if a third caller ever appears.
             if (dss.items.len == 1) {
-                const iter = dss.items[0]; // possibly FILTERED — what the loop reads
+                const iter = dss.items[0]; // possibly FILTERED - what the loop reads
                 // The flush re-emits the MASTER, so it must be the whole member. With
                 // no row filter these are the same object and src_pos stays empty.
                 const m = self.lib.find(splitSourceRef(names[0]).name) orelse iter;
                 const st = try self.arena.create(ModifyState);
                 st.* = .{
                     .master = m,
-                    .trans = m, // inert on this path — see above
+                    .trans = m, // inert on this path - see above
                     .m_by = &.{},
                     .t_by = &.{},
                     .m_slots = try io.columnSlots(self.pdv, m),
@@ -3419,21 +3419,21 @@ pub const Executor = struct {
         }
         if (self.merge_names) |names| return self.buildMerge(names);
         if (self.set_names) |names| point: {
-            // `set ds point=i;` — no sequential driver: the executable `.set`
+            // `set ds point=i;` - no sequential driver: the executable `.set`
             // reads obs `i` directly, and each successful read re-arms this
             // single-pass driver so the step iterates until STOP/ABORT/an
-            // out-of-range read (Language Reference: Concepts p.488: POINT= cannot detect EOF —
+            // out-of-range read (Language Reference: Concepts p.488: POINT= cannot detect EOF -
             // BUG-pointnoiterate). A re-read with no progress stops the step
             // (the .set arm) where SAS itself would loop forever. The BY/WHERE
             // guards and the source resolution live at the top of buildDriver
-            // (BUG-pointmergelookup) — they hold for every driver, not just this
+            // (BUG-pointmergelookup) - they hold for every driver, not just this
             // one. GAP-secondsetstmt: set_point_node set means the lookup rides
-            // a SECOND SET — the sequential driver below WON (Example 6 has no
+            // a SECOND SET - the sequential driver below WON (Example 6 has no
             // STOP: EOF, iteration and the implicit output are the driver's).
             if (self.set_point_var != null and self.set_point_node == null) {
                 // BUG-pointsuppressesalloutput: an INPUT + line source reads
                 // records alongside (Language Reference: Concepts p.477 step 3 names INPUT a peer of
-                // the dataset readers) and its EOF ends the step (Table 20.4) —
+                // the dataset readers) and its EOF ends the step (Table 20.4) -
                 // POINT= does NOT drive here: fall through to the .lines driver,
                 // keep the automatic output, skip the repeat-stop.
                 if (self.cur_src != null and self.in_items != null) break :point;
@@ -3461,12 +3461,12 @@ pub const Executor = struct {
             // as MERGE/UPDATE do (SAS builds the PDV from all sources at
             // compile time). Without this a var living only in a ZERO-ROW
             // source (the EMPTY_* metadata idiom) never gets its CERTAIN type
-            // — the compile pass's guess wins and gen2 EG's VISITNUM landed
+            // - the compile pass's guess wins and gen2 EG's VISITNUM landed
             // char instead of numeric (BUG-setpdvschema).
             for (dss.items) |ds| {
                 for (ds.columns.items) |c| _ = try self.pdv.define(c.name, c.type);
                 // SET'd vars are retained until the next read (SAS: SET/MERGE/
-                // MODIFY/UPDATE auto-retain) — the extra-SET path already does
+                // MODIFY/UPDATE auto-retain) - the extra-SET path already does
                 // this; without it a concat/interleave source lacking a var
                 // cleared the previous source's value to missing (BUG-setvarretain).
                 for (ds.columns.items) |c| try self.retained.append(self.arena, c.name);
@@ -3474,7 +3474,7 @@ pub const Executor = struct {
             var any_in = false;
             for (invars.items) |iv| any_in = any_in or iv != null;
             var st: SetState = .{ .dss = dss.items, .in_vars = invars.items, .any_in = any_in, .slots = try self.slotsOf(dss.items) };
-            // GAP-nobsmultisrc: `set a b … nobs=n;` — SAS sets nobs= to the SUM of
+            // GAP-nobsmultisrc: `set a b … nobs=n;` - SAS sets nobs= to the SUM of
             // observations across ALL sources, known at compile time. stampObs reads
             // this; single-source stays per-source (null).
             if (self.nobs_var != null and dss.items.len > 1) {
@@ -3484,7 +3484,7 @@ pub const Executor = struct {
             }
             // `set … ; by …;` interleaves by the BY key: precompute each source's
             // BY column indices and a per-source cursor. NOTSORTED has no sorted
-            // order to interleave by — concatenate instead; applyBy's peek still
+            // order to interleave by - concatenate instead; applyBy's peek still
             // gives consecutive-group FIRST./LAST. (GAP-batch-qa107). byColsOf
             // still validates the BY vars exist on every source either way.
             if (self.by_vars) |bys| {
@@ -3500,13 +3500,13 @@ pub const Executor = struct {
             return .{ .sets = st };
         }
         // A declared line source (datalines or INFILE) + at least one INPUT
-        // drives iterations off the read cursor — already seeded above. The
+        // drives iterations off the read cursor - already seeded above. The
         // io-free path (unit tests, interpret's null io) cannot OPEN an
         // external INFILE: its source registered but read nothing, and the
-        // phantom empty source must not drive a 0-iteration .lines step —
+        // phantom empty source must not drive a 0-iteration .lines step -
         // keep the pre-multiinfile inert-.once shape there (the FILENAME
         // binding still takes effect; the read is simply unobservable
-        // without io — main.zig's mid-PROC fileref test pins this shape).
+        // without io - main.zig's mid-PROC fileref test pins this shape).
         // A datalines device, or any external file once io exists, drives.
         if (self.cur_src != null and self.in_items != null) {
             var readable = false;
@@ -3520,7 +3520,7 @@ pub const Executor = struct {
         return .{ .once = false };
     }
 
-    /// True if the SET sources still hold an observation past the current cursor —
+    /// True if the SET sources still hold an observation past the current cursor -
     /// end= is 1 exactly when the row just read was the last one (BUG-setend).
     fn setsHasMore(sd: *const SetState) bool {
         if (sd.by_cols != null) {
@@ -3539,11 +3539,11 @@ pub const Executor = struct {
     }
 
     /// INFILE END= (FEAT-infileend): publish the flag from ONE authoritative
-    /// record position — 1 when no record remains past `last_rec`
+    /// record position - 1 when no record remains past `last_rec`
     /// (BUG-infileendmultirec). Iteration-top / source-switch callers pass
     /// `li.cur` (the record the next INPUT will read); execInput passes the
-    /// record it actually consumed, so `/`, `#n` and multi-INPUT iterations —
-    /// every record-advance path — agree through this one predicate.
+    /// record it actually consumed, so `/`, `#n` and multi-INPUT iterations -
+    /// every record-advance path - agree through this one predicate.
     /// REVERT-infileendmultirec: …EXCEPT where the reference forbids the flag
     /// entirely, in which case it stays 0 forever (infileEndRestricted).
     fn setInfileEnd(self: *Executor, last_rec: usize) Error!void {
@@ -3552,7 +3552,7 @@ pub const Executor = struct {
         try self.pdv.set(ev, .{ .num = if (is_last) 1 else 0 });
     }
 
-    /// The INFILE END= cases SAS 9.4 forbids — the flag is never set to 1, and
+    /// The INFILE END= cases SAS 9.4 forbids - the flag is never set to 1, and
     /// stays at its documented 0 (p.130: "Until SAS processes the last data
     /// record, the END= variable is set to 0"). NOT an error: the volume
     /// glosses its own "Restriction" wording as a flag that stays 0.
@@ -3576,22 +3576,22 @@ pub const Executor = struct {
     ///                UNBUFFERED is in effect.
     ///
     /// So DATALINES => UNBUFFERED in effect => END= never 1, for ANY input
-    /// shape — which is why the instream test below is unconditional and does
+    /// shape - which is why the instream test below is unconditional and does
     /// not care about the INPUT at all.
     ///
     /// "Restriction … cannot be used with" means a 0 flag and not a diagnostic:
     /// the SET statement uses the IDENTICAL construction for the IDENTICAL
     /// option at printed p.332 (footer "332 Chapter 2 / …") and then spells the
-    /// consequence out — "Restriction END= cannot be used with POINT=. When
+    /// consequence out - "Restriction END= cannot be used with POINT=. When
     /// random access is used, the END= variable is never set to 1." opensas
     /// already implements THAT half the never-set way, so the tree had voted
     /// one way on SET and the other on INFILE (D-009b).
     ///
     /// This REVERSES part of a green, gated landing (e7ac8ee7,
     /// BUG-infileendmultirec) whose premise came from a QA expectation of
-    /// `TOTAL groups=2`, not from the volume. Its ENGINEERING is kept intact —
+    /// `TOTAL groups=2`, not from the volume. Its ENGINEERING is kept intact -
     /// the one-helper/one-predicate shape is exactly what makes this rule a
-    /// single guard instead of four — and only the premise is corrected.
+    /// single guard instead of four - and only the premise is corrected.
     ///
     /// D-015a checked, since this rests on an undated Restriction: the whole
     /// INFILE chapter contains NO dated feature sentence ("maintenance
@@ -3601,7 +3601,7 @@ pub const Executor = struct {
     /// ponytail: "multiple input data records" is read as a RECORD-ADVANCE
     /// (`/`, `#n`) anywhere in the step's INPUT items. Two SEPARATE
     /// single-record INPUT statements in one iteration are deliberately NOT
-    /// restricted — p.130 says "an INPUT statement that reads multiple ...
+    /// restricted - p.130 says "an INPUT statement that reads multiple ...
     /// records", singular, and each such statement reads one. That is the one
     /// sub-case the wording leaves open; upgrade here if an oracle says
     /// otherwise.
@@ -3625,7 +3625,7 @@ pub const Executor = struct {
     fn loadNext(self: *Executor, d: *Driver) Error!bool {
         // Line-source iteration-boundary housekeeping, whatever the driver
         // (BUG-setinputinert): a trailing `@` is released at the top of the
-        // step — a SET/MERGE/UPDATE step with INPUTs is a hybrid (Language Reference: Concepts
+        // step - a SET/MERGE/UPDATE step with INPUTs is a hybrid (Language Reference: Concepts
         // p.477 step 3) and must not re-read one held record every iteration.
         // A consuming INPUT already cleared flag+cursor, so a released hold
         // never double-advances (BUG-atholdhang). `@@` keeps its hold across
@@ -3653,7 +3653,7 @@ pub const Executor = struct {
                 if (self.li.eof) return false;
                 if (self.li.cur >= self.li.lines.len) {
                     // BUG-multiinfilelastwins (Language Reference: Concepts Table 20.4 row 5): the step
-                    // stops when EOF is FIRST reached on ANY of the files — but
+                    // stops when EOF is FIRST reached on ANY of the files - but
                     // an exhausted CURRENT source is not EOF while another source
                     // still holds records; the iteration may switch to it. Stop
                     // only once every source is spent.
@@ -3663,14 +3663,14 @@ pub const Executor = struct {
                     self.li.eof = true;
                     return false;
                 }
-                // INFILE END= preset BEFORE the iteration's INPUT — 1 when no
+                // INFILE END= preset BEFORE the iteration's INPUT - 1 when no
                 // record remains past the one this INPUT will read; execInput
                 // re-publishes from the post-read position (BUG-infileendmultirec).
                 try self.setInfileEnd(self.li.cur);
                 return true;
             },
             // DOWLOOP-impl: a DOW SET reads at its node (dowRead) each DO iteration,
-            // so the outer loop only GATES on remaining rows — never consume here.
+            // so the outer loop only GATES on remaining rows - never consume here.
             .sets => |*sd| {
                 if (self.dow_set != null) return setsHasMore(sd);
                 return self.setsConsume(sd);
@@ -3685,7 +3685,7 @@ pub const Executor = struct {
     /// false when the sources are spent. Shared by the top-of-loop driver and the
     /// DOW inner read (dowRead).
     fn setsConsume(self: *Executor, sd: *SetState) Error!bool {
-        // `set … by …;` — interleave the pre-sorted sources by the BY key.
+        // `set … by …;` - interleave the pre-sorted sources by the BY key.
         if (sd.by_cols) |bc| {
             const pick = (try self.pickInterleave(sd.dss, sd.cursors, bc)) orelse return false;
             // Sorted-input invariant: the emitted key sequence never goes
@@ -3697,7 +3697,7 @@ pub const Executor = struct {
             self.truncBySet(tup); // compare/store the truncated key (BUG-setbyvarlen)
             // BUG-sortseq-byverify-datastep: the ORDER arm verifies under the
             // collation the sort used (Language Reference: Concepts printed
-            // p.533 Note) — `options sortseq=linguistic;` sorts GRP into A a b
+            // p.533 Note) - `options sortseq=linguistic;` sorts GRP into A a b
             // B c, which the byte compare read as "BY variables are not
             // properly sorted", errhalt-killing every later step of a valid
             // program. The GROUP arm below stays BYTE-EXACT: fold-equal
@@ -3716,11 +3716,11 @@ pub const Executor = struct {
             try self.stampObs(sd.dss[pick]);
             sd.cursors[pick] += 1;
             try self.setInFlags(sd, pick); // in= 1 on the contributing source (BUG-setinflag)
-            // end= (BUG-setend) — the hasMore scan only pays when an end= var exists
+            // end= (BUG-setend) - the hasMore scan only pays when an end= var exists
             if (self.set_end_var != null) try self.setEndFlag(!setsHasMore(sd));
             return true;
         }
-        // plain `set a b;` — read the sources end-to-end (concatenate).
+        // plain `set a b;` - read the sources end-to-end (concatenate).
         while (sd.di < sd.dss.len) {
             const ds = sd.dss[sd.di];
             if (sd.ri < ds.rowCount()) {
@@ -3733,7 +3733,7 @@ pub const Executor = struct {
                 // BUG-modifystoptruncates: a sequential MODIFY records its
                 // overrides BY MASTER ROW, so the row this iteration is editing
                 // has to be known. Only the single-dataset MODIFY reaches
-                // setsConsume with modify_by set — its BY sibling drives off the
+                // setsConsume with modify_by set - its BY sibling drives off the
                 // transaction and never uses this driver.
                 if (self.modify_by) |md| md.cur_m = if (md.src_pos.len > 0)
                     (if (sd.ri < md.src_pos.len) md.src_pos[sd.ri] - 1 else sd.ri)
@@ -3741,7 +3741,7 @@ pub const Executor = struct {
                     sd.ri;
                 sd.ri += 1;
                 try self.setInFlags(sd, sd.di); // in= 1 on the contributing source (BUG-setinflag)
-                // 1 on the last obs (BUG-setend) — the hasMore scan only pays when an end= var exists
+                // 1 on the last obs (BUG-setend) - the hasMore scan only pays when an end= var exists
                 if (self.set_end_var != null) try self.setEndFlag(!setsHasMore(sd));
                 return true;
             }
@@ -3753,18 +3753,18 @@ pub const Executor = struct {
 
     /// Language Reference: Concepts p.562 Step 2 / p.566 Step 1: when the contributing source changes
     /// (concatenate: end-of-file of a source; interleave: a new data set OR a new
-    /// BY group) the SET variables in the PDV go back to missing — a value from
+    /// BY group) the SET variables in the PDV go back to missing - a value from
     /// one source must never bleed onto another source's rows
     /// (BUG-setsourcereset). The retained-list registration stays: SET vars ARE
     /// retained WITHIN a source, and the ExtraSet `if _n_=1 then set` case needs
-    /// it (BUG-setvarretain) — this reset narrows that retain to per-source.
+    /// it (BUG-setvarretain) - this reset narrows that retain to per-source.
     fn resetSetVars(self: *Executor, sd: *const SetState) void {
         for (sd.slots) |slots| {
             self.resetPdvSlots(slots);
         }
     }
 
-    /// Reset one source's PDV cells to missing by slot — the per-read half of
+    /// Reset one source's PDV cells to missing by slot - the per-read half of
     /// the BUG-prefixmergewipe move for MERGE/UPDATE/MODIFY (their columns are
     /// retained across the iteration top now, Language Reference: Concepts p.495 step 5, so the wipe
     /// they relied on lives at the read instead).
@@ -3778,7 +3778,7 @@ pub const Executor = struct {
     /// DOWLOOP-impl: the DOW SET's read, fired at the SET node on each DO-loop
     /// iteration. SAS 9.4: the inner SET reads the NEXT obs, and BY first./last.
     /// are computed here (so `do until(last.grp)` can terminate the group). EOF at
-    /// the inner SET ends the DATA step at once — .stop, current obs not output.
+    /// the inner SET ends the DATA step at once - .stop, current obs not output.
     fn dowRead(self: *Executor) Error!Flow {
         const d = self.driver_ptr orelse return .normal;
         switch (d.*) {
@@ -3793,7 +3793,7 @@ pub const Executor = struct {
 
     /// The BY column indices of `bys` in `ds`, or null (error reported) when a
     /// BY var is absent from the source: the absent key would read all-missing
-    /// and silently garble the match — its rows emit first with everything else
+    /// and silently garble the match - its rows emit first with everything else
     /// missing, exit 0. SAS hard-errors instead (BUG-mergebymissing /
     /// CLIN-failloud). Shared by MERGE, SET-BY interleave, and UPDATE.
     fn byColsOf(self: *Executor, ds: *Dataset, bys: []const []const u8) Error!?[]const ?usize {
@@ -3814,7 +3814,7 @@ pub const Executor = struct {
         for (names) |name| {
             if (try self.resolveDataset(name, true, null)) |ds| {
                 // a WHERE statement filters EVERY merge input, as in SAS
-                // (BUG-wheremerge: it silently read unfiltered) — applied by
+                // (BUG-wheremerge: it silently read unfiltered) - applied by
                 // resolveDataset BEFORE firstobs=/obs= (BUG-wherestmtobsorder)
                 try list.append(self.arena, ds);
                 const iv = try self.inVarOf(name);
@@ -3833,7 +3833,7 @@ pub const Executor = struct {
         // otherwise contribute no columns and lose its variables everywhere.
         for (dss) |ds| {
             for (ds.columns.items) |c| _ = try self.pdv.define(c.name, c.type);
-            // BUG-prefixmergewipe: Language Reference: Concepts p.495 step 5 — MERGE vars are NOT reset
+            // BUG-prefixmergewipe: Language Reference: Concepts p.495 step 5 - MERGE vars are NOT reset
             // to missing at the top of the iteration, so retain them like SET's;
             // the per-read reset in mergeNext keeps an absent source's columns
             // missing for the groups it doesn't contribute to.
@@ -3841,7 +3841,7 @@ pub const Executor = struct {
         }
 
         const bys = self.by_vars orelse &.{}; // no BY → one group = positional 1:1 merge
-        // SAS restriction: NOTSORTED is not valid with MERGE — a match-merge
+        // SAS restriction: NOTSORTED is not valid with MERGE - a match-merge
         // needs sorted groups. Fail loud rather than silently mis-group.
         if (self.by_notsorted and bys.len > 0) {
             self.diags.report(.err, 0, "BY NOTSORTED is not valid with the MERGE statement", .{}) catch {};
@@ -3872,7 +3872,7 @@ pub const Executor = struct {
     }
 
     // ── UPDATE ────────────────────────────────────────────────────────────
-    /// `update master trans; by k;` — build the driver. Pre-declares every column
+    /// `update master trans; by k;` - build the driver. Pre-declares every column
     /// of both sources so the output carries the master's schema (plus any new
     /// transaction columns), and precomputes the BY column indices per source.
     fn buildUpdate(self: *Executor, names: []const []const u8) Error!Driver {
@@ -3896,7 +3896,7 @@ pub const Executor = struct {
         const bys = self.by_vars orelse &.{};
         // SAS 9.4 requires BY on UPDATE (and on MODIFY with a transaction
         // dataset, which shares this driver): without it every row collapsed
-        // into one artificial group and transactions applied positionally —
+        // into one artificial group and transactions applied positionally -
         // silent-wrong output on a common user error (BUG-updatenoby).
         if (bys.len == 0) {
             self.diags.report(.err, 0, "The BY statement is required for the UPDATE statement", .{}) catch {};
@@ -3913,7 +3913,7 @@ pub const Executor = struct {
     }
 
     /// Load one UPDATE output observation. Source columns were reset to missing
-    /// at the top of this call (BUG-prefixmergewipe — the top-of-iteration reset
+    /// at the top of this call (BUG-prefixmergewipe - the top-of-iteration reset
     /// no longer wipes retained UPDATE vars, Language Reference: Concepts p.495 step 5), so a master
     /// obs is loaded whole, then matching transaction obs are applied
     /// (non-missing overwrites); a transaction-only key becomes a new obs.
@@ -3942,7 +3942,7 @@ pub const Executor = struct {
             try self.byTupleOfSet(u.trans, u.ti, u.t_by);
 
         // Sorted-input invariant, as in mergeNext/SET-BY: a backwards group key
-        // means an unsorted source — fail loud, don't silently mis-apply
+        // means an unsorted source - fail loud, don't silently mis-apply
         // transactions (BUG-setbyunsorted). The verify folds under the sort's
         // collation, like the SET arm (BUG-sortseq-byverify-datastep).
         if (u.prev_g) |pg| if (self.cmpBy(gkey, pg, io.global_sortseq_linguistic) == .lt) {
@@ -3959,7 +3959,7 @@ pub const Executor = struct {
             try self.stampObs(u.master);
             u.mi += 1;
         }
-        // (MODIFY no longer routes here — it is transaction-driven, see
+        // (MODIFY no longer routes here - it is transaction-driven, see
         // modifyNext; the no-match _DSENMR/_DSEMTR flagging lives there.)
         // Apply every transaction obs sharing this key, in order (cumulative).
         while (u.ti < u.trans.rowCount() and
@@ -3970,7 +3970,7 @@ pub const Executor = struct {
         }
 
         // first./last. BY flags (BUG-updatefirstlast): UPDATE emits ONE obs per
-        // BY group, so each obs is its group's first AND last — gated per level
+        // BY group, so each obs is its group's first AND last - gated per level
         // by where the key changes vs the neighbor groups (as mergeNext 91d30bd;
         // duplicate master keys yield equal neighbors → both flags 0, like SAS).
         const nby = u.m_by.len;
@@ -3991,7 +3991,7 @@ pub const Executor = struct {
             }
         }
         // UPDATE `end=e` (BUG-mergeupdateend): 1 when this group drained both
-        // sources — cursors sit past the last master AND last transaction row.
+        // sources - cursors sit past the last master AND last transaction row.
         if (self.set_end_var != null)
             try self.setEndFlag(u.mi >= u.master.rowCount() and u.ti >= u.trans.rowCount());
         return true;
@@ -4002,7 +4002,7 @@ pub const Executor = struct {
     fn applyTrans(self: *Executor, ds: *Dataset, row: usize) Error!void {
         for (ds.columns.items, 0..) |c, ci| {
             const v = ds.row(row)[ci];
-            // GAP-updatemode: NOMISSINGCHECK applies EVERY value — an ordinary
+            // GAP-updatemode: NOMISSINGCHECK applies EVERY value - an ordinary
             // missing overwrites the master too (special missings apply either
             // way, per isUpdateMissing's doc). Default MISSINGCHECK unchanged.
             if (self.update_nomissingcheck or !isUpdateMissing(v)) try self.pdv.set(c.name, v);
@@ -4013,12 +4013,12 @@ pub const Executor = struct {
     fn buildModify(self: *Executor, names: []const []const u8) Error!Driver {
         // a WHERE statement filters both MODIFY inputs, as UPDATE (BUG-wheremerge);
         // resolveDataset(…, true) filters BEFORE firstobs=/obs= (BUG-wherestmtobsorder).
-        // GAP-modifywherestmt: and the master's surviving positions are CAPTURED —
+        // GAP-modifywherestmt: and the master's surviving positions are CAPTURED -
         // filter-then-match (Statements ref printed p.360: "SAS selects observations
         // from each input data set before it combines them"; printed p.245: "uses
         // dynamic WHERE processing to locate the matching observation"). The
         // scan/match below reads the FILTERED copy while the commit re-emits the
-        // UNFILTERED member through src_pos — a master row the WHERE hid is never
+        // UNFILTERED member through src_pos - a master row the WHERE hid is never
         // matched AND never destroyed. Before this, `modify m t; by k; where k>1;`
         // (and its where= option twin) flushed the filtered copy: the hidden rows
         // were GONE at rc 0, the data-loss shape the rc-2 refusal guarded.
@@ -4039,20 +4039,20 @@ pub const Executor = struct {
         for (master.?.columns.items) |c| try self.retained.append(self.arena, c.name);
         for (trans.?.columns.items) |c| try self.retained.append(self.arena, c.name);
         const bys = self.by_vars orelse &.{};
-        // MODIFY with a transaction dataset requires BY (same guard UPDATE has —
+        // MODIFY with a transaction dataset requires BY (same guard UPDATE has -
         // BUG-updatenoby; message shared with the nested-source path).
         if (bys.len == 0) {
             self.diags.report(.err, 0, "The BY statement is required for the UPDATE statement", .{}) catch {};
             return .{ .once = true }; // spent driver: no iterations, no output
         }
-        // NOTE: no sorted-input requirement and no NOTSORTED rejection — "The
+        // NOTE: no sorted-input requirement and no NOTSORTED rejection - "The
         // MODIFY statement does not require sorted files" (Language Reference: Concepts p.585/p.587
         // Notes, p.588 Table 23.3); the match below is a key lookup, not a merge.
         const m_by = (try self.byColsOf(master.?, bys)) orelse return .{ .once = true }; // spent driver: no iterations, no output
         const t_by = (try self.byColsOf(trans.?, bys)) orelse return .{ .once = true }; // spent driver: no iterations, no output
         // A row-filtered master commits against the UNFILTERED member (the
         // single-dataset path's invariant): scan the filtered copy, flush the
-        // member. Positions existing at all IS the filter detector — column-only
+        // member. Positions existing at all IS the filter detector - column-only
         // options (keep=/drop=/rename=) keep today's resolved-copy commit.
         const member = self.lib.find(splitSourceRef(names[0]).name);
         const use_member = msrc != null and member != null and member.? != master.?;
@@ -4073,7 +4073,7 @@ pub const Executor = struct {
     /// Load one MODIFY-BY iteration = one TRANSACTION observation
     /// (BUG-modifybymasterdriven). A matched key loads the master obs and
     /// overlays the WHOLE transaction obs (p.596: REPLACE "replac[es] its
-    /// observation with the observation from the transaction data set" —
+    /// observation with the observation from the transaction data set" -
     /// UPDATE's MISSINGCHECK skip has no MODIFY analog); an unmatched key flags
     /// _DSENMR (first) or _DSEMTR (consecutive repeat, p.599 Table 23.4).
     fn modifyNext(self: *Executor, md: *ModifyState) Error!bool {
@@ -4081,24 +4081,24 @@ pub const Executor = struct {
             try self.modifyFlush(md);
             return false;
         }
-        // Per-read reset (moved here from the top-of-iteration loop —
+        // Per-read reset (moved here from the top-of-iteration loop -
         // BUG-prefixmergewipe): an unmatched iteration's master vars stay
         // missing, a matched one overlays master then transaction below.
         self.resetPdvSlots(md.m_slots);
         self.resetPdvSlots(md.t_slots);
         // GAP-modifywherestmt: match against the FILTERED copy when a row filter
-        // (WHERE statement / where= / obs-window) selected the master —
+        // (WHERE statement / where= / obs-window) selected the master -
         // filter-then-match, p.360/p.245; src_pos then maps a scan row back to
         // its physical master row for the commit. scan == master when unfiltered.
         const mscan = md.scan orelse md.master;
         const tt = try self.byTupleOfSet(md.trans, md.ti, md.t_by);
-        // GROUPING check — BYTE-EXACT on purpose (never folds): fold-equal
+        // GROUPING check - BYTE-EXACT on purpose (never folds): fold-equal
         // transaction keys (A vs a) are distinct MODIFY keys even though the
         // sortedness verify folds (BUG-sortseq-byverify-datastep).
         const same_key = if (md.prev_key) |pk| self.cmpBy(tt, pk, false) == .eq else false;
         // Locate the master obs. Duplicate BY values match in order (p.588 Table
         // 23.3 allows them in BOTH sources): a repeated key continues the scan
-        // past the last match; a new key scans from the top — MODIFY requires no
+        // past the last match; a new key scans from the top - MODIFY requires no
         // sorted input (p.585 Note). ponytail: O(master × transaction) worst
         // case (unsorted master); build an index only if real studies feel it.
         var found: ?usize = null;
@@ -4148,10 +4148,10 @@ pub const Executor = struct {
     }
 
     /// The rebuild-commit (opensas commits a MODIFY by re-emitting the master,
-    /// io.putInput replaces it): re-emit the master IN ORIGINAL ORDER — the obs
+    /// io.putInput replaces it): re-emit the master IN ORIGINAL ORDER - the obs
     /// the transaction-driven driver never visited go out untouched (SAS's
     /// in-place guarantee), recorded REPLACE overrides replace their row,
-    /// REMOVE tombstones drop theirs — then the OUTPUT-added rows (appends land
+    /// REMOVE tombstones drop theirs - then the OUTPUT-added rows (appends land
     /// at the END of an in-place modify). Idempotent; also called post-loop so
     /// a mid-step `stop;` still leaves a complete master.
     fn modifyFlush(self: *Executor, md: *ModifyState) Error!void {
@@ -4163,9 +4163,9 @@ pub const Executor = struct {
                 if (maybe) |row| {
                     try self.loadCapturedRow(row);
                     try self.outputAll();
-                } // null = REMOVEd — absent from the rebuilt master
+                } // null = REMOVEd - absent from the rebuilt master
             } else {
-                // untouched master obs: clear ALL iteration state first — the
+                // untouched master obs: clear ALL iteration state first - the
                 // transaction-only PDV vars must read missing, not the last
                 // transaction's stale values (in-place = byte-identical to input).
                 for (self.pdv.vars.items) |*v| v.value = missingOf(v.type);
@@ -4181,7 +4181,7 @@ pub const Executor = struct {
 
     /// MODIFY-BY REPLACE (explicit or implicit): record the current PDV as the
     /// rebuilt obs for THIS iteration's master row (cur_m). Null cur_m is
-    /// unreachable — a no-match iteration sets obs_handled at the loop top.
+    /// unreachable - a no-match iteration sets obs_handled at the loop top.
     fn modifyReplace(self: *Executor, md: *ModifyState) Error!void {
         const r = md.cur_m orelse return;
         try md.repl.put(self.arena, r, try self.capturePdvRow());
@@ -4206,22 +4206,22 @@ pub const Executor = struct {
     }
 
     /// A `where expr;` STATEMENT filters the input BEFORE the step sees rows, so
-    /// end=/first./last. reflect the FILTERED stream — real SAS engine WHERE. The
+    /// end=/first./last. reflect the FILTERED stream - real SAS engine WHERE. The
     /// old subsetting-if desugar mistimed `set … end=last; where c; if last then
     /// …` whenever the physically-last row failed the predicate: the flag row was
     /// discarded and the `if last` never ran (bit a real XPT-export
-    /// macro's SYMPUT('nb') — GAP-vtabledisk fallout). Rows are evaluated on a THROWAWAY
+    /// macro's SYMPUT('nb') - GAP-vtabledisk fallout). Rows are evaluated on a THROWAWAY
     /// PDV (io.applyWhere's where=-option pattern), never the live one. Applied
     /// to every SET/MERGE/UPDATE source that does NOT carry its own where=
     /// option (BUG-wheremerge; the option takes precedence, Language Reference: Concepts p.215).
     /// NOBS= stays the PHYSICAL count (SAS reports unfiltered).
     /// `obs_out` (GAP-modifywherestmt): each surviving row's 1-based SOURCE
     /// position, composed through any earlier filter's list exactly like
-    /// io.applyObsSlice — the MODIFY commit's filtered-row → master-row map.
+    /// io.applyObsSlice - the MODIFY commit's filtered-row → master-row map.
     fn applyWhereStmt(self: *Executor, src: *Dataset, obs_out: ?*?[]const usize) Error!*Dataset {
         const e = self.where_expr orelse return src;
         const a = self.arena;
-        // A WHERE variable must exist on the source — eval maps an unknown name
+        // A WHERE variable must exist on the source - eval maps an unknown name
         // to missing, which silently filtered EVERY row; SAS errors
         // "Variable X is not on file" (BUG-wherevar). Error reported inside;
         // the empty filtered result then emits nothing, like a missing SET file.
@@ -4234,7 +4234,7 @@ pub const Executor = struct {
         }
         var pdv = Pdv.init(a);
         // BUG-wherefunc: the PDV is throwaway, the DIAGS and CALL_FN must be the
-        // REAL ones (borrowed from the live evaluator) — a junk sink with no
+        // REAL ones (borrowed from the live evaluator) - a junk sink with no
         // dispatch made `where upcase(x)="Y"` silently misfilter: the function
         // reported "not supported" into the discarded sink and returned missing,
         // so char compares passed EVERY row and numeric compares dropped all.
@@ -4249,7 +4249,7 @@ pub const Executor = struct {
                 try pdv.set(col.name, row[j]);
             }
             // WHERE-context truthiness (Language Reference: Concepts p.216): a bare char var means
-            // non-blank — whereTruthy, NOT the IF rule (BUG-wherebarechar).
+            // non-blank - whereTruthy, NOT the IF rule (BUG-wherebarechar).
             if ((try ev.eval(e)).whereTruthy()) {
                 try out.rows.append(a, row);
                 if (obs_out) |oo| try kept_obs.append(a, if (oo.*) |l| l[ri] else ri + 1);
@@ -4260,7 +4260,7 @@ pub const Executor = struct {
     }
 
     /// Every variable a WHERE expression references must be a column of the
-    /// source dataset (BUG-wherevar) — fail loud like SAS, don't filter to zero.
+    /// source dataset (BUG-wherevar) - fail loud like SAS, don't filter to zero.
     /// Reports the error itself; false = at least one variable is not on file.
     fn checkWhereVars(self: *Executor, e: *const ast.Expr, src: *Dataset) Error!bool {
         switch (e.*) {
@@ -4286,20 +4286,20 @@ pub const Executor = struct {
     /// `where=`/`firstobs=`/`obs=` are applied by io.applyDatasetOptions.
     ///
     /// `where_first` (SET/MERGE/UPDATE drivers): DEFER the firstobs=/obs= slice,
-    /// apply the DATA-step WHERE STATEMENT, THEN slice — so positions count
+    /// apply the DATA-step WHERE STATEMENT, THEN slice - so positions count
     /// WITHIN the WHERE-selected subset (BUG-wherestmtobsorder), mirroring the
     /// where= OPTION twin (whereobsorder). Callers that pass true must NOT also
     /// call applyWhereStmt (finishResolve already did). Non-driver callers
     /// (nobs=, column seeding, MODIFY, POINT=) pass false: slice inline, no
-    /// statement filter — unchanged behavior.
+    /// statement filter - unchanged behavior.
     fn resolveDataset(self: *Executor, name: []const u8, where_first: bool, srcobs: ?*?[]const usize) Error!?*Dataset {
-        // `sashelp.vtable` — the dictionary view of the current library's members,
+        // `sashelp.vtable` - the dictionary view of the current library's members,
         // built fresh so it reflects datasets created earlier this run. Any dataset
         // options (`(where=…)`) still apply; a `where` STATEMENT is filtered by the
         // step (BUG-xptcreat-novtable).
         const ref0 = splitSourceRef(name);
         const base = ref0.name;
-        // `sashelp.vtable` / `sashelp.vcolumn` — dictionary views built fresh so they
+        // `sashelp.vtable` / `sashelp.vcolumn` - dictionary views built fresh so they
         // reflect datasets created earlier this run (ISS-dictviews). Any dataset
         // options (`(where=…)`) still apply; a `where` STATEMENT is filtered by the
         // step (BUG-xptcreat-novtable).
@@ -4323,7 +4323,7 @@ pub const Executor = struct {
         if (ref0.opts.len == 0) {
             const ds = self.lib.find(name) orelse return null;
             // No per-dataset options: the global `options obs=/firstobs=` still
-            // bound the read (BUG-globalobs). Slice a COPY — the library dataset
+            // bound the read (BUG-globalobs). Slice a COPY - the library dataset
             // must stay whole for later reads.
             if (!io.globalObsActive()) return self.stampPhys(try self.finishResolve(ds, &.{}, where_first, srcobs), ds.rowCount());
             const copy = try self.arena.create(Dataset);
@@ -4354,20 +4354,20 @@ pub const Executor = struct {
     /// The POINT= direct-access source (BUG-pointnobsbase): the PHYSICAL
     /// dataset, unsliced. NOBS= is the physical descriptor count (BUG-pointnobs,
     /// doc-finder-tick283 F2: FIRSTOBS=/OBS=/WHERE window the READ, not the
-    /// descriptor), and POINT= is documented absolute direct access — so the two
+    /// descriptor), and POINT= is documented absolute direct access - so the two
     /// must share the PHYSICAL base, or the canonical `do i=1 to n; set d
     /// point=i nobs=n;` loop contradicts itself inside one step (NOBS= said 5,
     /// the range check said "has 2 observations", and the out-of-range ERROR
-    /// killed the run — `options obs=N;` at the top killed every POINT= loop).
+    /// killed the run - `options obs=N;` at the top killed every POINT= loop).
     /// obs=/firstobs= (and global `options obs=`) window a SEQUENTIAL read
     /// only; they do not apply to direct access. where= never reaches here:
-    /// buildDriver's guard rejects it loud (BUG-pointwheredsopt — Statements
+    /// buildDriver's guard rejects it loud (BUG-pointwheredsopt - Statements
     /// ref p.335 forbids WHERE= with POINT= outright); the token drop below
     /// stays as belt-and-braces, identical to obs=/firstobs=. Column options
     /// (keep=/drop=/rename=) still apply to the copy that is read.
     fn resolvePointSource(self: *Executor, name: []const u8) Error!?*Dataset {
         if (std.mem.indexOfScalar(u8, name, '(') == null) {
-            // dictionary views are built, not library-found — keep the general path
+            // dictionary views are built, not library-found - keep the general path
             if (std.ascii.eqlIgnoreCase(name, "sashelp.vtable") or std.ascii.eqlIgnoreCase(name, "sashelp.vcolumn"))
                 return self.resolveDataset(name, false, null);
             return self.lib.find(name);
@@ -4379,7 +4379,7 @@ pub const Executor = struct {
         const src = self.lib.find(base) orelse return null;
         const toks = self.lexOpts(ref.opts) catch |e|
             return if (e == error.OutOfMemory) error.OutOfMemory else src;
-        // Drop the row-windowing options from the list — they must not slice the
+        // Drop the row-windowing options from the list - they must not slice the
         // direct-access read. keep=/drop=/rename= stay. skip_obs_slice=true
         // covers the global `options obs=/firstobs=` defaults.
         var kept: std.ArrayList(lex.Token) = .empty;
@@ -4389,14 +4389,14 @@ pub const Executor = struct {
                 (eqi(toks[i].text, "where") or eqi(toks[i].text, "obs") or eqi(toks[i].text, "firstobs")))
             {
                 i += 2;
-                if (i < toks.len and toks[i].tag == .lparen) { // where=(expr) — skip the balanced group
+                if (i < toks.len and toks[i].tag == .lparen) { // where=(expr) - skip the balanced group
                     var depth: usize = 1;
                     i += 1;
                     while (i < toks.len and depth > 0) : (i += 1) {
                         if (toks[i].tag == .lparen) depth += 1;
                         if (toks[i].tag == .rparen) depth -= 1;
                     }
-                } else i += 1; // obs=N / firstobs=N — a single value token
+                } else i += 1; // obs=N / firstobs=N - a single value token
                 continue;
             }
             try kept.append(self.arena, toks[i]);
@@ -4412,7 +4412,7 @@ pub const Executor = struct {
     }
 
     /// NOBS= count of a resolved source: the PHYSICAL pre-slice count when
-    /// resolveDataset recorded one (BUG-pointnobs — FIRSTOBS=/OBS= window the
+    /// resolveDataset recorded one (BUG-pointnobs - FIRSTOBS=/OBS= window the
     /// READ, they do not shrink the descriptor-level NOBS=), else rowCount.
     fn physNobs(self: *Executor, ds: *const Dataset) usize {
         return self.nobs_phys.get(ds) orelse ds.rowCount();
@@ -4421,7 +4421,7 @@ pub const Executor = struct {
     /// The where-then-slice tail of resolveDataset (BUG-wherestmtobsorder). When
     /// `where_first`, the firstobs=/obs= slice was deferred: apply the WHERE
     /// STATEMENT, then the slice, so positions count WITHIN the filtered subset.
-    /// `opt_toks` carry the firstobs=/obs= tokens (empty for a plain name — the
+    /// `opt_toks` carry the firstobs=/obs= tokens (empty for a plain name - the
     /// global range still applies). applyWhereStmt returns a fresh copy when a
     /// WHERE is in effect, so slicing it never touches the library dataset.
     fn finishResolve(self: *Executor, ds: *Dataset, opt_toks: []const lex.Token, where_first: bool, srcobs: ?*?[]const usize) Error!*Dataset {
@@ -4430,7 +4430,7 @@ pub const Executor = struct {
         // statement and a WHERE= data set option apply to the same data set,
         // the data set option takes precedence." A source carrying its own
         // top-level where= IGNORES the WHERE statement (which still filters
-        // the step's other sources) — opensas used to AND the two.
+        // the step's other sources) - opensas used to AND the two.
         const filtered = if (toksHaveWhereOpt(opt_toks)) ds else try self.applyWhereStmt(ds, srcobs);
         // BUG-modifywhereopt: this used to pass `null` and DISCARD the surviving
         // positions, so the mapping stopped composing the moment a WHERE statement
@@ -4453,7 +4453,7 @@ pub const Executor = struct {
         return (try self.optPresent(name, &.{"where"})) != null;
     }
 
-    /// True when the lexed option list carries a top-level `where=` — the same
+    /// True when the lexed option list carries a top-level `where=` - the same
     /// depth rule as optPresent (a `rename=(where=x)` one level down does NOT
     /// count), but over tokens the caller already lexed.
     fn toksHaveWhereOpt(toks: []const lex.Token) bool {
@@ -4470,8 +4470,8 @@ pub const Executor = struct {
     }
 
     /// The first of `wanted` present as a TOP-LEVEL `opt=` in the source's encoded
-    /// options, or null. One scanner for both askers — the POINT=/WHERE= legality
-    /// guard above and the MODIFY row-subset refusal below — so "top level" cannot
+    /// options, or null. One scanner for both askers - the POINT=/WHERE= legality
+    /// guard above and the MODIFY row-subset refusal below - so "top level" cannot
     /// come to mean two different things (BUG-modifymasteroptname).
     fn optPresent(self: *Executor, name: []const u8, wanted: []const []const u8) Error!?[]const u8 {
         const ref = splitSourceRef(name);
@@ -4507,7 +4507,7 @@ pub const Executor = struct {
     /// Emit one merged observation; false when every source is spent.
     fn mergeNext(self: *Executor, md: *MergeState) Error!bool {
         if (md.dss.len == 0) return false;
-        // Per-read reset (moved here from the top-of-iteration loop —
+        // Per-read reset (moved here from the top-of-iteration loop -
         // BUG-prefixmergewipe, Language Reference: Concepts p.495 step 5 keeps MERGE vars retained
         // across the iteration top): a source absent from this group loads
         // nothing below, so its columns stay missing exactly as before.
@@ -4538,7 +4538,7 @@ pub const Executor = struct {
             }
 
             // Sorted-input invariant: each group's BY key is >= the previous group's.
-            // If it went backwards, a source is out of order — SAS errors "BY variables
+            // If it went backwards, a source is out of order - SAS errors "BY variables
             // are not properly sorted" rather than silently dropping the out-of-order
             // rows (which `if a and b` then filters away). Fail loud, don't truncate
             // (BUG-mergeunsorted / CLIN-failloud). The verify folds under the
@@ -4595,13 +4595,13 @@ pub const Executor = struct {
         // LAST row in merge order, so a common var kept the stale value (e.g.
         // visitdy=22 held from the short source instead of `.` from the live one).
         // Fix: load exhausted sources' last row FIRST, then live sources at `iter`
-        // — live values overwrite common columns; a column UNIQUE to an exhausted
+        // - live values overwrite common columns; a column UNIQUE to an exhausted
         // source survives (nothing live rewrites it). Sources absent from the group
         // (count==0) load nothing and the per-read reset above leaves them missing.
         //
         // BUT only for a match-merge (nby>0). A one-to-one merge with NO BY
         // collapses everything into one group, so an exhausted short source would
-        // hold its LAST row across the tail — wrong: Language Reference: Concepts p.110 says a no-BY merge
+        // hold its LAST row across the tail - wrong: Language Reference: Concepts p.110 says a no-BY merge
         // source, once exhausted, has its vars go MISSING (BUG-mergenobymissing).
         // The per-iter reset already left them missing, so just skip the hold.
         if (nby > 0) for (md.dss, 0..) |_, d| {
@@ -4624,7 +4624,7 @@ pub const Executor = struct {
             if (d < md.in_vars.len) if (md.in_vars[d]) |iv|
                 try self.pdv.set(iv, .{ .num = in_flag });
         }
-        // first./last. BY flags — MERGE emits one obs per group iteration, so
+        // first./last. BY flags - MERGE emits one obs per group iteration, so
         // "first" is the group's first iteration and "last" its final one, gated
         // per level by where the key changed vs the neighbor groups
         // (BUG-mergefirstlast; SET has its own peek-based applyBy).
@@ -4636,7 +4636,7 @@ pub const Executor = struct {
                 try self.pdv.set(self.last_names[k], .{ .num = if (is_last and k >= md.last_level) 1 else 0 });
             }
         }
-        // MERGE `end=e` (BUG-mergeupdateend): 1 on the last obs the merge emits —
+        // MERGE `end=e` (BUG-mergeupdateend): 1 on the last obs the merge emits -
         // the final iteration of the final BY group (no rows past any group end).
         if (self.set_end_var != null) {
             var more = md.iter + 1 < md.iters;
@@ -4659,19 +4659,19 @@ pub const Executor = struct {
     /// pops it (an unmatched RETURN is the ordinary "output + top of step"). Since
     /// DO/IF bodies are inlined into the one op stream, a label at any nesting
     /// depth is reachable and a LINK return lands on the op right after the call
-    /// site — even mid-loop (BUG-controlflownesting). Other flows (DELETE/STOP/…)
+    /// site - even mid-loop (BUG-controlflownesting). Other flows (DELETE/STOP/…)
     /// propagate to the iteration loop.
-    /// Run the flattened op stream over [first, end) — the whole stream in an
+    /// Run the flattened op stream over [first, end) - the whole stream in an
     /// unsplit step, or one half of the BUG-setstmtorder split around the
     /// driving read. Leaving the range at the stack's BASE depth means a GOTO
-    /// jumped OUT of the range, crossing the driving read statement — SAS would
+    /// jumped OUT of the range, crossing the driving read statement - SAS would
     /// skip or re-run the read, which the per-iteration split cannot model. Fail
     /// LOUD (D-002) instead of silently dropping the jump target. A LINK is
     /// exempt (BUG-linkacrossset): it always RETURNs to the statement after the
     /// LINK (Language Reference: Concepts p.485 Table 20.3), so the read still executes exactly once,
-    /// in order — the depth > base detour below runs the subroutine wherever
+    /// in order - the depth > base detour below runs the subroutine wherever
     /// its label sits and only a pop may bring control back into the range (any
-    /// other re-entry is a fall-through INTO the read — unmoldable, fail loud).
+    /// other re-entry is a fall-through INTO the read - unmoldable, fail loud).
     fn runProgramRange(self: *Executor, first: usize, end: usize) Error!Flow {
         const ops = self.ops;
         var pc: usize = first;
@@ -4680,8 +4680,8 @@ pub const Executor = struct {
         var on_detour = false;
         while (true) {
             // NOTE-linkimplicitreturn: falling off the END of the op stream is
-            // the step's implied RETURN — "Every DATA step has an implied
-            // RETURN as its last executable statement" (Statements p.325) —
+            // the step's implied RETURN - "Every DATA step has an implied
+            // RETURN as its last executable statement" (Statements p.325) -
             // and a RETURN after a LINK pops back to the statement following
             // the LINK (p.116, p.222; Language Reference: Concepts p.485 Table 20.3), it does NOT
             // end the iteration. Only a stack at base ends the range.
@@ -4699,11 +4699,11 @@ pub const Executor = struct {
             const in_range = pc >= first and pc < end;
             if (!in_range) {
                 if (self.link_stack.items.len == base) break; // range done, or a GOTO crossed the read
-                on_detour = true; // LINK detour into the other half — safe, it RETURNs
+                on_detour = true; // LINK detour into the other half - safe, it RETURNs
             } else if (on_detour) {
                 if (self.link_stack.items.len == base) {
                     on_detour = false; // the subroutine RETURNed all the way back
-                } else break; // fell INTO the range mid-subroutine (towards the read) — fail loud
+                } else break; // fell INTO the range mid-subroutine (towards the read) - fail loud
             }
             switch (ops[pc]) {
                 .stmt => |s| {
@@ -4729,7 +4729,7 @@ pub const Executor = struct {
                     const start = toF64(try self.ev.eval(e.start));
                     const stop = toF64(try self.ev.eval(e.stop));
                     const step = if (e.by) |by| toF64(try self.ev.eval(by)) else 1;
-                    // BUG-doByZero: BY 0 would loop forever — SAS ERRORs, not a
+                    // BUG-doByZero: BY 0 would loop forever - SAS ERRORs, not a
                     // silent 0-iteration skip. A genuinely MISSING bound stays on
                     // the note path below (NaN never == 0).
                     if (step == 0) {
@@ -4771,7 +4771,7 @@ pub const Executor = struct {
             }
         }
         if (pc != end) {
-            diag.markGap(); // a GOTO over the driving source is valid SAS — our gap, rc 2
+            diag.markGap(); // a GOTO over the driving source is valid SAS - our gap, rc 2
             self.diags.report(.err, 0, "a GOTO/LINK transfer crosses the driving SET/MERGE/UPDATE/MODIFY statement, which is not supported", .{}) catch {};
             return error.ExecError;
         }
@@ -4780,12 +4780,12 @@ pub const Executor = struct {
 
     /// Compile the step body to the flat op stream (self.ops), resolving every
     /// GOTO/LINK target against the FULL label table (any nesting depth). An
-    /// undefined target is a compile-time ERROR (F3 fail-loud) — reported here;
+    /// undefined target is a compile-time ERROR (F3 fail-loud) - reported here;
     /// run() gates on hasStepErrors() so the step never executes.
     fn compileProgram(self: *Executor, program: []const ast.Stmt) Error!void {
         var c: OpCompiler = .{ .a = self.arena };
         // Inline of compileStmts: compiling the driver statement records the op
-        // index the iteration splits at (BUG-setstmtorder) — the ops BEFORE it
+        // index the iteration splits at (BUG-setstmtorder) - the ops BEFORE it
         // are the pre-read prefix, its own op onward the post-read suffix.
         for (program) |*s| {
             if (self.driver_stmt) |ds| if (s == ds) {
@@ -4794,7 +4794,7 @@ pub const Executor = struct {
             try c.compileStmt(s);
         }
         // BUG-leavecontinueopen: LEAVE/CONTINUE in open code is a SAS compile-time
-        // ERROR (728-185) — the step must NOT run with the statements after it
+        // ERROR (728-185) - the step must NOT run with the statements after it
         // silently dropped. Reported like an undefined label: the hasStepErrors()
         // gate in run() halts before a single observation is written.
         if (c.stray_lc) |kw|
@@ -4822,10 +4822,10 @@ pub const Executor = struct {
     }
 
     /// Apply each collected variable attribute to its PDV var, once the var
-    /// exists. Set-only (never defines) so column order — SAS's source-appearance
-    /// order — is untouched. The fmt's leading byte tags the kind: \x00 label,
+    /// exists. Set-only (never defines) so column order - SAS's source-appearance
+    /// order - is untouched. The fmt's leading byte tags the kind: \x00 label,
     /// \x01 informat, else a display format.
-    /// Stamp collected attributes onto the PDV — but only when a new variable has
+    /// Stamp collected attributes onto the PDV - but only when a new variable has
     /// been defined since the last run (re-stamping is idempotent). Called before
     /// every statement, so the guard is what keeps a big deep-nested step from
     /// re-scanning attrs×vars per statement (BUG-xohang).
@@ -4851,12 +4851,12 @@ pub const Executor = struct {
         switch (s.*) {
             .assign => |a| {
                 // A combinatorics FUNCTION form (rc = allcomb(...)) mutates its variable
-                // args like the CALL routine and returns a status — handle it before the
+                // args like the CALL routine and returns a status - handle it before the
                 // plain value assignment (Phase-F-final).
                 if (!(a.value.* == .call and try self.runCombFunc(a.target, a.value.call))) {
                     try self.pdv.set(a.target, try self.ev.eval(a.value));
                     // GH#27 (EPIC-charfixedwidth-slice1): a BARE char-literal RHS fixes
-                    // an undeclared target's width — AFTER the store, so pdv.set's
+                    // an undeclared target's width - AFTER the store, so pdv.set's
                     // define has settled the type (a numeric target stays un-stamped).
                     // The literal itself always fits its own width; every LATER store
                     // then truncates at it (setAt), the SAS compile-time rule. The
@@ -4886,7 +4886,7 @@ pub const Executor = struct {
             .hash_decl => |d| try self.hashDeclare(d),
             .hash_op => |op| try self.hashOp(op),
             .call_ => |c| try self.runCall(c),
-            .null_stmt => return .normal, // the SAS null statement `;` — no-op (PARSE-nullstmt)
+            .null_stmt => return .normal, // the SAS null statement `;` - no-op (PARSE-nullstmt)
             .where_ => return .normal, // consumed at compile time (scan → driver filter)
             .delete => return .deleted, // drop the current obs, return to top of step
             .stop => return .stop, // terminate the DATA step
@@ -4895,13 +4895,13 @@ pub const Executor = struct {
             .continue_ => return .continue_, // skip to the next DO-loop iteration
             .leave => return .leave, // exit the enclosing DO loop
             // Reached only when a selector SELECT falls through every WHEN and has no
-            // OTHERWISE. SAS errors and stops the step here (BUG-selectnomatch) — a
+            // OTHERWISE. SAS errors and stops the step here (BUG-selectnomatch) - a
             // silently-skipped no-match hides a mis-valued selector.
             .select_nomatch => {
                 self.diags.report(.err, 0, "no WHEN condition was satisfied and there is no OTHERWISE statement in the SELECT group", .{}) catch {};
                 return error.ExecError;
             },
-            .label => {}, // a GOTO/LINK target marker — inert when reached in sequence
+            .label => {}, // a GOTO/LINK target marker - inert when reached in sequence
             .goto => |lbl| {
                 self.pending_label = lbl;
                 return .goto_;
@@ -4910,13 +4910,13 @@ pub const Executor = struct {
                 self.pending_label = lbl;
                 return .link_;
             },
-            // `set ds point=i;` is EXECUTABLE — it direct-reads obs `i` here each time
+            // `set ds point=i;` is EXECUTABLE - it direct-reads obs `i` here each time
             // it is reached (BUG-setpoint). An EXTRA SET (MULTISET-impl: a 2nd or a
             // conditional SET) is also executable, reading via its own cursor. The
             // driver SET (the loop's first) is driver-based and stays inert.
             .set => {
                 // GAP-secondsetstmt: the POINT= read fires only at the node that
-                // CARRIES the option — null set_point_node is the driver list's
+                // CARRIES the option - null set_point_node is the driver list's
                 // own SET (POINT=-only step / MERGE-side lookup); a second-SET
                 // lookup (p.341 Example 6) reads at its OWN node, and the
                 // sequential driver SET beside it stays inert here (loadNext
@@ -4926,28 +4926,28 @@ pub const Executor = struct {
                     if (self.set_point_dss.len > 0) {
                         // BUG-pointredefinesnobs: the addressable range is the
                         // CONCATENATION of every listed source, so the bound is
-                        // their total — obs a.n+1 is b's first, not out of range.
+                        // their total - obs a.n+1 is b's first, not out of range.
                         var total: usize = 0;
                         for (self.set_point_dss) |d| total += d.rowCount();
                         const i = toF64(self.pdv.get(pv) orelse Value.missing); // 1-based obs number
                         // NOTE-pointoorhard: a missing/out-of-range POINT= must NOT halt
                         // the step. Statements Ref SET POINT=: "If SAS reads an invalid
                         // value of the POINT= variable, it sets the automatic variable
-                        // _ERROR_ to 1" — and its CONTINUOUS-LOOP caution only makes
+                        // _ERROR_ to 1" - and its CONTINUOUS-LOOP caution only makes
                         // sense if the step CONTINUES past the invalid value; Language Reference: Concepts
                         // p.488's documented idiom (`if _error_ then stop;`) is the user
                         // side of exactly that contract. So: _ERROR_=1, a loud NOTE, and
-                        // the iteration runs on to the user's guard. (The old ERRHALT —
-                        // e1d73fbf BUG-pointnobs, "halt like the array-OOR paths" — made
+                        // the iteration runs on to the user's guard. (The old ERRHALT -
+                        // e1d73fbf BUG-pointnobs, "halt like the array-OOR paths" - made
                         // the idiom unrunnable: rc 1 and the ERROR errhalt-poisoned every
                         // later step, suppressing the following PROC PRINT.)
                         // ponytail: three residuals are oracle-blocked; picked defensibly:
-                        //   class = NOTE (not ERROR) — the doc says only "sets _ERROR_ to
+                        //   class = NOTE (not ERROR) - the doc says only "sets _ERROR_ to
                         //     1"; an ERROR would fail the exit code and errhalt-poison
                         //     later steps, which is the very halt behaviour being removed.
-                        //   rc/SYSERR = 0 — a NOTE sets neither; the step ends via the
+                        //   rc/SYSERR = 0 - a NOTE sets neither; the step ends via the
                         //     user's own STOP/loop, not via the invalid read.
-                        //   stale PDV = re-output as coded — SET vars are retained and no
+                        //   stale PDV = re-output as coded - SET vars are retained and no
                         //     read happened, so an explicit OUTPUT writes the retained
                         //     values with _ERROR_=1 set (loud); suppressing it would
                         //     diverge from generic OUTPUT semantics.
@@ -4966,7 +4966,7 @@ pub const Executor = struct {
                             // iteration ends the step like STOP (current obs not
                             // output); a re-read WITHIN one iteration (a DO loop
                             // reading one obs twice) is fine. Both this and the
-                            // re-arm apply only when POINT= DRIVES — alongside a
+                            // re-arm apply only when POINT= DRIVES - alongside a
                             // MERGE/UPDATE/INPUT driver a re-read is an ordinary
                             // repeated lookup and the driver, not the read, ends the
                             // step (BUG-pointmergelookup).
@@ -4979,7 +4979,7 @@ pub const Executor = struct {
                                 // FAILED read (the NOTE arm above) does NOT re-arm: a
                                 // bare `set d point=_n_;` with no STOP then terminates
                                 // at the first invalid read instead of spinning NOTEs
-                                // forever — the deliberate bound DEC-pointrepeatstop
+                                // forever - the deliberate bound DEC-pointrepeatstop
                                 // already applies to no-progress re-reads, extended to
                                 // no-progress invalid reads (SAS's own answer is the
                                 // documented continuous-loop CAUTION: use STOP).
@@ -5012,7 +5012,7 @@ pub const Executor = struct {
             .infile => try self.selectInfileStmt(s),
             // declaratives: consumed by `scan`, inert at run time
             .drop, .keep, .rename, .retain, .merge, .by, .array, .datalines, .format, .informat, .file => {},
-            // UPDATE/MODIFY parse today; their exec semantics are dev2's — this
+            // UPDATE/MODIFY parse today; their exec semantics are dev2's - this
             // inert stub only keeps the exhaustive switch compiling (G-update).
             .update, .modify => {},
         }
@@ -5023,7 +5023,7 @@ pub const Executor = struct {
     /// and ends the step like STOP (current obs not output). ABEND [n] /
     /// RETURN n / bare n additionally kill the SESSION: g_abort_rc carries the
     /// exit code to main, and the ERROR diagnostic poisons every later step
-    /// (syntax-check mode, BUG-errhalt) — no downstream DATA/PROC runs.
+    /// (syntax-check mode, BUG-errhalt) - no downstream DATA/PROC runs.
     fn runAbort(self: *Executor, arg: ast.AbortArg) Error!Flow {
         try self.pdv.set("_error_", .{ .num = 1 });
         const rc: u8 = switch (arg) {
@@ -5044,14 +5044,14 @@ pub const Executor = struct {
     /// (contains no local macro variables), usually CALL SYMPUT creates the
     /// variable in the closest nonempty symbol table."
     ///
-    /// The scope lives in macro.zig (this store has none — see `Library.macro_vars`),
+    /// The scope lives in macro.zig (this store has none - see `Library.macro_vars`),
     /// so ask it first: `symputLocal` files the variable in the owning macro frame
     /// and reports true, and the flat store must then NOT get a copy or a later
     /// step would resurrect the dead local through `bindStepVars`. False = no
     /// nonempty local table (open code, or a parameter-less macro whose frame is
-    /// empty — the doc's ENV3) → global, i.e. exactly the previous behaviour.
+    /// empty - the doc's ENV3) → global, i.e. exactly the previous behaviour.
     /// Routed here rather than inside `setMacroVar`, which is shared with PROC SQL's
-    /// `INTO :mvar` and the SQLOBS/SQLRC automatics — the p.77 rule is about CALL
+    /// `INTO :mvar` and the SQLOBS/SQLRC automatics - the p.77 rule is about CALL
     /// SYMPUT only, and quietly rescoping SELECT INTO would be an invented semantic.
     fn setSymput(self: *Executor, name: []const u8, val: []const u8, tab: @import("macro.zig").SymTab) Error!void {
         if (try @import("macro.zig").symputLocal(name, val, tab)) return;
@@ -5060,14 +5060,14 @@ pub const Executor = struct {
 
     /// CALL SYMPUTX's third argument, `symbol-table` (BUG-symputxsymtab). SAS 9.4
     /// Macro Language: Reference, Fifth Edition, printed p.307:
-    ///   G — "stored in the global symbol table, even if a local symbol table exists"
-    ///   L — "the most local symbol table that exists… If a local symbol table
+    ///   G - "stored in the global symbol table, even if a local symbol table exists"
+    ///   L - "the most local symbol table that exists… If a local symbol table
     ///        does not exist… the global symbol table"
-    ///   F — the DEFAULT: "if the macro variable exists in any symbol table, CALL
+    ///   F - the DEFAULT: "if the macro variable exists in any symbol table, CALL
     ///        SYMPUTX uses the version in the most local symbol table in which it
     ///        exists. If the macro variable does not exist, CALL SYMPUTX stores
     ///        the variable in the most local symbol table that it finds."
-    /// It was parsed and DISCARDED with no diagnostic — a silent no-op, which
+    /// It was parsed and DISCARDED with no diagnostic - a silent no-op, which
     /// D-002 forbids outright. Absent (or absent-third-arg CALL SYMPUT) = F.
     /// Anything outside G/L/F is a LOUD user error (rc 1), never a silent
     /// fallback to the default: guessing there is how a `'g'` typo'd to `'q'`
@@ -5092,14 +5092,14 @@ pub const Executor = struct {
     /// SCAN, CATS/CATT/CATX, SORTN/SORTC/SORT, LABEL, STDIZE, the RAN*/perm/comb
     /// family, the PRX* family (PRXCHANGE/NEXT/POSN/SUBSTR/FREE), elementwise
     /// TANH/LOGISTIC/SOFTMAX, VNAME/VNEXT, and IS8601_CONVERT. An UNIMPLEMENTED
-    /// routine is a hard ERROR (fail loud), never a silent no-op — a dropped
+    /// routine is a hard ERROR (fail loud), never a silent no-op - a dropped
     /// mutation in a clinical pipeline is the worst failure class (CLIN-failloud).
-    /// ponytail: CALL COMPRESS is NOT wired — its SAS signature (mutate-arg-1 vs
+    /// ponytail: CALL COMPRESS is NOT wired - its SAS signature (mutate-arg-1 vs
     /// result-var) is ambiguous enough that guessing risks silent-wrong output, so
     /// it stays fail-loud until a program pins the exact form.
     fn runCall(self: *Executor, c_in: ast.Call) Error!void {
-        // BUG-callrefarray: an array-element argument `a{i}` — and `of a{*}`, which
-        // the parser expands to `a{1}..a{n}` — reaches here as an `.array_ref` Expr,
+        // BUG-callrefarray: an array-element argument `a{i}` - and `of a{*}`, which
+        // the parser expands to `a{1}..a{n}` - reaches here as an `.array_ref` Expr,
         // which the by-reference handlers (they write back only through `.variable`)
         // treat as read-only. Resolve each to its underlying element VARIABLE first,
         // so the routine's mutation lands in the array slot.
@@ -5137,7 +5137,7 @@ pub const Executor = struct {
             };
             return;
         }
-        // CALL SYMPUT('name', value) / SYMPUTX — write a macro variable from the
+        // CALL SYMPUT('name', value) / SYMPUTX - write a macro variable from the
         // DATA step. SYMPUTX strips leading/trailing blanks from name and value.
         if (eqi(c.name, "symput") or eqi(c.name, "symputx")) {
             if (c.args.len >= 2) {
@@ -5145,7 +5145,7 @@ pub const Executor = struct {
                 if (eqi(c.name, "symputx")) {
                     // SYMPUTX numeric converts via BEST32. (BUG-symputxwidth):
                     // BEST12. loses precision/E-notation past 12 sig digits.
-                    // `{d}` prints shortest round-trip digits — what SAS's
+                    // `{d}` prints shortest round-trip digits - what SAS's
                     // BEST32. shows (bestNumW(32) over-pads to the width,
                     // e.g. pi → 3.1415926535897896). Missings/overflow keep
                     // bestNumW's '.'-letter rendering.
@@ -5179,7 +5179,7 @@ pub const Executor = struct {
                         },
                     };
                     // CALL SYMPUT has NO symbol-table argument (printed p.301
-                    // gives it exactly two) — a third one was silently dropped.
+                    // gives it exactly two) - a third one was silently dropped.
                     if (c.args.len >= 3)
                         return self.diags.fail(error.ExecError, 0, "CALL SYMPUT takes two arguments; the symbol-table argument belongs to CALL SYMPUTX", .{});
                     try self.setSymput(std.mem.trimEnd(u8, nm, " "), val, .default);
@@ -5187,14 +5187,14 @@ pub const Executor = struct {
             }
             return;
         }
-        // CALL EXECUTE('program text') — macro-process the text NOW, then queue
+        // CALL EXECUTE('program text') - macro-process the text NOW, then queue
         // the SAS statements it generated to run AFTER this step finishes. The
         // step driver is main.zig's runExpanded, unreachable from here
         // (circular import), so we append to the library queue and main drains
         // it FIFO (FEAT-callexecute). Non-char argument and %nrstr-style macro
         // quoting fail LOUD (D-002).
         //
-        // GH#13 GAP-callexecutemacro — THE TWO TIMINGS. Macro Language:
+        // GH#13 GAP-callexecutemacro - THE TWO TIMINGS. Macro Language:
         // Reference printed p.123, "CALL EXECUTE Routine Timing Details": "if
         // CALL EXECUTE produces macro language elements, those elements execute
         // immediately. If CALL EXECUTE produces SAS language statements, or if
@@ -5204,10 +5204,10 @@ pub const Executor = struct {
         // "immediately" half: a %LET in the text is visible to a later SYMGET
         // in this same step), and only its OUTPUT is queued (the "after the end
         // of the step" half). It used to queue the raw argument verbatim, so
-        // `call execute('%rep(1)')` reached the lexer as a bare `%` —
+        // `call execute('%rep(1)')` reached the lexer as a bare `%` -
         // `unexpected character '%'`, rc 1, the whole run dead.
         // ponytail: the queue drain lexes, it does NOT macro-process, which is
-        // why the expansion has to happen here rather than there — and also why
+        // why the expansion has to happen here rather than there - and also why
         // %nrstr (whose whole point is deferring resolution PAST the queue)
         // stays an rc-2 gap below rather than riding this path.
         if (eqi(c.name, "execute")) {
@@ -5217,7 +5217,7 @@ pub const Executor = struct {
             } else null;
             if (text == null) {
                 // AUDIT-errhaltclass: HALT for the same reason as the %nrstr arm
-                // below — no continuing-class reading exists (a routine that
+                // below - no continuing-class reading exists (a routine that
                 // queues a program has no value to make missing), so it takes
                 // Language Reference: Concepts printed p.174-175's "stopped processing this step" +
                 // "was not replaced". Pre-fix the step ran every row and replaced
@@ -5227,8 +5227,8 @@ pub const Executor = struct {
                 // and this arm is deliberately left erroring rather than
                 // converted. Two readings survive the volume. Macro Language:
                 // Reference printed p.296 lists only CHARACTER forms for
-                // `argument`, but CALL SYMPUT — its sibling in the same chapter,
-                // printed p.306 — auto-converts a numeric expression to character
+                // `argument`, but CALL SYMPUT - its sibling in the same chapter,
+                // printed p.306 - auto-converts a numeric expression to character
                 // "and writes a message in the log", and the Functions Reference
                 // entry (printed p.303) carries the generic CALL-routine note
                 // "All argument types must be CHAR, VARCHAR, or NUMERIC. If the
@@ -5236,23 +5236,23 @@ pub const Executor = struct {
                 // may well queue "42" rather than error. Converting to a halt is
                 // safe REGARDLESS: report(.err) already errhalt-kills the rest of
                 // the run, so this only stops a bogus member being written. But
-                // whether it should be an ERROR at all is ORACLE-callexecutenum —
+                // whether it should be an ERROR at all is ORACLE-callexecutenum -
                 // one live-SAS run of `call execute(1);`. If SAS converts, this
                 // whole arm becomes a num->char conversion + NOTE, not a halt.
                 //
                 // Note this arm also fires on wrong ARITY (0 or 2+ args), which
-                // no conversion reading can rescue — that half is unambiguous.
+                // no conversion reading can rescue - that half is unambiguous.
                 return self.diags.fail(error.ExecError, 0, "CALL EXECUTE requires a single character argument", .{});
             }
             if (hasMacroQuoting(text.?)) {
                 // AUDIT-errhaltclass: HALT, do not report-and-run-on. This arm is
                 // an UNSUPPORTED-FEATURE refusal, and %nrstr here is not a user
-                // mistake — Macro Language: Reference printed p.296 TIPs this exact
+                // mistake - Macro Language: Reference printed p.296 TIPs this exact
                 // call as the documented workaround ("call execute('%nrstr(%sales('
                 // ||month||'))');"). We still cannot honour it, so CLAUDE.md's "an
                 // unsupported feature must error visibly, NEVER no-op" governs: a
                 // loud ERROR the step then ignores is still a no-op. There is no
-                // continuing-class reading — Language Reference: Concepts printed p.172-174 defines that
+                // continuing-class reading - Language Reference: Concepts printed p.172-174 defines that
                 // class by assigning a MISSING VALUE and carrying on, and a routine
                 // that queues a program has no value to make missing; the unit of
                 // WORK simply does not happen. So it takes the p.174-175 Example
@@ -5263,10 +5263,10 @@ pub const Executor = struct {
                 // (main.zig:297), so the only delta is that the step no longer
                 // writes an output member over a live one.
                 // The reference TIPs this exact call as the documented workaround
-                // (comment above) — valid SAS we can't honour, so rc 2 (D-009).
+                // (comment above) - valid SAS we can't honour, so rc 2 (D-009).
                 //
                 // GH#13 UPDATE: the macro facility is no longer "long gone" at
-                // CALL EXECUTE time — the arm below now routes through it. This
+                // CALL EXECUTE time - the arm below now routes through it. This
                 // arm still stands, for the narrower and more precise reason:
                 // %NRSTR's whole POINT is to defer resolution past the queue,
                 // and it is the DRAIN that has no macro processor (main.zig
@@ -5281,16 +5281,16 @@ pub const Executor = struct {
             // GH#13 GAP-callexecutemacro: macro-process at CALL time (p.123).
             const gen = (try macro.expandForExecute(text.?)) orelse
                 // No live Session: the CLI setup pass / a unit test. Queueing
-                // verbatim here is the OLD bug, so refuse loudly instead —
+                // verbatim here is the OLD bug, so refuse loudly instead -
                 // rc 2, because a program that reaches this is valid SAS we
                 // simply cannot run from this context (D-009b(i)).
                 return failGap(self.diags, "CALL EXECUTE needs the macro processor, which is not available in this context", .{});
             // A macro TRIGGER that survived expansion means `process` left it
-            // masked on purpose (%nrstr) — the drain cannot run it. Fail at the
+            // masked on purpose (%nrstr) - the drain cannot run it. Fail at the
             // GAP class rather than letting the lexer call it a user error.
             if (macro.residualTrigger(gen)) |trig|
                 return failGap(self.diags, "CALL EXECUTE generated an unresolved macro reference '{s}'; deferred macro resolution is not supported", .{trig});
-            // Pure macro language (`%let`, `%put`) generates no statements —
+            // Pure macro language (`%let`, `%put`) generates no statements -
             // it already ran above, so there is nothing to defer. Queueing the
             // blank would make the drain lex an empty program.
             if (std.mem.trim(u8, gen, " \t\r\n").len == 0) return;
@@ -5338,7 +5338,7 @@ pub const Executor = struct {
         if (eqi(c.name, "lexcomb")) return self.callLexcomb(c);
         // ── F-callplumbing proof: 3 more CALL routines wired through the same
         // call-by-reference mechanism (var args → writable PDV slots).
-        if (eqi(c.name, "sort")) { // CALL SORT — like SORTN/SORTC; type from the first arg
+        if (eqi(c.name, "sort")) { // CALL SORT - like SORTN/SORTC; type from the first arg
             const fv = if (c.args.len > 0 and c.args[0] == .variable) self.pdv.get(c.args[0].variable) else null;
             const is_char = switch (fv orelse Value{ .num = 0 }) {
                 .str => true,
@@ -5374,7 +5374,7 @@ pub const Executor = struct {
         }
         if (eqi(c.name, "is8601_convert")) {
             // CALL IS8601_CONVERT(convert-from, convert-to, <from-vars>, <to-vars>).
-            // ponytail: ONLY 'dt/dt'→'du' — two datetimes in, duration (seconds) out
+            // ponytail: ONLY 'dt/dt'→'du' - two datetimes in, duration (seconds) out
             // = later−earlier. Any other from/to combo falls through to the hard error
             // below (never silently return seconds for an unimplemented form).
             // Upgrade path: full ISO-8601 interval/duration model (dun/intvl/du/dt/
@@ -5392,15 +5392,15 @@ pub const Executor = struct {
             }
         }
         // An unsupported CALL routine silently mutating nothing is dangerous for a
-        // clinical pipeline — make it a hard ERROR, not a note (CLIN-failloud).
-        // NOTE-callnohalt: SAS also ABORTS the step on that ERROR — returning
+        // clinical pipeline - make it a hard ERROR, not a note (CLIN-failloud).
+        // NOTE-callnohalt: SAS also ABORTS the step on that ERROR - returning
         // normally let the statements after the bad CALL run on a poisoned PDV.
         // Mirror the select_nomatch/array-oor path: ExecError out of runStmt.
         //
         // SPLIT (audit-exitcodecontract.md §5c): a name the Functions and CALL
         // Routines reference lists is valid SAS we have not written → gap, rc 2
         // ("file an opensas issue"). A misspelling (`call symptu(...)`) keeps
-        // rc 1 — re-tagging the whole catch-all would send a typo to our tracker.
+        // rc 1 - re-tagging the whole catch-all would send a typo to our tracker.
         if (isCallRoutine(c.name))
             return failGap(self.diags, "CALL {s}() is not supported", .{c.name});
         return self.diags.fail(error.ExecError, 0, "CALL {s}() is not supported", .{c.name});
@@ -5593,7 +5593,7 @@ pub const Executor = struct {
 
     /// CALL GRAYCODE(k, v1…vn): the n numeric variables are a 0/1 subset indicator;
     /// advance to the next subset in binary-reflected Gray-code (minimal-change)
-    /// order — exactly one bit flips — and set k to the new subset size.
+    /// order - exactly one bit flips - and set k to the new subset size.
     fn callGraycode(self: *Executor, c: ast.Call) Error!void {
         if (c.args.len < 2) return;
         const n = c.args.len - 1;
@@ -5636,7 +5636,7 @@ pub const Executor = struct {
 
     /// Combinatorics FUNCTION forms (rc = allcomb(count,k,v…), allperm/graycode/
     /// lexcomb/lexcombi/lexperk/lexperm/sort): run the CALL routine of the same name to
-    /// permute the variable args, then return SAS's status — the leftmost-changed
+    /// permute the variable args, then return SAS's status - the leftmost-changed
     /// variable index (0 if none), the subset size for GRAYCODE, or 1 for SORT.
     /// Returns false if `name` is not a combinatorics function. (Phase-F-final)
     fn runCombFunc(self: *Executor, target: []const u8, c: ast.Call) Error!bool {
@@ -5724,7 +5724,7 @@ pub const Executor = struct {
     }
 
     /// CALL STREAMINIT(<seed | RNG-name>): seed the RAND stream (a string RNG name is
-    /// accepted but ignored — one generator).
+    /// accepted but ignored - one generator).
     fn callStreamInit(self: *Executor, c: ast.Call) Error!void {
         if (c.args.len < 1) return;
         const v = try self.ev.eval(&c.args[0]);
@@ -5732,7 +5732,7 @@ pub const Executor = struct {
     }
 
     /// CALL STREAM(key): select a reproducible RAND stream identified by `key`
-    /// (approximated by reseeding — a single MINSTD generator, not 2^63 substreams).
+    /// (approximated by reseeding - a single MINSTD generator, not 2^63 substreams).
     fn callStream(self: *Executor, c: ast.Call) Error!void {
         if (c.args.len < 1) return;
         try self.setRngStream(@intFromFloat(@trunc(toF64(try self.ev.eval(&c.args[0])))));
@@ -5784,7 +5784,7 @@ pub const Executor = struct {
     }
 
     /// CALL SORTN/SORTC: sort the (numeric/character) argument variables ascending
-    /// and write them back in place — the i-th smallest value goes to the i-th arg.
+    /// and write them back in place - the i-th smallest value goes to the i-th arg.
     fn callSort(self: *Executor, c: ast.Call, char: bool) Error!void {
         var names: std.ArrayList([]const u8) = .empty;
         for (c.args) |arg| try names.append(self.arena, if (arg == .variable) arg.variable else "");
@@ -5867,7 +5867,7 @@ pub const Executor = struct {
     }
 
     /// The current character value of a variable (trailing blanks dropped), "" if
-    /// unset or numeric — the accumulator the CAT* CALL routines append onto.
+    /// unset or numeric - the accumulator the CAT* CALL routines append onto.
     fn curText(self: *Executor, name: []const u8) []const u8 {
         return switch (self.pdv.get(name) orelse Value{ .str = "" }) {
             .str => |s| std.mem.trimEnd(u8, s, " "),
@@ -5894,7 +5894,7 @@ pub const Executor = struct {
     /// argument variables in place. Default / STD → mean 0, unit std dev. RANGE →
     /// (x-min)/(max-min), scaled to 0..1. The method may be given as "method=X"
     /// or as a bare method name X (BUG-callstdizerange). Any other method fails
-    /// LOUD (BUG-callstdizemethod) — never silently apply the wrong method.
+    /// LOUD (BUG-callstdizemethod) - never silently apply the wrong method.
     /// Missing values are left untouched.
     fn callStdize(self: *Executor, c: ast.Call) Error!void {
         var range = false;
@@ -5922,10 +5922,10 @@ pub const Executor = struct {
                         // BUG-callstdizeoptmsg: the message used to call EVERY
                         // rejected option a METHOD, so `mult=2` rendered as the
                         // nonsense `CALL STDIZE METHOD=mult=2`. Two of the
-                        // reference's three categories are not methods — a
+                        // reference's three categories are not methods - a
                         // VARDEF-option is a variance DIVISOR (DF/N) and a
                         // miscellaneous-option is a post-scaling knob or flag
-                        // (MULT=, FUZZ=, NORM, PSTAT, …) — so name the option
+                        // (MULT=, FUZZ=, NORM, PSTAT, …) - so name the option
                         // instead of mislabelling it.
                         if (kind != .standardization) {
                             self.diags.report(.err, 0, "CALL STDIZE option {s} is not supported yet", .{m}) catch {};
@@ -5934,7 +5934,7 @@ pub const Executor = struct {
                     }
                     // A standardization-option, or an unrecognised token: a bare
                     // unknown keyword is most likely a mistyped method, and that
-                    // stays the user's error (rc 1 — no markGap above).
+                    // stays the user's error (rc 1 - no markGap above).
                     self.diags.report(.err, 0, "CALL STDIZE METHOD={s} is not supported yet", .{m}) catch {};
                     return error.ExecError;
                 }
@@ -6004,7 +6004,7 @@ pub const Executor = struct {
         const n = vals.len;
         const kk = @min(combN(kf), n); // user k; out-of-range → 0 (BUG-combcallcrash)
         for (0..kk) |i| { // partial Fisher-Yates: choose the i-th of k
-            // lehmerNext ∈ [0,1) so this product is internally bounded [0, n-i) — no toInt guard needed.
+            // lehmerNext ∈ [0,1) so this product is internally bounded [0, n-i) - no toInt guard needed.
             const j = i + @as(usize, @intFromFloat(lehmerNext(&st) * @as(f64, @floatFromInt(n - i))));
             std.mem.swap(Value, &vals[i], &vals[@min(j, n - 1)]);
         }
@@ -6014,7 +6014,7 @@ pub const Executor = struct {
     }
 
     /// CALL ALLPERM(count, var …): the count-th permutation in SAS's minimal-change
-    /// (Steinhaus-Johnson-Trotter) order — BUG-allpermorder. Stateless: the value
+    /// (Steinhaus-Johnson-Trotter) order - BUG-allpermorder. Stateless: the value
     /// set is recovered by sorting, then the rank is Trotter-Johnson-unranked.
     fn callAllperm(self: *Executor, c: ast.Call) Error!void {
         if (c.args.len < 2) return;
@@ -6035,7 +6035,7 @@ pub const Executor = struct {
     }
 
     /// CALL ALLCOMB(count, k, var …): the count-th k-combination in SAS's
-    /// revolving-door (minimal-change) order — BUG-allpermorder. Each successive
+    /// revolving-door (minimal-change) order - BUG-allpermorder. Each successive
     /// combination differs from the previous by exactly one element.
     fn callAllcomb(self: *Executor, c: ast.Call) Error!void {
         if (c.args.len < 3) return;
@@ -6053,7 +6053,7 @@ pub const Executor = struct {
     }
 
     /// Write the combination `combo` (indices into `sorted`) into the first
-    /// variables, the complement after — shared by ALLCOMB and LEXCOMB.
+    /// variables, the complement after - shared by ALLCOMB and LEXCOMB.
     fn placeCombo(self: *Executor, args: []const ast.Expr, sorted: []const Value, combo: []const usize) Error!void {
         const in_combo = try self.arena.alloc(bool, sorted.len);
         @memset(in_combo, false);
@@ -6110,9 +6110,9 @@ pub const Executor = struct {
         };
     }
 
-    /// `a{i} = expr;` — write the value into the i-th (1-based) member variable.
+    /// `a{i} = expr;` - write the value into the i-th (1-based) member variable.
     /// An out-of-range subscript is an execution-time ERROR that sets _ERROR_=1
-    /// and halts the step (BUG-arrwriteoor) — identical to the READ path
+    /// and halts the step (BUG-arrwriteoor) - identical to the READ path
     /// (BUG-arrayoorerror, eval.zig subscriptOor); SAS 9.4 stops on both.
     fn runArrayAssign(self: *Executor, aa: ast.ArrayAssign) Error!void {
         // A special-list array (`array v{*} _numeric_;`) resolves its members from
@@ -6121,11 +6121,11 @@ pub const Executor = struct {
         const x = toF64(try self.ev.eval(aa.array.index));
         const xf = @floor(x);
         // The parser folds `{lo:hi}` subscripts to 1-based offsets at parse time
-        // (ARRAY-lobound), so the span is always 1..N — an in-span write via a
+        // (ARRAY-lobound), so the span is always 1..N - an in-span write via a
         // negative lower bound (b[-1] in b[-1:1]) never reaches this check.
         // A MISSING (NaN) subscript is out of range too (BUG-arraysubmissing): NaN
         // fails every `<`/`>` compare, so it slips past the span check unless caught
-        // explicitly — a silent no-op write was the bug. Fail loud like the read path.
+        // explicitly - a silent no-op write was the bug. Fail loud like the read path.
         if (std.math.isNan(x) or xf < 1 or xf > @as(f64, @floatFromInt(elements.len))) {
             self.ev.setError() catch {}; // _ERROR_=1; losing it to OOM doesn't soften the abort
             // aa.array.line = source line of the reference (NOTE-arrayoorlineno; 0 = unknown; tokens carry no column).
@@ -6135,18 +6135,18 @@ pub const Executor = struct {
         try self.pdv.set(elements[i - 1], try self.ev.eval(aa.value));
     }
 
-    /// `substr(v, pos <, len>) = value;` — splice `value` into `v`'s char value at
+    /// `substr(v, pos <, len>) = value;` - splice `value` into `v`'s char value at
     /// [pos, pos+len), leaving the rest untouched (BUG-substrlvalue). A position
     /// past the string, or a non-positive pos/len, is a no-op (as SAS, with a NOTE).
     fn runSubstrAssign(self: *Executor, sa: ast.SubstrAssign) Error!void {
         var cur = self.curText(sa.target);
         // An OMITTED-length SUBSTR lvalue spans to the target's DECLARED width, so
-        // the splice window reaches the declared end (SAS) — pad the working copy to
+        // the splice window reaches the declared end (SAS) - pad the working copy to
         // `vr.len` first (BUG-substrlvalue-declared). Was: window limited to the
         // current (trimmed) length, so `substr(t $5, 2)='XXXX'` wrote only 1 char →
         // `aX` instead of `aXXXX` (data loss). An EXPLICIT length is untouched; a var
         // with no declared LENGTH (len==0) keeps current behavior. ponytail: local to
-        // this path — global fixed-width char storage is the deferred EPIC-charfixedwidth.
+        // this path - global fixed-width char storage is the deferred EPIC-charfixedwidth.
         if (sa.len == null) {
             const declared = if (self.pdv.indexOf(sa.target)) |ix| self.pdv.vars.items[ix].len else 0;
             if (declared > cur.len) {
@@ -6160,7 +6160,7 @@ pub const Executor = struct {
         if (std.math.isNan(pf) or pf < 1) return;
         const p0 = @as(usize, @intFromFloat(@floor(pf))) - 1; // 0-based start
         if (p0 >= cur.len) {
-            self.diags.note(0, "SUBSTR: position past the value of {s} — assignment ignored", .{sa.target}) catch {};
+            self.diags.note(0, "SUBSTR: position past the value of {s} - assignment ignored", .{sa.target}) catch {};
             return;
         }
         const avail = cur.len - p0; // can't extend the string
@@ -6189,14 +6189,14 @@ pub const Executor = struct {
         return null;
     }
 
-    /// `declare hash h(...);` — register an empty object. ponytail: the `dataset:`
+    /// `declare hash h(...);` - register an empty object. ponytail: the `dataset:`
     /// argument (load a table on declare) is not honoured yet; the corpus builds
     /// its hash with `add`. Re-declaring each iteration just resets it (fine for
     /// the single-iteration steps the corpus uses).
     fn hashDeclare(self: *Executor, d: ast.HashDecl) Error!void {
         // A hash object persists across DATA-step iterations (SAS builds it once
         // and it lives for the whole step). `declare` re-executed on a later row
-        // must NOT wipe it — keep the existing object so lookup-joins see the data
+        // must NOT wipe it - keep the existing object so lookup-joins see the data
         // added on earlier rows (BUG-hashpersist). Constructor args still apply to
         // the existing object (idempotent), so `declare hash h;` followed by
         // `h = _new_ hash(ordered:'a');` picks the options up (GAP-hashnew).
@@ -6208,21 +6208,21 @@ pub const Executor = struct {
         };
         // Whitelist the constructor tags SAS defines (BUG-hashunknownarg): a
         // misspelled tag (`odered:` for `ordered:`) used to be silently
-        // IGNORED — the hash ran with default behavior and no hint.
+        // IGNORED - the hash ran with default behavior and no hint.
         //
         // The list is the DOC'S, not a guess: SAS 9.4 Component Objects
         // Reference, "DECLARE Statement: Hash and Hash Iterator Objects"
-        // (printed p.30-33) — "There are seven valid hash object argument and
+        // (printed p.30-33) - "There are seven valid hash object argument and
         // value tags", then names them: dataset, duplicate, hashexp, keysum,
         // multidata, ordered, suminc. KEYSUM was MISSING from this list, so a
         // LEGAL `keysum:'v'` drew a factually WRONG "undefined argument tag"
-        // ERROR. keysum is a real tag we do not IMPLEMENT — that is the
+        // ERROR. keysum is a real tag we do not IMPLEMENT - that is the
         // suminc: case below, not this one. hashexp: is a benign perf hint:
         // accepted, not honored (hash sizing is automatic here).
         //
         // AUDIT-errhaltclass: this HALTS rather than reporting and running on.
         // An undefined tag means the object is not the one the program asked
-        // for, and it was then used anyway — the BUG-hashexprdeferredhalt shape,
+        // for, and it was then used anyway - the BUG-hashexprdeferredhalt shape,
         // and the ERROR class of Language Reference: Concepts printed p.174-175 (Example Code 8.6:
         // "stopped processing this step" + "was not replaced"). Two diags.fail
         // siblings already live in this very function (the hiter arms below).
@@ -6232,42 +6232,42 @@ pub const Executor = struct {
             if (!known)
                 return self.diags.fail(error.ExecError, 0, "hash constructor: undefined argument tag '{s}:'", .{nm});
         };
-        // `declare hiter hi("h")` — one positional string arg names the hash to
+        // `declare hiter hi("h")` - one positional string arg names the hash to
         // walk (the constructor's other forms all use `name:` arguments).
         // Language Reference: Concepts p.624: the name MUST be quoted, and the hash must be declared
         // BEFORE the iterator. Both used to be dropped on the floor (an unquoted
         // arg evaluates numeric; an unknown name found no hash), leaving an
         // UNBOUND iterator whose every first()/next() returned rc=1 with no
-        // diagnostic — an empty walk and an empty dataset at exit 0
+        // diagnostic - an empty walk and an empty dataset at exit 0
         // (BUG-hiterbadhash). Fail loud like the unknown-tag/unknown-method
         // paths of the same family.
         if (d.args.len == 1 and d.args[0].name == null) {
             const v = try self.ev.eval(d.args[0].value);
             if (v != .str)
-                return self.diags.fail(error.ExecError, 0, "hash iterator {s}: the hash object name must be a quoted string — declare hiter {s}('hashname')", .{ d.name, d.name });
+                return self.diags.fail(error.ExecError, 0, "hash iterator {s}: the hash object name must be a quoted string - declare hiter {s}('hashname')", .{ d.name, d.name });
             if (self.findHash(v.str) == null)
                 return self.diags.fail(error.ExecError, 0, "hash iterator {s}: hash object '{s}' is not declared (declare the hash before the iterator)", .{ d.name, v.str });
             h.iter_of = v.str;
         }
-        // `declare hash h(dataset:"name")` — remember the source table; its rows
+        // `declare hash h(dataset:"name")` - remember the source table; its rows
         // are loaded into the hash on defineDone (BUG-hashdataset).
         for (d.args) |arg| if (arg.name) |nm| if (eqi(nm, "dataset")) {
             const v = try self.ev.eval(arg.value);
             // NOTE-declarehashtrim: trim like hashOutput (BUG-hashoutputnametrim)
-            // — the same computed-name idiom (`'w' || nm`, nm blank-padded) must
+            // - the same computed-name idiom (`'w' || nm`, nm blank-padded) must
             // not miss an EXISTING member at the declare end: untrimmed it
             // errored 'hash dataset woo       not found' (loud but wrong).
             if (v == .str) h.src = std.mem.trim(u8, v.str, " ");
         };
-        // `declare hash h(ordered:'a')` — keep entries in ascending/descending key
+        // `declare hash h(ordered:'a')` - keep entries in ascending/descending key
         // order for iteration and output (BUG-hashordered). SAS accepts a quoted
         // 'a'/'ascending'/'yes'/'y'/'d'/'descending'/'n'/'no' or a numeric boolean.
         for (d.args) |arg| if (arg.name) |nm| if (eqi(nm, "ordered")) {
             h.ordered = parseHashOrder(try self.ev.eval(arg.value));
         };
-        // `declare hash h(multidata:'y')` — allow MULTIPLE data records per key:
+        // `declare hash h(multidata:'y')` - allow MULTIPLE data records per key:
         // add() always succeeds, find()/find_next() walk the key's records in
-        // insertion order (BUG-hashmultidata — was parsed, then silently ignored,
+        // insertion order (BUG-hashmultidata - was parsed, then silently ignored,
         // dropping every duplicate-key record with no error). SAS takes 'y'/'yes'
         // (case-insensitive) or a numeric boolean.
         for (d.args) |arg| if (arg.name) |nm| if (eqi(nm, "multidata")) {
@@ -6279,10 +6279,10 @@ pub const Executor = struct {
                 .num => |x| x != 0,
             };
         };
-        // `declare hash h(duplicate:'r')` — a duplicate-key add REPLACES the
+        // `declare hash h(duplicate:'r')` - a duplicate-key add REPLACES the
         // stored record ('r'/'replace', last wins) or logs an ERROR
         // ('e'/'error'); absent → keep the first, SAS's default
-        // (BUG-hashduplicate — was parsed, then silently dropped).
+        // (BUG-hashduplicate - was parsed, then silently dropped).
         for (d.args) |arg| if (arg.name) |nm| if (eqi(nm, "duplicate")) {
             const v = try self.ev.eval(arg.value);
             if (v == .str) {
@@ -6290,23 +6290,23 @@ pub const Executor = struct {
                 h.duplicate = if (eqi(s, "r") or eqi(s, "replace")) .replace else if (eqi(s, "e") or eqi(s, "error")) .err else .keep_first;
             }
         };
-        // `declare hash h(suminc:'cnt')` / `(keysum:'v')` — per-key summaries
+        // `declare hash h(suminc:'cnt')` / `(keysum:'v')` - per-key summaries
         // (SUM/SUMDUP, and the FIND-count keysum variable) are NOT supported,
         // and the tag used to be dropped SILENTLY: a program relying on the
         // maintained summary then computed garbage with no hint
         // (GAP-hashmethods).
         //
         // AUDIT-errhaltclass: reporting loud and then RUNNING ON is still a
-        // no-op — the step computed that garbage and WROTE IT, and the nonzero
+        // no-op - the step computed that garbage and WROTE IT, and the nonzero
         // exit does not travel with the data set. CLAUDE.md's "an unsupported
         // feature must error visibly, never no-op" is only half-kept by an
         // ERROR the step ignores, so the step stops here (Language Reference: Concepts printed
         // p.174-175). keysum joins suminc: both name a key summary we do not
         // maintain, and both are LEGAL tags (component-objects ref printed
-        // p.32-33) — so they must be rejected as UNSUPPORTED, not as undefined.
+        // p.32-33) - so they must be rejected as UNSUPPORTED, not as undefined.
         for (d.args) |arg| if (arg.name) |nm| {
             // Both tags are LEGAL (component-objects ref printed p.32-33, as the
-            // comment above says) — valid SAS we don't maintain, so rc 2 (D-009).
+            // comment above says) - valid SAS we don't maintain, so rc 2 (D-009).
             if (eqi(nm, "suminc"))
                 return failGap(self.diags, "hash suminc: key summaries (sum/sumdup) are not supported yet", .{});
             if (eqi(nm, "keysum"))
@@ -6318,20 +6318,20 @@ pub const Executor = struct {
     ///
     /// Invariant (BUG-hashexprdeferredhalt, SUPERSEDES the GAP-hashmethods
     /// "defined non-zero rc" rule of 991ba598): a hash failure reported at ERROR
-    /// severity STOPS THE STEP where it happens — it does not fabricate an rc and
+    /// severity STOPS THE STEP where it happens - it does not fabricate an rc and
     /// run on. GAP-hashmethods aimed at the right target ("wrong branch after a
     /// visible error") and missed: setting rc=1 makes the value DEFINED but still
     /// INVENTED, so `if h.find() = 1 then …` took the branch on the error code
-    /// itself, ran the rest of the step, and wrote the observation — the ERROR only
+    /// itself, ran the rest of the step, and wrote the observation - the ERROR only
     /// surfaced afterwards. The cure for a wrong branch is not to reach it.
     ///
     /// Language Reference: Concepts printed p.172 (Chapter 8, "Execution-Time Errors") splits the classes:
     /// "Most execution-time errors produce warning messages or notes in the SAS log
-    /// but allow the program to continue executing", with footnote 1 — "more serious
+    /// but allow the program to continue executing", with footnote 1 - "more serious
     /// errors can cause SAS to enter syntax check mode and stop processing the
     /// program". Printed p.173-174 shows the continuing class (division by 0: "SAS
     /// executes the entire step, assigns a missing value"), and printed p.174-175
-    /// Example Code 8.6 shows the ERROR class — the log reads "ERROR: Array subscript
+    /// Example Code 8.6 shows the ERROR class - the log reads "ERROR: Array subscript
     /// out of range", then "NOTE: The SAS System stopped processing this step because
     /// of errors" and "WARNING: Data set WORK.TEST was not replaced because this step
     /// was stopped". These are ERRORs, so they take the p.174-175 path. That exact
@@ -6344,12 +6344,12 @@ pub const Executor = struct {
         var rc: f64 = 0;
         if (eqi(op.method, "defineKey")) {
             // ignore re-definition once the object is built (declare/define run
-            // each iteration when not guarded by `if _n_=1`) — BUG-hashpersist.
+            // each iteration when not guarded by `if _n_=1`) - BUG-hashpersist.
             if (!h.done) try self.defineArgNames(h, &h.keys, true, op.args);
         } else if (eqi(op.method, "defineData")) {
             if (!h.done) try self.defineArgNames(h, &h.datas, false, op.args);
         } else if (eqi(op.method, "defineDone")) {
-            if (!h.done) { // build once — load the dataset: source now that keys/data are known
+            if (!h.done) { // build once - load the dataset: source now that keys/data are known
                 h.done = true;
                 try self.hashDefineCheckNames(h);
                 try self.hashLoadDataset(h);
@@ -6379,11 +6379,11 @@ pub const Executor = struct {
         } else if (eqi(op.method, "clear")) {
             // SAS CLEAR (GAP-hashitermethods): remove every item; the object
             // stays usable. A bound hiter's cursor is now out of range, so its
-            // next move reports exhaustion — coherent, never a stale read.
+            // next move reports exhaustion - coherent, never a stale read.
             h.entries.clearRetainingCapacity();
             h.index.clearRetainingCapacity();
             h.md_key = null; // find_next after clear must not walk stale records
-            // a bound hiter's cursor is off the (now empty) entries — not
+            // a bound hiter's cursor is off the (now empty) entries - not
             // positioned on any key, so p.621's remove-guard must not fire.
             for (self.hashes.items) |*it| if (it.*.iter_of) |b| {
                 if (eqi(b, h.name)) it.*.iter_on = false;
@@ -6400,7 +6400,7 @@ pub const Executor = struct {
             };
             rc = 0;
         } else if (eqi(op.method, "num_items") or eqi(op.method, "item_size")) {
-            // Language Reference: Concepts p.623 hash ATTRIBUTES — reachable parenless (`n = h.num_items;`)
+            // Language Reference: Concepts p.623 hash ATTRIBUTES - reachable parenless (`n = h.num_items;`)
             // or as `h.num_items()`; both land here with an empty arg list
             // (GAP-hashnumitems).
             if (op.args.len != 0) {
@@ -6414,7 +6414,7 @@ pub const Executor = struct {
             // SPLIT (audit-exitcodecontract.md §5c): a method the Component
             // Objects reference's own dictionary NAMES is valid SAS we haven't
             // written → gap, rc 2. A typo'd method falls to the arm below and
-            // stays rc 1 — re-tagging the whole catch-all would tell a user who
+            // stays rc 1 - re-tagging the whole catch-all would tell a user who
             // wrote `h.fnd()` to file an opensas issue.
             return failGap(self.diags, "hash method {s}() is not supported yet", .{op.method});
         } else {
@@ -6425,7 +6425,7 @@ pub const Executor = struct {
 
     /// Approximate per-item byte size for `h.item_size` (Language Reference: Concepts p.623): the sum
     /// of the key + data variable widths. ponytail: SAS's true ITEM_SIZE adds
-    /// internal per-item overhead the doc doesn't pin down — doc-finder tick116
+    /// internal per-item overhead the doc doesn't pin down - doc-finder tick116
     /// F3 records "approx ok"; refine only if a program compares against SAS's.
     fn hashItemSize(self: *Executor, h: *HashObject) usize {
         var n: usize = 0;
@@ -6448,12 +6448,12 @@ pub const Executor = struct {
     /// object (`inner = _new_ hash();` registers the object, never a PDV var)
     /// falls through to `orelse .missing` / an absent source column and stores a
     /// SILENT numeric missing, which a later find() hands back as `inner=.` at
-    /// exit 0. Nested-hash storage is unsupported — fail loud instead of writing
+    /// exit 0. Nested-hash storage is unsupported - fail loud instead of writing
     /// garbage into the entry. A hash of hashes IS documented SAS (Language Reference: Concepts), so
     /// this is our gap: rc 2, not a user error.
     ///
     /// BUG-hashofhashexplicit: ONE predicate, called from the two places a data
-    /// tuple can be built, because they do not share a call path — defineDone
+    /// tuple can be built, because they do not share a call path - defineDone
     /// (which covers the `dataset:` bulk load, every keyed method, and BOTH the
     /// implicit and explicit `data:` spellings) and collectArgs (which is all
     /// that is left when a program never calls defineDone). It used to live
@@ -6467,8 +6467,8 @@ pub const Executor = struct {
     /// Language Reference: Concepts p.613: "If you use a key or data variable without declaring or
     /// initializing that key or data variable outside the hash object, an error
     /// occurs." A typo'd defineKey/defineData name used to return rc=0, after
-    /// which find() reported a HIT (rc=0) while restoring nothing — and pdv.set
-    /// materialised a PHANTOM column of all-missing (BUG-hashdefinenovar — the
+    /// which find() reported a HIT (rc=0) while restoring nothing - and pdv.set
+    /// materialised a PHANTOM column of all-missing (BUG-hashdefinenovar - the
     /// bare-positional-name half of BUG-hashdefinetag's stated fix, which never
     /// landed). Checked at defineDone, not at the define* calls: the
     /// compile-time PDV already holds every LENGTH/assignment/SET/RETAIN/array
@@ -6483,7 +6483,7 @@ pub const Executor = struct {
     fn hashDefineCheckOne(self: *Executor, h: *HashObject, nm: []const u8, kind: []const u8) Error!void {
         if (self.pdv.indexOf(nm) != null) return;
         // A hash OBJECT named as data. This used to DEFER to the add-time
-        // collectArgs path ("let it speak") — but that path only spoke for the
+        // collectArgs path ("let it speak") - but that path only spoke for the
         // implicit `h.add()` spelling, so `h.add(key: 1, data: inner)` and the
         // `dataset:` bulk load (which never calls collectArgs at all) both
         // stored a silent missing at exit 0. Say it here, where every spelling
@@ -6497,7 +6497,7 @@ pub const Executor = struct {
 
     /// Load every row of the `dataset:"name"` source into the hash: key tuple from
     /// the defineKey columns, data tuple from the defineData columns. Duplicate
-    /// keys follow `duplicate:` — keep first (SAS default), replace (last wins),
+    /// keys follow `duplicate:` - keep first (SAS default), replace (last wins),
     /// or log an ERROR (BUG-hashduplicate);
     /// with multidata:'y' every row loads (BUG-hashmultidata).
     fn hashLoadDataset(self: *Executor, h: *HashObject) Error!void {
@@ -6522,8 +6522,8 @@ pub const Executor = struct {
             const dup: ?usize = if (h.multidata) null else h.index.getContext(kv, .{});
             if (dup != null) switch (h.duplicate) {
                 .keep_first => continue, // duplicate key → keep first
-                .err => { // duplicate:'e' — log the documented ERROR, keep first
-                    // SEV-rcbydesignerr: rcErr — recoverable. printed p.32:
+                .err => { // duplicate:'e' - log the documented ERROR, keep first
+                    // SEV-rcbydesignerr: rcErr - recoverable. printed p.32:
                     // 'error'/'e' "reports an error to the log if a duplicate
                     // key is found"; the Note (pp.31-32) stores the first
                     // instance and ignores subsequent ones. A data condition
@@ -6532,7 +6532,7 @@ pub const Executor = struct {
                     self.diags.rcErr(0, "hash dataset {s}: duplicate key (duplicate:'e')", .{src}) catch {};
                     continue;
                 },
-                .replace => {}, // duplicate:'r' — fall through, overwrite below
+                .replace => {}, // duplicate:'r' - fall through, overwrite below
             };
             const dv = try self.arena.alloc(Value, h.datas.items.len);
             for (h.datas.items, 0..) |dnm, j| dv[j] = colVal(ds, row, dnm);
@@ -6546,14 +6546,14 @@ pub const Executor = struct {
         }
     }
 
-    /// Rebuild the key→slot index from the ordered entries — after any op that
+    /// Rebuild the key→slot index from the ordered entries - after any op that
     /// reorders slots (a `remove`'s orderedRemove shift, or an `ordered:` sort), so
     /// the index can never go stale (PERF-hashscan). ponytail: O(n); fine because
     /// only remove and ordered-iteration/output trigger it, both rare vs add/find.
     fn hashReindex(self: *Executor, h: *HashObject) Error!void {
         h.index.clearRetainingCapacity();
         for (h.entries.items, 0..) |e, i| {
-            // multidata hashes hold several entries per key — keep the FIRST slot
+            // multidata hashes hold several entries per key - keep the FIRST slot
             // so find() still returns the key's first record (BUG-hashmultidata).
             const gop = try h.index.getOrPutContext(self.arena, e.keyvals, .{});
             if (!gop.found_existing) gop.value_ptr.* = i;
@@ -6562,12 +6562,12 @@ pub const Executor = struct {
 
     /// Append the variable names a defineKey/defineData argument denotes: a
     /// plain positional arg is one name; the `all:'y'` tag means EVERY
-    /// variable of the input — for defineData, the KEY variables included (SAS:
+    /// variable of the input - for defineData, the KEY variables included (SAS:
     /// the keys are data too, the documented idiom for keeping the key column
-    /// on .output() — BUG-hashdefinedataall; tick116 FINDING-2 pinned the wrong
+    /// on .output() - BUG-hashdefinedataall; tick116 FINDING-2 pinned the wrong
     /// key-excluded form). With `dataset:` the variables are the DATASET's
     /// columns (the step needn't already carry them); otherwise the DATA step
-    /// PDV. SAS DEFINEDATA/DEFINEKEY method dict (BUG-hashdefinetag — the tag
+    /// PDV. SAS DEFINEDATA/DEFINEKEY method dict (BUG-hashdefinetag - the tag
     /// value was taken as a literal var name, defining a phantom variable named
     /// 'yes').
     fn defineArgNames(self: *Executor, h: *HashObject, list: *std.ArrayList([]const u8), is_key: bool, args: []const ast.HashArg) Error!void {
@@ -6605,7 +6605,7 @@ pub const Executor = struct {
         }
     }
 
-    /// A define* argument names a variable — evaluate it to its string value.
+    /// A define* argument names a variable - evaluate it to its string value.
     fn argName(self: *Executor, arg: ast.HashArg) Error![]const u8 {
         return switch (try self.ev.eval(arg.value)) {
             .str => |s| s,
@@ -6617,7 +6617,7 @@ pub const Executor = struct {
     /// the key/data variables when the explicit form is not used).
     fn collectArgs(self: *Executor, h: *const HashObject, vars: []const []const u8, args: []const ast.HashArg, want: []const u8) Error![]const Value {
         // NOTE-hashofhash / BUG-hashofhashexplicit: ABOVE the implicit/explicit
-        // branch, because what is wrong is the defined data NAMES — a property of
+        // branch, because what is wrong is the defined data NAMES - a property of
         // the definition, identical under both spellings. Sitting inside the
         // `len == 0` arm made it an implicit-form-only guard, so the explicit
         // `h.add(key: 1, data: inner)` stored a silent missing at exit 0.
@@ -6627,7 +6627,7 @@ pub const Executor = struct {
         // BUG-declaredobjnamevalue moved it FURTHER up, above the arg-evaluation
         // loop, and the move follows from the sentence above: `vars` is the
         // definition, so nothing about the ARGS can change the verdict. It now
-        // also decides a genuine collision — a nested hash IS documented SAS, so
+        // also decides a genuine collision - a nested hash IS documented SAS, so
         // this is our GAP (rc 2), whereas the new object-as-a-value guard in
         // eval.zig is a USER error (rc 1). Evaluating `data: inner` first let the
         // rc-1 guard preempt the rc-2 one and reclassify a documented feature.
@@ -6643,17 +6643,17 @@ pub const Executor = struct {
         // defined variable count. A SHORT list left trailing entry cells
         // uninitialized and crashed .output() reading garbage; SAS errors and
         // stops the step. (Zero explicit tags → the implicit form: PDV values of
-        // every defined var — length always matches, so it's fine.)
+        // every defined var - length always matches, so it's fine.)
         if (out.items.len != 0 and out.items.len != vars.len) {
             return self.diags.fail(error.ExecError, 0, "hash: the number of {s}: argument tags ({d}) must match the number of {s} variables ({d})", .{ want, out.items.len, want, vars.len });
         }
         // BUG-hashkeytypesilent (D-002): the Component Objects ref pins the SAME
-        // normative sentence 18 times — on the KEY: argument of every keyed
+        // normative sentence 18 times - on the KEY: argument of every keyed
         // method (ADD/CHECK/FIND/FIND_NEXT/FIND_PREV/REF/REMOVE/REPLACE) and on
         // the DATA: form: the value's "type must match the corresponding key
         // variable that is specified in a DEFINEKEY method call". A mismatched
-        // key used to be just a lookup that misses — rc=160038, BYTE-IDENTICAL
-        // to a legitimate miss, in both directions — so the reference's own
+        // key used to be just a lookup that misses - rc=160038, BYTE-IDENTICAL
+        // to a legitimate miss, in both directions - so the reference's own
         // `if rc ne 0 then not found` idiom silently swallowed a bug in the
         // user's code. Only the EXPLICIT form is checked: the implicit form
         // reads the defined variables' own PDV values, matching by construction.
@@ -6665,7 +6665,7 @@ pub const Executor = struct {
     }
 
     /// The declared type of a hash key/data variable: the PDV variable's type,
-    /// else the `dataset:` source column's. null when the name is unknown —
+    /// else the `dataset:` source column's. null when the name is unknown -
     /// defineDone's hashDefineCheckNames already failed loud for that in a real
     /// program (hand-built test hashes carry no schema to check against).
     fn hashVarType(self: *Executor, h: *const HashObject, name: []const u8) ?pdv_mod.VarType {
@@ -6677,7 +6677,7 @@ pub const Executor = struct {
     }
 
     /// One explicit key:/data: value against its defined variable's declared
-    /// type (BUG-hashkeytypesilent): a mismatch is a malformed call — fail loud
+    /// type (BUG-hashkeytypesilent): a mismatch is a malformed call - fail loud
     /// naming the variable and both types, never a silent "not found".
     fn hashArgTypeCheck(self: *Executor, h: *const HashObject, name: []const u8, v: Value, tag: []const u8) Error!void {
         const decl = self.hashVarType(h, name) orelse return;
@@ -6691,9 +6691,9 @@ pub const Executor = struct {
         });
     }
 
-    /// `add(...)` — single-data: a duplicate key follows `duplicate:` — keep the
+    /// `add(...)` - single-data: a duplicate key follows `duplicate:` - keep the
     /// first record and return non-zero (SAS default), replace it in place
-    /// ('r'), or log an ERROR ('e') — BUG-hashduplicate. multidata:'y': always append and return 0 — every key may
+    /// ('r'), or log an ERROR ('e') - BUG-hashduplicate. multidata:'y': always append and return 0 - every key may
     /// hold many records, walked by find()/find_next() (BUG-hashmultidata).
     fn hashAdd(self: *Executor, h: *HashObject, args: []const ast.HashArg) Error!f64 {
         const kv = try self.collectArgs(h, h.keys.items, args, "key");
@@ -6704,7 +6704,7 @@ pub const Executor = struct {
                 return 0;
             },
             .err => { // duplicate:'e' → documented log ERROR, keep first
-                // SEV-rcbydesignerr: rcErr — ADD's documented contract is a
+                // SEV-rcbydesignerr: rcErr - ADD's documented contract is a
                 // nonzero rc on an existing key (printed p.26); the log ERROR
                 // is the fallback for an UNCHECKED rc (p.24). Recoverable.
                 self.diags.rcErr(0, "hash add: duplicate key (duplicate:'e')", .{}) catch {};
@@ -6733,7 +6733,7 @@ pub const Executor = struct {
         return out;
     }
 
-    /// `replace(...)` — overwrite the data of an existing key *in place* (so a
+    /// `replace(...)` - overwrite the data of an existing key *in place* (so a
     /// later `find` sees the new values), or insert it if the key is new.
     fn hashReplace(self: *Executor, h: *HashObject, args: []const ast.HashArg) Error!f64 {
         const kv = try self.collectArgs(h, h.keys.items, args, "key");
@@ -6766,14 +6766,14 @@ pub const Executor = struct {
         return 160038; // SAS's hash "key not found" return code
     }
 
-    /// `find_next()` — after a successful find()/find_next(), load the NEXT data
+    /// `find_next()` - after a successful find()/find_next(), load the NEXT data
     /// record of the same key (insertion order) into the PDV and return 0; at the
     /// end of the key's records (always immediate for single-data hashes) return
-    /// SAS's "not found". ponytail: linear scan from the cursor — O(n) per step;
+    /// SAS's "not found". ponytail: linear scan from the cursor - O(n) per step;
     /// per-key slot chains if a profile ever shows this hot.
     fn hashFindNext(self: *Executor, h: *HashObject) Error!f64 {
         const key = h.md_key orelse {
-            // SEV-rcbydesignerr: rcErr — a failed FIND_NEXT returns SAS's
+            // SEV-rcbydesignerr: rcErr - a failed FIND_NEXT returns SAS's
             // nonzero rc; the ERROR is the documented unchecked-rc fallback
             // (printed p.53). Recoverable: the caller inspects the rc.
             self.diags.rcErr(0, "find_next() called without a successful find()", .{}) catch {};
@@ -6795,7 +6795,7 @@ pub const Executor = struct {
         return 160038;
     }
 
-    /// `check(...)` — like `find` but does NOT load the data into the PDV; just
+    /// `check(...)` - like `find` but does NOT load the data into the PDV; just
     /// reports whether the key is present (0 = found, non-zero = not).
     fn hashCheck(self: *Executor, h: *HashObject, args: []const ast.HashArg) Error!f64 {
         const kv = try self.collectArgs(h, h.keys.items, args, "key");
@@ -6803,16 +6803,16 @@ pub const Executor = struct {
         return 160038;
     }
 
-    /// `remove(...)` — delete the entry for the key (0 = removed, non-zero = not
+    /// `remove(...)` - delete the entry for the key (0 = removed, non-zero = not
     /// found). Order-preserving so an active iterator stays coherent. With
-    /// multidata:'y' REMOVE deletes EVERY record of the key (SAS 9.4 —
+    /// multidata:'y' REMOVE deletes EVERY record of the key (SAS 9.4 -
     /// BUG-hashmultidataremove); REMOVEDUP is the separate cursor-only method
     /// (still unimplemented, fail-loud).
     fn hashRemove(self: *Executor, h: *HashObject, args: []const ast.HashArg) Error!f64 {
         const kv = try self.collectArgs(h, h.keys.items, args, "key");
         const slot = h.index.getContext(kv, .{}) orelse return 160038;
         // Language Reference: Concepts p.621 Note: while a bound hash ITERATOR is positioned on the
-        // key, REMOVE must NOT remove it — an ERROR goes to the log and the
+        // key, REMOVE must NOT remove it - an ERROR goes to the log and the
         // hash is left untouched. opensas removed it anyway AND corrupted the
         // walk: orderedRemove shifts later slots down while the iterator's
         // iter_pos still advanced, so a walk-and-delete loop visited every
@@ -6822,15 +6822,15 @@ pub const Executor = struct {
             const bound = it.iter_of orelse continue;
             if (!it.iter_on or !eqi(bound, h.name)) continue;
             if (it.iter_pos < h.entries.items.len and tupleEq(h.entries.items[it.iter_pos].keyvals, kv)) {
-                // SEV-rcbydesignerr: rcErr — printed p.82 Restriction: the key
+                // SEV-rcbydesignerr: rcErr - printed p.82 Restriction: the key
                 // is not removed and "an error message is issued"; the method
                 // fails with a nonzero rc the caller checks. Recoverable.
-                self.diags.rcErr(0, "hash remove: key not removed — hash iterator {s} is positioned on it", .{it.name}) catch {};
+                self.diags.rcErr(0, "hash remove: key not removed - hash iterator {s} is positioned on it", .{it.name}) catch {};
                 return 1;
             }
         }
         if (h.multidata) {
-            // one compaction pass: copy survivors forward, then shrink —
+            // one compaction pass: copy survivors forward, then shrink -
             // per-match orderedRemove was O(E) each → O(N·E) remove-all
             // (PERF-hashremovequad). Identical result: every record of the
             // key gone, survivor order preserved, one reindex below.
@@ -6841,17 +6841,17 @@ pub const Executor = struct {
                 w += 1;
             }
             h.entries.shrinkRetainingCapacity(w);
-            if (h.md_key) |mk| { // the find_next cursor's key is gone — no stale walk
+            if (h.md_key) |mk| { // the find_next cursor's key is gone - no stale walk
                 if (tupleEq(mk, kv)) h.md_key = null;
             }
         } else {
             _ = h.entries.orderedRemove(slot); // keep insertion order; shifts later slots
         }
-        try self.hashReindex(h); // slots after the removal moved — rebuild the index
+        try self.hashReindex(h); // slots after the removal moved - rebuild the index
         return 0;
     }
 
-    /// `output(dataset:"name")` — write every entry to a new dataset: the key
+    /// `output(dataset:"name")` - write every entry to a new dataset: the key
     /// columns then the data columns (types from the stored values). Returns 0.
     fn hashOutput(self: *Executor, h: *HashObject, args: []const ast.HashArg) Error!f64 {
         var name: ?[]const u8 = null;
@@ -6861,20 +6861,20 @@ pub const Executor = struct {
         };
         var dsname = name orelse {
             // NOTE-hashoutputnods: no dataset: tag used to return rc=1 with NO
-            // diagnostic — a silent no-op when the rc went unchecked. Fail loud.
-            // SEV-rcbydesignerr: rcErr — a failed OUTPUT returns nonzero by
+            // diagnostic - a silent no-op when the rc went unchecked. Fail loud.
+            // SEV-rcbydesignerr: rcErr - a failed OUTPUT returns nonzero by
             // contract (printed p.73); loud but not a step-killer.
             self.diags.rcErr(0, "hash output: dataset: is required", .{}) catch {};
             return 1;
         };
         // BUG-hashoutputnametrim: a COMPUTED name (`dataset: 'w' || nm`, the
         // split-by-group idiom, with nm blank-padded) kept its trailing blanks
-        // and created an UNREACHABLE member at rc=0 — while the options branch
+        // and created an UNREACHABLE member at rc=0 - while the options branch
         // below trimmed its half (two paths, one function, disagreeing). Trim
-        // once up front, then the member must be a valid [lib.]name — both
+        // once up front, then the member must be a valid [lib.]name - both
         // SAS behaviours (trim, or error) beat a silent unreachable success.
         dsname = std.mem.trim(u8, dsname, " ");
-        // dataset:'member(opts)' — split the trailing data-set options off the
+        // dataset:'member(opts)' - split the trailing data-set options off the
         // member name (BUG-hashoutputdsopt): the parenthesized string used to
         // become the member name VERBATIM, so `out(where=(k>1))` wrote a table
         // literally named that and silently dropped the filter.
@@ -6887,7 +6887,7 @@ pub const Executor = struct {
             opt_src = dsname[lp + 1 .. dsname.len - 1];
             dsname = std.mem.trim(u8, dsname[0..lp], " "); // blanks before `(` too
         }
-        { // [lib.]member — each part a V7 name (NVALID rules)
+        { // [lib.]member - each part a V7 name (NVALID rules)
             var parts = std.mem.splitScalar(u8, dsname, '.');
             var np: usize = 0;
             var ok = true;
@@ -6906,7 +6906,7 @@ pub const Executor = struct {
         ds.* = Dataset.init(self.arena, dsname);
         const first = if (h.entries.items.len > 0) h.entries.items[0] else null;
         // SAS .output() writes ONLY the DEFINEDATA variables; a key is written only
-        // when it is also defined as data (BUG-hashoutputkeys) — keys are not dumped
+        // when it is also defined as data (BUG-hashoutputkeys) - keys are not dumped
         // automatically (a documented gotcha: add the key to defineData to keep it).
         for (h.datas.items, 0..) |d, j| _ = try ds.addColumn(d, self.hashOutColType(first, d, j));
         for (h.entries.items) |e| {
@@ -6921,7 +6921,7 @@ pub const Executor = struct {
         if (opt_src) |os| {
             const toks = try lex.tokenize(self.arena, os, self.diags);
             // An unknown option fails loud INSIDE applyDatasetOptions (io.zig,
-            // since tick298) — the exec-side pre-check used to report the SAME
+            // since tick298) - the exec-side pre-check used to report the SAME
             // option a second time, two ERRORs for one mistake
             // (NOTE-dsoptdoublereport). Keep hashOutput's rc=1 contract by
             // watching the diagnostic count across the call.
@@ -6937,7 +6937,7 @@ pub const Executor = struct {
 
     /// Output column type for one defineData variable: the DECLARED PDV type
     /// when the variable is certainly known (`length name $ n;` stays Char even
-    /// with ZERO entries — NOTE-hashemptytype: first-entry inference defaulted
+    /// with ZERO entries - NOTE-hashemptytype: first-entry inference defaulted
     /// an empty hash's columns to numeric, silently flipping char vars to Num).
     /// A compile-time-guessed or unknown name keeps the old first-entry
     /// inference (then numeric).
@@ -6949,18 +6949,18 @@ pub const Executor = struct {
         return colTypeAt(first, j, false);
     }
 
-    /// hiter `first()` / `next()` / `prev()` / `last()` — walk the entries of the
+    /// hiter `first()` / `next()` / `prev()` / `last()` - walk the entries of the
     /// hash this iterator is bound to, loading each entry's key+data variables
     /// into the PDV.
     /// Returns 0 while positioned on an entry, non-zero once past the end / empty
-    /// (prev() before the first entry included — GAP-hashitermethods).
+    /// (prev() before the first entry included - GAP-hashitermethods).
     fn hashIterMove(self: *Executor, h: *HashObject, move: IterMove) Error!f64 {
-        // BUG-hiterbadhash: an unbound iterator (no/illegal constructor arg —
+        // BUG-hiterbadhash: an unbound iterator (no/illegal constructor arg -
         // `declare hiter it;` carries no name exec can see) or one whose hash
-        // has since been DELETE'd used to bail SILENTLY here — rc=1, no
+        // has since been DELETE'd used to bail SILENTLY here - rc=1, no
         // diagnostic, empty walk at exit 0. Fail loud instead.
         const bound = h.iter_of orelse
-            return self.diags.fail(error.ExecError, 0, "hash iterator {s} is not bound to a hash object — declare hiter {s}('hashname')", .{ h.name, h.name });
+            return self.diags.fail(error.ExecError, 0, "hash iterator {s} is not bound to a hash object - declare hiter {s}('hashname')", .{ h.name, h.name });
         const tgt = self.findHash(bound) orelse
             return self.diags.fail(error.ExecError, 0, "hash iterator {s}: hash object '{s}' is not declared", .{ h.name, bound });
         // A fresh walk (first/last) re-applies the ordered: key order (BUG-hashordered).
@@ -6987,7 +6987,7 @@ pub const Executor = struct {
                 h.iter_pos = n - 1;
             },
         }
-        if (h.iter_pos >= n) { // exhausted — no longer pointing at a key
+        if (h.iter_pos >= n) { // exhausted - no longer pointing at a key
             h.iter_on = false;
             return 1;
         }
@@ -7000,7 +7000,7 @@ pub const Executor = struct {
 
     fn runIf(self: *Executor, iff: ast.If) Error!Flow {
         const c = try self.ev.eval(iff.cond);
-        // bare `if c;` — both branches null — is a subsetting filter.
+        // bare `if c;` - both branches null - is a subsetting filter.
         if (iff.then_branch == null and iff.else_branch == null) {
             return if (c.truthy()) .normal else .deleted;
         }
@@ -7065,11 +7065,11 @@ pub const Executor = struct {
                 try self.pdv.set(it.name, .{ .num = x }); // SAS leaves index one past the end
             },
             .list => |lst| {
-                // `do i = 1, 3, 5;` / mixed ranges — iterate each spec's values
+                // `do i = 1, 3, 5;` / mixed ranges - iterate each spec's values
                 specs: for (lst.specs) |spec| {
                     const sv = try self.ev.eval(spec.start);
-                    // A bare value with no `TO` range is exactly ONE iteration — assign
-                    // it verbatim. Covers char values (`do c="a","b";` — G-dolist) AND a
+                    // A bare value with no `TO` range is exactly ONE iteration - assign
+                    // it verbatim. Covers char values (`do c="a","b";` - G-dolist) AND a
                     // numeric-missing literal (`do s=10,.,30;`): `.` is a legitimate value,
                     // not a malformed range, so it must NOT hit the NaN guard below and be
                     // silently dropped (BUG-dolistmiss).
@@ -7109,14 +7109,14 @@ pub const Executor = struct {
 
     /// Move the PUT output column pointer to 1-based column `n`: pad the current
     /// line with spaces so the next item starts there. The ONE landing site for
-    /// both `@n` and `@(expression)` (GAP-atexpression-put) — a second copy would
+    /// both `@n` and `@(expression)` (GAP-atexpression-put) - a second copy would
     /// be a second ceiling to drift. ponytail: forward-only; a target before the
     /// current column can't rewind an append-only buffer, so it no-ops there
-    /// (SAS would overwrite) — note if a program needs it.
+    /// (SAS would overwrite) - note if a program needs it.
     fn putColPtr(self: *Executor, n: usize) Error!void {
         // BUG-putptroom: an unbounded @n pads gigabytes (hang/OOM). The parser
         // rejects oversized literals; guard the alloc site too (same ceiling,
-        // parser.zig max_put_ptr) — and `@(expr)` has no parse-time value at all,
+        // parser.zig max_put_ptr) - and `@(expr)` has no parse-time value at all,
         // so for that form THIS is the only guard.
         if (n > max_put_ptr)
             return self.diags.fail(error.ExecError, 0, "put: @{d} column pointer exceeds the {d} line-size ceiling", .{ n, max_put_ptr });
@@ -7125,17 +7125,17 @@ pub const Executor = struct {
     }
 
     /// `put` writes a line to the log. ponytail: list style only, single space
-    /// between values — SAS's column/format-driven spacing lands with B2 formats.
+    /// between values - SAS's column/format-driven spacing lands with B2 formats.
     fn runPut(self: *Executor, items: []const ast.PutItem) Error!void {
         var need_space = false;
         // BUG-putlistsep: a LIST-style value item (unformatted variable, named
         // `x=`, array element, _all_ list) leaves ONE trailing separator blank
-        // for WHATEVER follows — Language Reference: Concepts p.621's own log renders
+        // for WHATEVER follows - Language Reference: Concepts p.621's own log renders
         // `put k 'removed from hash object'` as `Joyce removed from hash
         // object`. A FORMATTED item fills its own field and owes none
         // (`put '[' x 5. ']'` → `[    42]`, BUG-putfmtblank); a literal adds
         // none of its own (`put 'lit' n` → `lit42`). need_space alone cannot
-        // carry this — it is set after formatted values too — so owe_blank
+        // carry this - it is set after formatted values too - so owe_blank
         // tracks "the previous item was list-style"; the literal arm is its
         // only new consumer (value arms keep their putfmtblank rules verbatim).
         var owe_blank = false;
@@ -7154,34 +7154,34 @@ pub const Executor = struct {
                 },
                 .literal => |lit| {
                     // BUG-putlistsep: collect the blank a list-style value owes
-                    // (Language Reference: Concepts p.621). DLM mode unchanged — literals stay
+                    // (Language Reference: Concepts p.621). DLM mode unchanged - literals stay
                     // undelimited there (the fileopts fixtures pin that).
                     if (owe_blank and !dlm_on) try self.putBuf().append(self.arena, sep);
                     try self.putBuf().appendSlice(self.arena, lit);
                     need_space = false;
                     owe_blank = false;
                 },
-                // `@n` — move the output column pointer to column n (1-based): pad the
+                // `@n` - move the output column pointer to column n (1-based): pad the
                 // current line with spaces so the next item starts at column n. ponytail:
                 // forward-only; `@n` before the current column can't rewind an append-only
-                // buffer, so it no-ops there (SAS would overwrite) — note if a program needs it.
+                // buffer, so it no-ops there (SAS would overwrite) - note if a program needs it.
                 .col => |n| {
                     try self.putColPtr(n);
                     need_space = false; // @col sets spacing explicitly
                     owe_blank = false;
                 },
-                // GAP-atexpression-put: `@(expression)` — Statements printed p.269,
+                // GAP-atexpression-put: `@(expression)` - Statements printed p.269,
                 // the PUT twin of INPUT's p.168 form. Evaluated PER PUT against the
                 // live PDV (the doc's own example is `b=5; put @(b*3) name $10.;`),
-                // clamped by io.clampCol — the SAME rule `@n`/`@var`/INPUT's
-                // `@(expr)` route through — then the SAME putColPtr as `.col`.
+                // clamped by io.clampCol - the SAME rule `@n`/`@var`/INPUT's
+                // `@(expr)` route through - then the SAME putColPtr as `.col`.
                 .col_expr => |e| {
                     switch (try self.ev.eval(e)) {
                         .num => |x| {
                             // The ceiling must see the RAW value, before clampCol.
                             // clampCol's out-of-range fallback is column 1, which for
                             // INPUT is a harmless short read but for PUT would
-                            // SILENTLY write at column 1 — `put @(1e20) x;` must fail
+                            // SILENTLY write at column 1 - `put @(1e20) x;` must fail
                             // loud like `put @(40000) x;`, not quietly move to the
                             // left margin. NaN (a SAS missing value) fails this
                             // comparison and so still lands on column 1, matching how
@@ -7191,7 +7191,7 @@ pub const Executor = struct {
                             try self.putColPtr(io.clampCol(x));
                         },
                         // A CHARACTER result is SAS's OTHER parenthesised form, the
-                        // `@(character-expression)` string search — unimplemented on
+                        // `@(character-expression)` string search - unimplemented on
                         // the INPUT side too (io.evalColExpr), and identical here:
                         // landing on column 1 would silently write the WRONG column.
                         .str => return self.diags.fail(error.ExecError, 0, "put: @(character-expression) string-search pointer is not supported", .{}),
@@ -7199,7 +7199,7 @@ pub const Executor = struct {
                     need_space = false;
                     owe_blank = false;
                 },
-                // `put a[i]` (runtime index) / `put a[*]` (every element) — BUG-putarrayref
+                // `put a[i]` (runtime index) / `put a[*]` (every element) - BUG-putarrayref
                 .array_elem => |ae| {
                     // special-list array members come from the live PDV (GH#48)
                     const elements = if (ae.special) |k| try eval.specialArrayNames(self.arena, self.pdv, k) else ae.elements;
@@ -7208,11 +7208,11 @@ pub const Executor = struct {
                         if (xf >= 1 and xf <= @as(f64, @floatFromInt(elements.len))) {
                             const nm = elements[@as(usize, @intFromFloat(xf)) - 1];
                             if (need_space) try self.putBuf().append(self.arena, sep);
-                            // `put a[i]=;` — named output: the label is the RESOLVED
+                            // `put a[i]=;` - named output: the label is the RESOLVED
                             // element's own name (a[2] → a2=; array a[3] x y z → y=).
                             if (ae.named) {
                                 // NOTE-temparraylabel: a _TEMPORARY_ element's PDV name
-                                // is synthesized (`_temp_x_6`) — echoing it leaks an
+                                // is synthesized (`_temp_x_6`) - echoing it leaks an
                                 // internal name. Label with the array-ref form instead
                                 // (x[6]=). ponytail: flat subscript even for multidim
                                 // (x[2,3] → x[6]=); the folded bounds aren't on the item.
@@ -7238,14 +7238,14 @@ pub const Executor = struct {
                     }
                 },
                 .variable => |v| {
-                    // `put _page_;` — page eject (form-feed), not a PDV lookup
+                    // `put _page_;` - page eject (form-feed), not a PDV lookup
                     // (BUG-putpage: fell through to missing → printed ".").
                     if (eqi(v.name, "_page_")) {
                         try self.putBuf().append(self.arena, '\x0c');
                         need_space = false;
                         owe_blank = false;
                         // `put _all_;` / `_numeric_` / `_character_` list every matching PDV
-                        // variable as `name=value` — char values via appendValue, not "."
+                        // variable as `name=value` - char values via appendValue, not "."
                         // (BUG-putall-char).
                     } else if (specialPutList(v.name)) |kind| {
                         try self.putAllVars(kind, &need_space, &owe_blank);
@@ -7253,18 +7253,18 @@ pub const Executor = struct {
                         const pa = peelAlign(v.fmt);
                         // GAP-putcolonformat: `put x : fmt.` is MODIFIED LIST
                         // OUTPUT, which spaces like a LIST item and not like a
-                        // formatted one — so it is peeled before the separator
+                        // formatted one - so it is peeled before the separator
                         // rule below and re-joins it on the list side.
                         const ml = peelColon(pa.fmt);
                         // LIST output: an item with an explicit format fills its own
-                        // field width — NO extra leading separator blank
+                        // field width - NO extra leading separator blank
                         // (BUG-putfmtblank); an unformatted list item keeps its one
                         // leading blank. (Named output below keeps its separator
-                        // unconditionally — SAS spaces `x=` items even formatted.)
+                        // unconditionally - SAS spaces `x=` items even formatted.)
                         if (need_space and (ml.fmt == null or ml.colon or dlm_on)) try self.putBuf().append(self.arena, sep);
                         // BUG-declaredobjnamevalue: a PUT item is not an
                         // expression, so this read is the one place a bare name
-                        // becomes a value WITHOUT passing eval's guard — `put h;`
+                        // becomes a value WITHOUT passing eval's guard - `put h;`
                         // rendered a fabricated `.` at exit 0.
                         try self.ev.rejectObjectName(v.name);
                         const val = self.pdv.get(v.name) orelse Value.missing;
@@ -7286,13 +7286,13 @@ pub const Executor = struct {
                         // LIST output: only an item with NO explicit format owes
                         // the next item a blank; a formatted item owes none
                         // (BUG-putlistsep / BUG-putfmtblank). A modified-list item
-                        // DOES owe one — p.298: "each value is followed by a
+                        // DOES owe one - p.298: "each value is followed by a
                         // single blank" (p.283 leans on exactly that, using
                         // `+(-1)` to take the blank back before a period).
                         owe_blank = ml.fmt == null or ml.colon;
                     }
                 },
-                // `put x=;` — "name=" with no gap before the value, spaced from siblings
+                // `put x=;` - "name=" with no gap before the value, spaced from siblings
                 .named => |n| {
                     if (specialPutList(n.name)) |kind| {
                         try self.putAllVars(kind, &need_space, &owe_blank);
@@ -7302,7 +7302,7 @@ pub const Executor = struct {
                         // case, not the reference-site spelling (Language Reference: Concepts p.537's
                         // log renders `put _n_= … first.state=` as
                         // `_N_=1 FIRST.State=1`; p.539: `first.x=` → `FIRST.x=1`).
-                        try self.ev.rejectObjectName(n.name); // `put h=;` — see the .variable arm above
+                        try self.ev.rejectObjectName(n.name); // `put h=;` - see the .variable arm above
                         try self.putBuf().appendSlice(self.arena, try self.putNamedLabel(n.name));
                         try self.putBuf().append(self.arena, '=');
                         const val = self.pdv.get(n.name) orelse Value.missing;
@@ -7328,18 +7328,18 @@ pub const Executor = struct {
         return null;
     }
 
-    /// `put _all_/_numeric_/_character_;` — emit each matching PDV variable as
+    /// `put _all_/_numeric_/_character_;` - emit each matching PDV variable as
     /// `name=value` (char values via appendValue → their text, not "."). The
     /// first./last. BY flags are internal and skipped (BUG-putall-char).
     fn putAllVars(self: *Executor, kind: PutAllKind, need_space: *bool, owe_blank: *bool) Error!void {
-        // two passes: data variables first, then the automatics — SAS lists
+        // two passes: data variables first, then the automatics - SAS lists
         // `_all_` with the automatics at the end, in the order `_ERROR_ _N_`
         // (CHARNUM-errorvar). Storage order is _N_ first, so emit the autos from
         // a fixed ordered list rather than storage order.
         for (self.pdv.vars.items) |v| {
             if (isByFlag(v.name)) continue;
-            // `_INFILE_` skipped too — an input-buffer echo, not a data var.
-            // `_SETOBS_` as well: internal nobs= machinery (PERF-loadrowdual —
+            // `_INFILE_` skipped too - an input-buffer echo, not a data var.
+            // `_SETOBS_` as well: internal nobs= machinery (PERF-loadrowdual -
             // it's now defined only when nobs= is used; every other special
             // list already skips it via eval.isAutoVar).
             if (eqi(v.name, "_n_") or eqi(v.name, "_error_") or eqi(v.name, "_iorc_") or eqi(v.name, "_infile_") or eqi(v.name, "_setobs_")) continue;
@@ -7358,15 +7358,15 @@ pub const Executor = struct {
 
     /// ISS-errordump (Language Reference: Concepts printed p.518, "How SAS Handles Invalid
     /// Data" action 4): an iteration that ENDS with `_ERROR_=1` dumps the
-    /// observation — every data variable as `name=value`, the automatics last
-    /// (`_ERROR_=1 _N_=k`) — so a bad-data row shows the user exactly what the
+    /// observation - every data variable as `name=value`, the automatics last
+    /// (`_ERROR_=1 _N_=k`) - so a bad-data row shows the user exactly what the
     /// PDV held when it was flagged. Fired at the row boundary, BEFORE the next
     /// iteration resets `_ERROR_`, and only when the program has not cleared the
-    /// flag itself (`if _error_ then _error_=0;` suppresses the dump — p.601's
+    /// flag itself (`if _error_ then _error_=0;` suppresses the dump - p.601's
     /// documented idiom, which is why the check reads the live PDV). The dump is
     /// LOG output: it rides the captured diagnostics (stderr in the CLI, main.zig
     /// keeps the listing on stdout), so no stdout golden moves. Rendering reuses
-    /// putAllVars verbatim — one var order, one skip list, one renderer for both
+    /// putAllVars verbatim - one var order, one skip list, one renderer for both
     /// `put _all_` and the dump.
     fn dumpErrorObs(self: *Executor) Error!void {
         const ev = self.pdv.get("_error_") orelse return;
@@ -7381,7 +7381,7 @@ pub const Executor = struct {
     }
 
     /// The label SAS prints for a `put name=;` item: the variable's DEFINED case
-    /// (GAP-putnamedcase — Language Reference: Concepts pp.537/538/539 logs). first./last. flags render
+    /// (GAP-putnamedcase - Language Reference: Concepts pp.537/538/539 logs). first./last. flags render
     /// the prefix uppercase + the base var's defined case (`FIRST.State=`); the
     /// automatics uppercase (`_N_=`); an unknown (uninitialized) name keeps its
     /// reference spelling.
@@ -7415,7 +7415,7 @@ pub const Executor = struct {
     }
 
     /// A variable's display format: the PDV var's own (fast path), else the
-    /// step's collected FORMAT/ATTRIB list — cached onto the var once found.
+    /// step's collected FORMAT/ATTRIB list - cached onto the var once found.
     fn resolveFormat(self: *Executor, name: []const u8) ?[]const u8 {
         if (self.pdv.formatOf(name)) |f| return f;
         for (self.formats.items) |f| if (eqi(f.name, name)) {
@@ -7427,7 +7427,7 @@ pub const Executor = struct {
 
     /// Where `put` writes: the external FILE buffer when a `file "path";` is in
     /// effect, otherwise the SAS log (the CLI's stdout). `file print;`/`file log;`
-    /// (GAP-fileprint) target the log too — opensas has one stdout stream for
+    /// (GAP-fileprint) target the log too - opensas has one stdout stream for
     /// both listing and log (main.zig), so both keywords route there.
     fn putBuf(self: *Executor) *std.ArrayList(u8) {
         if (self.put_redirect) |b| return b;
@@ -7436,7 +7436,7 @@ pub const Executor = struct {
     }
 
     /// Length of the line currently being built in the put buffer (bytes since the
-    /// last '\n'), i.e. the 0-based column the next write lands on — for `@n`/PUT.
+    /// last '\n'), i.e. the 0-based column the next write lands on - for `@n`/PUT.
     fn curLineLen(self: *Executor) usize {
         const buf = self.putBuf().items;
         if (std.mem.lastIndexOfScalar(u8, buf, '\n')) |nl| return buf.len - nl - 1;
@@ -7445,11 +7445,11 @@ pub const Executor = struct {
 
     fn appendValue(self: *Executor, v: Value) Error!void {
         switch (v) {
-            // List-PUT writes a char value's bytes verbatim — SAS preserves trailing
+            // List-PUT writes a char value's bytes verbatim - SAS preserves trailing
             // blanks here (e.g. `put x $char5.` → "ABC  "). So a GH#60 `''` blank
             // prints as a space; only CSV export drops an all-blank value (io.zig).
             .str => |s| try self.putBuf().appendSlice(self.arena, s),
-            // SAS default numeric format (BEST12.) — trims f64 noise. A PLAIN
+            // SAS default numeric format (BEST12.) - trims f64 noise. A PLAIN
             // missing prints the OPTIONS MISSING= char (BUG-optmissing); special
             // missings (.A–.Z/._) keep their letter via bestNum.
             .num => |x| try self.putBuf().appendSlice(self.arena, if (std.math.isNan(x) and Value.missingChar(x) == '.')
@@ -7468,7 +7468,7 @@ pub const Executor = struct {
 
     /// DSD-aware PUT field emission (BUG-fileopts): emit via emitField, then
     /// when FILE DSD is on and the emitted text holds the delimiter or a quote,
-    /// rewrap that slice in double quotes (doubling embedded quotes — CSV rules,
+    /// rewrap that slice in double quotes (doubling embedded quotes - CSV rules,
     /// SAS DSD semantics). Buffer-splice keeps emitField the single formatter.
     fn emitPutValue(self: *Executor, val: Value, fmt: ?[]const u8, al: PutAlign) Error!void {
         const f = self.file orelse return self.emitField(val, fmt, al);
@@ -7479,7 +7479,7 @@ pub const Executor = struct {
         const s = buf.items[start..];
         const dlm = f.dlm orelse ',';
         // Quote-trigger mirrors appendCsvField (PROC EXPORT): delimiter, '"', \n, \r.
-        // ponytail: no leading/trailing-blank trigger (export has one) — DSD char values
+        // ponytail: no leading/trailing-blank trigger (export has one) - DSD char values
         // are length-padded, so blank-triggered quoting would quote every char field.
         if (std.mem.indexOfScalar(u8, s, dlm) == null and std.mem.indexOfAny(u8, s, "\"\n\r") == null) return;
         var q: std.ArrayList(u8) = .empty;
@@ -7512,7 +7512,7 @@ pub const Executor = struct {
     }
 
     /// Peel the ':' MODIFIED LIST OUTPUT marker the parser prefixes to a PUT
-    /// item's format (GAP-putcolonformat, parser.tryModifiedList) — the same
+    /// item's format (GAP-putcolonformat, parser.tryModifiedList) - the same
     /// marker-byte convention as peelAlign's '>'/'<', which is peeled first
     /// because attachAlign prepends outside it.
     fn peelColon(fmt: ?[]const u8) struct { fmt: ?[]const u8, colon: bool } {
@@ -7556,12 +7556,12 @@ pub const Executor = struct {
 
     // ── output ───────────────────────────────────────────────────────────
 
-    /// `output [a b …];` — a bare `output;` writes to every dataset the DATA
+    /// `output [a b …];` - a bare `output;` writes to every dataset the DATA
     /// statement named; named targets route to one of those declared datasets.
     fn runOutput(self: *Executor, names: []const []const u8) Error!void {
         // MODIFY control statements REPLACE/REMOVE arrive as a \x00-sentinel OUTPUT
         // node (parser encodes them so no new AST variant is needed). They are valid
-        // ONLY inside a MODIFY step — in-place obs control has no meaning elsewhere,
+        // ONLY inside a MODIFY step - in-place obs control has no meaning elsewhere,
         // so fail loud (never silently rewrite/drop the wrong dataset).
         if (names.len == 1 and names[0].len > 1 and names[0][0] == 0) {
             const ctl = names[0][1..]; // "replace" | "remove"
@@ -7575,7 +7575,7 @@ pub const Executor = struct {
             // so REMOVE can't corrupt a partially-rewritten master. Both override the
             // implicit end-of-obs REPLACE for this iteration (obs_handled).
             // MODIFY-BY (transaction-driven): record into the driver's rebuild
-            // tables instead — the whole master is emitted at exhaustion (modifyFlush).
+            // tables instead - the whole master is emitted at exhaustion (modifyFlush).
             self.obs_handled = true;
             if (self.modify_by) |md| {
                 if (eqi(ctl, "replace")) {
@@ -7592,21 +7592,21 @@ pub const Executor = struct {
         // model re-emits the whole master, so emitting the modified PDV looks like
         // REPLACE and silently loses the untouched originals SAS would keep on disk.
         // MODIFY with a transaction (BY form) is different: OUTPUT is the Language Reference: Concepts p.601
-        // revised-program idiom for ADDING a no-match row — append the PDV obs to the
+        // revised-program idiom for ADDING a no-match row - append the PDV obs to the
         // rebuilt master and mark the obs handled so the implicit REPLACE doesn't
         // duplicate it this iteration.
         if (self.modify_names) |mn| {
             if (mn.len < 2) {
                 // The MODIFY entry itself documents OUTPUT inside a MODIFY step
                 // ("writes the current observation to the end of all data sets",
-                // Statements ref p.240ff) — valid SAS we bail on, so rc 2.
+                // Statements ref p.240ff) - valid SAS we bail on, so rc 2.
                 diag.markGap();
                 self.diags.report(.err, 0, "OUTPUT is not supported in a DATA step with MODIFY; use REPLACE or REMOVE", .{}) catch {};
                 return error.ExecError;
             }
             self.obs_handled = true;
             // MODIFY-BY: an explicit OUTPUT APPENDS the new obs (the p.601
-            // no-match idiom) — buffered, emitted at the END of the rebuilt
+            // no-match idiom) - buffered, emitted at the END of the rebuilt
             // master (in-place semantics; BUG-modifybymasterdriven).
             if (names.len == 0) {
                 if (self.modify_by) |md| {
@@ -7624,7 +7624,7 @@ pub const Executor = struct {
 
     /// A bare `output;` or the implicit bottom-of-step output: write the
     /// current observation to the primary AND every extra dataset the DATA
-    /// statement named (BUG-multioutput — Language Reference: Concepts DATA-statement semantics).
+    /// statement named (BUG-multioutput - Language Reference: Concepts DATA-statement semantics).
     fn outputAll(self: *Executor) Error!void {
         try self.output(self.cur_out.?);
         for (self.extra_outs) |x| try self.output(x);
@@ -7633,21 +7633,21 @@ pub const Executor = struct {
     /// The dataset a named `output` writes to: the primary, or one of the extra
     /// datasets the DATA statement declared. SAS 9.4 raises a compile-time ERROR
     /// ("The data set name is not in the list of output data sets") for any other
-    /// name — lazily registering it instead filled a PHANTOM dataset, left the
+    /// name - lazily registering it instead filled a PHANTOM dataset, left the
     /// declared one empty, and diagnosed nothing, so a typo (`output rst;` for
     /// `output rest;`) was silent data loss (BUG-outputundeclared). Loud ERROR +
-    /// halt at runtime — close enough to SAS's compile-time, never silent.
+    /// halt at runtime - close enough to SAS's compile-time, never silent.
     fn outputTarget(self: *Executor, name: []const u8) Error!*Dataset {
         if (self.outputNamed(name)) |ds| return ds;
         self.diags.report(.err, 0, "The data set name {s} is not in the list of output data sets for the DATA statement", .{name}) catch {};
         return error.ExecError;
     }
 
-    /// "Is this name one of the step's output data sets?" — the primary or one of
-    /// the DATA statement's extras — answered in ONE place, because two callers
+    /// "Is this name one of the step's output data sets?" - the primary or one of
+    /// the DATA statement's extras - answered in ONE place, because two callers
     /// ask it: a named `output <ds>;` (above) and MODIFY's master-membership
     /// restriction (assertModifyMasterIsOutput). `work.x` and `x` name the SAME
-    /// member — Library.put/find both compare through stripWork — so this must
+    /// member - Library.put/find both compare through stripWork - so this must
     /// strip it too, or the legal `data work.d; modify d;` reads as a mismatch.
     fn outputNamed(self: *Executor, name: []const u8) ?*Dataset {
         const want = stripWork(name);
@@ -7664,16 +7664,16 @@ pub const Executor = struct {
     /// Seed a fresh output dataset's columns from the PDV, honouring drop/keep and
     /// stamping format/label/declared-length. SAS defines the output schema at
     /// compile time, so a 0-row step (subsetting-if, all deletes, SET of empty)
-    /// still carries its columns — call this at step finalize when nothing output.
+    /// still carries its columns - call this at step finalize when nothing output.
     fn seedSchema(self: *Executor, out: *Dataset) Error!void {
-        // GAP-ch23med-tick296 F3: a MODIFY master's descriptor is FROZEN — it is
+        // GAP-ch23med-tick296 F3: a MODIFY master's descriptor is FROZEN - it is
         // the master's own, verbatim, never the PDV's. See modifyFrozenMaster.
         if (self.modifyFrozenMaster(out)) |m| {
             for (m.columns.items) |c| _ = try out.addColumnLike(c.name, c);
             return;
         }
         // ponytail: column order follows first-creation order, not SAS's
-        // source-appearance order — cosmetic until PROC PRINT cares.
+        // source-appearance order - cosmetic until PROC PRINT cares.
         for (self.pdv.vars.items) |v| {
             if (self.included(v.name)) _ = try out.addColumn(v.name, v.type);
         }
@@ -7689,7 +7689,7 @@ pub const Executor = struct {
         for (out.columns.items) |c| if (self.pdv.labelOf(c.name)) |l| out.setLabel(c.name, l);
         // Declared char width → output column. The PDV var carries it from either a
         // LENGTH/ATTRIB statement (seeded at step start) or a SET/MERGE source column
-        // (seedInputColumns), so stamping from the var covers both — a `set EMPTY`
+        // (seedInputColumns), so stamping from the var covers both - a `set EMPTY`
         // shell dataset keeps its Char n, not Char 1 (BUG-contentsmeta, ISS-attriblength).
         for (out.columns.items) |c| if (c.type == .char and c.len == null)
             if (self.pdv.indexOf(c.name)) |i| {
@@ -7697,12 +7697,12 @@ pub const Executor = struct {
                 if (L > 0) out.setLen(c.name, L);
             };
         // BUG-informatwidth: a char var whose ONLY width source is an INFORMAT
-        // statement (`informat c $15.;` — no LENGTH/ATTRIB, no $w. FORMAT) takes
+        // statement (`informat c $15.;` - no LENGTH/ATTRIB, no $w. FORMAT) takes
         // the informat width as its declared length (Language Reference: Concepts p.72: a var created
         // in a FORMAT/INFORMAT statement gets the spec's width). The FORMAT twin
         // resolves at display time (contentsLen's charFormatWidth fallback);
         // stamping here puts the real width on the descriptor so CONTENTS/OUT=
-        // and a read-back SET carry it. Descriptor-only — the PDV var's len
+        // and a read-back SET carry it. Descriptor-only - the PDV var's len
         // stays 0, so no storage truncation (EPIC-charfixedwidth's half).
         // ponytail: a conflicting $w. FORMAT + $v. INFORMAT on one var keeps
         // the FORMAT width regardless of statement order (SAS: first wins).
@@ -7726,7 +7726,7 @@ pub const Executor = struct {
     }
 
     /// The MODIFY master's LIVE dataset when `out` is the step's re-emission of
-    /// it — i.e. the one output whose descriptor MUST NOT CHANGE — else null.
+    /// it - i.e. the one output whose descriptor MUST NOT CHANGE - else null.
     ///
     /// GAP-ch23med-tick296 F3. MODIFY updates in place, so the descriptor is not
     /// the step's to rewrite. DATA Step Statements ref printed p.240 (pdf 251,
@@ -7735,9 +7735,9 @@ pub const Executor = struct {
     /// portion of a SAS data set, such as adding a variable." Language Reference: Concepts printed p.585
     /// (running header "Combining SAS Data Sets: Methods 585") repeats it as a
     /// Note, and Language Reference: Concepts printed p.588 Table 23.3 row "Scope of changes" gives the
-    /// FULL extent — MODIFY "cannot change the data set descriptor information,
+    /// FULL extent - MODIFY "cannot change the data set descriptor information,
     /// so changes such as ADDING OR DELETING variables, variable labels, and so
-    /// on, are not valid" — which is why this freezes the whole descriptor and
+    /// on, are not valid" - which is why this freezes the whole descriptor and
     /// not just the add half.
     ///
     /// opensas rebuilt the schema from the PDV on every commit, so all three
@@ -7749,20 +7749,20 @@ pub const Executor = struct {
     /// descriptor rule is the fix for all three rather than a guard on adds.
     ///
     /// NOT AN ERROR, and that is doc-settled rather than chosen: Statements ref
-    /// printed p.253 (footer "MODIFY Statement 253"), the Example 3 discussion —
+    /// printed p.253 (footer "MODIFY Statement 253"), the Example 3 discussion -
     /// "MODIFY does not add NWSTOCK to the INVTY.STOCK data set because that
     /// would modify the data set descriptor. Thus, it is not necessary to put
     /// NWSTOCK in a DROP statement." So a PDV variable outside the descriptor is
     /// simply not written, no diagnostic, and the reference states outright that
     /// a DROP is unnecessary. Failing loud here would have rejected the
     /// reference's OWN flagship Example 3, whose transaction variable NWSTOCK is
-    /// deliberately left undropped (D-014). The value is not lost, either — the
+    /// deliberately left undropped (D-014). The value is not lost, either - the
     /// example USES it (`instock = instock + nwstock`) and only declines to store
     /// it, so this is a scratch variable, not a discarded answer.
     ///
     /// Only the MASTER is frozen. `data invty.stock invty.stock95 invty.stock97;
     /// modify invty.stock;` (printed p.260 Example 8) writes two BRAND-NEW data
-    /// sets alongside it, and those take the ordinary full-PDV schema — hence the
+    /// sets alongside it, and those take the ordinary full-PDV schema - hence the
     /// per-output test rather than a step-wide flag.
     fn modifyFrozenMaster(self: *Executor, out: *Dataset) ?*Dataset {
         const names = self.modify_names orelse return null;
@@ -7770,7 +7770,7 @@ pub const Executor = struct {
         // BUG-modifymasteroptname: the same split the output guard needs. Without
         // it a subsetted `modify a(where=…)` matched no output and found no member,
         // so the descriptor freeze silently stopped protecting exactly the shape
-        // that was hardest to get right — the sibling caller the ticket did not name.
+        // that was hardest to get right - the sibling caller the ticket did not name.
         const master = splitSourceRef(names[0]);
         if (!std.ascii.eqlIgnoreCase(stripWork(out.name), stripWork(master.name))) return null;
         const m = self.lib.find(master.name) orelse return null;
@@ -7778,7 +7778,7 @@ pub const Executor = struct {
     }
 
     /// WARN (not halt) on a KEEP/DROP/RENAME statement name that resolves to no
-    /// PDV var — the "never been referenced" case (GH#22 ISS-dkrocondwarn).
+    /// PDV var - the "never been referenced" case (GH#22 ISS-dkrocondwarn).
     /// DKROCOND= governs this and defaults to WARN in SAS 9.4: the step still
     /// runs and writes its output (keeping/dropping only the vars that exist),
     /// job RC=4. GH#19 wrongly escalated to ERROR+abort, blocking valid programs
@@ -7794,14 +7794,14 @@ pub const Executor = struct {
 
     fn assertReferenced(self: *Executor, name: []const u8) Error!void {
         // A `pfx:` name-prefix wildcard (GAP-dropcolon) is a pattern, not a
-        // literal name — never a "never referenced" typo. Automatics and the
+        // literal name - never a "never referenced" typo. Automatics and the
         // parser's `_setobs_`/`_error_` helpers aren't data vars either, and the
         // helper may not reach the PDV on a 0-row read (io defines it per row).
         if (name.len > 0 and name[name.len - 1] == ':') return;
         if (self.pdv.indexOf(name) != null) return;
         if (isByFlag(name) or eqi(name, "_n_") or eqi(name, "_error_") or eqi(name, "_iorc_") or eqi(name, "_setobs_") or eqi(name, "_infile_")) return;
         // SET point=/nobs= temps dropped by dropSetControlTemp may never reach
-        // the PDV (an unassigned point var) — not a typo (BUG-setpointtemp).
+        // the PDV (an unassigned point var) - not a typo (BUG-setpointtemp).
         if (self.set_point_var) |pv| if (eqi(name, pv)) return;
         if (self.nobs_var) |nv| if (eqi(name, nv)) return;
         const up = try std.ascii.allocUpperString(self.arena, name);
@@ -7810,12 +7810,12 @@ pub const Executor = struct {
     }
 
     /// `_ALL_`/`_NUMERIC_`/`_CHARACTER_` in a RETAIN/KEEP/DROP list are SAS name
-    /// lists resolved against the PDV, not literal variable names — the parser
+    /// lists resolved against the PDV, not literal variable names - the parser
     /// passes them through as plain names, like `of _numeric_` (parser.zig:1755).
     /// Expand them here, right after declareVars completes the compile-time PDV,
     /// reusing the ARRAY special-list resolution (GH#48, eval.specialArrayNames).
     /// ponytail: membership uses declareVars' static type guesses (a later runtime
-    /// write can correct a guess) — move to live resolution in included()/
+    /// write can correct a guess) - move to live resolution in included()/
     /// isRetained() if a program ever depends on runtime-typed membership.
     fn expandSpecialVarLists(self: *Executor) Error!void {
         try self.expandSpecialVarList(&self.keeps);
@@ -7844,20 +7844,20 @@ pub const Executor = struct {
 
     /// `_ALL_`/`_NUMERIC_`/`_CHARACTER_` as a FORMAT/INFORMAT statement or ATTRIB
     /// format=/informat=/label= "variable": a name LIST (Statements Ref printed
-    /// p.24 — "_NUMERIC_ specifies all numeric variables … _ALL_ specifies all
+    /// p.24 - "_NUMERIC_ specifies all numeric variables … _ALL_ specifies all
     /// variables"), applied per member, never a column of its own
     /// (BUG-speciallistphantom, GH#79). Both lists expand here, right after the
     /// compile-time PDV completes, reusing the ARRAY special-list resolution
     /// (eval.specialArrayNames, GH#48) like expandSpecialVarLists. The num/char
     /// format-type check declareStmt runs on an explicitly named variable runs
-    /// per member here — `_all_` must not smuggle a numeric format onto a
+    /// per member here - `_all_` must not smuggle a numeric format onto a
     /// character variable past it (SAS errors that attach whichever way the
     /// variable was named; the `_numeric_`/`_character_` forms pre-filter by
     /// type, which is why SAS programs use THOSE for typed formats).
     fn expandSpecialFormats(self: *Executor) Error!void {
         // The type check is KEYED per list so each expanded member is validated
         // exactly once (BUG-informatallnotypecheck): scan appends a display
-        // format to BOTH lists, so it is checked on the .formats pass only —
+        // format to BOTH lists, so it is checked on the .formats pass only -
         // checking non-riders on both passes would report it twice (the dedup
         // the old `false` was for). But an informat (\x01 rider) lives on attrs
         // ONLY, so skipping the whole attrs pass let `informat _all_ 8.;`
@@ -7876,10 +7876,10 @@ pub const Executor = struct {
         for (list.items) |it| {
             if (specialVarList(it.name)) |kind| {
                 // label (\x00) riders and the `format x;` removal sentinel ($.)
-                // attach unchecked — like declareStmt's exclusions, they carry
+                // attach unchecked - like declareStmt's exclusions, they carry
                 // no display-format type to conflict. The item class this pass
                 // validates: display formats on the .formats pass, informat
-                // (\x01) riders on the .attrs pass — never both, never neither.
+                // (\x01) riders on the .attrs pass - never both, never neither.
                 const rider = it.fmt.len > 0 and (it.fmt[0] == 0 or it.fmt[0] == 1);
                 const spec = if (rider) it.fmt[1..] else it.fmt;
                 const class_match = switch (check) {
@@ -7915,7 +7915,7 @@ pub const Executor = struct {
     }
 
     fn included(self: *const Executor, name: []const u8) bool {
-        // first./last., `_N_`, `_ERROR_`, `_IORC_` and `_INFILE_` are automatics — never written out.
+        // first./last., `_N_`, `_ERROR_`, `_IORC_` and `_INFILE_` are automatics - never written out.
         if (isByFlag(name) or eqi(name, "_n_") or eqi(name, "_error_") or eqi(name, "_iorc_") or eqi(name, "_infile_")) return false;
         if (self.keep_mode) return self.nameInFast(&self.keeps_set, self.keeps.items, name);
         return !self.nameInFast(&self.drops_set, self.drops.items, name);
@@ -7927,14 +7927,14 @@ pub const Executor = struct {
 
     /// BUG-prefixreadflags: define a read-flag automatic (first./last., end=,
     /// in=) with its SAS initial value 0 and mark it retained so the
-    /// top-of-iteration reset skips it (Language Reference: Concepts p.79 — automatics are retained,
+    /// top-of-iteration reset skips it (Language Reference: Concepts p.79 - automatics are retained,
     /// never set to missing).
     fn keepReadFlag(self: *Executor, name: []const u8) Error!void {
         try self.pdv.set(name, .{ .num = 0 });
         try self.retained.append(self.arena, name);
     }
 
-    /// O(1) nameIn: hash lookup when freezeNameLists populated `set` — an empty
+    /// O(1) nameIn: hash lookup when freezeNameLists populated `set` - an empty
     /// set means an empty list, a `pfx:` wildcard list, or pre-freeze, and the
     /// linear scan is right for all three (PERF-arraydeclquad).
     fn nameInFast(self: *const Executor, set: *const std.StringHashMapUnmanaged(void), list: []const []const u8, name: []const u8) bool {
@@ -7975,7 +7975,7 @@ pub const Executor = struct {
     /// `ling` folds the character arm to SORTSEQ=LINGUISTIC dictionary order.
     /// ONLY the three sortedness verifies pass the system flag
     /// (io.global_sortseq_linguistic, BUG-sortseq-byverify-datastep): every
-    /// other caller — the interleave/group picks and the group-change checks —
+    /// other caller - the interleave/group picks and the group-change checks -
     /// passes `false` and stays BYTE-EXACT, so fold-equal neighbours (A vs a)
     /// pass the order check yet remain separate BY groups. The same
     /// order/grouping split as proc.zig's byOrderViolation-vs-byte-equality
@@ -8005,7 +8005,7 @@ pub const Executor = struct {
     /// Set `first.<var>` / `last.<var>` for the observation now in the PDV.
     /// `first.<var>[k]` is 1 from the first BY level that changed vs the previous
     /// obs on down; `last.<var>[k]` likewise vs the next obs (peeked). BY needs
-    /// sorted SET input — only the `sets` driver can look ahead, so other drivers
+    /// sorted SET input - only the `sets` driver can look ahead, so other drivers
     /// leave the flags unset. ponytail: no sortedness check (input assumed sorted).
     fn applyBy(self: *Executor, d: *Driver, bys: []const []const u8) Error!void {
         const cur = try self.arena.alloc(Value, bys.len);
@@ -8063,7 +8063,7 @@ pub const Executor = struct {
     }
 
     /// SET+BY: truncate a raw BY tuple in place to the PDV storage width so
-    /// last./the sortedness check compare the SAME value first./PDV do — char
+    /// last./the sortedness check compare the SAME value first./PDV do - char
     /// LENGTH and numeric LENGTH<8 byte-truncation (GH#46). Twin of MERGE's
     /// byTupleInto/by_len (BUG-mergebyvarlen): without it a value differing only
     /// past the declared length splits a spurious group (wrong last.) or trips a
@@ -8081,7 +8081,7 @@ pub const Executor = struct {
                     tup[j] = .{ .str = s[0..vr.len] };
                 },
                 // ponytail: mirrors pdv.setAt's GH#46 high-N-byte mask; kept local
-                // (3 lines) so the fix stays in exec.zig — pdv.truncNum is the
+                // (3 lines) so the fix stays in exec.zig - pdv.truncNum is the
                 // source of truth if this ever needs to change.
                 .num => |x| if (vr.type == .num and vr.numlen >= 3 and vr.numlen < 8 and std.math.isFinite(x)) {
                     const shift: u6 = @intCast(8 * (8 - vr.numlen));
@@ -8130,7 +8130,7 @@ fn isByFlag(name: []const u8) bool {
     return startsWithI(name, "first.") or startsWithI(name, "last.");
 }
 
-/// First BY level at which two group keys differ (len when equal) — the level
+/// First BY level at which two group keys differ (len when equal) - the level
 /// from which first./last. flags turn on (BUG-mergefirstlast).
 fn changeLevel(a: []const Value, b: []const Value) usize {
     for (a, 0..) |v, k| if (!valueEq(v, b[k])) return k;
@@ -8138,7 +8138,7 @@ fn changeLevel(a: []const Value, b: []const Value) usize {
 }
 
 /// BY-key equality of a dataset row against a key tuple, without allocating a
-/// tuple (the MODIFY-BY master scan calls this per row — BUG-modifybymasterdriven).
+/// tuple (the MODIFY-BY master scan calls this per row - BUG-modifybymasterdriven).
 fn rowKeyEq(ds: *Dataset, row: usize, cols: []const ?usize, key: []const Value) bool {
     const cells = ds.row(row);
     for (cols, 0..) |c, j| {
@@ -8159,7 +8159,7 @@ fn eqi(a: []const u8, b: []const u8) bool {
 
 /// True if CALL EXECUTE's queued text uses a macro-quoting function we'd have
 /// to resolve when the queue drains (%str/%nrstr/%quote/%bquote/%nrbquote/
-/// %unquote) — the macro facility is gone by then, so the caller fails LOUD
+/// %unquote) - the macro facility is gone by then, so the caller fails LOUD
 /// instead of running quoting syntax as literal source (FEAT-callexecute, D-002).
 fn hasMacroQuoting(s: []const u8) bool {
     const forms = [_][]const u8{ "%str(", "%nrstr(", "%quote(", "%bquote(", "%nrbquote(", "%unquote(" };
@@ -8173,16 +8173,16 @@ fn hasMacroQuoting(s: []const u8) bool {
 /// at every loop entry, so the cached op stream is safe to reuse each iteration).
 const Op = union(enum) {
     stmt: *const ast.Stmt, // a non-control statement, run via runStmt
-    jmp: usize, // GOTO (compiled) — absolute PC
-    link: usize, // LINK (compiled) — push pc+1, jump
+    jmp: usize, // GOTO (compiled) - absolute PC
+    link: usize, // LINK (compiled) - push pc+1, jump
     jfalse: struct { cond: *const ast.Expr, target: usize }, // eval cond; falsy → target (IF / DO WHILE-UNTIL)
-    // `do i = start to stop by step;` — enter evaluates+validates the bounds
+    // `do i = start to stop by step;` - enter evaluates+validates the bounds
     // (bad → optional note + skip_pc, matching runDo's early return), else arms st.
     do_enter: struct { name: []const u8, start: *const ast.Expr, stop: *const ast.Expr, by: ?*const ast.Expr, st: *DoState, skip_pc: usize, note_bad: bool },
     do_chk: struct { st: *DoState, fail_pc: usize }, // in range → pc+1 (body), else fail_pc
     do_set: struct { name: []const u8, st: *DoState }, // body top: index var = st.x
     do_incr: struct { st: *DoState, chk_pc: usize, name: ?[]const u8 = null }, // x += step, back to chk (CONTINUE lands here); name set → re-read index from PDV first (iterative DO honors body reassignment)
-    do_final: struct { name: []const u8, st: *DoState }, // iterative-DO exit: index one past (LEAVE lands here — pre-incr, like `break`)
+    do_final: struct { name: []const u8, st: *DoState }, // iterative-DO exit: index one past (LEAVE lands here - pre-incr, like `break`)
     do_setv: struct { name: []const u8, value: *const ast.Expr }, // single-value list-DO spec: assign verbatim (char-safe)
 };
 
@@ -8193,8 +8193,8 @@ const LoopCtx = struct { cont: std.ArrayList(usize) = .empty, brk: std.ArrayList
 
 /// Flattens a statement list into ops. Labels record their PC (first definition
 /// wins, like the old top-level scan); GOTO/LINK record a patch site; CONTINUE/
-/// LEAVE become jumps patched to the enclosing loop's incr/exit (a stray one —
-/// lexically outside any loop — stays a plain statement, preserving the old
+/// LEAVE become jumps patched to the enclosing loop's incr/exit (a stray one -
+/// lexically outside any loop - stays a plain statement, preserving the old
 /// fall-through-to-output behaviour).
 const OpCompiler = struct {
     a: std.mem.Allocator,
@@ -8202,7 +8202,7 @@ const OpCompiler = struct {
     labels: std.ArrayList(struct { name: []const u8, pc: usize }) = .empty,
     xfers: std.ArrayList(struct { op: usize, name: []const u8 }) = .empty,
     loops: std.ArrayList(LoopCtx) = .empty,
-    // First stray LEAVE/CONTINUE keyword (outside every DO loop) — a SAS compile
+    // First stray LEAVE/CONTINUE keyword (outside every DO loop) - a SAS compile
     // ERROR (728-185), reported by compileProgram so the step never runs.
     stray_lc: ?[]const u8 = null,
 
@@ -8249,7 +8249,7 @@ const OpCompiler = struct {
             .goto => |name| _ = try c.xfers.append(c.a, .{ .op = try c.emit(.{ .jmp = 0 }), .name = name }),
             .link => |name| _ = try c.xfers.append(c.a, .{ .op = try c.emit(.{ .link = 0 }), .name = name }),
             .if_ => |iff| {
-                // bare `if c;` — both branches null — is a subsetting filter: keep
+                // bare `if c;` - both branches null - is a subsetting filter: keep
                 // it a plain statement so runStmt returns .deleted as before.
                 if (iff.then_branch == null and iff.else_branch == null) {
                     _ = try c.emit(.{ .stmt = s });
@@ -8296,7 +8296,7 @@ const OpCompiler = struct {
                     for (ctx.brk.items) |i| c.patch(i, brk_t);
                 },
                 .list => |lst| {
-                    // `do i = v1, a to b, …;` — the body compiles once PER SPEC (a
+                    // `do i = v1, a to b, …;` - the body compiles once PER SPEC (a
                     // bad range silently yields nothing, no note; LEAVE exits all).
                     var brks: std.ArrayList(usize) = .empty;
                     for (lst.specs) |spec| {
@@ -8374,7 +8374,7 @@ fn valueEq(a: Value, b: Value) bool {
 
 /// UPDATE "no-change" test: only a PLAIN numeric missing (`.`) or an all-blank
 /// character value in the transaction is skipped (keeps the master). A SPECIAL
-/// missing (.A–.Z / ._) is a real value that MUST overwrite — it is the
+/// missing (.A–.Z / ._) is a real value that MUST overwrite - it is the
 /// doc-sanctioned way to blank a master value (Language Reference: Concepts p.586; BUG-updatespecialmiss).
 /// Special missings ride in the NaN payload, so gate on missingRank==1 (plain)
 /// rather than any-NaN, which swallowed .A/.Z/._ as no-change.
@@ -8392,7 +8392,7 @@ fn isUpdateMissing(v: Value) bool {
 /// as the lowest value. Two missings are NOT automatically equal: special
 /// missings (.A–.Z, ._) are distinct values that compare and sort by rank
 /// (._ < . < .A < … < .Z < every number), mirroring the evaluator's cmpNum
-/// (eval.zig) — the old any-NaN-equals-any-NaN collapse merged .A into . for
+/// (eval.zig) - the old any-NaN-equals-any-NaN collapse merged .A into . for
 /// hash keys and MERGE BY (BUG-execmissdistinct).
 fn cmpValueOrd(a: Value, b: Value) std.math.Order {
     if (a == .str and b == .str) {
@@ -8416,7 +8416,7 @@ fn cmpValueOrd(a: Value, b: Value) std.math.Order {
 }
 
 /// SORTSEQ=LINGUISTIC dictionary order for the sortedness verify's character
-/// arm — byte-for-byte proc.zig's cmpStrLing (and main.zig's cmpStrLingTrim
+/// arm - byte-for-byte proc.zig's cmpStrLing (and main.zig's cmpStrLingTrim
 /// twin): letters compare case-folded, blank-padded like cmpValueOrd so a
 /// prefix orders below its extension (BUG-sortseq-byverify-datastep).
 fn cmpStrOrdLing(a: []const u8, b: []const u8) std.math.Order {
@@ -8448,7 +8448,7 @@ fn parseHashOrder(v: Value) HashOrder {
 }
 
 /// Sort a hash's entries by key tuple for an `ordered:` hash. ponytail: sorted
-/// lazily at each iteration start / output, not maintained on every add — fine
+/// lazily at each iteration start / output, not maintained on every add - fine
 /// for the build-then-walk pattern; move to insertion-sort if add-during-walk
 /// order ever matters.
 fn hashSortEntries(h: *HashObject) void {
@@ -8493,7 +8493,7 @@ fn zeros(a: std.mem.Allocator, n: usize) Error![]usize {
     return z;
 }
 
-/// True when the INPUT items carry an explicit RECORD advance (`/` or `#n`) —
+/// True when the INPUT items carry an explicit RECORD advance (`/` or `#n`) -
 /// nameless pointer-control items whose informat starts with the control char.
 /// Under MISSOVER/TRUNCOVER/STOPOVER these split the read into per-record
 /// segments (BUG-inputmultirecmode); `@col`/`+n` are column moves, not advances.
@@ -8530,7 +8530,7 @@ fn recordShort(line: []const u8, from: usize, items: []const ast.InputItem, dlm:
     if (need == 0) return false;
     var avail: usize = 0;
     if (dlm) |d| {
-        // BUG-dlmmultichar: `d` is a delimiter SET — count bytes that are members.
+        // BUG-dlmmultichar: `d` is a delimiter SET - count bytes that are members.
         const rest = if (from <= line.len) line[from..] else "";
         var seps: usize = 0;
         for (rest) |ch| if (std.mem.indexOfScalar(u8, d, ch) != null) {
@@ -8545,14 +8545,14 @@ fn recordShort(line: []const u8, from: usize, items: []const ast.InputItem, dlm:
     return avail < need;
 }
 
-/// True if `line` from byte `pos` on is only whitespace — the held record is
+/// True if `line` from byte `pos` on is only whitespace - the held record is
 /// spent and the driver should step to the next line.
 fn onlyWsFrom(line: []const u8, pos: usize) bool {
     if (pos >= line.len) return true;
     return std.mem.indexOfNone(u8, line[pos..], " \t") == null;
 }
 
-/// `_ALL_`/`_NUMERIC_`/`_CHARACTER_` — the special variable name lists, or null
+/// `_ALL_`/`_NUMERIC_`/`_CHARACTER_` - the special variable name lists, or null
 /// for an ordinary name (RETAIN/KEEP/DROP expansion; mirrors eval's ARRAY/`of`
 /// specialList and the `put _all_` specialPutList).
 fn specialVarList(name: []const u8) ?ast.SpecialArr {
@@ -8563,8 +8563,8 @@ fn specialVarList(name: []const u8) ?ast.SpecialArr {
 }
 
 /// Insert `list`'s names (lowercased) into `set` for O(1) membership. A
-/// `pfx:` wildcard entry (GAP-dropcolon) leaves the set EMPTY — checked before
-/// any insert — so membership falls back to nameIn's prefix scan.
+/// `pfx:` wildcard entry (GAP-dropcolon) leaves the set EMPTY - checked before
+/// any insert - so membership falls back to nameIn's prefix scan.
 fn freezeNameList(arena: std.mem.Allocator, set: *std.StringHashMapUnmanaged(void), list: []const []const u8) Error!void {
     for (list) |n| if (n.len > 0 and n[n.len - 1] == ':') return;
     for (list) |n| try set.put(arena, try std.ascii.allocLowerString(arena, n), {});
@@ -8581,7 +8581,7 @@ fn nameIn(list: []const []const u8, name: []const u8) bool {
 }
 
 /// The common char-RETURNING functions, for the compile-time type guess
-/// (BUG-pdvcompilevars). Not exhaustive — a wrong num guess self-heals on an
+/// (BUG-pdvcompilevars). Not exhaustive - a wrong num guess self-heals on an
 /// executed path (pdv.declare/set), so only never-executed assignments of a
 /// missing entry would mistype, as numeric missing instead of blank.
 const char_fns = [_][]const u8{
@@ -8592,9 +8592,9 @@ const char_fns = [_][]const u8{
     "quote",     "dequote",   "byte",    "char",     "coalescec", "ifc",
     "choosec",   "symget",    "resolve", "vname",    "vtype",     "vformat",
     "vinformat", "vlabel",
-    // `__assignc(rhs, n)` — the parser's own assignment-to-length-n-char-var
+    // `__assignc(rhs, n)` - the parser's own assignment-to-length-n-char-var
     // wrapper; its result is char by construction. Missing here, a var first
-    // assigned a literal under a (late) LENGTH guessed NUMERIC in the PDV —
+    // assigned a literal under a (late) LENGTH guessed NUMERIC in the PDV -
     // and NOTE-fmtnumoncharcoerce's format type check then false-fired on a
     // later legitimate char format (`length nm $8; nm="Ada"; format nm $char8.;`).
     "__assignc",
@@ -8717,7 +8717,7 @@ fn valLess(_: void, a: Value, b: Value) bool {
 }
 
 /// BUG-combcallcrash: a user-supplied n/k CALL arg → nonneg integer. <1 or
-/// out-of-range (NaN/±inf/huge — fns.toInt returns null) → 0, so the routine's
+/// out-of-range (NaN/±inf/huge - fns.toInt returns null) → 0, so the routine's
 /// `k==0`/`k>n` guard no-ops instead of trapping `@intFromFloat`.
 fn combN(x: f64) usize {
     const i = fns.toInt(x) orelse return 0;
@@ -8725,8 +8725,8 @@ fn combN(x: f64) usize {
 }
 
 /// BUG-combcallcrash: a user-supplied 1-based "count" CALL arg → 0-based rank
-/// clamped to [0, max]. Out-of-range (huge/NaN/inf) clamps to `max` — SAS: a
-/// past-the-end count yields the last item — and never traps `@intFromFloat`.
+/// clamped to [0, max]. Out-of-range (huge/NaN/inf) clamps to `max` - SAS: a
+/// past-the-end count yields the last item - and never traps `@intFromFloat`.
 fn combRank(comptime T: type, x: f64, max: T) T {
     const i = fns.toInt(x) orelse return max;
     return if (i < 1) 0 else @min(@as(T, @intCast(i)) - 1, max);
@@ -8742,7 +8742,7 @@ fn binom(n: usize, k: usize) usize {
 }
 
 /// Fill `buf` (length n) with the 0-based index permutation at Trotter-Johnson
-/// (Steinhaus-Johnson-Trotter, minimal-change) rank `rank` — SAS's ALLPERM order.
+/// (Steinhaus-Johnson-Trotter, minimal-change) rank `rank` - SAS's ALLPERM order.
 /// Kreher & Stinson, Combinatorial Algorithms, §2.4.
 fn tjUnrank(buf: []usize, n: usize, rank: usize) void {
     if (n == 0) return;
@@ -8778,7 +8778,7 @@ fn tjUnrank(buf: []usize, n: usize, rank: usize) void {
     for (0..n) |idx| buf[idx] = pi[idx + 1] - 1;
 }
 
-/// The k-combinations of {0..n-1} in revolving-door (minimal-change) order — SAS's
+/// The k-combinations of {0..n-1} in revolving-door (minimal-change) order - SAS's
 /// ALLCOMB order. Recursive: A(n,k) = A(n-1,k), then reverse(A(n-1,k-1) with n-1).
 fn revolvingDoor(a: std.mem.Allocator, n: usize, k: usize) error{OutOfMemory}![]const []const usize {
     if (k == 0) {
@@ -8821,7 +8821,7 @@ fn stmtHasOutput(s: ast.Stmt) bool {
     return switch (s) {
         // A real OUTPUT statement suppresses the implicit one; the \x00-sentinel
         // MODIFY REPLACE/REMOVE encoding does NOT (it only overrides per-obs, via
-        // the run-time obs_handled flag — an untouched obs keeps its implicit REPLACE).
+        // the run-time obs_handled flag - an untouched obs keeps its implicit REPLACE).
         .output => |names| !(names.len == 1 and names[0].len > 0 and names[0][0] == 0),
         .do_ => |d| for (d.body) |b| {
             if (stmtHasOutput(b)) break true;
@@ -8849,7 +8849,7 @@ fn diagsWarn(d: *const diag.Diagnostics, needle: []const u8) bool {
 }
 
 test "GH#22 ISS-dkrocondwarn: KEEP statement of a never-referenced var WARNs and continues; a later-created var stays legal" {
-    // typo — KEEP names YY, but the step only ever holds x → DKROCOND=WARN:
+    // typo - KEEP names YY, but the step only ever holds x → DKROCOND=WARN:
     // WARN, step still runs and writes its output, no syntax-check poison.
     {
         var f = fixture();
@@ -8868,7 +8868,7 @@ test "GH#22 ISS-dkrocondwarn: KEEP statement of a never-referenced var WARNs and
         try t.expect(!f.diags.hasStepErrors()); // no abort / syntax-check poison
         try t.expect(out.rowCount() == 1); // step still produced its output
     }
-    // nuance — KEEP names `later`, CREATED AFTER the keep statement → NO error,
+    // nuance - KEEP names `later`, CREATED AFTER the keep statement → NO error,
     // and the var reaches the output (validated against the final PDV).
     {
         var f = fixture();
@@ -8891,13 +8891,13 @@ test "GH#22 ISS-dkrocondwarn: KEEP statement of a never-referenced var WARNs and
     }
 }
 
-test "GH#31: undeclared char width stamps at the first TEXTUAL literal — branch order, dead code, retain position" {
+test "GH#31: undeclared char width stamps at the first TEXTUAL literal - branch order, dead code, retain position" {
     // SAS compiles the whole step before a row runs: the width comes from the
     // first occurrence in SOURCE order, branches and dead code included
     // (Language Reference: Concepts p.49, "Creating Variables"). Three shapes
     // the GH#27 runtime stamps got wrong (executed-first), plus the two
     // controls that were already right and must stay so.
-    // p1 — the repro: the THEN branch's wider literal is textually first ($6)
+    // p1 - the repro: the THEN branch's wider literal is textually first ($6)
     // even though the ELSE executes first on row 1.
     {
         var f = fixture();
@@ -8920,7 +8920,7 @@ test "GH#31: undeclared char width stamps at the first TEXTUAL literal — branc
         try t.expectEqualStrings("abcdef", out.row(1)[yi].str); // was "ab": $2 from the executed ELSE
         try t.expectEqual(@as(usize, 6), f.pdv.vars.items[f.pdv.indexOf("y").?].len);
     }
-    // p3 — dead code still stamps: `if 0 then y='abcdefgh'` never runs, its
+    // p3 - dead code still stamps: `if 0 then y='abcdefgh'` never runs, its
     // literal is still the first TEXTUAL occurrence ($8).
     {
         var f = fixture();
@@ -8938,9 +8938,9 @@ test "GH#31: undeclared char width stamps at the first TEXTUAL literal — branc
         try t.expectEqualStrings("abcdef", out.row(0)[out.indexOf("y").?].str); // was "ab"
         try t.expectEqual(@as(usize, 8), f.pdv.vars.items[f.pdv.indexOf("y").?].len);
     }
-    // p7 + p5 — retain position: an assignment textually BEFORE the retain
+    // p7 + p5 - retain position: an assignment textually BEFORE the retain
     // statement outranks its init ($6); textually AFTER, the init wins ($2)
-    // and the assignment truncates — that control was already correct.
+    // and the assignment truncates - that control was already correct.
     {
         var f = fixture();
         defer f.deinit();
@@ -9010,7 +9010,7 @@ test "NOTE-ofvarlistuninit: `sum(of _numeric_)`/`of _character_` emit NO spuriou
     // The parser's expandOf passes the reserved list name through as a plain
     // .variable for RUNTIME expansion (eval.zig), so the uninit scan saw a
     // "variable" that can never be one (Language Reference: Concepts ch.25 reserves the three list
-    // names) and noted it — the value was always correct, the NOTE spurious.
+    // names) and noted it - the value was always correct, the NOTE spurious.
     // Dead-branch calls (the fixture evaluator wires no call_fn): the uninit
     // scan is compile-time and walks them anyway; live values are pinned end
     // to end by tests/corpus/of_varlist_uninit.
@@ -9045,7 +9045,7 @@ test "BUG-putpagenote: put _page_/_all_/_numeric_/_character_ emit NO uninit NOT
     defer f.deinit();
     f.prime();
     var x = f.exec();
-    // The PUT directive/list pseudo-names are not PDV reads — no NOTE for them;
+    // The PUT directive/list pseudo-names are not PDV reads - no NOTE for them;
     // `ghost` is a genuine uninitialized read → exactly one NOTE, for ghost only.
     const items = [_]ast.PutItem{
         .{ .variable = .{ .name = "_page_" } },
@@ -9071,7 +9071,7 @@ test "BUG-putpagenote: put _page_/_all_/_numeric_/_character_ emit NO uninit NOT
 
 test "GAP-atexpression-put: PUT @(expr) clamps zero/negative to column 1 (p.269); a character result and an over-ceiling column both fail LOUD" {
     // The positive/truncating/computed arms are pinned by tests/corpus/
-    // put_atexpression.sas; these three cannot be — two are hard ERRORs (the
+    // put_atexpression.sas; these three cannot be - two are hard ERRORs (the
     // corpus diffs stdout only) and the ceiling one would otherwise pad 40 KB.
     {
         var f = fixture();
@@ -9093,7 +9093,7 @@ test "GAP-atexpression-put: PUT @(expr) clamps zero/negative to column 1 (p.269)
     }
     {
         // A CHARACTER result is SAS's OTHER parenthesised form, the
-        // @(character-expression) string search — unimplemented on INPUT
+        // @(character-expression) string search - unimplemented on INPUT
         // (io.evalColExpr) and identically loud here: silently landing on
         // column 1 would write the WRONG column (D-002/D-003).
         var f = fixture();
@@ -9136,7 +9136,7 @@ test "GAP-atexpression-put: PUT @(expr) clamps zero/negative to column 1 (p.269)
         try t.expect(std.mem.indexOf(u8, f.diags.list.items[f.diags.list.items.len - 1].message, "line-size ceiling") != null);
     }
     {
-        // A MISSING pointer value (NaN) is not "out of range" — it lands on column
+        // A MISSING pointer value (NaN) is not "out of range" - it lands on column
         // 1, exactly as io.ptrCol treats a missing `@var`. It must NOT trip the
         // ceiling guard above (NaN fails every comparison, deliberately).
         var f = fixture();
@@ -9154,7 +9154,7 @@ test "GAP-atexpression-put: PUT @(expr) clamps zero/negative to column 1 (p.269)
 test "BUG-firstlastnotbyvar: first./last. of a non-BY var gets the uninitialized NOTE (typo'd flag), a genuine BY flag stays silent" {
     // Language Reference: Concepts p.540's payroll program, one letter changed (`first.Departmnt` for
     // `first.Department`): the accumulator never resets, so DDG reports
-    // 1,148,000 instead of 448,000 — SAS prints those same numbers AND logs
+    // 1,148,000 instead of 448,000 - SAS prints those same numbers AND logs
     // `NOTE: Variable first.Departmnt is uninitialized.` (a NOTE; SAS
     // CONTINUES, so this must never be a hard ERROR). `temp` below is the
     // chapter's salaries table already sorted by Department.
@@ -9162,7 +9162,7 @@ test "BUG-firstlastnotbyvar: first./last. of a non-BY var gets the uninitialized
     const cats = [_][]const u8{ "Salaried", "Hourly", "Hourly", "Salaried" };
     const rates = [_]f64{ 20000, 230, 200, 4000 };
 
-    // block 1 — the typo'd flag: the NOTE fires, values stay SAS-faithful.
+    // block 1 - the typo'd flag: the NOTE fires, values stay SAS-faithful.
     {
         var f = fixture();
         defer f.deinit();
@@ -9186,7 +9186,7 @@ test "BUG-firstlastnotbyvar: first./last. of a non-BY var gets the uninitialized
         const else_hr: ast.Stmt = .{ .if_ = .{ .cond = f.bin(.eq, f.vbl("WageCategory"), f.e(.{ .str = "Hourly" })), .then_branch = &then_hr, .else_branch = null } };
         // if first.Departmnt then Payroll=0;   ← the typo (never fires)
         const reset: ast.Stmt = .{ .assign = .{ .target = "Payroll", .value = f.num(0) } };
-        // Payroll + YearlyWage;  (the sum statement — retain 0 above makes the
+        // Payroll + YearlyWage;  (the sum statement - retain 0 above makes the
         // plain add exact; the fixture's evaluator wires no call_fn for sum())
         const prog = [_]ast.Stmt{
             .{ .set = &sets },
@@ -9200,7 +9200,7 @@ test "BUG-firstlastnotbyvar: first./last. of a non-BY var gets the uninitialized
         var out = Dataset.init(f.a(), "work.out");
         try x.run(&prog, &out);
 
-        // SAS's NOTE — once, reference case preserved, NOTE severity only.
+        // SAS's NOTE - once, reference case preserved, NOTE severity only.
         try t.expect(diagsNote(&f.diags, "Variable first.Departmnt is uninitialized."));
         try t.expect(!f.diags.hasStepErrors());
         // …and the numbers stay the SAS-faithful typo'd ones: BAD 700,000 and
@@ -9212,7 +9212,7 @@ test "BUG-firstlastnotbyvar: first./last. of a non-BY var gets the uninitialized
         try t.expectEqualStrings("DDG", out.row(1)[out.indexOf("Department").?].str);
         try t.expectEqual(@as(f64, 1148000), out.row(1)[pc].num);
     }
-    // block 2 — the CORRECT spelling: no NOTE, accumulator resets (DDG = 448,000).
+    // block 2 - the CORRECT spelling: no NOTE, accumulator resets (DDG = 448,000).
     {
         var f = fixture();
         defer f.deinit();
@@ -9255,7 +9255,7 @@ test "BUG-firstlastnotbyvar: first./last. of a non-BY var gets the uninitialized
 }
 
 test "BUG-spuriousnote: MERGE in= flags + hash-method targets note NO uninit NOTE; a real uninit var still notes" {
-    // 1. `merge a(in=ina) b(in=inb); z = (ina = 1);` — ina/inb are set per read
+    // 1. `merge a(in=ina) b(in=inb); z = (ina = 1);` - ina/inb are set per read
     // by the merge driver, never PDV-seeded → no NOTE.
     {
         var f = fixture();
@@ -9278,7 +9278,7 @@ test "BUG-spuriousnote: MERGE in= flags + hash-method targets note NO uninit NOT
             .{ .merge = &names },
             .{ .by = &bys },
             .{ .assign = .{ .target = "z", .value = f.bin(.eq, f.vbl("ina"), f.num(1)) } },
-            // `if ina and inb;` — both flags read in a condition
+            // `if ina and inb;` - both flags read in a condition
             .{ .if_ = .{ .cond = f.bin(.@"and", f.vbl("ina"), f.vbl("inb")), .then_branch = null, .else_branch = null } },
         };
         var out = Dataset.init(f.a(), "work.out");
@@ -9286,17 +9286,17 @@ test "BUG-spuriousnote: MERGE in= flags + hash-method targets note NO uninit NOT
         try t.expect(!diagsNote(&f.diags, "is uninitialized")); // no spurious NOTE
         try t.expectEqual(@as(usize, 1), out.rowCount()); // values still correct
     }
-    // 2. `rc = it.first(); do while (rc = 0); rc = it.next(); end;` — rc is written
+    // 2. `rc = it.first(); do while (rc = 0); rc = it.next(); end;` - rc is written
     // by the hash op at run time, never seeded by declareStmt → no NOTE.
-    // (BUG-hiterbadhash: first()/next() on the bare HASH `h` — an unbound
-    // iterator — is a loud ERROR now; the walk goes through a declared hiter.)
+    // (BUG-hiterbadhash: first()/next() on the bare HASH `h` - an unbound
+    // iterator - is a loud ERROR now; the walk goes through a declared hiter.)
     {
         var f = fixture();
         defer f.deinit();
         f.prime();
         var x = f.exec();
         // p.613 (BUG-hashdefinenovar): key/data vars must exist outside the
-        // hash — model the `length k 8;` a legal program carries.
+        // hash - model the `length k 8;` a legal program carries.
         _ = try f.pdv.declare("k", .num);
 
         const key_arg = [_]ast.HashArg{.{ .name = null, .value = f.e(.{ .str = "k" }) }};
@@ -9337,14 +9337,14 @@ test "BUG-spuriousnote: MERGE in= flags + hash-method targets note NO uninit NOT
     }
 }
 
-test "PERF-arraydeclquad: a wide _temporary_ array declares O(N) — elements stay dropped, values intact" {
+test "PERF-arraydeclquad: a wide _temporary_ array declares O(N) - elements stay dropped, values intact" {
     var f = fixture();
     defer f.deinit();
     f.prime();
     var x = f.exec();
 
     // N=4000 temporary elements: the old linear nameIn made seeding the schema
-    // O(N²) — 16M case-insensitive compares for a decl-only step.
+    // O(N²) - 16M case-insensitive compares for a decl-only step.
     const N = 4000;
     const elems = try f.a().alloc([]const u8, N);
     for (elems, 0..) |*e, k| e.* = try std.fmt.allocPrint(f.a(), "t{d}", .{k + 1});
@@ -9457,20 +9457,20 @@ test "Library index: find/replace O(1), stays correct across proc-style rename +
     try t.expect(lib.find("work.d5") != null); // work. stripped
     try t.expect(lib.find("d6") == null); // genuine miss
 
-    // replace d3 in place (data d3; …) — same slot, no duplicate row
+    // replace d3 in place (data d3; …) - same slot, no duplicate row
     const rep = f.newDs("d3");
     try lib.putInput("d3", rep);
     try t.expectEqual(@as(usize, 5), lib.names.items.len);
     try t.expectEqual(rep, lib.find("d3").?);
 
-    // simulate PROC DATASETS `change d1=dm;` — proc.zig mutates names/sets DIRECTLY
+    // simulate PROC DATASETS `change d1=dm;` - proc.zig mutates names/sets DIRECTLY
     // (in place, no length change), so the index entry for d1 is now stale.
     lib.names.items[0] = "dm";
     lib.sets.items[0].name = "dm";
     try t.expect(lib.find("dm") != null); // scan-fallback keeps the renamed member findable
     try t.expect(lib.find("d1") == null); // old name is gone
 
-    // simulate PROC DATASETS `delete d4;` — direct orderedRemove shrinks the arrays;
+    // simulate PROC DATASETS `delete d4;` - direct orderedRemove shrinks the arrays;
     // the next lookup detects count != len and rebuilds the index.
     _ = lib.names.orderedRemove(3); // d4 slot
     _ = lib.sets.orderedRemove(3);
@@ -9504,7 +9504,7 @@ test "GH#15 ISS-readonlyguard: output access to a read-only libref fails loud; r
     try f.lib.putInput("src.ec", f.newDs("src.ec"));
     try t.expect(f.lib.find("src.ec") != null);
 
-    // A non-readonly (WORK) output — e.g. PROC SORT OUT=WORK.x — installs fine.
+    // A non-readonly (WORK) output - e.g. PROC SORT OUT=WORK.x - installs fine.
     try f.lib.put("work.t", f.newDs("work.t"));
     try t.expect(f.lib.find("work.t") != null);
 }
@@ -9544,7 +9544,7 @@ test "MULTISET-impl: `set a; set b;` reads both in parallel (one-to-one), stops 
 
 test "MULTISET-impl: `if _n_=1 then set summary;` reads the lookup once and RETAINS it" {
     // Classic SAS lookup idiom: the conditional SET fires only on _n_=1, and a
-    // SET'd variable is retained until its next read — so the summary value sticks
+    // SET'd variable is retained until its next read - so the summary value sticks
     // to every obs of the driving dataset.
     var f = fixture();
     defer f.deinit();
@@ -9588,7 +9588,7 @@ test "DOWLOOP-impl: `do until(last.grp); set x; by grp; ...` sums per group, one
     f.prime();
     var x = f.exec();
 
-    const xd = f.newDs("x"); // grp, amt — sorted by grp
+    const xd = f.newDs("x"); // grp, amt - sorted by grp
     _ = try xd.addColumn("grp", .num);
     _ = try xd.addColumn("amt", .num);
     try xd.appendRow(&.{ .{ .num = 1 }, .{ .num = 10 } });
@@ -9642,13 +9642,13 @@ test "DOWLOOP-impl: a SET in an ITERATIVE DO (no POINT=) still fails LOUD, not s
 }
 
 test "BUG-dowinsideifhang: SET in an IF-wrapped DO UNTIL terminates (reads at the node, EOF stops the step)" {
-    // data o; if 1 then do until(e); set a end=e; end; run; — was an
+    // data o; if 1 then do until(e); set a end=e; end; run; - was an
     // unbounded-memory infinite loop (QA tick307 F2: 100% CPU, ~60 MB/s,
     // never exits): detectDowSet's top-level walk could not see the
     // IF-wrapped DOW and the SET was inert, so e never fired. The .do_ arm of
     // collectExtraSetsStmt (BUG-doblocksourceinert) registers it as an
     // executable extra SET: reads fire at the node, e flags the last obs, EOF
-    // at the next pass stops the step without output — the same 1-obs/last-row
+    // at the next pass stops the step without output - the same 1-obs/last-row
     // result as the pinned `do until(e); if 1 then set a end=e; end;` sibling
     // (set_nested_opts F1). Termination verified under `timeout` before
     // pinning; a regression to the hang wedges this test, which is the point.
@@ -9675,7 +9675,7 @@ test "BUG-dowinsideifhang: SET in an IF-wrapped DO UNTIL terminates (reads at th
     try t.expectEqual(@as(f64, 20), out.row(0)[out.indexOf("v").?].num);
 }
 
-test "BUG-dowinsideifhang: MERGE/UPDATE/MODIFY in a DO UNTIL/WHILE fails LOUD — IF-wrapped and top-level agree" {
+test "BUG-dowinsideifhang: MERGE/UPDATE/MODIFY in a DO UNTIL/WHILE fails LOUD - IF-wrapped and top-level agree" {
     // The same shape with a runtime-inert source can never terminate (nothing
     // drives the end condition; the source's read never fires). opensas drives
     // only a SET in a DOW loop, so both the IF-wrapped and the top-level form
@@ -9713,7 +9713,7 @@ test "BUG-dowinsideifhang: MERGE/UPDATE/MODIFY in a DO UNTIL/WHILE fails LOUD �
 test "BUG-setstmtorder: statements BEFORE the driving SET run BEFORE its read (prefix sees missing then last-read values)" {
     // Language Reference: Concepts Ch.24: the read happens where the SET statement sits. Program:
     //   pre = k;        <- prefix: iter1 k missing, iter2 k=1 (SET vars are
-    //   set a;              NOT reset per iteration — Language Reference: Concepts p.562)
+    //   set a;              NOT reset per iteration - Language Reference: Concepts p.562)
     //   post = k;       <- suffix: the just-read value
     //   n = _n_;        <- _N_ is already live in the prefix (guardrail b)
     var f = fixture();
@@ -9749,7 +9749,7 @@ test "BUG-setstmtorder: statements BEFORE the driving SET run BEFORE its read (p
     try t.expectEqual(@as(f64, 2), out.row(1)[ni].num);
 }
 
-test "BUG-setstmtorder: a nested driver (IF-branch SET) keeps read-first — no split" {
+test "BUG-setstmtorder: a nested driver (IF-branch SET) keeps read-first - no split" {
     // Guardrail (a): only a DIRECT top-level driver splits. `set a;` inside
     // `if _n_=1 then …` stays an executable extra whose node read fires where
     // it sits; the top-level `set b;` drives and still reads first.
@@ -9784,7 +9784,7 @@ test "BUG-setstmtorder: a nested driver (IF-branch SET) keeps read-first — no 
 
 test "BUG-setstmtorder: a GOTO crossing the driving SET fails LOUD (no silent jump-drop)" {
     // The split cannot model a transfer over the read (SAS would skip/re-run
-    // it) — D-002: a visible ERROR, never a silently truncated jump.
+    // it) - D-002: a visible ERROR, never a silently truncated jump.
     var f = fixture();
     defer f.deinit();
     f.prime();
@@ -9838,7 +9838,7 @@ test "BUG-controlflownesting: a LINK from INSIDE a DO loop resumes at the call s
 }
 
 test "BUG-controlflownesting: GOTO/LINK to an UNDEFINED label fails LOUD at compile time (F3)" {
-    // SAS errors at compile time and the step does not execute — no silent rc-0 stop.
+    // SAS errors at compile time and the step does not execute - no silent rc-0 stop.
     var f = fixture();
     defer f.deinit();
     f.prime();
@@ -9848,7 +9848,7 @@ test "BUG-controlflownesting: GOTO/LINK to an UNDEFINED label fails LOUD at comp
         .{ .link = "alsonowhere" },
     };
     var out = Dataset.init(f.a(), "out");
-    try x.run(&prog, &out); // reports both, halts before running — no ExecError throw
+    try x.run(&prog, &out); // reports both, halts before running - no ExecError throw
     try t.expect(diagsHave(&f.diags, "label nowhere is not defined"));
     try t.expect(diagsHave(&f.diags, "label alsonowhere is not defined"));
     try t.expectEqual(@as(usize, 0), out.rowCount());
@@ -9860,7 +9860,7 @@ test "CALL MISSING sets numeric args to . and char args to blank, leaving others
     f.prime();
     var x = f.exec();
 
-    // x=42 (num), s="abc" (char), other=7 (num) — CALL MISSING must touch only x, s
+    // x=42 (num), s="abc" (char), other=7 (num) - CALL MISSING must touch only x, s
     try f.pdv.set("x", .{ .num = 42 });
     _ = try f.pdv.define("s", .char);
     try f.pdv.set("s", .{ .str = "abc" });
@@ -9887,7 +9887,7 @@ test "bare output fans out to every DATA-named dataset; named output routes sing
     f.prime();
     var x = f.exec();
 
-    // `data m1 m2; …` — main.zig registers the extra up front (0-obs creation)
+    // `data m1 m2; …` - main.zig registers the extra up front (0-obs creation)
     // and hands it to the executor via extra_outs.
     const primary = f.newDs("m1");
     const extra = f.newDs("m2");
@@ -9914,7 +9914,7 @@ test "BUG-outputundeclared: `output <undeclared>;` is a loud ERROR, no phantom d
     f.prime();
     var x = f.exec();
 
-    // `data rest; set x; output rst;` — rst is a typo, NOT the declared output.
+    // `data rest; set x; output rst;` - rst is a typo, NOT the declared output.
     const primary = f.newDs("rest");
     x.cur_out = primary;
     try f.pdv.set("a", .{ .num = 1 });
@@ -9924,7 +9924,7 @@ test "BUG-outputundeclared: `output <undeclared>;` is a loud ERROR, no phantom d
     try t.expect(f.lib.find("rst") == null); // no phantom dataset registered
     try t.expectEqual(@as(usize, 0), primary.rows.items.len); // nothing half-written
 
-    // `data a b; … output a; output b;` — declared names still route fine.
+    // `data a b; … output a; output b;` - declared names still route fine.
     const b = f.newDs("b");
     x.extra_outs = &.{b};
     const an = [_][]const u8{"rest"}; // primary by name (case-insensitive)
@@ -9969,8 +9969,8 @@ test "CALL EXECUTE queues program text FIFO; non-char and %nrstr forms fail LOUD
 
     // %nrstr-style macro quoting → captured ERROR, nothing queued, and the step
     // STOPS (AUDIT-errhaltclass): an unsupported feature must not no-op, and a
-    // halt is what keeps main.zig's `lib.put(name, ds)` — which sits AFTER
-    // `try ex.run(...)` — from replacing a live member with the step's output.
+    // halt is what keeps main.zig's `lib.put(name, ds)` - which sits AFTER
+    // `try ex.run(...)` - from replacing a live member with the step's output.
     const a4 = [_]ast.Expr{.{ .str = "%nrstr(data &x; run;)" }};
     try t.expectError(error.ExecError, x.runStmt(&.{ .call_ = .{ .name = "execute", .args = &a4 } }));
     try t.expect(diagsHave(&f.diags, "macro-quoting functions"));
@@ -10009,7 +10009,7 @@ test "GH#13 GAP-callexecutemacro: CALL EXECUTE macro-processes at CALL time, que
     try t.expect(!f.diags.hasErrors());
 
     // PURE macro language generates no SAS statements, so there is nothing to
-    // defer — the %LET's effect is all that survives, and it happened NOW, while
+    // defer - the %LET's effect is all that survives, and it happened NOW, while
     // this step is still executing (the other half of the p.123 split).
     const a2 = [_]ast.Expr{.{ .str = "%let tag=queued;" }};
     _ = try x.runStmt(&.{ .call_ = .{ .name = "execute", .args = &a2 } });
@@ -10074,7 +10074,7 @@ test "CALL SYMPUT/SYMPUTX write macro variables to the library store (G-callrout
     var x = f.exec();
 
     try f.pdv.set("v", .{ .num = 100 });
-    // call symput('maxv', v); — numeric converts via BEST12.: right-justified
+    // call symput('maxv', v); - numeric converts via BEST12.: right-justified
     // 12-char field (leading blanks), UNtrimmed, + the num→char NOTE
     // (BUG-symputnumfmt; SYMPUTX below is the one that trims)
     const a1 = [_]ast.Expr{ .{ .str = "maxv" }, .{ .variable = "v" } };
@@ -10083,7 +10083,7 @@ test "CALL SYMPUT/SYMPUTX write macro variables to the library store (G-callrout
     try t.expect(f.diags.list.items.len == 1);
     try t.expect(std.mem.indexOf(u8, f.diags.list.items[0].message, "converted to character") != null);
 
-    // call symputx('NM', '  hi  '); — SYMPUTX trims; the name is case-insensitive
+    // call symputx('NM', '  hi  '); - SYMPUTX trims; the name is case-insensitive
     const a2 = [_]ast.Expr{ .{ .str = "NM" }, .{ .str = "  hi  " } };
     _ = try x.runStmt(&.{ .call_ = .{ .name = "symputx", .args = &a2 } });
     try t.expectEqualStrings("hi", x.lib.macroVar("nm").?);
@@ -10170,7 +10170,7 @@ test "CALL STDIZE / RANPERM / RANPERK / RANCOMB / ALLPERM / LEXCOMB (combinatori
     try t.expectEqual(@as(f64, 0), f.pdv.get("b").?.num);
     try t.expectEqual(@as(f64, 1), f.pdv.get("c").?.num);
 
-    // CALL RANPERM(seed, p,q,r): a permutation of {10,20,30} — sum preserved,
+    // CALL RANPERM(seed, p,q,r): a permutation of {10,20,30} - sum preserved,
     // all values present, and deterministic for a fixed seed.
     try f.pdv.set("seed", .{ .num = 7 });
     try f.pdv.set("p", .{ .num = 10 });
@@ -10198,7 +10198,7 @@ test "CALL STDIZE / RANPERM / RANPERK / RANCOMB / ALLPERM / LEXCOMB (combinatori
     try t.expect(cw >= 1 and cw <= 4 and cx >= 1 and cx <= 4 and cw < cx); // sorted subset
 
     // CALL ALLPERM over {1,2,3}: the EXACT SAS minimal-change (SJT) sequence
-    // 123, 132, 312, 321, 231, 213 — each differs by one adjacent swap.
+    // 123, 132, 312, 321, 231, 213 - each differs by one adjacent swap.
     try f.pdv.set("d1", .{ .num = 1 });
     try f.pdv.set("d2", .{ .num = 2 });
     try f.pdv.set("d3", .{ .num = 3 });
@@ -10212,7 +10212,7 @@ test "CALL STDIZE / RANPERM / RANPERK / RANCOMB / ALLPERM / LEXCOMB (combinatori
     }
 
     // CALL ALLCOMB over {10,20,30,40} k=2: the EXACT revolving-door sequence
-    // {10,20},{20,30},{10,30},{30,40},{20,40},{10,40} — one element changes each step.
+    // {10,20},{20,30},{10,30},{30,40},{20,40},{10,40} - one element changes each step.
     const want_comb = [_][2]f64{ .{ 10, 20 }, .{ 20, 30 }, .{ 10, 30 }, .{ 30, 40 }, .{ 20, 40 }, .{ 10, 40 } };
     for (want_comb, 1..) |wc, cnt| {
         try f.pdv.set("v1", .{ .num = 10 });
@@ -10241,7 +10241,7 @@ test "CALL STDIZE / RANPERM / RANPERK / RANCOMB / ALLPERM / LEXCOMB (combinatori
     }
 }
 
-test "BUG-callscanstale: CALL SCAN routes through the SCAN machinery — modifiers + default delims agree with SCAN()" {
+test "BUG-callscanstale: CALL SCAN routes through the SCAN machinery - modifiers + default delims agree with SCAN()" {
     var f = fixture();
     defer f.deinit();
     f.prime();
@@ -10311,7 +10311,7 @@ test "BUG-callstdizeoptmsg: a rejected VARDEF/miscellaneous option is named as a
         .{ .opt = "mult=2", .want = "CALL STDIZE option mult=2 is not supported yet", .rc = 2 },
         .{ .opt = "df", .want = "CALL STDIZE option df is not supported yet", .rc = 2 },
         .{ .opt = "pstat", .want = "CALL STDIZE option pstat is not supported yet", .rc = 2 },
-        // a standardization-option IS a method — this half must NOT move, or the
+        // a standardization-option IS a method - this half must NOT move, or the
         // fix would have traded one wrong label for another.
         .{ .opt = "median", .want = "CALL STDIZE METHOD=median is not supported yet", .rc = 2 },
         .{ .opt = "method=euclen", .want = "CALL STDIZE METHOD=euclen is not supported yet", .rc = 2 },
@@ -10416,7 +10416,7 @@ test "BUG-calllabel2arg: DATA-step CALL LABEL(var, out) writes the label; unlabe
     };
     var out = Dataset.init(f.a(), "work.out");
     try x.run(&prog, &out);
-    const r = out.row(0); // the PDV is reset after the final pass — assert the row
+    const r = out.row(0); // the PDV is reset after the final pass - assert the row
     try t.expectEqualStrings("Body Weight", r[out.indexOf("lb").?].str); // was: silent blank, no diagnostic
     try t.expectEqualStrings("ht", r[out.indexOf("lb2").?].str); // no label → variable name
 }
@@ -10429,8 +10429,8 @@ test "GAP-calloutarg-note: pure-output CALL args (SCAN pos/len, PRXPOSN position
 
     // pos/len/p/l/lb appear ONLY as CALL output args; ghost is a genuine read.
     // `w=pos+len` reads pos/len AFTER the call (the tick137 repro reads them in
-    // substr — the fixture's evaluator wires no call_fn, so a binary read stands
-    // in) — SAS's whole-step compile still emits no NOTE for them.
+    // substr - the fixture's evaluator wires no call_fn, so a binary read stands
+    // in) - SAS's whole-step compile still emits no NOTE for them.
     const scan_args = [_]ast.Expr{ .{ .variable = "s" }, .{ .num = 2 }, .{ .variable = "pos" }, .{ .variable = "len" }, .{ .str = "," } };
     const posn_args = [_]ast.Expr{ .{ .variable = "rx" }, .{ .num = 1 }, .{ .variable = "p" }, .{ .variable = "l" } };
     const lbl_args = [_]ast.Expr{ .{ .variable = "s" }, .{ .variable = "lb" } };
@@ -10452,7 +10452,7 @@ test "GAP-calloutarg-note: pure-output CALL args (SCAN pos/len, PRXPOSN position
     try t.expect(!diagsNote(&f.diags, "Variable lb is uninitialized."));
     try t.expect(diagsNote(&f.diags, "Variable ghost is uninitialized.")); // control: real reads still note
     // values are unaffected (the GAP was log-noise only)
-    const r = out.row(0); // the PDV is reset after the final pass — assert the row
+    const r = out.row(0); // the PDV is reset after the final pass - assert the row
     try t.expectEqual(@as(f64, 3), r[out.indexOf("pos").?].num);
     try t.expectEqual(@as(f64, 1), r[out.indexOf("len").?].num);
     try t.expectEqual(@as(f64, 4), r[out.indexOf("w").?].num);
@@ -10595,7 +10595,7 @@ test "REVERT-infileendmultirec: INFILE END= over DATALINES never reaches 1 (0,0,
     try t.expectEqual(@as(usize, 3), out.rowCount());
     const fi = out.indexOf("flag").?;
     // REVERT-infileendmultirec: this test asked for (0,0,1) and so PINNED the
-    // restricted case — the source is `inline_data = true`, i.e. DATALINES, and
+    // restricted case - the source is `inline_data = true`, i.e. DATALINES, and
     // Statements ref printed p.138 makes UNBUFFERED unconditionally in effect
     // for instream data, where "SAS never sets the END= variable to 1". The
     // flag stays at its documented 0 (p.130) for every record, including the
@@ -10604,13 +10604,13 @@ test "REVERT-infileendmultirec: INFILE END= over DATALINES never reaches 1 (0,0,
     try t.expectEqual(@as(f64, 0), out.row(0)[fi].num);
     try t.expectEqual(@as(f64, 0), out.row(1)[fi].num);
     try t.expectEqual(@as(f64, 0), out.row(2)[fi].num);
-    // The OTHER half of this test's subject — that END= really does reach 1 on
-    // the last record where it is LEGAL — cannot be exercised here: the unit
+    // The OTHER half of this test's subject - that END= really does reach 1 on
+    // the last record where it is LEGAL - cannot be exercised here: the unit
     // fixture is io-free, so DATALINES is the only source it can open, and
     // DATALINES is exactly the restricted case. It is pinned instead by
     // tests/corpus/infile_end.sas block 2, an EXTERNAL file with a single
     // INPUT (`seen` = 0,0,1), which this change deliberately leaves unmoved.
-    // temporary, like _N_/SET end= — never an output column.
+    // temporary, like _N_/SET end= - never an output column.
     try t.expect(out.indexOf("eof") == null);
     // …and still 0 rather than MISSING: a restricted END= is defined, not unset,
     // so no "uninitialized" NOTE may appear.
@@ -10711,7 +10711,7 @@ test "BUG-multiinfilelastwins: two INFILEs keep independent cursors; EOF on the 
     try t.expect(!diagsHave(&f.diags, "uninitialized"));
 }
 
-test "BUG-multiinfilelastwins: two `infile datalines` share ONE instream cursor — no rewind (Language Reference: Concepts Table 21.5 row 10)" {
+test "BUG-multiinfilelastwins: two `infile datalines` share ONE instream cursor - no rewind (Language Reference: Concepts Table 21.5 row 10)" {
     var f = fixture();
     defer f.deinit();
     f.prime();
@@ -10741,7 +10741,7 @@ test "BUG-setinputinert: SET + INPUT reads the line source alongside the driver;
     // Language Reference: Concepts p.477 step 3 names INPUT a peer of SET/MERGE/UPDATE/MODIFY;
     // Table 20.4's last row stops the step at the first EOF of ANY
     // data-reading statement. `set a; input z; datalines;` used to make the
-    // INPUT a total silent no-op — z missing on every row, exit 0.
+    // INPUT a total silent no-op - z missing on every row, exit 0.
     var f = fixture();
     defer f.deinit();
     f.prime();
@@ -10777,7 +10777,7 @@ test "BUG-setinputinert: SET + INPUT reads the line source alongside the driver;
     try t.expectEqual(@as(usize, 2), out2.rowCount());
 
     // the sibling stays LOUD (BUG-inputnosourcefabricates): a SET driver does
-    // not give INPUT a source — `set a; input x;` with no datalines/INFILE
+    // not give INPUT a source - `set a; input x;` with no datalines/INFILE
     // errors instead of fabricating all-missing columns.
     var f3 = fixture();
     defer f3.deinit();
@@ -10796,14 +10796,14 @@ test "BUG-setinputinert: SET + INPUT reads the line source alongside the driver;
 test "io-free external INFILE keeps the inert-.once shape (no phantom 0-iteration .lines step)" {
     // interpret's null io (unit tests, the pure-in-memory path) cannot OPEN
     // an external INFILE: the source registers but reads nothing. That
-    // phantom empty source must NOT drive the .lines gate — the step keeps
+    // phantom empty source must NOT drive the .lines gate - the step keeps
     // the pre-multiinfile inert-.once shape: one iteration, INPUT inert,
     // the body runs, no diagnostics (main.zig's mid-PROC-fileref interpret
     // test reads through a hoisted FILENAME on exactly this path).
     var f = fixture();
     defer f.deinit();
     f.prime();
-    var x = f.exec(); // io stays null — the io-free path
+    var x = f.exec(); // io stays null - the io-free path
     const inf: ast.Infile = .{ .path = "not-read-in-the-io-free-path.dat" };
     const iw = [_]ast.InputItem{.{ .name = "w", .type = .char }};
     const prog = [_]ast.Stmt{
@@ -10928,7 +10928,7 @@ test "output columns order by first appearance: SET before a retained/sum var (B
     try a1.appendRow(&.{.{ .num = 2 }});
     try f.lib.put("a", a1);
 
-    // set a; retain cnt 0; cnt = cnt + 1;  — `cnt` has an init (like the `retain
+    // set a; retain cnt 0; cnt = cnt + 1;  - `cnt` has an init (like the `retain
     // cnt 0` the parser hoists from a `cnt + 1` sum statement), which used to land
     // in the PDV before the SET's `id`.
     const set_names = [_][]const u8{"a"};
@@ -11014,7 +11014,7 @@ test "BY groups: first./last. flags over a sorted SET; automatics stay out of ou
     try t.expectEqual(@as(f64, 0), out.row(0)[li].num);
     try t.expectEqual(@as(f64, 0), out.row(1)[fi].num); // A(20): last of group
     try t.expectEqual(@as(f64, 1), out.row(1)[li].num);
-    try t.expectEqual(@as(f64, 1), out.row(2)[fi].num); // B(30): singleton — first and last
+    try t.expectEqual(@as(f64, 1), out.row(2)[fi].num); // B(30): singleton - first and last
     try t.expectEqual(@as(f64, 1), out.row(2)[li].num);
 
     // the first./last. automatics are not columns in the output dataset
@@ -11028,7 +11028,7 @@ test "SET a b; BY x interleaves pre-sorted sources by key, with first./last. (BU
     f.prime();
     var x = f.exec();
 
-    // a: x=1(a1),1(a2),2(a3)   b: x=1(b1),3(b3)  — both sorted by x
+    // a: x=1(a1),1(a2),2(a3)   b: x=1(b1),3(b3)  - both sorted by x
     const a1 = f.newDs("a");
     _ = try a1.addColumn("x", .num);
     _ = try a1.addColumn("v", .char);
@@ -11106,7 +11106,7 @@ test "MERGE match-merge: combine columns on the BY key" {
     f.prime();
     var x = f.exec();
 
-    const one = f.newDs("one"); // id, name — sorted by id
+    const one = f.newDs("one"); // id, name - sorted by id
     _ = try one.addColumn("id", .num);
     _ = try one.addColumn("name", .char);
     try one.appendRow(&.{ .{ .num = 1 }, .{ .str = "Alice" } });
@@ -11114,7 +11114,7 @@ test "MERGE match-merge: combine columns on the BY key" {
     try one.appendRow(&.{ .{ .num = 3 }, .{ .str = "Carol" } });
     try f.lib.put("one", one);
 
-    const two = f.newDs("two"); // id, age — sorted by id
+    const two = f.newDs("two"); // id, age - sorted by id
     _ = try two.addColumn("id", .num);
     _ = try two.addColumn("age", .num);
     try two.appendRow(&.{ .{ .num = 1 }, .{ .num = 30 } });
@@ -11196,7 +11196,7 @@ test "multi-output: `output name` routes to named datasets in the Library" {
         .{ .if_ = .{ .cond = f.bin(.lt, f.vbl("v"), f.num(10)), .then_branch = out_lo, .else_branch = out_hi } },
     };
 
-    // `data lo hi; …` — SAS requires every `output <name>;` target to be one of
+    // `data lo hi; …` - SAS requires every `output <name>;` target to be one of
     // the DATA statement's datasets (BUG-outputundeclared killed the lazy create).
     var lo = Dataset.init(f.a(), "lo"); // primary dataset is `lo`
     const hi = f.newDs("hi");
@@ -11217,21 +11217,21 @@ test "N-way MERGE keeps every column when a source misses the first BY group (BU
     f.prime();
     var x = f.exec();
 
-    const a_ds = f.newDs("a"); // id, x  — has id 1, 2
+    const a_ds = f.newDs("a"); // id, x  - has id 1, 2
     _ = try a_ds.addColumn("id", .num);
     _ = try a_ds.addColumn("x", .num);
     try a_ds.appendRow(&.{ .{ .num = 1 }, .{ .num = 10 } });
     try a_ds.appendRow(&.{ .{ .num = 2 }, .{ .num = 20 } });
     try f.lib.put("a", a_ds);
 
-    const b_ds = f.newDs("b"); // id, y  — has id 2, 3 (absent from first group id=1)
+    const b_ds = f.newDs("b"); // id, y  - has id 2, 3 (absent from first group id=1)
     _ = try b_ds.addColumn("id", .num);
     _ = try b_ds.addColumn("y", .num);
     try b_ds.appendRow(&.{ .{ .num = 2 }, .{ .num = 200 } });
     try b_ds.appendRow(&.{ .{ .num = 3 }, .{ .num = 300 } });
     try f.lib.put("b", b_ds);
 
-    const c_ds = f.newDs("c"); // id, z  — has id 1, 3
+    const c_ds = f.newDs("c"); // id, z  - has id 1, 3
     _ = try c_ds.addColumn("id", .num);
     _ = try c_ds.addColumn("z", .num);
     try c_ds.appendRow(&.{ .{ .num = 1 }, .{ .num = 1000 } });
@@ -11288,7 +11288,7 @@ test "MERGE sorted repeated BY key keeps all 6 rows (BUG-mergeunsorted control)"
     defer f.deinit();
     f.prime();
     var x = f.exec();
-    // big sorted: 1,1,2,2,3,3 — two rows per key merged against one look row each.
+    // big sorted: 1,1,2,2,3,3 - two rows per key merged against one look row each.
     const r = try mergeBigLook(&f, &x, &.{ 1, 1, 2, 2, 3, 3 });
     try t.expect(!r.err);
     try t.expectEqual(@as(usize, 6), r.rows);
@@ -11299,7 +11299,7 @@ test "MERGE unsorted input fails loud, no silent drop (BUG-mergeunsorted)" {
     defer f.deinit();
     f.prime();
     var x = f.exec();
-    // big unsorted: 1,2,3,1,2,3 — the second 1/2/3 go backwards. SAS errors
+    // big unsorted: 1,2,3,1,2,3 - the second 1/2/3 go backwards. SAS errors
     // "BY variables are not properly sorted"; we must NOT silently truncate.
     const r = try mergeBigLook(&f, &x, &.{ 1, 2, 3, 1, 2, 3 });
     try t.expect(r.err); // captured diagnostic, no aborting process (D-003)
@@ -11310,7 +11310,7 @@ test "SET-BY interleave on unsorted input fails loud (BUG-setbyunsorted)" {
     defer f.deinit();
     f.prime();
 
-    // a: k=1,3 (sorted); b: k=2,1 (UNSORTED) — the emitted sequence 1,2 then
+    // a: k=1,3 (sorted); b: k=2,1 (UNSORTED) - the emitted sequence 1,2 then
     // b's trailing 1 goes backwards. Was: silent wrong order + wrong first./last.
     const a_ds = f.newDs("a");
     _ = try a_ds.addColumn("k", .num);
@@ -11350,12 +11350,12 @@ test "SET-BY interleave on unsorted input fails loud (BUG-setbyunsorted)" {
 
 test "SET-BY verify honors SORTSEQ=LINGUISTIC (BUG-sortseq-byverify-datastep)" {
     // The SET guard verifies under the collation the sort used (LR: Concepts
-    // printed p.533 Note), like proc.byOrderViolation and the PRINT twin —
+    // printed p.533 Note), like proc.byOrderViolation and the PRINT twin -
     // while GROUPING stays byte-exact. Invented data.
     var f = fixture();
     defer f.deinit();
     f.prime();
-    // s: GRP in LINGUISTIC order (what `proc sort; by grp;` emits — the byte
+    // s: GRP in LINGUISTIC order (what `proc sort; by grp;` emits - the byte
     // order of these same rows would be A B a b c)
     const s_ds = f.newDs("s");
     _ = try s_ds.addColumn("grp", .char);
@@ -11389,7 +11389,7 @@ test "SET-BY verify honors SORTSEQ=LINGUISTIC (BUG-sortseq-byverify-datastep)" {
         }
     }
     // DESCENDING + linguistic: the per-key inversion is orthogonal to the
-    // collation — c B b a A is fold-descending and verifies clean (fold-equal
+    // collation - c B b a A is fold-descending and verifies clean (fold-equal
     // neighbours B/b and a/A are .eq steps, which never violate)
     f.diags = diag.Diagnostics.init(f.a());
     const d_ds = f.newDs("d");
@@ -11407,7 +11407,7 @@ test "SET-BY verify honors SORTSEQ=LINGUISTIC (BUG-sortseq-byverify-datastep)" {
         try t.expectEqual(@as(usize, 5), out.rowCount());
     }
     // control, flag OFF: the same A a b B c data goes BACKWARDS in byte order
-    // at b→B — the byte verify stays a fail-loud control (D-002)
+    // at b→B - the byte verify stays a fail-loud control (D-002)
     f.diags = diag.Diagnostics.init(f.a());
     io.global_sortseq_linguistic = false;
     {
@@ -11425,7 +11425,7 @@ test "UPDATE BY populates first./last. (BUG-updatefirstlast)" {
     f.prime();
     var x = f.exec();
 
-    // qa repro: update m t; by k; f=first.k; l=last.k; — one obs per group,
+    // qa repro: update m t; by k; f=first.k; l=last.k; - one obs per group,
     // so both flags are 1 on every row (values 99/20 already verified correct).
     const master = f.newDs("m");
     _ = try master.addColumn("k", .num);
@@ -11477,7 +11477,7 @@ test "UPDATE BY two levels: first./last. gate per changed level (BUG-updatefirst
     const trans = f.newDs("t");
     _ = try trans.addColumn("g", .num);
     _ = try trans.addColumn("k", .num);
-    try f.lib.put("t", trans); // empty transactions — pure pass-through
+    try f.lib.put("t", trans); // empty transactions - pure pass-through
 
     const names = [_][]const u8{ "m", "t" };
     const by_names = [_][]const u8{ "g", "k" };
@@ -11621,7 +11621,7 @@ test "SET on a missing dataset fails loud, emits nothing (BUG-setmissingquiet)" 
     f.prime();
     var x = f.exec();
 
-    // data back; set nosuch; run; — was a warning + skipped step + exit 0,
+    // data back; set nosuch; run; - was a warning + skipped step + exit 0,
     // silently never creating `back`. SAS: "ERROR: File NOSUCH does not exist".
     const names = [_][]const u8{"nosuch"};
     const prog = [_]ast.Stmt{.{ .set = &names }};
@@ -11637,7 +11637,7 @@ test "INFILE of a non-existent file fails loud, does not silently read 0 obs (IS
     f.prime();
     var x = f.exec();
 
-    // infile "…nonexistent…"; input x; — was `readFileAlloc(...) catch ""`, so a
+    // infile "…nonexistent…"; input x; - was `readFileAlloc(...) catch ""`, so a
     // missing physical file produced a silent 0-obs dataset at exit 0. SAS hard-
     // errors "Physical file does not exist". Needs a real Io (the null unit-test
     // branch must NOT fire) → the global single-threaded io reaches the disk.
@@ -11657,13 +11657,13 @@ test "INFILE of a non-existent file fails loud, does not silently read 0 obs (IS
     try t.expectEqual(@as(usize, 0), out.rowCount()); // and no row was fabricated
 }
 
-test "PERF-infilecap: INFILE streams a >1 MiB external file — no size cap, every row read" {
+test "PERF-infilecap: INFILE streams a >1 MiB external file - no size cap, every row read" {
     var f = fixture();
     defer f.deinit();
     f.prime();
     var x = f.exec();
 
-    // ~3 MB CSV — over the old 1 MiB readFileAlloc cap, which failed the step,
+    // ~3 MB CSV - over the old 1 MiB readFileAlloc cap, which failed the step,
     // and (bonus bug) its catch mislabeled error.FileTooBig as "Physical file
     // does not exist" for a file that EXISTS.
     const io_ = std.Io.Threaded.global_single_threaded.io();
@@ -11703,7 +11703,7 @@ test "MERGE with a BY variable absent from one source fails loud, emits nothing 
     f.prime();
     var x = f.exec();
 
-    // a(k,v) sorted by k; b(x,w) has NO k — real SAS hard-errors; we silently
+    // a(k,v) sorted by k; b(x,w) has NO k - real SAS hard-errors; we silently
     // interleaved b's rows first (all-missing key) then a's (BUG-mergebymissing).
     const a_ds = f.newDs("a");
     _ = try a_ds.addColumn("k", .num);
@@ -11810,7 +11810,7 @@ test "UPDATE applies transaction rows to master by BY key (BUG-updatebroken)" {
 
 test "MODIFY-BY no-match: ERROR + _IORC_=_DSENMR, unmatched row NOT fabricated (BUG-modifybynomatch)" {
     // Language Reference: Concepts p.599 Table 23.4 (_DSENMR) + p.600 worked example: a MODIFY … BY
-    // transaction obs with no master match is an ERROR — "No matching
+    // transaction obs with no master match is an ERROR - "No matching
     // observation was found in <master> data set.", _ERROR_=1, _IORC_=1230015,
     // and "0 observations added" (appending unmatched keys is UPDATE's job).
     var f = fixture();
@@ -11837,7 +11837,7 @@ test "MODIFY-BY no-match: ERROR + _IORC_=_DSENMR, unmatched row NOT fabricated (
 
     var out = Dataset.init(f.a(), "master"); // in place: output shares the master name
     try x.run(&prog, &out);
-    try f.lib.put("master", &out); // main's commit — put replaces the master
+    try f.lib.put("master", &out); // main's commit - put replaces the master
 
     // Matched obs rewritten, unmatched NOT added; the step ran to completion.
     const m2 = f.lib.find("master").?;
@@ -11850,7 +11850,7 @@ test "MODIFY-BY no-match: ERROR + _IORC_=_DSENMR, unmatched row NOT fabricated (
     try t.expect(f.diags.hasStepErrors());
     try t.expect(diagsHave(&f.diags, "No matching observation was found in master data set."));
     // ISS-errordump: the unhandled no-match left _ERROR_=1 at the iteration end,
-    // so the offending row dumps its PDV after the ERROR — the unmatched
+    // so the offending row dumps its PDV after the ERROR - the unmatched
     // transaction row (id=3), automatics last.
     const dump = f.diags.list.items[f.diags.list.items.len - 1];
     try t.expectEqual(diag.Severity.note, dump.severity);
@@ -11859,7 +11859,7 @@ test "MODIFY-BY no-match: ERROR + _IORC_=_DSENMR, unmatched row NOT fabricated (
 
 test "MODIFY-BY revised program: test _IORC_, OUTPUT the unmatched row, clear _ERROR_ (BUG-modifybynomatch)" {
     // Language Reference: Concepts p.601 revised program: `if _iorc_ = <_DSENMR> then do; output;
-    // _error_ = 0; end; else replace;` — the program handles the no-match
+    // _error_ = 0; end; else replace;` - the program handles the no-match
     // itself, so the row IS added and NO error is raised (the step and every
     // later step run clean; a matched read sees _IORC_=0).
     var f = fixture();
@@ -11872,11 +11872,11 @@ test "MODIFY-BY revised program: test _IORC_, OUTPUT the unmatched row, clear _E
     _ = try master.addColumn("v", .num);
     // GAP-ch23med-tick296 F3: `seen` is DECLARED ON THE MASTER. It used to be a
     // step-created variable, and this test asserted it came back as a column of
-    // the master — i.e. it PINNED the descriptor-growth bug, because MODIFY
+    // the master - i.e. it PINNED the descriptor-growth bug, because MODIFY
     // "cannot modify the descriptor portion of a SAS data set, such as adding a
     // variable" (Statements ref printed p.240). The variable is only this test's
     // recorder for per-observation `_IORC_`, so declaring it up front keeps every
-    // assertion below testing exactly what it tested — and makes the program
+    // assertion below testing exactly what it tested - and makes the program
     // legal SAS as well.
     _ = try master.addColumn("seen", .num);
     try master.appendRow(&.{ .{ .num = 1 }, .{ .num = 10 }, missingOf(.num) });
@@ -11916,7 +11916,7 @@ test "MODIFY-BY revised program: test _IORC_, OUTPUT the unmatched row, clear _E
     try t.expectEqual(@as(usize, 3), m2.rowCount()); // program added the new key
     try t.expectEqual(@as(f64, 999), m2.row(1)[vi].num); // matched: replaced
     try t.expectEqual(@as(f64, 30), m2.row(2)[vi].num); // no-match: OUTPUT added
-    // the id=1 master row has NO transaction — it is never read into the PDV
+    // the id=1 master row has NO transaction - it is never read into the PDV
     // (BUG-modifybymasterdriven: no _SOK iteration exists for it), so `seen`
     // was never assigned there: missing, and the row is re-emitted untouched.
     try t.expect(std.math.isNan(m2.row(0)[si].num));
@@ -11958,7 +11958,7 @@ test "BUG-modifyendmsg: MODIFY END= is reported as the EOF flag it is, not as di
     // p.240-241: END= "creates and names a temporary variable that contains an
     // end-of-file indicator", appears on Forms 1/2/4 (the sequential, matching
     // and KEY= forms) and carries the Restriction "Do not use this argument in
-    // the same MODIFY statement with the POINT= argument" — so it is not the
+    // the same MODIFY statement with the POINT= argument" - so it is not the
     // direct-access form, it is barred from co-occurring with it. Message-only:
     // the gap and its rc 2 are unchanged, and pinned here alongside the wording.
     diag.resetGap();
@@ -11984,17 +11984,17 @@ test "BUG-modifyendmsg: MODIFY END= is reported as the EOF flag it is, not as di
 test "GAP-modifywherestmt: a WHERE statement filters-then-matches in BOTH MODIFY shapes, no row loss" {
     // Statements ref printed p.360: "SAS selects observations from each input
     // data set before it combines them"; printed p.245: "uses dynamic WHERE
-    // processing to locate the matching observation" — filter-then-match, the
+    // processing to locate the matching observation" - filter-then-match, the
     // only reading consistent with the described mechanism (the exact
     // WHERE-excluded-master-row case is genuinely doc-silent; the doc-finder
     // verdict is not re-derived here). Both shapes previously failed in
-    // OPPOSITE silently-wrong ways — the single-dataset shape IGNORED the
+    // OPPOSITE silently-wrong ways - the single-dataset shape IGNORED the
     // statement (wrong values), the BY shape flushed the filtered copy
-    // (destroyed rows) — then both refused at rc 2. Now implemented: the
+    // (destroyed rows) - then both refused at rc 2. Now implemented: the
     // iteration reads/matches the filtered copy, the commit re-emits the
     // UNFILTERED member through src_pos.
 
-    // 1. BY shape: data m; modify m t; by k; where k>1; — k=1 is hidden from
+    // 1. BY shape: data m; modify m t; by k; where k>1; - k=1 is hidden from
     //    the match AND from the transaction (p.360: the bare statement filters
     //    every input), must survive the commit EXACTLY as stored; k=2 is
     //    overlaid by the transaction. (The old destroy shape, flipped.)
@@ -12038,7 +12038,7 @@ test "GAP-modifywherestmt: a WHERE statement filters-then-matches in BOTH MODIFY
         try t.expectEqual(@as(f64, 30), stored.row(2)[vc].num); // selected, never matched
     }
 
-    // 2. Single-dataset shape: data m; modify m; where k>2; v=v+1; — only the
+    // 2. Single-dataset shape: data m; modify m; where k>2; v=v+1; - only the
     //    selected rows are read and updated; k=1/2 come back byte-identical.
     //    (Was silently IGNORED: all four rows were bumped.)
     {
@@ -12071,12 +12071,12 @@ test "GAP-modifywherestmt: a WHERE statement filters-then-matches in BOTH MODIFY
     }
 }
 
-test "GAP-modifywherestmt: filter-then-match's doc-silent case — a surviving transaction naming a WHERE-excluded master key is a NO-MATCH" {
+test "GAP-modifywherestmt: filter-then-match's doc-silent case - a surviving transaction naming a WHERE-excluded master key is a NO-MATCH" {
     // The exact case the doc-finder found GENUINELY DOC-SILENT (Table 23.3 has
     // no subsetting row; _DSENMR does not distinguish physically-absent from
     // WHERE-excluded): master (k=1,x=5) fails `where x>10`, transaction (k=1,
-    // x=20) passes it (x rides BOTH inputs, p.360's rule). Filter-then-match —
-    // the only reading consistent with p.360/p.245 — says the transaction is
+    // x=20) passes it (x rides BOTH inputs, p.360's rule). Filter-then-match -
+    // the only reading consistent with p.360/p.245 - says the transaction is
     // UNMATCHED: _IORC_=_DSENMR, the p.601 idiom OUTPUTs a NEW row, and the
     // excluded master row is re-emitted untouched, so the master ends with
     // BOTH k=1 rows. Match-then-filter would instead have updated the hidden
@@ -12124,15 +12124,15 @@ test "GAP-modifywherestmt: filter-then-match's doc-silent case — a surviving t
     try t.expectEqual(@as(f64, 5), stored.row(0)[xc].num); // re-emitted UNTOUCHED (no loss)
     try t.expectEqual(@as(f64, 2), stored.row(1)[kc].num); // matched (survives the filter):
     try t.expectEqual(@as(f64, 25), stored.row(1)[xc].num); // transaction overlay
-    try t.expectEqual(@as(f64, 1), stored.row(2)[kc].num); // the p.601 OUTPUT — a NEW row
+    try t.expectEqual(@as(f64, 1), stored.row(2)[kc].num); // the p.601 OUTPUT - a NEW row
     try t.expectEqual(@as(f64, 20), stored.row(2)[xc].num); // appended at the END
 }
 
-test "BUG-modifymasteroptname: a master's dataset OPTIONS are not part of its name — same rc-1 mismatch text with and without them" {
+test "BUG-modifymasteroptname: a master's dataset OPTIONS are not part of its name - same rc-1 mismatch text with and without them" {
     // The mismatch guard used to compare the SERIALIZED name+options blob, so
     // `modify a(keep=x)` reported "MODIFY updates a(keep = x ) in place, …" and
     // could never match any DATA statement name. Both spellings must now produce
-    // the IDENTICAL diagnostic naming the bare member `a` — that identity is the
+    // the IDENTICAL diagnostic naming the bare member `a` - that identity is the
     // point, so a future change cannot fix one spelling and drift on the other.
     for ([_][]const u8{ "a", "a(keep = x )" }) |master| {
         diag.resetGap();
@@ -12152,17 +12152,17 @@ test "BUG-modifymasteroptname: a master's dataset OPTIONS are not part of its na
         var out = Dataset.init(f.a(), "b"); // the DATA statement names `b`, not `a`
         try t.expectError(error.ExecError, x.run(&prog, &out));
         try t.expectEqualStrings(
-            "MODIFY updates a in place, but the DATA statement names b — the MODIFY data set must also appear in the DATA statement",
+            "MODIFY updates a in place, but the DATA statement names b - the MODIFY data set must also appear in the DATA statement",
             f.diags.list.items[f.diags.list.items.len - 1].message,
         );
         try t.expectEqual(@as(u8, 1), rcOf(&f)); // user error, not a gap
     }
 }
 
-test "BUG-modifyoutnamemismatch: MODIFY's master must be an output data set — rc 1, master untouched, wrong output never written" {
+test "BUG-modifyoutnamemismatch: MODIFY's master must be an output data set - rc 1, master untouched, wrong output never written" {
     // `data b; modify d;` degraded SILENTLY to `data b; set d;` at exit 0. The
     // corpus fixtures pin the rc and the values that come back on a revert; this
-    // pins what they cannot show from outside the process — that the master is
+    // pins what they cannot show from outside the process - that the master is
     // left ALONE and the wrongly-named output receives NOTHING, so there is no
     // half-written state behind the diagnostic.
     diag.resetGap();
@@ -12183,11 +12183,11 @@ test "BUG-modifyoutnamemismatch: MODIFY's master must be an output data set — 
     var out = Dataset.init(f.a(), "b"); // the DATA statement names `b`, not `d`
     try t.expectError(error.ExecError, x.run(&prog, &out));
     try t.expectEqualStrings(
-        "MODIFY updates d in place, but the DATA statement names b — the MODIFY data set must also appear in the DATA statement",
+        "MODIFY updates d in place, but the DATA statement names b - the MODIFY data set must also appear in the DATA statement",
         f.diags.list.items[f.diags.list.items.len - 1].message,
     );
     // rc 1, NOT 2: the program breaks a documented Restriction (Statements ref
-    // printed p.241, master-data-set), so real SAS rejects it too — "fix your
+    // printed p.241, master-data-set), so real SAS rejects it too - "fix your
     // SAS", not an opensas hole (D-009). No markGap anywhere on this path.
     try t.expectEqual(@as(u8, 1), rcOf(&f));
     // The master is byte-identical: the step never ran a row.
@@ -12198,8 +12198,8 @@ test "BUG-modifyoutnamemismatch: MODIFY's master must be an output data set — 
 }
 
 test "BUG-modifyoutnamemismatch D-014 control: the master may be an EXTRA output, and `work.d` names `d`" {
-    // Statements ref printed p.260 Example 8 — `data invty.stock invty.stock95
-    // invty.stock97; modify invty.stock;` — makes the rule MEMBERSHIP, not
+    // Statements ref printed p.260 Example 8 - `data invty.stock invty.stock95
+    // invty.stock97; modify invty.stock;` - makes the rule MEMBERSHIP, not
     // equality. An over-strict `==` here would reject legal SAS, which is its
     // own shipped regression (D-014). Both loopholes the guard must leave open
     // are pinned: the master sitting among `extra_outs` rather than as the
@@ -12239,7 +12239,7 @@ test "REMOVE outside a MODIFY step fails LOUD (FEAT-datamodify-rest)" {
     try f.lib.put("s", src);
 
     // `remove;` encodes as OUTPUT of the \x00remove sentinel; with no MODIFY in the
-    // step it is meaningless in-place control — fail loud, never drop the wrong obs.
+    // step it is meaningless in-place control - fail loud, never drop the wrong obs.
     const set_names = [_][]const u8{"s"};
     const rm = [_][]const u8{"\x00remove"};
     const prog = [_]ast.Stmt{ .{ .set = &set_names }, .{ .output = &rm } };
@@ -12327,21 +12327,21 @@ test "hash add rejects duplicate keys; replace overwrites in place (BUG-hashrepl
     try t.expectEqual(@as(f64, 200), f.pdv.get("v").?.num); // the replaced data, not the stale 100
 }
 
-test "SEV-rcbydesignerr: the seven rc-by-design hash conditions report a RECOVERABLE error — loud and exit-relevant, but later steps are not poisoned" {
+test "SEV-rcbydesignerr: the seven rc-by-design hash conditions report a RECOVERABLE error - loud and exit-relevant, but later steps are not poisoned" {
     // Component Objects Reference: every hash method entry carries the same rc
-    // contract — "A return code of zero indicates success; a nonzero value
+    // contract - "A return code of zero indicates success; a nonzero value
     // indicates failure. If you do not supply a return code variable for the
     // method call and the method fails, then an appropriate error message is
     // written to the log." (ADD printed p.24, FIND_NEXT p.53, OUTPUT p.73,
     // REMOVE p.82; duplicate:'e' itself printed p.32.) The ERROR is the
-    // documented fallback for an UNCHECKED rc — a program that checks the rc
+    // documented fallback for an UNCHECKED rc - a program that checks the rc
     // has handled the condition BY DESIGN, so the report must stay an ERROR
     // (non-zero exit) yet must not errhalt-skip later steps (the D-014
     // shape). Each arm below asserts the rc, the captured message (D-003),
     // and hasErrors() && !hasStepErrors(); each revert of one site turns
     // exactly its arm red.
 
-    // 1. dataset-load duplicate:'e' — report, keep first, continue (p.32).
+    // 1. dataset-load duplicate:'e' - report, keep first, continue (p.32).
     {
         var f = fixture();
         defer f.deinit();
@@ -12449,7 +12449,7 @@ test "BUG-hashkeytypesilent: a type-mismatched KEY:/DATA: argument fails LOUD on
     f.prime();
     var ex = f.exec();
 
-    // numeric key k, char data d — declared outside the hash (Language Reference: Concepts p.613).
+    // numeric key k, char data d - declared outside the hash (Language Reference: Concepts p.613).
     _ = try f.pdv.define("k", .num);
     _ = try f.pdv.define("d", .char);
     const h = try f.a().create(HashObject);
@@ -12465,7 +12465,7 @@ test "BUG-hashkeytypesilent: a type-mismatched KEY:/DATA: argument fails LOUD on
     const key9 = [_]ast.HashArg{.{ .name = "key", .value = f.num(9) }};
     const keyS = [_]ast.HashArg{.{ .name = "key", .value = f.e(.{ .str = "abc" }) }};
 
-    // CONTROLS — unchanged: type-matched calls behave exactly as before, and a
+    // CONTROLS - unchanged: type-matched calls behave exactly as before, and a
     // legitimate miss still returns the plain not-found rc with NO diagnostic
     // (that distinction IS the fix).
     try t.expectEqual(@as(f64, 0), try ex.hashAdd(h, &seed));
@@ -12475,9 +12475,9 @@ test "BUG-hashkeytypesilent: a type-mismatched KEY:/DATA: argument fails LOUD on
     try t.expectEqual(@as(f64, 0), try ex.hashCheck(h, &key1));
     try t.expectEqual(@as(f64, 160038), try ex.hashCheck(h, &key9));
     try t.expectEqual(@as(f64, 160038), try ex.hashRemove(h, &key9)); // absent
-    try t.expect(!f.diags.hasErrors()); // misses are quiet — only mismatches are loud
+    try t.expect(!f.diags.hasErrors()); // misses are quiet - only mismatches are loud
 
-    // LOUD — a char value against the numeric key on EVERY keyed method: a
+    // LOUD - a char value against the numeric key on EVERY keyed method: a
     // malformed call (Component Objects ref: the type-match sentence appears
     // 18 times), not a miss. Loud via captured diagnostics (D-003).
     const putS = [_]ast.HashArg{ .{ .name = "key", .value = f.e(.{ .str = "abc" }) }, .{ .name = "data", .value = str_one } };
@@ -12490,7 +12490,7 @@ test "BUG-hashkeytypesilent: a type-mismatched KEY:/DATA: argument fails LOUD on
     for (f.diags.list.items) |dg|
         try t.expect(std.mem.indexOf(u8, dg.message, "key k is numeric but the key: argument is character") != null);
 
-    // DATA: form — the same sentence covers it: numeric value into char data d.
+    // DATA: form - the same sentence covers it: numeric value into char data d.
     const nd = f.diags.count();
     const badData = [_]ast.HashArg{ .{ .name = "key", .value = f.num(2) }, .{ .name = "data", .value = f.num(5) } };
     try t.expectError(error.ExecError, ex.hashAdd(h, &badData));
@@ -12498,7 +12498,7 @@ test "BUG-hashkeytypesilent: a type-mismatched KEY:/DATA: argument fails LOUD on
     try t.expectEqual(nd + 2, f.diags.count());
     try t.expect(std.mem.indexOf(u8, f.diags.list.items[nd].message, "data d is character but the data: argument is numeric") != null);
 
-    // SYMMETRIC — a numeric value against a CHAR-keyed hash fails loud too,
+    // SYMMETRIC - a numeric value against a CHAR-keyed hash fails loud too,
     // while a char key that simply misses stays a plain 160038.
     _ = try f.pdv.define("c", .char);
     const hc = try f.a().create(HashObject);
@@ -12536,14 +12536,14 @@ test "hash attributes: num_items live count, item_size width sum, unknown/args f
     try ex.hashOp(.{ .target = "s", .obj = "h", .method = "item_size", .args = &.{} });
     try t.expectEqual(@as(f64, 16), f.pdv.get("s").?.num); // num key 8 + data 8
 
-    // the count is live — a remove shrinks it.
+    // the count is live - a remove shrinks it.
     const key1 = [_]ast.HashArg{.{ .name = "key", .value = f.num(1) }};
     try t.expectEqual(@as(f64, 0), try ex.hashRemove(h, &key1));
     try ex.hashOp(.{ .target = "n2", .obj = "h", .method = "num_items", .args = &.{} });
     try t.expectEqual(@as(f64, 1), f.pdv.get("n2").?.num);
     try t.expect(!f.diags.hasErrors()); // all of the above stays quiet
 
-    // an unknown `.attr` and an attribute-with-arguments both fail LOUD — and now
+    // an unknown `.attr` and an attribute-with-arguments both fail LOUD - and now
     // HALT the step (BUG-hashexprdeferredhalt) rather than fabricating an rc.
     try t.expectError(error.ExecError, ex.hashOp(.{ .target = "x", .obj = "h", .method = "bogus_attr", .args = &.{} }));
     try t.expectError(error.ExecError, ex.hashOp(.{ .target = "y", .obj = "h", .method = "num_items", .args = &key1 }));
@@ -12567,12 +12567,12 @@ test "unsupported hash methods fail loud AND HALT the step, fabricating no rc; s
     try ex.hashes.append(f.a(), h);
 
     // Every currently-unsupported method/operation (ref/equals/sum/sumdup/
-    // find_prev/has_next/has_prev/do_over — clear/delete/hiter prev are
+    // find_prev/has_next/has_prev/do_over - clear/delete/hiter prev are
     // supported now, GAP-hashitermethods): a loud captured ERROR that STOPS THE
     // STEP. BUG-hashexprdeferredhalt supersedes the original "defined non-zero rc"
     // rule here: rc=1 was defined but INVENTED, and `if h.ref() = 1 then …` duly
     // took the branch, wrote its output, and only then surfaced the ERROR. The rc
-    // target must stay UNSET — there is no value to branch on because there is no
+    // target must stay UNSET - there is no value to branch on because there is no
     // more step (Language Reference: Concepts printed p.174-175, Example Code 8.6).
     const unsupported = [_][]const u8{ "ref", "equals", "sum", "sumdup", "find_prev", "has_next", "has_prev", "do_over" };
     for (unsupported, 0..) |m, i| {
@@ -12592,7 +12592,7 @@ test "unsupported hash methods fail loud AND HALT the step, fabricating no rc; s
     try t.expectError(error.ExecError, ex.hashOp(.{ .target = "rcu", .obj = "nope", .method = "find", .args = &.{} }));
     try t.expect(f.pdv.get("rcu") == null);
 
-    // `declare hash h2(suminc:'cnt')` — the silent no-op fails loud AND halts
+    // `declare hash h2(suminc:'cnt')` - the silent no-op fails loud AND halts
     // (AUDIT-errhaltclass): a loud ERROR the step then ignores is still a no-op.
     const before = f.diags.count();
     const suminc_arg = [_]ast.HashArg{.{ .name = "suminc", .value = f.e(.{ .str = "cnt" }) }};
@@ -12612,7 +12612,7 @@ test "hash duplicate: 'r' replaces on add, 'e' logs an error, default keeps firs
     const put999 = [_]ast.HashArg{ .{ .name = "key", .value = f.num(1) }, .{ .name = "data", .value = f.num(999) } };
     const key1 = [_]ast.HashArg{.{ .name = "key", .value = f.num(1) }};
 
-    // duplicate:'r' — the LAST added record wins.
+    // duplicate:'r' - the LAST added record wins.
     const hr = try f.a().create(HashObject);
     hr.* = .{ .name = "hr", .duplicate = .replace };
     try hr.keys.append(f.a(), "k");
@@ -12624,7 +12624,7 @@ test "hash duplicate: 'r' replaces on add, 'e' logs an error, default keeps firs
     try t.expectEqual(@as(f64, 0), try ex.hashFind(hr, &key1));
     try t.expectEqual(@as(f64, 999), f.pdv.get("v").?.num); // last wins
 
-    // duplicate:'e' — captured ERROR, first record kept, non-zero rc.
+    // duplicate:'e' - captured ERROR, first record kept, non-zero rc.
     const he = try f.a().create(HashObject);
     he.* = .{ .name = "he", .duplicate = .err };
     try he.keys.append(f.a(), "k");
@@ -12644,8 +12644,8 @@ test "BUG-hashunknownarg: a misspelled constructor tag fails LOUD; known tags st
     f.prime();
     var ex = f.exec();
 
-    // `declare hash h(odered:'a')` — typo of ordered: SAS rejects an undefined
-    // argument tag; it must ERROR, never silently leave a default hash — and
+    // `declare hash h(odered:'a')` - typo of ordered: SAS rejects an undefined
+    // argument tag; it must ERROR, never silently leave a default hash - and
     // (AUDIT-errhaltclass) it must HALT, never leave the default hash in place
     // for the rest of the step to use.
     const bad = [_]ast.HashArg{.{ .name = "odered", .value = f.e(.{ .str = "a" }) }};
@@ -12671,7 +12671,7 @@ test "BUG-hashunknownarg: a misspelled constructor tag fails LOUD; known tags st
 
     // AUDIT-errhaltclass, the KEYSUM half: `keysum:` is one of the seven LEGAL
     // tags and was missing from the whitelist, so it drew the WRONG diagnostic
-    // ("undefined argument tag") — a factually false message about a tag the
+    // ("undefined argument tag") - a factually false message about a tag the
     // volume defines. It is UNSUPPORTED here (we maintain no key summary), so
     // it must fail as unsupported, and halt, exactly like suminc:.
     const ks = [_]ast.HashArg{.{ .name = "keysum", .value = f.e(.{ .str = "cnt" }) }};
@@ -12681,7 +12681,7 @@ test "BUG-hashunknownarg: a misspelled constructor tag fails LOUD; known tags st
     try t.expect(std.mem.indexOf(u8, last, "undefined argument tag") == null); // not the wrong message
 }
 
-test "AUDIT-errhaltclass: dataset: naming no table HALTS the step — no empty hash, no fabricated missing, no output row" {
+test "AUDIT-errhaltclass: dataset: naming no table HALTS the step - no empty hash, no fabricated missing, no output row" {
     var f = fixture();
     defer f.deinit();
     f.prime();
@@ -12690,7 +12690,7 @@ test "AUDIT-errhaltclass: dataset: naming no table HALTS the step — no empty h
     // `declare hash bad(dataset:'no_such_table'); defineKey('k'); defineData('v');
     //  defineDone(); k=1; rc=bad.find(); flag='WROTE'; output;`
     // Pre-fix: the ERROR was reported, hashLoadDataset RETURNED, and the step ran
-    // to completion against an EMPTY hash — find() missed, v stayed MISSING, and
+    // to completion against an EMPTY hash - find() missed, v stayed MISSING, and
     // the row was written. On a libname-backed run that data set landed on disk at
     // exit 1 and read back at exit 0. The load path is reached from defineDone.
     const src_arg = [_]ast.HashArg{.{ .name = "dataset", .value = f.e(.{ .str = "no_such_table" }) }};
@@ -12710,18 +12710,18 @@ test "AUDIT-errhaltclass: dataset: naming no table HALTS the step — no empty h
     var out = Dataset.init(f.a(), "work.out_never");
     try t.expectError(error.ExecError, ex.run(&prog, &out));
     try t.expect(diagsHave(&f.diags, "hash dataset no_such_table not found")); // captured (D-003)
-    // NO row: run() erroring is what keeps main.zig's `lib.put(name, ds)` — which
-    // sits AFTER `try ex.run(…)` — from registering the data set at all.
+    // NO row: run() erroring is what keeps main.zig's `lib.put(name, ds)` - which
+    // sits AFTER `try ex.run(…)` - from registering the data set at all.
     try t.expectEqual(@as(usize, 0), out.rowCount());
     // `flag` and `rc` exist as compile-time PDV slots (SAS builds the whole PDV
-    // up front, BUG-pdvcompilevars) — what must not exist is a VALUE in them:
+    // up front, BUG-pdvcompilevars) - what must not exist is a VALUE in them:
     // the step stopped before the find() and before the assignment, so no
     // fabricated rc and no 'WROTE' ever reached a slot.
     if (f.pdv.get("flag")) |fv| try t.expect(fv != .str or fv.str.len == 0 or std.mem.trim(u8, fv.str, " ").len == 0);
     if (f.pdv.get("rc")) |rv| try t.expect(rv == .num and std.math.isNan(rv.num));
 
     // Control: the SAME construct over a table that EXISTS loads and looks up, and
-    // stays quiet — the halt is keyed on the missing table, not on `dataset:`.
+    // stays quiet - the halt is keyed on the missing table, not on `dataset:`.
     var f2 = fixture();
     defer f2.deinit();
     f2.prime();
@@ -12756,7 +12756,7 @@ test "AUDIT-errhaltclass: dataset: naming no table HALTS the step — no empty h
 test "BUG-symputxsymtab: a symbol-table argument outside G/L/F fails LOUD, never silently reverts to the default" {
     // SAS 9.4 Macro Language: Reference, Fifth Edition, printed p.307 defines
     // exactly three values for CALL SYMPUTX's third argument. It was PARSED AND
-    // DISCARDED with no diagnostic at all — the silent no-op D-002 forbids
+    // DISCARDED with no diagnostic at all - the silent no-op D-002 forbids
     // outright, and the reason `call symputx('gv','val','G')` inside a macro left
     // `&gv` unresolved at exit 0.
     //
@@ -12769,7 +12769,7 @@ test "BUG-symputxsymtab: a symbol-table argument outside G/L/F fails LOUD, never
     f.prime();
     var ex = f.exec();
 
-    // `call symputx('a', 'v', 'Q');` — HALTS the step (AUDIT-errhaltclass): a
+    // `call symputx('a', 'v', 'Q');` - HALTS the step (AUDIT-errhaltclass): a
     // wrongly scoped macro variable is exactly as dangerous as no variable, so
     // the statements after it must not run on the wrong assumption.
     const bad = [_]ast.Expr{ .{ .str = "a" }, .{ .str = "v" }, .{ .str = "Q" } };
@@ -12782,7 +12782,7 @@ test "BUG-symputxsymtab: a symbol-table argument outside G/L/F fails LOUD, never
     try t.expect(diagsHave(&f.diags, "must be 'G', 'L' or 'F'")); // captured (D-003)
     try t.expectEqual(@as(usize, 0), out.rowCount());
 
-    // A NUMERIC third argument is the same class — there is no numeric reading of
+    // A NUMERIC third argument is the same class - there is no numeric reading of
     // a symbol-table name to fall back on.
     var f2 = fixture();
     defer f2.deinit();
@@ -12794,7 +12794,7 @@ test "BUG-symputxsymtab: a symbol-table argument outside G/L/F fails LOUD, never
     try t.expectError(error.ExecError, ex2.run(&prog2, &out2));
     try t.expect(diagsHave(&f2.diags, "must be 'G', 'L' or 'F'"));
 
-    // CALL SYMPUT has only TWO arguments (printed p.301) — a third one was also
+    // CALL SYMPUT has only TWO arguments (printed p.301) - a third one was also
     // dropped in silence, and it is a real user mistake (SYMPUTX was meant).
     var f3 = fixture();
     defer f3.deinit();
@@ -12809,7 +12809,7 @@ test "BUG-symputxsymtab: a symbol-table argument outside G/L/F fails LOUD, never
     // Control: the three LEGAL values (and lowercase, and blank-padded) are
     // accepted quietly. No macro Session is live in a unit test, so `symputLocal`
     // reports false for every one of them and the value lands in the flat
-    // exec->macro store — which is all this arm needs to prove: the argument is
+    // exec->macro store - which is all this arm needs to prove: the argument is
     // READ and validated, not discarded.
     for ([_][]const u8{ "G", "l", " F " }) |tabv| {
         var fo = fixture();
@@ -12825,14 +12825,14 @@ test "BUG-symputxsymtab: a symbol-table argument outside G/L/F fails LOUD, never
     }
 }
 
-test "BUG-hiterbadhash: a hiter bound to an undeclared/typo'd hash fails LOUD — declare-time and first-use agree" {
+test "BUG-hiterbadhash: a hiter bound to an undeclared/typo'd hash fails LOUD - declare-time and first-use agree" {
     var f = fixture();
     defer f.deinit();
     f.prime();
     var ex = f.exec();
 
     // Repro A (Language Reference: Concepts p.624 Note: the hash must be declared BEFORE the
-    // iterator): `declare hiter it('hh')` with only `h` declared — one typo
+    // iterator): `declare hiter it('hh')` with only `h` declared - one typo
     // used to bind nothing; every first()/next() then returned rc=1 with NO
     // diagnostic, so the canonical do-while walk emitted an EMPTY dataset at
     // exit 0. Now a captured ERROR at declare (D-003, no aborting process).
@@ -12842,13 +12842,13 @@ test "BUG-hiterbadhash: a hiter bound to an undeclared/typo'd hash fails LOUD �
     try t.expectError(error.ExecError, ex.hashDeclare(.{ .name = "it", .args = &typo }));
     try t.expect(diagsHave(&f.diags, "hash object 'hh' is not declared"));
 
-    // Repro B (p.624: the name MUST be quoted): `declare hiter it2(h)` — the
+    // Repro B (p.624: the name MUST be quoted): `declare hiter it2(h)` - the
     // bare h evaluates numeric and used to be dropped on the floor.
     const unq = [_]ast.HashArg{.{ .name = null, .value = f.vbl("h") }};
     try t.expectError(error.ExecError, ex.hashDeclare(.{ .name = "it2", .args = &unq }));
     try t.expect(diagsHave(&f.diags, "must be a quoted string"));
 
-    // First-use fallback: `declare hiter it3;` (no arg — indistinguishable
+    // First-use fallback: `declare hiter it3;` (no arg - indistinguishable
     // from `declare hash` at the AST level) stays silent at declare, but the
     // FIRST move on the unbound iterator fails loud instead of rc=1-quiet.
     try ex.hashDeclare(.{ .name = "it3", .args = noargs });
@@ -12856,7 +12856,7 @@ test "BUG-hiterbadhash: a hiter bound to an undeclared/typo'd hash fails LOUD �
     try t.expectError(error.ExecError, ex.hashIterMove(it3, .first));
     try t.expect(diagsHave(&f.diags, "not bound to a hash object"));
 
-    // Bound, then the hash DELETE'd under it — first move fails loud too.
+    // Bound, then the hash DELETE'd under it - first move fails loud too.
     const good = [_]ast.HashArg{.{ .name = null, .value = f.e(.{ .str = "h" }) }};
     try ex.hashDeclare(.{ .name = "it4", .args = &good });
     try ex.hashOp(.{ .target = null, .obj = "h", .method = "delete", .args = noargs });
@@ -12875,7 +12875,7 @@ test "BUG-hiterbadhash: a hiter bound to an undeclared/typo'd hash fails LOUD �
     try t.expectEqual(before, f.diags.count()); // silence preserved
 }
 
-test "BUG-hashremoveiter: REMOVE while a bound iterator points at the key errors per Language Reference: Concepts p.621 — hash untouched, walk visits every record" {
+test "BUG-hashremoveiter: REMOVE while a bound iterator points at the key errors per Language Reference: Concepts p.621 - hash untouched, walk visits every record" {
     var f = fixture();
     defer f.deinit();
     f.prime();
@@ -12907,7 +12907,7 @@ test "BUG-hashremoveiter: REMOVE while a bound iterator points at the key errors
     // walk-and-delete: p.621 blocks every remove (iterator positioned), so all
     // five records are visited and the hash keeps all five. Pre-fix the cursor
     // corrupted: visited k=1,3,5 and left 2,4 behind at exit 0. (Results read
-    // from the OUTPUT rows — the PDV is wiped at end of step.)
+    // from the OUTPUT rows - the PDV is wiped at end of step.)
     const body = [_]ast.Stmt{
         .{ .hash_op = .{ .target = "junk", .obj = "h", .method = "remove", .args = noargs } },
         .{ .assign = .{ .target = "visited", .value = f.bin(.add, f.vbl("visited"), f.vbl("k")) } },
@@ -12918,7 +12918,7 @@ test "BUG-hashremoveiter: REMOVE while a bound iterator points at the key errors
     var out = Dataset.init(A, "work.out");
     try x.run(stmts.items, &out);
     try t.expect(diagsHave(&f.diags, "hash iterator it is positioned on it")); // captured ERROR (D-003)
-    try t.expectEqual(@as(usize, 5), out.rowCount()); // every record visited — no skip
+    try t.expectEqual(@as(usize, 5), out.rowCount()); // every record visited - no skip
     const ki = out.indexOf("k").?;
     const vi = out.indexOf("visited").?;
     var r: usize = 0;
@@ -12932,9 +12932,9 @@ test "BUG-hashremoveiter: REMOVE while a bound iterator points at the key errors
     }
     try t.expectEqual(@as(usize, 5), x.findHash("h").?.entries.items.len); // nothing removed
 
-    // Control 1 (clean fixture — keeps the control independent of the ERROR
+    // Control 1 (clean fixture - keeps the control independent of the ERROR
     // the walk above recorded): an iterator walked to EXHAUSTION is no longer
-    // positioned — a later remove succeeds.
+    // positioned - a later remove succeeds.
     var f1 = fixture();
     defer f1.deinit();
     f1.prime();
@@ -12958,7 +12958,7 @@ test "BUG-hashremoveiter: REMOVE while a bound iterator points at the key errors
     try t.expectEqual(@as(usize, 0), x1.findHash("h").?.entries.items.len); // removed
 
     // Control 2: a DECLARED but never-walked iterator is not "pointing to the
-    // key" (iter_on=false) — remove is NOT blocked, no diagnostic.
+    // key" (iter_on=false) - remove is NOT blocked, no diagnostic.
     var f2 = fixture();
     defer f2.deinit();
     f2.prime();
@@ -12988,7 +12988,7 @@ test "BUG-hashdefinenovar: defineKey/defineData naming a variable that exists no
     var x = f.exec();
 
     // `length v 8; declare hash h(dataset:'ref'); defineKey('k'); defineData('vv')`
-    // — the one-character typo. k is legal via the SECOND universe (a ref
+    // - the one-character typo. k is legal via the SECOND universe (a ref
     // column, though not a PDV var); vv is in NEITHER. Pre-fix: rc=0, find()
     // reported a HIT restoring nothing, and a phantom vv column materialised.
     const ref = f.newDs("ref");
@@ -13010,7 +13010,7 @@ test "BUG-hashdefinenovar: defineKey/defineData naming a variable that exists no
     try t.expectError(error.ExecError, x.run(&prog, &out)); // captured, no abort (D-003)
     try t.expect(diagsHave(&f.diags, "data variable 'vv' is not declared or initialized"));
 
-    // key side, no dataset: source — same rule.
+    // key side, no dataset: source - same rule.
     var f2 = fixture();
     defer f2.deinit();
     f2.prime();
@@ -13036,7 +13036,7 @@ test "NOTE-declarehashtrim: declare hash dataset: trims the computed name, like 
     _ = try woo.addColumn("x", .num);
     try woo.appendRow(&.{.{ .num = 1 }});
     try f.lib.put("woo", woo);
-    // `declare hash h(dataset: 'w' || nm)` with nm $8 = 'oo' — the value
+    // `declare hash h(dataset: 'w' || nm)` with nm $8 = 'oo' - the value
     // arrives blank-padded; untrimmed it missed the EXISTING member
     // ('hash dataset woo       not found', loud but wrong).
     _ = try f.pdv.declare("x", .num);
@@ -13068,14 +13068,14 @@ test "BUG-hashoutputnametrim: output(dataset:<expr>) trims the computed name; an
 
     try x.hashDeclare(.{ .name = "h", .args = &.{} });
     const obj = x.findHash("h").?;
-    // `'w' || nm` with nm $8 holding 'oo' — the value arrives blank-padded.
-    // Pre-fix the member was literally 'woo     ' — created at rc=0, unreachable.
+    // `'w' || nm` with nm $8 holding 'oo' - the value arrives blank-padded.
+    // Pre-fix the member was literally 'woo     ' - created at rc=0, unreachable.
     const padded = [_]ast.HashArg{.{ .name = "dataset", .value = f.e(.{ .str = "woo     " }) }};
     try t.expectEqual(@as(f64, 0), try x.hashOutput(obj, &padded));
-    try t.expect(x.lib.find("woo") != null); // trimmed — reachable
+    try t.expect(x.lib.find("woo") != null); // trimmed - reachable
     try t.expect(!f.diags.hasErrors());
 
-    // a name that is not [lib.]member (V7 rules) — loud, rc=1, nothing created.
+    // a name that is not [lib.]member (V7 rules) - loud, rc=1, nothing created.
     const bad = [_]ast.HashArg{.{ .name = "dataset", .value = f.e(.{ .str = "9bad" }) }};
     try t.expectEqual(@as(f64, 1), try x.hashOutput(obj, &bad));
     try t.expect(diagsHave(&f.diags, "'9bad' is not a valid SAS data set name"));
@@ -13117,7 +13117,7 @@ test "BUG-hashoutputdsopt: output(dataset:'m(where=…)') applies the options; u
     const badopt = [_]ast.HashArg{.{ .name = "dataset", .value = f.e(.{ .str = "bad(pw=secret)" }) }};
     try t.expectEqual(@as(f64, 1), try ex.hashOutput(h, &badopt));
     try t.expect(f.diags.hasErrors()); // captured diagnostic, not a process abort (D-003)
-    // NOTE-dsoptdoublereport: EXACTLY ONE diagnostic for the one bad option —
+    // NOTE-dsoptdoublereport: EXACTLY ONE diagnostic for the one bad option -
     // io.zig's unknown-option error; the exec-side pre-check that doubled it is
     // gone. (The where= option inside parens must NOT be misread as an option
     // name either: the earlier out(where=(k>1)) call above stayed silent.)
@@ -13153,7 +13153,7 @@ test "NOTE-hashemptytype/hashoutputnods: empty hash keeps declared col types; ou
     try t.expectEqual(pdv_mod.VarType.char, ds.columns.items[0].type);
     try t.expect(!f.diags.hasErrors());
 
-    // output() with NO dataset: tag — loud ERROR + rc=1 (was a silent no-op).
+    // output() with NO dataset: tag - loud ERROR + rc=1 (was a silent no-op).
     try t.expectEqual(@as(f64, 1), try ex.hashOutput(h, &.{}));
     try t.expect(f.diags.hasErrors()); // captured diagnostic, not a process abort (D-003)
 }
@@ -13170,7 +13170,7 @@ test "hash multidata: add keeps duplicate keys, find/find_next walk all records 
     try h.datas.append(f.a(), "v");
     h.done = true;
 
-    // the ticket repro: (1,10)(1,20)(2,30)(1,40) — every add must succeed
+    // the ticket repro: (1,10)(1,20)(2,30)(1,40) - every add must succeed
     const adds = [_][2]f64{ .{ 1, 10 }, .{ 1, 20 }, .{ 2, 30 }, .{ 1, 40 } };
     for (adds) |kv| {
         const a = [_]ast.HashArg{ .{ .name = "key", .value = f.num(kv[0]) }, .{ .name = "data", .value = f.num(kv[1]) } };
@@ -13188,7 +13188,7 @@ test "hash multidata: add keeps duplicate keys, find/find_next walk all records 
     try t.expectEqual(@as(f64, 40), f.pdv.get("v").?.num);
     try t.expectEqual(@as(f64, 160038), try ex.hashFindNext(h)); // chain exhausted
 
-    // k=2 holds a single record — find_next ends immediately
+    // k=2 holds a single record - find_next ends immediately
     const key2 = [_]ast.HashArg{.{ .name = "key", .value = f.num(2) }};
     try t.expectEqual(@as(f64, 0), try ex.hashFind(h, &key2));
     try t.expectEqual(@as(f64, 30), f.pdv.get("v").?.num);
@@ -13224,7 +13224,7 @@ test "hash multidata remove-all: single pass removes every record, survivors kee
     }
     try t.expectEqual(@as(usize, 300), h.entries.items.len);
 
-    // set the find_next cursor on the doomed key — remove must invalidate it
+    // set the find_next cursor on the doomed key - remove must invalidate it
     const key1 = [_]ast.HashArg{.{ .name = "key", .value = f.num(1) }};
     try t.expectEqual(@as(f64, 0), try ex.hashFind(h, &key1));
 
@@ -13251,7 +13251,7 @@ test "special missings stay distinct in hash keys, valueEq, TupleCtx (BUG-execmi
     const U = Value.specialMissing('_');
 
     // cmpValueOrd: special missings compare/sort by rank, not one NaN bucket
-    // (._ < . < .A < … < .Z < every number — Language Reference: Concepts Table 5.1)
+    // (._ < . < .A < … < .Z < every number - Language Reference: Concepts Table 5.1)
     try t.expect(cmpValueOrd(A, Value.missing) != .eq);
     try t.expect(cmpValueOrd(A, A) == .eq);
     try t.expect(cmpValueOrd(U, Value.missing) == .lt); // ._ < .
@@ -13281,7 +13281,7 @@ test "special missings stay distinct in hash keys, valueEq, TupleCtx (BUG-execmi
     const chkA = [_]ast.HashArg{.{ .name = "key", .value = f.num(A.num) }};
     try t.expectEqual(@as(f64, 160038), try ex.hashCheck(h, &chkM)); // . ≠ .A → not found
     try t.expectEqual(@as(f64, 0), try ex.hashCheck(h, &chkA)); // .A found
-    // . is a DISTINCT key, not a duplicate of .A — both survive (ordered-hash 5-key case)
+    // . is a DISTINCT key, not a duplicate of .A - both survive (ordered-hash 5-key case)
     const addM = [_]ast.HashArg{ .{ .name = "key", .value = f.num(Value.missing.num) }, .{ .name = "data", .value = f.num(2) } };
     try t.expectEqual(@as(f64, 0), try ex.hashAdd(h, &addM));
     try t.expectEqual(@as(usize, 2), h.entries.items.len);
@@ -13348,7 +13348,7 @@ test "hash object persists across DATA-step iterations (BUG-hashpersist)" {
         .{ .name = "data", .value = f.bin(.mul, f.vbl("k"), f.num(10)) },
     };
     const find_args = [_]ast.HashArg{.{ .name = "key", .value = f.num(1) }};
-    // p.613 (BUG-hashdefinenovar): kk/v must exist outside the hash — model the
+    // p.613 (BUG-hashdefinenovar): kk/v must exist outside the hash - model the
     // `length kk v 8;` a legal program carries (k comes from the INPUT).
     _ = try f.pdv.declare("kk", .num);
     _ = try f.pdv.declare("v", .num);
@@ -13381,9 +13381,9 @@ test "BUG-hashoutputkeys-crash: a data: tag-count mismatch fails loud instead of
     f.prime();
     var x = f.exec();
 
-    // defineData names TWO vars but add() gives ONE data: tag — the repro that
+    // defineData names TWO vars but add() gives ONE data: tag - the repro that
     // left a short datavals and crashed .output() reading an uninitialized cell.
-    // (k/v declared up front — p.613 requires them outside the hash.)
+    // (k/v declared up front - p.613 requires them outside the hash.)
     _ = try f.pdv.declare("k", .num);
     _ = try f.pdv.declare("v", .num);
     const key_def = [_]ast.HashArg{.{ .name = null, .value = f.e(.{ .str = "k" }) }};
@@ -13416,7 +13416,7 @@ test "NOTE-hashofhash: a hash-valued data item (nested hash) fails loud instead 
     f.prime();
     var x = f.exec();
 
-    // `inner = _new_ hash();` desugars to the second hash_decl below — it
+    // `inner = _new_ hash();` desugars to the second hash_decl below - it
     // registers the object but never a PDV var, so defineData("inner") + add()
     // used to store a SILENT numeric missing (exit 0, no diagnostic).
     const key_arg = [_]ast.HashArg{.{ .name = null, .value = f.e(.{ .str = "k" }) }};
@@ -13432,7 +13432,7 @@ test "NOTE-hashofhash: a hash-valued data item (nested hash) fails loud instead 
     };
 
     var out = Dataset.init(f.a(), "out");
-    x.run(&prog, &out) catch {}; // step aborts loud — reaching here is half the proof
+    x.run(&prog, &out) catch {}; // step aborts loud - reaching here is half the proof
     var found = false;
     for (f.diags.list.items) |d|
         if (d.severity == .err and std.mem.indexOf(u8, d.message, "hash-valued data items (nested hash) are not supported") != null) {
@@ -13453,7 +13453,7 @@ test "BUG-hashofhashexplicit: the EXPLICIT key:/data: spelling reaches the neste
     f.prime();
     var x = f.exec();
 
-    // No defineDone — so the define-time guard never runs and collectArgs is
+    // No defineDone - so the define-time guard never runs and collectArgs is
     // the only thing standing between an explicit `data:` tag and a silently
     // stored missing. Pre-fix this returned rc 0 and appended an entry.
     const key_arg = [_]ast.HashArg{.{ .name = null, .value = f.e(.{ .str = "k" }) }};
@@ -13489,7 +13489,7 @@ test "BUG-hashofhashexplicit: the dataset: bulk load reaches the nested-hash gua
     f.prime();
     var x = f.exec();
 
-    // `declare hash h(dataset:'ref'); defineData('inner')` — no add() anywhere,
+    // `declare hash h(dataset:'ref'); defineData('inner')` - no add() anywhere,
     // so no collectArgs call exists to catch this. Pre-fix, defineDone loaded
     // the row with `inner` fabricated as missing (there is no such column) and
     // a later find() reported a HIT handing back `inner=.` at exit 0.
@@ -13524,7 +13524,7 @@ test "BUG-hashofhashexplicit: the dataset: bulk load reaches the nested-hash gua
 // GENERAL shape `x = inner + 1;`, and a `.sas` file may hold exactly one error
 // (BUG-errhalt), so the two remaining entry classes live here. Each is caught by
 // a DIFFERENT site, so neither can stand in for the other:
-//   - the `data:` slot — the symptom that surfaced the bug — reaches the guard
+//   - the `data:` slot - the symptom that surfaced the bug - reaches the guard
 //     via eval's `.variable` arm, but ONLY once the nested-hash gap guard above
 //     it has declined (see collectArgs: `vars` is clean here, because the
 //     defineData'd name is an ordinary variable and the OBJECT is merely the
@@ -13560,14 +13560,14 @@ test "BUG-declaredobjnamevalue: an object supplied as a data: VALUE errors inste
     };
 
     var out = Dataset.init(f.a(), "out");
-    x.run(&prog, &out) catch {}; // step aborts loud — reaching here is half the proof
+    x.run(&prog, &out) catch {}; // step aborts loud - reaching here is half the proof
     var found = false;
     for (f.diags.list.items) |d|
         if (d.severity == .err and std.mem.indexOf(u8, d.message, "Object inner cannot be used as a value") != null) {
             found = true;
         };
     try t.expect(found);
-    // THE DIAGNOSTIC IS HALF THE ASSERTION — the fabricated value is what made
+    // THE DIAGNOSTIC IS HALF THE ASSERTION - the fabricated value is what made
     // this the worst class, so pin that nothing was stored.
     try t.expectEqual(@as(usize, 0), x.findHash("h").?.entries.items.len);
     // and that the rc-2 nested-hash GAP was not reclassified as this rc-1 user
@@ -13583,7 +13583,7 @@ test "BUG-declaredobjnamevalue: `put h;` errors instead of rendering a fabricate
     var x = f.exec();
 
     // A PUT item reads the PDV directly, so this never routes through eval's
-    // `.variable` arm — pre-fix `put h; put h=;` printed ". h=." at rc 0.
+    // `.variable` arm - pre-fix `put h; put h=;` printed ". h=." at rc 0.
     const items = [_]ast.PutItem{
         .{ .variable = .{ .name = "h" } },
         .{ .named = .{ .name = "h" } },
@@ -13601,7 +13601,7 @@ test "BUG-declaredobjnamevalue: `put h;` errors instead of rendering a fabricate
             found = true;
         };
     try t.expect(found);
-    // The VALUE again: pre-fix the log held ". h=." — nothing may reach it now.
+    // The VALUE again: pre-fix the log held ". h=." - nothing may reach it now.
     try t.expectEqualStrings("", x.log.items);
 }
 
@@ -13637,7 +13637,7 @@ test "PDV vars exist at COMPILE time: dead-branch assign + bare FORMAT reach the
     var x = f.exec();
 
     // data out; x='2023-05-01'; if 0 then ev2=1; if 0 then s2=cats('a');
-    //           format ev3 8.; run;   — the EPOCH-derivation shape (full dates →
+    //           format ev3 8.; run;   - the EPOCH-derivation shape (full dates →
     // the partial-date branches never run, yet those columns must still exist).
     const dead_num = ast.Stmt{ .assign = .{ .target = "ev2", .value = f.num(1) } };
     const cats_args = [_]ast.Expr{.{ .str = "a" }};
@@ -13712,7 +13712,7 @@ test "DELETE drops the current obs; STOP ends the DATA step (CTLSTMT)" {
 test "abort: RETURN n sets the session rc + poisons later steps; plain only ends the step (BUG-abortreturncode)" {
     // ABORT RETURN 8: step ends now (0 obs), _ERROR_=1, session rc handed to
     // main via g_abort_rc; the ERROR diagnostic is the session-halt poison
-    // (captured reporter, D-003 — no spawned process exit).
+    // (captured reporter, D-003 - no spawned process exit).
     {
         var f = fixture();
         defer f.deinit();
@@ -13745,7 +13745,7 @@ test "abort: RETURN n sets the session rc + poisons later steps; plain only ends
 
 test "array write: out-of-range subscript is a SAS ERROR that halts the step (BUG-arrwriteoor)" {
     // OOB write: ERROR (captured reporter, no spawned abort), _ERROR_=1, ExecError
-    // aborts the step — the statement after the bad write never runs, no obs out.
+    // aborts the step - the statement after the bad write never runs, no obs out.
     {
         var f = fixture();
         defer f.deinit();
@@ -13772,7 +13772,7 @@ test "array write: out-of-range subscript is a SAS ERROR that halts the step (BU
         try t.expect(after == null or after.?.num != 2); // step stopped AT the bad write
         try t.expectEqual(@as(usize, 0), out.rowCount()); // current obs not output
     }
-    // a MISSING (.) subscript is out of range too — the write fails loud, not a
+    // a MISSING (.) subscript is out of range too - the write fails loud, not a
     // silent no-op (BUG-arraysubmissing). NaN slips past the `<`/`>` span check,
     // so it must be caught explicitly; same halt/message as any OOR write.
     {
@@ -13819,7 +13819,7 @@ test "array write: out-of-range subscript is a SAS ERROR that halts the step (BU
 test "array multidim write: per-dimension OOR subscript fails LOUD, valid folds row-major (BUG-arraymultidimoor)" {
     // The parser emits a `__dimchk` index for a multi-dim ref (eval.zig resolves
     // it): each subscript is checked against ITS dimension's bounds BEFORE the
-    // row-major fold. `__dimchk(name, line, {idx,lo,size}…)` — build it here the
+    // row-major fold. `__dimchk(name, line, {idx,lo,size}…)` - build it here the
     // way parser_expr.arraySubscript does, then drive the write path.
     const mkDimchk = struct {
         // dims: list of {idx_expr, lo, size}; returns the __dimchk index expr.
@@ -13837,7 +13837,7 @@ test "array multidim write: per-dimension OOR subscript fails LOUD, valid folds 
     }.f;
     const elems: []const []const u8 = &.{ "a1", "a2", "a3", "a4" }; // array a{2,2}
 
-    // WRITE a{1,3}=9 — col 3 doesn't exist; the raw fold would land in a valid
+    // WRITE a{1,3}=9 - col 3 doesn't exist; the raw fold would land in a valid
     // flat slot (a3) and corrupt it silently. Per-dim check fails loud + halts.
     {
         var f = fixture();
@@ -13861,7 +13861,7 @@ test "array multidim write: per-dimension OOR subscript fails LOUD, valid folds 
         try t.expect(after == null or after.?.num != 2); // step stopped AT the bad write
     }
 
-    // VALID a{2,1}=9 — row 2, col 1 folds row-major to flat 3 (a3), NOT a2/a4.
+    // VALID a{2,1}=9 - row 2, col 1 folds row-major to flat 3 (a3), NOT a2/a4.
     {
         var f = fixture();
         defer f.deinit();
@@ -13878,8 +13878,8 @@ test "array multidim write: per-dimension OOR subscript fails LOUD, valid folds 
     }
 }
 
-test "array decl validation: excess inits, char init for numeric array, bare array name — fail LOUD (BUG-arrayinitvalidate)" {
-    // F1: 3 initial values for 2 elements — SAS ERROR; the excess used to be
+test "array decl validation: excess inits, char init for numeric array, bare array name - fail LOUD (BUG-arrayinitvalidate)" {
+    // F1: 3 initial values for 2 elements - SAS ERROR; the excess used to be
     // silently dropped. Compile-time: the gate halts the step, no obs out.
     {
         var f = fixture();
@@ -13892,7 +13892,7 @@ test "array decl validation: excess inits, char init for numeric array, bare arr
             .{ .array = .{ .name = "a", .elements = elems, .inits = &inits } },
         };
         var out = Dataset.init(f.a(), "work.out");
-        try x.run(&prog, &out); // gate, not a propagated error — like a bad label
+        try x.run(&prog, &out); // gate, not a propagated error - like a bad label
         try t.expect(f.diags.hasStepErrors());
         var found = false;
         for (f.diags.list.items) |d| if (d.severity == .err and std.mem.indexOf(u8, d.message, "exceeds the number of array elements") != null) {
@@ -13901,7 +13901,7 @@ test "array decl validation: excess inits, char init for numeric array, bare arr
         try t.expect(found);
         try t.expectEqual(@as(usize, 0), out.rowCount()); // step never ran
     }
-    // F2: a CHARACTER constant initializing a NUMERIC array element — SAS ERROR;
+    // F2: a CHARACTER constant initializing a NUMERIC array element - SAS ERROR;
     // it used to be stored as a char, corrupting the element's type.
     {
         var f = fixture();
@@ -13923,7 +13923,7 @@ test "array decl validation: excess inits, char init for numeric array, bare arr
         try t.expect(found);
         try t.expectEqual(@as(usize, 0), out.rowCount());
     }
-    // F3: a bare array NAME in a scalar expression (`s = a + 1`) — SAS ERROR
+    // F3: a bare array NAME in a scalar expression (`s = a + 1`) - SAS ERROR
     // ("array subscript required"); it used to fabricate a phantom uninitialized
     // scalar and compute a wrong (missing) result.
     {
@@ -13946,7 +13946,7 @@ test "array decl validation: excess inits, char init for numeric array, bare arr
         try t.expectEqual(@as(usize, 0), out.rowCount());
     }
     // The VALID shapes stay byte-identical: exact-count inits, FEWER inits than
-    // elements (rest default to missing — legal in SAS), a char literal into a
+    // elements (rest default to missing - legal in SAS), a char literal into a
     // `$` array, subscripted access, and an array name inside an a{i} read.
     {
         var f = fixture();
@@ -13957,7 +13957,7 @@ test "array decl validation: excess inits, char init for numeric array, bare arr
         const eb: []const []const u8 = &.{ "y1", "y2", "y3" };
         const ec: []const []const u8 = &.{ "c1", "c2" };
         const ia = [_]*const ast.Expr{ f.num(1), f.num(2), f.num(3) };
-        const ib = [_]*const ast.Expr{ f.num(1), f.num(2) }; // fewer — legal
+        const ib = [_]*const ast.Expr{ f.num(1), f.num(2) }; // fewer - legal
         const ic = [_]*const ast.Expr{ f.e(.{ .str = "x" }), f.e(.{ .str = "y" }) };
         const prog = [_]ast.Stmt{
             .{ .array = .{ .name = "a", .elements = ea, .inits = &ia } },
@@ -13979,7 +13979,7 @@ test "array decl validation: excess inits, char init for numeric array, bare arr
 }
 
 test "array with a mixed num/char member list fails LOUD at bind time (BUG-mixedtypearray)" {
-    // A char member (`x2='ab'` types it char) in a NUMERIC array — SAS 9.4
+    // A char member (`x2='ab'` types it char) in a NUMERIC array - SAS 9.4
     // compile-time ERROR. It used to be silently accepted: x2 kept its char
     // type and `mix{2}=2;` silently converted. Gate, not a propagated error.
     {
@@ -14005,7 +14005,7 @@ test "array with a mixed num/char member list fails LOUD at bind time (BUG-mixed
         try t.expectEqual(@as(usize, 0), out.rowCount()); // step never ran
     }
     // The VALID shapes stay clean: all-numeric, all-char (`$`), and a
-    // special-list array (`_all_` is heterogeneous by design — exempt).
+    // special-list array (`_all_` is heterogeneous by design - exempt).
     {
         var f = fixture();
         defer f.deinit();
@@ -14034,7 +14034,7 @@ test "array with a mixed num/char member list fails LOUD at bind time (BUG-mixed
 test "NOTE-fmtnumoncharcoerce: a format whose type disagrees with the variable is a compile-time ERROR, both directions + ATTRIB" {
     // SAS 9.4: the FORMAT statement associates char vars with char formats and
     // numeric vars with numeric formats (Formats & Informats Ref printed p.7);
-    // an incompatible format ERRORs (p.5) — it never silently coerces. The
+    // an incompatible format ERRORs (p.5) - it never silently coerces. The
     // check runs in declareStmt so the hasStepErrors() gate halts the step
     // BEFORE an observation is written (no output is produced first).
 
@@ -14082,7 +14082,7 @@ test "NOTE-fmtnumoncharcoerce: a format whose type disagrees with the variable i
         try t.expectEqual(@as(usize, 0), out.rowCount());
     }
     // 3. ATTRIB spelling (rides the same .format node): `attrib n format=$8.;`
-    //    on a numeric var errors at compile time too — the shape that used to
+    //    on a numeric var errors at compile time too - the shape that used to
     //    slip to a per-cell runtime error.
     {
         var f = fixture();
@@ -14099,7 +14099,7 @@ test "NOTE-fmtnumoncharcoerce: a format whose type disagrees with the variable i
         try x.run(&prog, &out);
         try t.expect(f.diags.hasStepErrors());
     }
-    // 4. `length c $3; attrib c format=8.2;` — the seedDeclVar "defined as
+    // 4. `length c $3; attrib c format=8.2;` - the seedDeclVar "defined as
     //    both" conflict already reports it; the format check must NOT double.
     {
         var f = fixture();
@@ -14122,7 +14122,7 @@ test "NOTE-fmtnumoncharcoerce: a format whose type disagrees with the variable i
         try t.expectEqual(@as(usize, 1), errs); // one root cause, one ERROR
     }
     // 5. controls must not move: numeric format on numeric, `$` format on
-    //    char, and the removal sentinel `format x;` on either type — all clean.
+    //    char, and the removal sentinel `format x;` on either type - all clean.
     {
         var f = fixture();
         defer f.deinit();
@@ -14153,9 +14153,9 @@ test "BUG-informatallnotypecheck: a special-list format/informat type conflict f
     // check (display on the .formats pass, informat on the .attrs pass)
     // validates each member exactly once: the format arm must not fire TWICE
     // (the old double-report) and the informat arm must not fire ZERO times
-    // (the shipped regression — rc 0 with the bad informat attached).
+    // (the shipped regression - rc 0 with the bad informat attached).
 
-    // 1. informat arm: `informat _all_ 8.;` over a char var — exactly one ERROR.
+    // 1. informat arm: `informat _all_ 8.;` over a char var - exactly one ERROR.
     {
         var f = fixture();
         defer f.deinit();
@@ -14174,10 +14174,10 @@ test "BUG-informatallnotypecheck: a special-list format/informat type conflict f
         for (f.diags.list.items) |d| if (d.severity == .err and std.mem.indexOf(u8, d.message, "The numeric informat 8. cannot be used with character variable a.") != null) {
             hits += 1;
         };
-        try t.expectEqual(@as(usize, 1), hits); // once — not zero (the bug), not two
+        try t.expectEqual(@as(usize, 1), hits); // once - not zero (the bug), not two
         try t.expectEqual(@as(usize, 0), out.rowCount()); // halted before output
     }
-    // 2. format arm: `format _all_ 8.;` rides BOTH lists — still exactly one
+    // 2. format arm: `format _all_ 8.;` rides BOTH lists - still exactly one
     //    ERROR (the double-report the keyed check exists to prevent).
     {
         var f = fixture();
@@ -14197,11 +14197,11 @@ test "BUG-informatallnotypecheck: a special-list format/informat type conflict f
         for (f.diags.list.items) |d| if (d.severity == .err and std.mem.indexOf(u8, d.message, "The numeric format 8. cannot be used with character variable a.") != null) {
             hits += 1;
         };
-        try t.expectEqual(@as(usize, 1), hits); // once — not two (rides both lists)
+        try t.expectEqual(@as(usize, 1), hits); // once - not two (rides both lists)
         try t.expectEqual(@as(usize, 0), out.rowCount());
     }
     // 3. control: the same statements on an all-numeric PDV stay legal (the
-    //    informat ATTACHES — the check only gates type conflicts).
+    //    informat ATTACHES - the check only gates type conflicts).
     {
         var f = fixture();
         defer f.deinit();
@@ -14313,7 +14313,7 @@ test "stray LEAVE/CONTINUE in open code is a compile ERROR, step never runs (BUG
     defer f.deinit();
     f.prime();
 
-    // data out; x=1; leave; y=2; run; — SAS 728-185: compile ERROR, nothing runs.
+    // data out; x=1; leave; y=2; run; - SAS 728-185: compile ERROR, nothing runs.
     // Was: silently dropped y=2 and still wrote the truncated obs.
     var x = f.exec();
     const prog = [_]ast.Stmt{
@@ -14362,7 +14362,7 @@ test "DO loop BY 0 is an ERROR; BY 2 / BY -1 unchanged (BUG-doByZero)" {
     defer f.deinit();
     f.prime();
 
-    // do i=1 to 10 by 0; — would loop forever; SAS ERRORs (was: NOTE + 0 iters).
+    // do i=1 to 10 by 0; - would loop forever; SAS ERRORs (was: NOTE + 0 iters).
     var x = f.exec();
     const prog = [_]ast.Stmt{.{ .do_ = .{
         .header = .{ .iter = .{ .name = "i", .start = f.num(1), .stop = f.num(10), .by = f.num(0) } },
@@ -14393,7 +14393,7 @@ test "WHERE referencing a variable absent from the source fails loud, emits noth
     f.prime();
     var x = f.exec();
 
-    // data b; set a; where zzz > 1; run; — eval mapped the unknown var to
+    // data b; set a; where zzz > 1; run; - eval mapped the unknown var to
     // missing, so the filter silently kept ZERO rows, exit 0. SAS:
     // "ERROR: Variable ZZZ is not on file WORK.A".
     const a_ds = f.newDs("a");
@@ -14405,17 +14405,17 @@ test "WHERE referencing a variable absent from the source fails loud, emits noth
     const prog = [_]ast.Stmt{ .{ .set = &names }, .{ .where_ = f.bin(.gt, f.vbl("zzz"), f.num(1)) } };
     var out = Dataset.init(f.a(), "b");
     try x.run(&prog, &out);
-    try t.expect(f.diags.hasErrors()); // captured diagnostic — never a silent empty set
+    try t.expect(f.diags.hasErrors()); // captured diagnostic - never a silent empty set
     try t.expectEqual(@as(usize, 0), out.rowCount());
 }
 
-test "a second plain WHERE replaces the first — last wins (BUG-whereplacelast)" {
+test "a second plain WHERE replaces the first - last wins (BUG-whereplacelast)" {
     var f = fixture();
     defer f.deinit();
     f.prime();
     var x = f.exec();
 
-    // data b; set a; where k > 1; where k > 5; run; — SAS 9.4: a later plain
+    // data b; set a; where k > 1; where k > 5; run; - SAS 9.4: a later plain
     // WHERE supersedes the earlier one (only WHERE ALSO ANDs). Keeping the
     // first silently mis-filters.
     const a_ds = f.newDs("a");
@@ -14444,7 +14444,7 @@ test "WHERE with POINT= fails loud, emits nothing (QA-audit42)" {
     var x = f.exec();
 
     // data b; do i=1 to 2; set a point=i; output; end; stop; where k > 1; run;
-    // — SAS rejects WHERE+POINT=; we silently ignored the WHERE (wrong rows).
+    // - SAS rejects WHERE+POINT=; we silently ignored the WHERE (wrong rows).
     const a_ds = f.newDs("a");
     _ = try a_ds.addColumn("k", .num);
     try a_ds.appendRow(&.{.{ .num = 1 }});
@@ -14465,7 +14465,7 @@ test "POINT= with BY fails loud (BUG-setpointtemp)" {
     f.prime();
     var x = f.exec();
 
-    // data b; set a point=p; by k; run; — SAS: POINT= cannot be used with BY.
+    // data b; set a point=p; by k; run; - SAS: POINT= cannot be used with BY.
     // It silently emitted a bogus all-missing row, exit 0.
     const a_ds = f.newDs("a");
     _ = try a_ds.addColumn("k", .num);
@@ -14481,9 +14481,9 @@ test "POINT= with BY fails loud (BUG-setpointtemp)" {
 }
 
 test "POINT= beside a MERGE/INPUT driver: BY fails loud for ANY driver; no-BY merge + INPUT read and keep the automatic output (BUG-pointsuppressesalloutput + BUG-pointmergelookup)" {
-    // 1. MERGE + BY + POINT= — Statements ref, SET POINT= Restrictions: "You
+    // 1. MERGE + BY + POINT= - Statements ref, SET POINT= Restrictions: "You
     //    cannot use POINT= with a BY statement, a WHERE statement, or a WHERE=
-    //    data set option" — flat, driver-independent. The merge driver used to
+    //    data set option" - flat, driver-independent. The merge driver used to
     //    win buildDriver first, skip this guard, and silently emit merge rows
     //    with the lookup columns MISSING (QA tick357 F4).
     {
@@ -14509,12 +14509,12 @@ test "POINT= beside a MERGE/INPUT driver: BY fails loud for ANY driver; no-BY me
         try t.expectError(error.ExecError, x.run(&prog, &out));
         try t.expectEqualStrings("POINT= cannot be used with BY", f.diags.list.items[f.diags.list.items.len - 1].message);
     }
-    // 2. MERGE (no BY) + POINT= — the documented direct-access lookup beside a
+    // 2. MERGE (no BY) + POINT= - the documented direct-access lookup beside a
     //    driver (Statements ref, SET Example 6: `set revenue; … set expense
-    //    point=_n_;`). The merge driver's 4 rows must ALL appear — Language Reference: Concepts p.477
+    //    point=_n_;`). The merge driver's 4 rows must ALL appear - Language Reference: Concepts p.477
     //    step 5's automatic output is unconditional here (the 1736df6d
     //    regression keyed on the MENTION of POINT= and wrote ZERO rows, exit 0)
-    //    — and lv must be POPULATED by the direct read (the pre-existing hole
+    //    - and lv must be POPULATED by the direct read (the pre-existing hole
     //    parsed the SET and then never performed the read).
     {
         var f = fixture();
@@ -14549,7 +14549,7 @@ test "POINT= beside a MERGE/INPUT driver: BY fails loud for ANY driver; no-BY me
             try t.expectEqual(@as(f64, @floatFromInt(10 * (r + 1))), out.row(r)[vc].num); // merge sequence
         }
     }
-    // 3. INPUT + POINT= — INPUT is a peer reader with its own EOF (Language Reference: Concepts p.477
+    // 3. INPUT + POINT= - INPUT is a peer reader with its own EOF (Language Reference: Concepts p.477
     //    step 3; Table 20.4), so the step is INPUT-DRIVEN: one iteration per
     //    record, automatic output intact, direct read of obs p each time.
     {
@@ -14578,13 +14578,13 @@ test "POINT= beside a MERGE/INPUT driver: BY fails loud for ANY driver; no-BY me
 
 test "POINT= out-of-range obs is a NOTE + _ERROR_=1 and the step CONTINUES (NOTE-pointoorhard)" {
     // Statements Ref SET POINT=: an invalid POINT= value "sets the automatic
-    // variable _ERROR_ to 1" — and its continuous-loop caution only makes sense
+    // variable _ERROR_ to 1" - and its continuous-loop caution only makes sense
     // if the step CONTINUES; Language Reference: Concepts p.488's `if _error_ then stop;` idiom is the
     // user side of that contract. No halt, no errhalt poison. This test
     // deliberately INVERTS e1d73fbf's pin (BUG-pointnobs, "halt like the
     // array-OOR paths"): the halt made the documented idiom unrunnable (rc 1,
-    // later steps suppressed). _ERROR_ is asserted BEHAVIOURALLY — the guard
-    // firing and a captured copy — because the loop-top PDV reset makes the
+    // later steps suppressed). _ERROR_ is asserted BEHAVIOURALLY - the guard
+    // firing and a captured copy - because the loop-top PDV reset makes the
     // post-run value unobservable.
     const mk = struct {
         fn a(fx: anytype) !void {
@@ -14598,9 +14598,9 @@ test "POINT= out-of-range obs is a NOTE + _ERROR_=1 and the step CONTINUES (NOTE
     }.a;
 
     // 1. THE IDIOM: data b; do i=1 to 5; set a point=i; if _error_ then stop;
-    //    output; end; stop; run; — the guard must SEE _ERROR_=1 at i=4 and end
+    //    output; end; stop; run; - the guard must SEE _ERROR_=1 at i=4 and end
     //    the step: exactly the 3 real rows, no stale re-output, NOTE in the log,
-    //    and NO error class anywhere (rc stays 0, later steps run — a following
+    //    and NO error class anywhere (rc stays 0, later steps run - a following
     //    PROC PRINT is no longer suppressed).
     {
         var f = fixture();
@@ -14621,7 +14621,7 @@ test "POINT= out-of-range obs is a NOTE + _ERROR_=1 and the step CONTINUES (NOTE
             .body = &body,
         } }};
         var out = Dataset.init(f.a(), "b");
-        try x.run(&prog, &out); // NO ExecError — the step continues to the guard
+        try x.run(&prog, &out); // NO ExecError - the step continues to the guard
         try t.expect(!f.diags.hasErrors()); // NOTE only: rc stays 0 …
         try t.expect(!f.diags.hasStepErrors()); // … and no errhalt poison for later steps
         try t.expectEqual(@as(usize, 3), out.rowCount()); // guard fired at i=4: the 3 real rows ONLY
@@ -14630,9 +14630,9 @@ test "POINT= out-of-range obs is a NOTE + _ERROR_=1 and the step CONTINUES (NOTE
         try t.expectEqualStrings("SET POINT= invalid observation number 4: a has 3 observations", last.message);
     }
 
-    // 2. UNGUARDED: data b; do i=1 to 5; set a point=i; output; end; run; — the
+    // 2. UNGUARDED: data b; do i=1 to 5; set a point=i; output; end; run; - the
     //    loop runs to its end. Each failing iteration's explicit OUTPUT writes
-    //    the retained (stale) PDV with _ERROR_=1 loud — the oracle-blocked
+    //    the retained (stale) PDV with _ERROR_=1 loud - the oracle-blocked
     //    stale-PDV pick (SAS retention semantics), ponytail-marked at the .set
     //    arm. The trailing iteration-2 repeat-stop (DEC-pointrepeatstop) still
     //    terminates the re-armed driver.
@@ -14657,7 +14657,7 @@ test "POINT= out-of-range obs is a NOTE + _ERROR_=1 and the step CONTINUES (NOTE
         const kc = out.indexOf("k").?;
         for (0..5) |r| try t.expectEqual(@as(f64, @floatFromInt(@as(usize, 10) * @min(r + 1, 3))), out.row(r)[kc].num);
         // Both failing passes still note (the pass-5 one for obs 5 is the last
-        // POINT= NOTE) — and ISS-errordump now appends the end-of-iteration PDV
+        // POINT= NOTE) - and ISS-errordump now appends the end-of-iteration PDV
         // dump after them: the whole DO loop is ONE DATA-step iteration, so the
         // dump fires once, holding the retained (stale) last-read k, the
         // exhausted index (real SAS leaves i at 6), and the automatics last.
@@ -14670,11 +14670,11 @@ test "POINT= out-of-range obs is a NOTE + _ERROR_=1 and the step CONTINUES (NOTE
 
 test "ISS-errordump: a row flagged _ERROR_=1 dumps its observation at iteration end; clean rows dump nothing" {
     // Language Reference: Concepts printed p.518, "How SAS Handles Invalid Data" action 4: the
-    // offending observation is written to the log at the end of its iteration —
+    // offending observation is written to the log at the end of its iteration -
     // `input s $ v;` on "XX2025 XX" reads s as text, fails v on 'XX', and the
     // row dumps as `s=XX2025 v=. _ERROR_=1 _N_=1` (the put _all_ shape: data
     // vars first, automatics last, BUG-putallcase uppercasing). The dump is
-    // LOG-class output — it rides the captured diagnostics (stderr in the CLI),
+    // LOG-class output - it rides the captured diagnostics (stderr in the CLI),
     // never the listing, so stdout corpus goldens cannot move.
     var f = fixture();
     defer f.deinit();
@@ -14705,16 +14705,16 @@ test "ISS-errordump: a row flagged _ERROR_=1 dumps its observation at iteration 
     const dump = f.diags.list.items[f.diags.list.items.len - 1];
     try t.expectEqual(diag.Severity.note, dump.severity);
     try t.expectEqualStrings("s=XX2025 v=. _ERROR_=1 _N_=1", dump.message);
-    // The listing stays empty — a dump never reaches stdout (putBuf redirect).
+    // The listing stays empty - a dump never reaches stdout (putBuf redirect).
     try t.expectEqual(@as(usize, 0), x.log.items.len);
 }
 
-test "ISS-errordump: the p.601 in-step clear suppresses the dump — the flag is read live at iteration end" {
+test "ISS-errordump: the p.601 in-step clear suppresses the dump - the flag is read live at iteration end" {
     // Language Reference: Concepts p.601's documented handler clears the flag in-step
     // (`if _error_ then _error_=0;`), which is exactly why the dump decision
     // reads the live PDV at the row boundary, BEFORE the next iteration's reset:
     // a cleared row dumps nothing, a left-set one does. Uses the expression
-    // char→num path (eval.toNum → setError, CHARNUM-errorvar) — the dump keys on
+    // char→num path (eval.toNum → setError, CHARNUM-errorvar) - the dump keys on
     // _ERROR_=1 however it was raised, INPUT statement or not.
     var f = fixture();
     defer f.deinit();
@@ -14764,7 +14764,7 @@ test "ISS-errordump: the p.601 in-step clear suppresses the dump — the flag is
     }
 }
 
-test "ISS-errordump: a DELETEd offending row still dumps — the iteration completed, the flag is loud" {
+test "ISS-errordump: a DELETEd offending row still dumps - the iteration completed, the flag is loud" {
     // p.518 action 4 keys on the flag, not on the row's survival: the DELETE
     // suppressed the OBSERVATION, not the ERROR. Staying silent for a deleted
     // flagged row would be the failure class this codebase refuses (a bad-data
@@ -14801,10 +14801,10 @@ test "POINT= with a missing obs number is a NOTE + _ERROR_=1, step CONTINUES (NO
     f.prime();
     var x = f.exec();
 
-    // data b; set a point=p; e=_error_; output; stop; run; — p never assigned
+    // data b; set a point=p; e=_error_; output; stop; run; - p never assigned
     // (missing): same "invalid value of the POINT= variable" path as
     // out-of-range: NOTE, _ERROR_=1 (captured into e INSIDE the step, before the
-    // loop-top reset), continue — the explicit OUTPUT writes the never-loaded
+    // loop-top reset), continue - the explicit OUTPUT writes the never-loaded
     // (all-missing) PDV and STOP ends the step. No ExecError, rc 0, no poison.
     const a_ds = f.newDs("a");
     _ = try a_ds.addColumn("k", .num);
@@ -14837,10 +14837,10 @@ test "nested-only SET keeps END= and reads to EOF (BUG-nestedsetopts)" {
     f.prime();
     var x = f.exec();
 
-    // data w; if 1 then set d end=e; f=e; run; — the nested SET is the step's
+    // data w; if 1 then set d end=e; f=e; run; - the nested SET is the step's
     // ONLY source, so its \x00end= sentinel was never extracted (BUG-
-    // nestedsetdriver keeps nested sources out of set_names): e never fired —
-    // a DO UNTIL on it hung forever — and "File  end=e does not exist" leaked
+    // nestedsetdriver keeps nested sources out of set_names): e never fired -
+    // a DO UNTIL on it hung forever - and "File  end=e does not exist" leaked
     // the raw \x00. Correct: 2 obs, f = 0 then 1 (QA tick290 F1+F2).
     const d_ds = f.newDs("d");
     _ = try d_ds.addColumn("v", .num);
@@ -14862,14 +14862,14 @@ test "nested-only SET keeps END= and reads to EOF (BUG-nestedsetopts)" {
     try t.expectEqual(@as(f64, 1), out.row(1)[out.indexOf("f").?].num);
 }
 
-test "conditional POINT= lookup beside a driving SET reads (GAP-secondsetstmt); a SECOND POINT= source fails clean — no raw sentinel (BUG-nestedsetopts)" {
+test "conditional POINT= lookup beside a driving SET reads (GAP-secondsetstmt); a SECOND POINT= source fails clean - no raw sentinel (BUG-nestedsetopts)" {
     var f = fixture();
     defer f.deinit();
     f.prime();
     var x = f.exec();
 
     // Statements ref p.341 Example 6 makes ONE sequential driver + a second
-    // SET that is a direct-access POINT= lookup the documented idiom — the
+    // SET that is a direct-access POINT= lookup the documented idiom - the
     // conditional form `data o; set a; if _n_=1 then set b point=k; run;`
     // (which BUG-nestedsetopts' pin had LOUD) is the same family and must RUN:
     // the lookup reads b obs k on iteration 1, then the value RETAINS (SET vars
@@ -14945,7 +14945,7 @@ test "conditional POINT= lookup beside a driving SET reads (GAP-secondsetstmt); 
 
     // …and the p.335 third leg fires for the CLAIMED second-SET path too: a
     // where= option riding the lookup source (BUG-pointwheredsopt's scanner
-    // re-scoped to the lookup's own list — GAP-secondsetstmt).
+    // re-scoped to the lookup's own list - GAP-secondsetstmt).
     var f4 = fixture();
     defer f4.deinit();
     f4.prime();
@@ -14968,13 +14968,13 @@ test "conditional POINT= lookup beside a driving SET reads (GAP-secondsetstmt); 
     try t.expectEqualStrings("The WHERE= data set option cannot be used with the POINT= option", f4.diags.list.items[f4.diags.list.items.len - 1].message);
 }
 
-test "QA tick377 F2: the second-SET POINT= lookup's columns land at the carrying node — no false uninitialized NOTE; a genuine uninit read still notes" {
+test "QA tick377 F2: the second-SET POINT= lookup's columns land at the carrying node - no false uninitialized NOTE; a genuine uninit read still notes" {
     var f = fixture();
     defer f.deinit();
     f.prime();
     var x = f.exec();
 
-    // Repro A shape: `set drv; set lk point=_n_; x = b * 2; y = ghost + 1;` —
+    // Repro A shape: `set drv; set lk point=_n_; x = b * 2; y = ghost + 1;` -
     // b is first-mentioned at the SET that CARRIES POINT= (before x's
     // assignment), so the PDV order is a b x y and reading b notes NOTHING;
     // ghost is genuinely uninitialized and must still note, once.
@@ -15005,7 +15005,7 @@ test "QA tick377 F2: the second-SET POINT= lookup's columns land at the carrying
     for (f.diags.list.items) |d| {
         if (d.severity == .note and std.mem.indexOf(u8, d.message, "is uninitialized") != null) {
             uninit_notes += 1;
-            try t.expect(std.mem.indexOf(u8, d.message, "ghost") != null); // only ghost — never b
+            try t.expect(std.mem.indexOf(u8, d.message, "ghost") != null); // only ghost - never b
         }
     }
     try t.expectEqual(@as(usize, 1), uninit_notes);
@@ -15017,7 +15017,7 @@ test "QA tick377 F2: the second-SET POINT= lookup's columns land at the carrying
     try t.expectEqual(@as(f64, 20), out.row(0)[out.indexOf("x").?].num); // lookup value intact
     try t.expectEqual(@as(f64, 40), out.row(1)[out.indexOf("x").?].num);
 
-    // Repro B shape: `merge mA mB; set lk point=_n_;` — the MERGE driver owns
+    // Repro B shape: `merge mA mB; set lk point=_n_;` - the MERGE driver owns
     // the early slots and the FIRST top-level SET (the lookup) seeds its
     // column at its own node: k p q b, not b k p q.
     var f2 = fixture();
@@ -15055,7 +15055,7 @@ test "nested MERGE/UPDATE seed the PDV schema; nested UPDATE without BY fails lo
     f.prime();
     var x = f.exec();
 
-    // data w; if 0 then merge b; stop; run; — the nested cut-off contributed
+    // data w; if 0 then merge b; stop; run; - the nested cut-off contributed
     // NO PDV columns (a nested SET still did): "0 variables" at exit 0, and
     // `if _n_=1 then merge a b;` fabricated "1 obs with 0 variables".
     const b_ds = f.newDs("b");
@@ -15074,9 +15074,9 @@ test "nested MERGE/UPDATE seed the PDV schema; nested UPDATE without BY fails lo
     try x.run(&prog, &out);
     try t.expect(!f.diags.hasErrors());
     try t.expectEqual(@as(usize, 0), out.rowCount());
-    try t.expectEqual(@as(usize, 2), out.columns.items.len); // k v — the schema a nested SET always seeded
+    try t.expectEqual(@as(usize, 2), out.columns.items.len); // k v - the schema a nested SET always seeded
 
-    // data w2; if 0 then update b b; stop; run; — PRE errored "The BY
+    // data w2; if 0 then update b b; stop; run; - PRE errored "The BY
     // statement is required for the UPDATE statement"; the cut-off silently
     // emitted a 0-variable dataset instead. Fail loud restored.
     var x2 = f.exec();
@@ -15099,7 +15099,7 @@ test "NOBS= is the PHYSICAL obs count, not the firstobs=/obs= window (BUG-pointn
     f.prime();
     var x = f.exec();
 
-    // data b; set a(firstobs=2 obs=2) nobs=n; run; — the window reads 1 row,
+    // data b; set a(firstobs=2 obs=2) nobs=n; run; - the window reads 1 row,
     // but NOBS= is descriptor-level: the physical 3. Both producers (pre-loop
     // init and per-read stampObs) counted the SLICED copy before the fix.
     const a_ds = f.newDs("a");
@@ -15128,11 +15128,11 @@ test "POINT= + WHERE= dsopt fails LOUD (BUG-pointwheredsopt); POINT=/NOBS= keep 
     // Statements ref, SET POINT= Restrictions (printed p.335): "You cannot use
     // POINT= with a BY statement, a WHERE statement, or a WHERE= data set
     // option." The first two legs already failed loud; the THIRD was silently
-    // accepted — the BUG-pointnobsbase pin below was made BEFORE this repo had
+    // accepted - the BUG-pointnobsbase pin below was made BEFORE this repo had
     // the Statements volume and encoded a semantic (where= silently dropped,
     // read the PHYSICAL base) for a combination the doc forbids outright.
     // RETIRED: that where=-drop semantic. KEPT: NOBS= physical + POINT=
-    // physical under obs= — obs= is not in the restriction.
+    // physical under obs= - obs= is not in the restriction.
     var f = fixture();
     defer f.deinit();
     f.prime();
@@ -15146,10 +15146,10 @@ test "POINT= + WHERE= dsopt fails LOUD (BUG-pointwheredsopt); POINT=/NOBS= keep 
     const drop_helper = [_][]const u8{"_setobs_"}; // the parser injects `drop _setobs_;` on any SET step
     const empty_out = [_][]const u8{};
 
-    // LEGAL, unchanged (FIRST — the run-level errhalt gates any step compiled
+    // LEGAL, unchanged (FIRST - the run-level errhalt gates any step compiled
     // after an ERROR, so the loud arm cannot precede this on one fixture):
-    // `set d(obs=2) point=i nobs=n;` — obs= is NOT in the p.335 restriction.
-    // NOBS= reports the physical 5 and POINT= reads PHYSICAL obs 3 (v=3 — the
+    // `set d(obs=2) point=i nobs=n;` - obs= is NOT in the p.335 restriction.
+    // NOBS= reports the physical 5 and POINT= reads PHYSICAL obs 3 (v=3 - the
     // obs=-sliced copy holds only v=1,2): one base, no contradiction (the
     // still-legal half of the BUG-pointnobsbase pin).
     const names_ok = [_][]const u8{ "d(obs=2)", "\x00point=i" };
@@ -15165,10 +15165,10 @@ test "POINT= + WHERE= dsopt fails LOUD (BUG-pointwheredsopt); POINT=/NOBS= keep 
     try t.expect(!f.diags.hasErrors());
     try t.expectEqual(@as(usize, 1), out.rowCount());
     try t.expectEqual(@as(f64, 3), out.row(0)[out.indexOf("v").?].num); // PHYSICAL obs 3, not the obs=-sliced copy
-    try t.expectEqual(@as(f64, 5), x.pdv.get("n").?.num); // NOBS= physical — the SAME base
+    try t.expectEqual(@as(f64, 5), x.pdv.get("n").?.num); // NOBS= physical - the SAME base
 
-    // data w; i=3; set d(where=(v>3)) point=i nobs=n; output; run; — ILLEGAL:
-    // loud captured ERROR (D-003), spent driver, no rows — the same policy as
+    // data w; i=3; set d(where=(v>3)) point=i nobs=n; output; run; - ILLEGAL:
+    // loud captured ERROR (D-003), spent driver, no rows - the same policy as
     // the WHERE-statement leg above it, never a silent physical read.
     var x2 = f.exec();
     const names_bad = [_][]const u8{ "d(where=(v>3))", "\x00point=i" };
@@ -15187,9 +15187,9 @@ test "POINT= + WHERE= dsopt fails LOUD (BUG-pointwheredsopt); POINT=/NOBS= keep 
 }
 
 test "SET point=/nobs= temp vars drop from the output schema (BUG-setpointtemp)" {
-    // Pure control temps: `p = 1; set a point=p nobs=n; output;` — p/n are SAS-
+    // Pure control temps: `p = 1; set a point=p nobs=n; output;` - p/n are SAS-
     // temporary, b carries a's columns only; the direct read still lands.
-    // (Explicit OUTPUT: with POINT= there is no implicit one —
+    // (Explicit OUTPUT: with POINT= there is no implicit one -
     // BUG-pointautooutput.)
     {
         var f = fixture();
@@ -15214,7 +15214,7 @@ test "SET point=/nobs= temp vars drop from the output schema (BUG-setpointtemp)"
         var out = Dataset.init(f.a(), "b");
         try x.run(&prog, &out);
         try t.expectEqual(@as(usize, 1), out.rowCount()); // point read of obs p=1
-        try t.expectEqual(@as(usize, 1), out.columns.items.len); // k only — p/n dropped
+        try t.expectEqual(@as(usize, 1), out.columns.items.len); // k only - p/n dropped
         try t.expectEqualStrings("k", out.columns.items[0].name);
         try t.expectEqual(@as(f64, 7), out.row(0)[0].num);
     }
@@ -15265,7 +15265,7 @@ test "GH#69 SET stacks char+numeric var → fatal, 0 obs (captured reporter, D-0
     _ = try a_ds.addColumn("x", .char);
     try a_ds.appendRow(&.{.{ .str = "abc" }});
     try f.lib.put("a", a_ds);
-    const b_ds = f.newDs("b"); // b.x is NUMERIC — conflict
+    const b_ds = f.newDs("b"); // b.x is NUMERIC - conflict
     _ = try b_ds.addColumn("x", .num);
     try b_ds.appendRow(&.{.{ .num = 1 }});
     try f.lib.put("b", b_ds);
@@ -15279,7 +15279,7 @@ test "GH#69 SET stacks char+numeric var → fatal, 0 obs (captured reporter, D-0
 }
 
 test "GH#70 char LENGTH after SET on a numeric var → fatal; before SET is lenient" {
-    // FATAL: `set tmpl; length CMROUTE $24;` — LENGTH follows the SET (after_input).
+    // FATAL: `set tmpl; length CMROUTE $24;` - LENGTH follows the SET (after_input).
     {
         var f = fixture();
         defer f.deinit();
@@ -15297,8 +15297,8 @@ test "GH#70 char LENGTH after SET on a numeric var → fatal; before SET is leni
         try t.expect(f.diags.hasStepErrors());
         try t.expectEqual(@as(usize, 0), out.rowCount());
     }
-    // LENIENT: `length CMROUTE $24; set tmpl;` — schema-pin before the SET. opensas
-    // coerces (CSV type inference makes source types unreliable — real SDTM domains).
+    // LENIENT: `length CMROUTE $24; set tmpl;` - schema-pin before the SET. opensas
+    // coerces (CSV type inference makes source types unreliable - real SDTM domains).
     {
         var f = fixture();
         defer f.deinit();
@@ -15329,7 +15329,7 @@ test "GH#72 SET sources with different char lengths → WARNING, first length ke
     a_ds.setLen("x", 5);
     try a_ds.appendRow(&.{.{ .str = "abcde" }});
     try f.lib.put("a", a_ds);
-    const b_ds = f.newDs("b"); // x Char 20 — differing length
+    const b_ds = f.newDs("b"); // x Char 20 - differing length
     _ = try b_ds.addColumn("x", .char);
     b_ds.setLen("x", 20);
     try b_ds.appendRow(&.{.{ .str = "abcdefghij" }});
@@ -15357,7 +15357,7 @@ test "GH#71 input-side drop= of a never-referenced var is fatal (DKRICOND=ERROR)
     try a_ds.appendRow(&.{.{ .num = 1 }});
     try f.lib.put("a", a_ds);
 
-    // `set a (drop=NOTHERE)` — NOTHERE is on no column of an INPUT dataset.
+    // `set a (drop=NOTHERE)` - NOTHERE is on no column of an INPUT dataset.
     const names = [_][]const u8{"a(drop=NOTHERE)"};
     const prog = [_]ast.Stmt{.{ .set = &names }};
     var out = Dataset.init(f.a(), "b");
@@ -15409,8 +15409,8 @@ test "SELECT with no OTHERWISE and no matching WHEN fails LOUD via captured repo
 
 // ── D-009 exit-code contract, exec.zig's slice (GAP-gapsexitingone §5c) ──────
 //
-// Every arm below is pinned against `diag.exitCode(gapHit, hasErrors)` — the
-// two signals main.zig:89-90 actually read — through the D-003 CAPTURED
+// Every arm below is pinned against `diag.exitCode(gapHit, hasErrors)` - the
+// two signals main.zig:89-90 actually read - through the D-003 CAPTURED
 // reporter, never a spawned process. `tests/corpus/rc_*.sas` pin the same
 // verdicts end-to-end through main's exit path so the two surfaces can't drift.
 
@@ -15420,7 +15420,7 @@ fn rcOf(f: *Fixture) u8 {
 }
 
 test "D-009 §5c: the closed doc lists that SPLIT a gap from a typo are exactly the reference's own" {
-    // isHashMethod — Component Objects ref, the dictionary's own TOC (p.23).
+    // isHashMethod - Component Objects ref, the dictionary's own TOC (p.23).
     // Documented but unimplemented → the gap arm.
     for ([_][]const u8{ "do_over", "equals", "find_prev", "has_next", "has_prev", "ref", "removedup", "replacedup", "reset_dup", "setcur", "sum", "sumdup" }) |m|
         try t.expect(isHashMethod(m));
@@ -15429,14 +15429,14 @@ test "D-009 §5c: the closed doc lists that SPLIT a gap from a typo are exactly 
     for ([_][]const u8{ "fnd", "find_nxt", "reset_dupe", "num_item", "" }) |m|
         try t.expect(!isHashMethod(m));
 
-    // isCallRoutine — Functions ref `CALL <NAME> Routine` headings.
+    // isCallRoutine - Functions ref `CALL <NAME> Routine` headings.
     for ([_][]const u8{ "compcost", "module", "poke", "pokelong", "prxdebug", "sleep", "system", "tso", "wto", "set", "is8601_convert" }) |r|
         try t.expect(isCallRoutine(r));
     try t.expect(isCallRoutine("SYMPUT"));
     for ([_][]const u8{ "symptu", "misssing", "sortnn", "" }) |r|
         try t.expect(!isCallRoutine(r));
 
-    // stdizeOptKind — Functions ref p.419-421, all three option categories, and
+    // stdizeOptKind - Functions ref p.419-421, all three option categories, and
     // (BUG-callstdizeoptmsg) which category each lands in: only the first is a
     // METHOD, and the split is what keeps `mult=2` from being called one.
     for ([_][]const u8{ "mean", "median", "euclen", "iqr", "mad", "maxabs", "midrange", "range", "std", "sum", "ustd", "abw", "agk", "ahuber", "awave", "l", "spacing" }) |o|
@@ -15450,7 +15450,7 @@ test "D-009 §5c: the closed doc lists that SPLIT a gap from a typo are exactly 
 }
 
 test "D-009 §5c: a valid-SAS DATA-step shape exec.zig doesn't model exits 2, not 1" {
-    // `do i=1 to 3; set a; end;` — real SAS reads one obs per iteration.
+    // `do i=1 to 3; set a; end;` - real SAS reads one obs per iteration.
     {
         diag.resetGap();
         var f = fixture();
@@ -15467,7 +15467,7 @@ test "D-009 §5c: a valid-SAS DATA-step shape exec.zig doesn't model exits 2, no
         try t.expectError(error.ExecError, x.run(&prog, &out));
         try t.expectEqual(@as(u8, 2), rcOf(&f));
     }
-    // A DOW loop plus a second SET — several SET statements in one step is
+    // A DOW loop plus a second SET - several SET statements in one step is
     // ordinary SAS; opensas models exactly one DOW read.
     {
         diag.resetGap();
@@ -15486,7 +15486,7 @@ test "D-009 §5c: a valid-SAS DATA-step shape exec.zig doesn't model exits 2, no
         try t.expectEqual(@as(u8, 2), rcOf(&f));
     }
     // A MERGE driving a DOW loop: real SAS accepts it, so stopping rather than
-    // spinning is OUR limit — macro.zig's iterative-%DO gap, exactly (D-009b i).
+    // spinning is OUR limit - macro.zig's iterative-%DO gap, exactly (D-009b i).
     {
         diag.resetGap();
         var f = fixture();
@@ -15500,7 +15500,7 @@ test "D-009 §5c: a valid-SAS DATA-step shape exec.zig doesn't model exits 2, no
         try t.expectError(error.ExecError, x.run(&prog, &out));
         try t.expectEqual(@as(u8, 2), rcOf(&f));
     }
-    // `modify a point=p;` — Statements ref p.240-241 Form 3. Only end=/point=
+    // `modify a point=p;` - Statements ref p.240-241 Form 3. Only end=/point=
     // sentinels can reach the guard (the parser rejects any other name= at rc 1).
     {
         diag.resetGap();
@@ -15531,7 +15531,7 @@ test "D-009 §5c: a valid-SAS DATA-step shape exec.zig doesn't model exits 2, no
         try t.expectError(error.ExecError, x.run(&prog, &out));
         try t.expectEqual(@as(u8, 2), rcOf(&f));
     }
-    // A GOTO that jumps over the driving SET — legal SAS control flow.
+    // A GOTO that jumps over the driving SET - legal SAS control flow.
     {
         diag.resetGap();
         var f = fixture();
@@ -15553,7 +15553,7 @@ test "D-009 §5c: a valid-SAS DATA-step shape exec.zig doesn't model exits 2, no
         try t.expectError(error.ExecError, x.run(&prog, &out));
         try t.expectEqual(@as(u8, 2), rcOf(&f));
     }
-    // OUTPUT inside a MODIFY step — the MODIFY entry itself documents it
+    // OUTPUT inside a MODIFY step - the MODIFY entry itself documents it
     // ("writes the current observation to the end of all data sets").
     {
         diag.resetGap();
@@ -15674,7 +15674,7 @@ test "D-009 §5c: an unwritten CALL routine exits 2; a misspelled one still exit
         try t.expectError(error.ExecError, x.run(&prog, &out));
         try t.expectEqual(@as(u8, 1), rcOf(&f));
     }
-    // CALL EXECUTE with %nrstr — the reference TIPs this exact call as the
+    // CALL EXECUTE with %nrstr - the reference TIPs this exact call as the
     // documented workaround, so refusing it is our gap.
     {
         diag.resetGap();
@@ -15688,7 +15688,7 @@ test "D-009 §5c: an unwritten CALL routine exits 2; a misspelled one still exit
         try t.expectError(error.ExecError, x.run(&prog, &out));
         try t.expectEqual(@as(u8, 2), rcOf(&f));
     }
-    // CALL STDIZE SPLIT — a documented option (bare, `method=`-prefixed, or
+    // CALL STDIZE SPLIT - a documented option (bare, `method=`-prefixed, or
     // carrying an `=value` tail) is a gap; a misspelling stays the user's error.
     for ([_][]const u8{ "median", "method=median", "euclen", "mult=2", "df" }) |opt| {
         diag.resetGap();

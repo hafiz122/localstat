@@ -1,4 +1,4 @@
-/* BUG-commaxinformat: COMMAX/DOLLARX read the European convention — PERIOD is
+/* BUG-commaxinformat: COMMAX/DOLLARX read the European convention - PERIOD is
    the thousands separator, COMMA the decimal point (`1.234,56` -> 1234.56).
    Was read with the US roles (-> 1.23456) and the INPUT() form returned
    missing. US COMMA/DOLLAR keep comma=grouping, period=decimal. */

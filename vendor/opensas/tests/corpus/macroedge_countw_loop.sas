@@ -1,4 +1,4 @@
-/* Size a %do loop by %sysfunc(countw(list)) then %scan each token — the robust
+/* Size a %do loop by %sysfunc(countw(list)) then %scan each token - the robust
    count-then-index list walk. corpus-macroedge. */
 %let vars = AGE SEX RACE;
 %macro walk;

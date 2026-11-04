@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# release.sh vX.Y.Z — tag green main and publish a GitHub release.
+# release.sh vX.Y.Z - tag green main and publish a GitHub release.
 # The release-triggered Action (.github/workflows/release.yml) then re-runs the
 # gate, cross-compiles all four targets, and attaches binaries + SHA256SUMS.
 # Changelog = git log since the previous tag (task-ID commit style reads well).
@@ -34,5 +34,5 @@ NOTES=$(mktemp)
 git tag -a "$V" -m "$V"
 git push origin "$V"
 gh release create "$V" --title "$V" --notes-file "$NOTES"
-echo "release $V published — the Action is building and attaching binaries:"
+echo "release $V published - the Action is building and attaching binaries:"
 echo "  gh run watch \$(gh run list --workflow release --limit 1 --json databaseId -q '.[0].databaseId')"

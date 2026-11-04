@@ -1,5 +1,5 @@
 /* BUG-fmtnumoverflow: HEX/BINARY/E numeric renderers aborted (SIGABRT) on valid
-   finite doubles — |x| >= 2^64 for HEX(w<16)/BINARY, and the tiniest denormals
+   finite doubles - |x| >= 2^64 for HEX(w<16)/BINARY, and the tiniest denormals
    for Ew. Guarded now: cap the field / finite-safe mantissa, never crash. */
 data _null_;
   a = 1e300;  put "hex8:    [" a hex8. "]";

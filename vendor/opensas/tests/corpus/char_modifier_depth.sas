@@ -1,4 +1,4 @@
-/* doc-finder tick219 — CHARACTER function modifier/edge DEPTH (charfns.zig +
+/* doc-finder tick219 - CHARACTER function modifier/edge DEPTH (charfns.zig +
    functions.zig). Locks the verified-CORRECT behavior of the modifier args and
    clamp edges probed this run: SCAN m/negative-count, CATX missing-skip,
    COMPRESS k + class inversion, FINDW e word-number, FINDC backward, VERIFY

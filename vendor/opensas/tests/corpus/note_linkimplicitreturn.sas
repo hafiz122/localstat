@@ -1,12 +1,12 @@
 /* NOTE-linkimplicitreturn: a LINK-ed block that falls OFF THE END of the
    DATA step without an explicit RETURN is ended by the step's IMPLIED
-   RETURN — "Every DATA step has an implied RETURN as its last executable
-   statement" (Statements ref p.325) — and a RETURN after a LINK "returns
+   RETURN - "Every DATA step has an implied RETURN as its last executable
+   statement" (Statements ref p.325) - and a RETURN after a LINK "returns
    execution to the statement that follows the LINK statement" (p.116
    comparisons, p.222 LINK Details; Language Reference: Concepts p.485 Table 20.3). Before the fix
    opensas silently DROPPED the pending LINK at the end of the op stream:
    the statements between the LINK and the subroutine never ran (y stayed
-   missing) — a silent wrong answer. */
+   missing) - a silent wrong answer. */
 
 /* u1 (unsplit, INPUT-driven): sub falls off the end -> implied RETURN pops
    back to y=99, whose explicit RETURN then ends the iteration. y MUST be 99. */
@@ -40,7 +40,7 @@ datalines;
 run;
 data _null_; set u2; put "u2 x=" x "y=" y "z=" z "w=" w; run;
 
-/* u3 (SET-driven split step): same rule with the read in the middle —
+/* u3 (SET-driven split step): same rule with the read in the middle -
    sub falls off the end, implied RETURN pops back, y = v+1 runs. */
 data d; input v; datalines;
 10
@@ -56,7 +56,7 @@ data u3;
 run;
 data _null_; set u3; put "u3 v=" v "y=" y "z=" z; run;
 
-/* u4 (LINK issued BEFORE the driving SET — the BUG-linkacrossset family —
+/* u4 (LINK issued BEFORE the driving SET - the BUG-linkacrossset family -
    whose block falls off the end): the implied RETURN pops back into the
    prefix, the read still executes exactly once, in order. */
 data u4;
@@ -68,7 +68,7 @@ data u4;
 run;
 data _null_; set u4; put "u4 v=" v "x=" x "mult=" mult; run;
 
-/* u5 (contrast): a GOTO — NOT a LINK — falling off the end returns to the
+/* u5 (contrast): a GOTO - NOT a LINK - falling off the end returns to the
    TOP of the step (p.116: a RETURN after a GOTO goes to the beginning), so
    y=99 is skipped and y stays missing. Unchanged by the fix. */
 data u5;

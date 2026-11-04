@@ -1,5 +1,5 @@
 /* BUG-sqlgroupremerge: a GROUP BY select mixing a NON-group detail column with an
-   aggregate REMERGES in SAS 9.4 — the group aggregate is broadcast across every
+   aggregate REMERGES in SAS 9.4 - the group aggregate is broadcast across every
    detail row of its group, so all N rows come back (one per input row), not the
    single collapsed row per group. `gtot` = each row's group total.
    Guards: a pure GROUP BY select whose only bare column IS the group key still

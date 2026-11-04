@@ -1,4 +1,4 @@
-/* DATALINES-informat: a plain `$w.` informat is FORMATTED input — it reads the
+/* DATALINES-informat: a plain `$w.` informat is FORMATTED input - it reads the
    full w columns including embedded blanks, not a whitespace token. The `:$w.`
    colon form stays LIST input (token, then truncate to w). A `$w.` after a plain
    `$` list read starts at the cursor just past that token. */

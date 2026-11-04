@@ -1,5 +1,5 @@
 /* BUG-prefixreadflags (QA tick322 F2): the read-flag automatics are RETAINED
-   across iterations, never set to missing — Language Reference: Concepts p.79: "The values of
+   across iterations, never set to missing - Language Reference: Concepts p.79: "The values of
    automatic variables are retained from one iteration of the DATA step to the
    next, rather than set to missing"; p.553: LAST. is 0 or 1 (never missing).
    The driver split made statements before the SET user-visible pre-read code,
@@ -9,10 +9,10 @@
    Step o1: the end= var starts at 0, so z = e + 1 is 1 on every row (the last
    read's e=1 only shows on the EOF pass, which writes nothing).
    Step o2: first./last. before the read are the PREVIOUS read's flags
-   (initially 0/0) — not the current row's, not missing.
+   (initially 0/0) - not the current row's, not missing.
    Step o3: in= flags before the read likewise (concatenated sources).
    COLUMN ORDER (GAP-varorder-assignset): z / pf pl / pia pib are all defined by
-   statements TEXTUALLY before the SET, so they own the earlier slots — Language Reference: Concepts
+   statements TEXTUALLY before the SET, so they own the earlier slots - Language Reference: Concepts
    printed p.47, "position in observation is determined by the order in which
    the variables are defined in the DATA step". The read-flag automatics they
    read (e, first./last., in=) are not output columns, so only the assignment

@@ -1,7 +1,7 @@
 /* BUG-comparetypemismatch: a same-name variable that is NUMERIC in base but
-   CHARACTER in compare is NOT value-compared (SAS requires matching types —
+   CHARACTER in compare is NOT value-compared (SAS requires matching types -
    coercing would call numeric 10 EQUAL to "10"); it is excluded and noted.
-   BUG-comparedifsign: OUT= DIF/PCT use the SAS sign — Diff = comparison −
+   BUG-comparedifsign: OUT= DIF/PCT use the SAS sign - Diff = comparison −
    base, PctDiff = Diff / base × 100. */
 data b;
   input id x y $;

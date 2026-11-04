@@ -1,4 +1,4 @@
-/* QA tick290 — D-014 positive control for PROC COMPARE.
+/* QA tick290 - D-014 positive control for PROC COMPARE.
    main.zig hoists a mid-step TITLE/FOOTNOTE/OPTIONS to its own global segment but
    LEAVES ITS TOKENS in the step, so runCompare's D-002 fail-loud statement loop
    must skip a parser.isGlobalKw statement to its semicolon. Without that skip a
@@ -30,7 +30,7 @@ proc compare base=a compare=b;
   footnote2 "hoisted footnote";
 run;
 
-/* errhalt canary: this step MUST still run — an ERROR in the step above would
+/* errhalt canary: this step MUST still run - an ERROR in the step above would
    put the session in syntax-check mode and silently skip everything below. */
 title;
 footnote;

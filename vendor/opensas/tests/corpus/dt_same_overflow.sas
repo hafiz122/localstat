@@ -1,7 +1,7 @@
 /* SAME-alignment day-overflow clamping for month/qtr/year intervals.
    Date variant clamps day-of-month to target month length (31JAN+1mo=29FEB,
    29FEB+1yr=28FEB). Datetime (DT*) SAME mirrors this, clamping the day while
-   preserving time-of-day — qa-findings-tick148 BUG-intnxdtsameoverflow. */
+   preserving time-of-day - qa-findings-tick148 BUG-intnxdtsameoverflow. */
 data _null_;
   length a $10 b $10 c $10 d $10;
   a=put(intnx('month','31JAN2020'd,1,'s'),date9.);   /* 29FEB2020 */

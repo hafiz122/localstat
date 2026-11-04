@@ -1,5 +1,5 @@
 /* BUG-comparesilentopts: PROC COMPARE used to swallow an unknown option with
-   no diagnostic — a typo'd `criterionn=0.01` vanished, the default 1e-8 fuzz
+   no diagnostic - a typo'd `criterionn=0.01` vanished, the default 1e-8 fuzz
    was re-armed, and the verdict could flip (silent-wrong clinical result).
    It must FAIL LOUD instead (D-002, mirrors PROC CONTENTS). The valid compare
    below still prints its "no differences" summary; the 2nd proc prints

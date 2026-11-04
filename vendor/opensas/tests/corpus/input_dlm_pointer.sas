@@ -1,5 +1,5 @@
 /* BUG-inputdlmpointer: INPUT pointer controls under DLM=/DSD (Language Reference: Concepts Table 21.5,
-   pp.516-517 — pointer controls and delimiter options combine freely). @@ must
+   pp.516-517 - pointer controls and delimiter options combine freely). @@ must
    terminate, / and #n move the record, a trailing @ holds the field position,
    and no control may eat a field or emit a nameless column. */
 data _null_;

@@ -1,13 +1,13 @@
-//! sas7bdat (`.sas7bdat`) reader — the native SAS dataset format. Undocumented
+//! sas7bdat (`.sas7bdat`) reader - the native SAS dataset format. Undocumented
 //! by SAS, but reverse-engineered by the sas7bdat R package (Shotwell) and
 //! readstat/pyreadstat, which this ports. Layout:
 //!
 //! Portions ported from ReadStat (https://github.com/WizardMac/ReadStat),
 //! MIT License, Copyright (c) 2013-2016 Evan Miller.
 //!
-//!   header (header_length bytes) — magic, endianness/word-size flags, then
+//!   header (header_length bytes) - magic, endianness/word-size flags, then
 //!     header_length / page_size / page_count.
-//!   pages (page_count × page_size) — each a 16-byte page header (page type,
+//!   pages (page_count × page_size) - each a 16-byte page header (page type,
 //!     block count, subheader-pointer count) followed by, in a META/MIX page, a
 //!     downward-growing array of subheader pointers whose targets carry the
 //!     schema, and, in a MIX/DATA page, fixed-width observation rows.
@@ -15,30 +15,30 @@
 //! Schema comes from four subheaders keyed by a 4-byte signature: ROW_SIZE
 //! (row length + total row count), COL_SIZE (column count), COLUMN_TEXT (a
 //! string pool), COLUMN_NAME ((pool, offset, len) per column) and COLUMN_ATTRS
-//! (in-row offset, width, type per column — numerics are packed first, so the
+//! (in-row offset, width, type per column - numerics are packed first, so the
 //! per-column offset is authoritative, not declaration order). A char value is
 //! blank/nul-padded bytes; a numeric is a little-endian IEEE double, optionally
 //! truncated to `width < 8` high-order bytes; a SAS missing is a NaN.
 //!
-//! Scope (ponytail: what real CDISC/SDTM files need — verified byte-exact against
+//! Scope (ponytail: what real CDISC/SDTM files need - verified byte-exact against
 //! pyreadstat on real SDTM files): little-endian, uncompressed. Both bitnesses:
 //!   - 32-bit (byte-32 == 0x22) and 64-bit/u64 (0x33) are both read. The u64 path
 //!     widens page offsets, subheader-pointer entries and per-subheader field
 //!     offsets (ported from readstat); verified byte-exact vs pyreadstat on a real
 //!     64-bit file (testdata/test7.sas7bdat, all 10×100 cells). Every width-varying
-//!     read routes through `rdw()` — one branch, not scattered inline `if`s — which
+//!     read routes through `rdw()` - one branch, not scattered inline `if`s - which
 //!     both reads cleaner AND (load-bearing) keeps register pressure in `read()`
 //!     low enough that the Zig 0.16 self-hosted x86_64 backend allocates it
 //!     correctly; the scattered-ternary version miscompiled `a1` on that backend
-//!     (green under -fllvm and on aarch64, red on self-hosted x86_64 — the CI arch).
+//!     (green under -fllvm and on aarch64, red on self-hosted x86_64 - the CI arch).
 //!   - RLE/RDC compression → not handled (the corpus is all uncompressed); a
 //!     compressed row would decode as garbage. Upgrade: SASYZCRL/SASYZCR2.
 //!   - read-only: variable labels ARE read (each COLUMN_FORMAT subheader's
-//!     LABEL text-pool ref — GAP-sas7bdatlabelsubheader, verified byte-exact vs
+//!     LABEL text-pool ref - GAP-sas7bdatlabelsubheader, verified byte-exact vs
 //!     the labels in testdata/hadley.sas7bdat) but never WRITTEN in-file: the
 //!     writer emits no COLUMN_FORMAT subheader, so opensas-authored datasets
 //!     persist labels/formats via the .labels sidecar (io.zig), as they already
-//!     did for formats (GH#30/#31). In-file writing stays a separate ticket — a
+//!     did for formats (GH#30/#31). In-file writing stays a separate ticket - a
 //!     wrong sas7bdat writer corrupts every read, and no real-SAS consumer is
 //!     available here to verify one against.
 
@@ -148,7 +148,7 @@ pub fn read(a: std.mem.Allocator, bytes: []const u8, name: []const u8) Error!*Da
                 },
                 sig_col_attr => {
                     // (w+8)-byte header, then (w+8)-byte entries; width @ e+w (u32),
-                    // type byte @ e+w+6. (32-bit: 12/12, +4, +10 — as always.)
+                    // type byte @ e+w+6. (32-bit: 12/12, +4, +10 - as always.)
                     var e = soff + w + 8;
                     while (e + w + 8 <= soff + slen) : (e += w + 8) {
                         try attrs.append(a, .{
@@ -174,7 +174,7 @@ pub fn read(a: std.mem.Allocator, bytes: []const u8, name: []const u8) Error!*Da
                     // (32-bit) or +46 (u64); the LABEL ref is the next triple,
                     // fmt_ref+6/+8/+10. Both verified byte-exact vs real SAS files
                     // (hadley.sas7bdat 32-bit, which carries both a format and a
-                    // label triple; test7.sas7bdat u64) — the old
+                    // label triple; test7.sas7bdat u64) - the old
                     // +22/+24/+26 triple was a guess that only matched a hand-built
                     // buffer. A subheader too short to hold BOTH refs is an
                     // unrecognised shape: Damaged, never a silently-dropped label
@@ -231,20 +231,20 @@ pub fn read(a: std.mem.Allocator, bytes: []const u8, name: []const u8) Error!*Da
         _ = try ds.addColumn(c.name, if (c.is_char) .char else .num);
         if (c.format.len > 0) ds.setFormat(c.name, c.format);
         // GAP-sas7bdatlabelsubheader PRECEDENCE (deliberate, not load order):
-        // the in-file label is the BASE layer — what the file shipped with. A
+        // the in-file label is the BASE layer - what the file shipped with. A
         // sibling .labels sidecar (applied by the loader AFTER this read,
         // main.zig loadLibInputs) WINS on conflict: the sidecar records the
         // latest program state (LABEL statement / MODIFY). Pinned where the two
         // disagree by corpus sas7bdat_label_precedence.
         if (c.label.len > 0) ds.setLabel(c.name, c.label);
         // A char column's COLUMN_ATTR width IS its declared storage length (SAS
-        // descriptor semantics — the writer stamped it from Column.len), so
+        // descriptor semantics - the writer stamped it from Column.len), so
         // restore it: a write→read round-trip keeps `length x $8` instead of
         // shrinking to the data-max width (BUG-libnamelenloss).
         if (c.is_char and c.width > 0) ds.setLen(c.name, c.width);
     }
     // BUG-sas7bdattruncread: columns parsed but no ROW_SIZE subheader = the
-    // schema pages themselves were truncated mid-sweep — damaged, NOT a valid
+    // schema pages themselves were truncated mid-sweep - damaged, NOT a valid
     // empty dataset (a real 0-obs dataset still declares row_length > 0).
     if (row_len == 0) return error.Damaged;
 
@@ -279,7 +279,7 @@ pub fn read(a: std.mem.Allocator, bytes: []const u8, name: []const u8) Error!*Da
                 const field = bytes[ro + c.off .. ro + c.off + c.width];
                 cells[i] = if (c.is_char)
                     // Slice the (arena-owned, program-lived) file buffer directly
-                    // instead of duping every cell — a 340MB source is millions of
+                    // instead of duping every cell - a 340MB source is millions of
                     // char cells, and the per-cell dupe dominated load time, tripping
                     // the benchmark watchdog on the largest domains (BUG-clinhang). `bytes` is
                     // allocated with the same `a` as the Dataset, so it outlives it.
@@ -292,7 +292,7 @@ pub fn read(a: std.mem.Allocator, bytes: []const u8, name: []const u8) Error!*Da
         }
     }
     // BUG-sas7bdattruncread: the declared row_count is authoritative. Walking off
-    // EOF first means the file was truncated on disk — fail loud (the member then
+    // EOF first means the file was truncated on disk - fail loud (the member then
     // fails to load and the step ERRORs) instead of returning a silently-partial
     // study, the clinical worst case. A complete file reads exactly row_count.
     if (read_rows < row_count) return error.Damaged;
@@ -305,10 +305,10 @@ pub fn read(a: std.mem.Allocator, bytes: []const u8, name: []const u8) Error!*Da
 /// COL_NAME/COL_ATTR subheaders (block == subheader count → 0 data rows), then
 /// N DATA pages of fixed-width rows. Numerics are full 8-byte IEEE doubles (NaN =
 /// missing); char columns are space-padded to their max width.
-/// ponytail: not the full SAS on-disk layout (no COL_FORMAT/labels — those
-/// persist via the .labels sidecar, io.zig — no compression, no page checksums)
-/// — just enough that our reader reconstructs the same dataset.
-/// NOTE: engine hookup (libname writing .sas7bdat) lives in io.zig — not wired here
+/// ponytail: not the full SAS on-disk layout (no COL_FORMAT/labels - those
+/// persist via the .labels sidecar, io.zig - no compression, no page checksums)
+/// - just enough that our reader reconstructs the same dataset.
+/// NOTE: engine hookup (libname writing .sas7bdat) lives in io.zig - not wired here
 /// (dev1 owns io.zig this tick); this is the standalone writer it will call.
 pub fn write(a: std.mem.Allocator, ds: *const Dataset) Error![]u8 {
     const ncol = ds.columns.items.len;
@@ -375,7 +375,7 @@ pub fn write(a: std.mem.Allocator, ds: *const Dataset) Error![]u8 {
     wr32(buf, 200, page_size);
     wr32(buf, 204, page_count);
 
-    // Page 0 — MIX, schema only (block == nsub ⇒ reader reads 0 rows here).
+    // Page 0 - MIX, schema only (block == nsub ⇒ reader reads 0 rows here).
     const p0 = header_len;
     wr16(buf, p0 + 16, page_mix);
     wr16(buf, p0 + 18, nsub); // block count
@@ -415,7 +415,7 @@ pub fn write(a: std.mem.Allocator, ds: *const Dataset) Error![]u8 {
         buf[e + 10] = if (c.type == .char) 2 else 1;
     }
 
-    // Data pages — fixed-width rows starting right after the page header (+24).
+    // Data pages - fixed-width rows starting right after the page header (+24).
     var written: usize = 0;
     for (0..data_pages) |dp| {
         const base = header_len + (1 + dp) * page_size;
@@ -467,7 +467,7 @@ fn rd32(b: []const u8, o: usize) usize {
 }
 /// Read an unsigned little-endian field whose width follows the file's bitness:
 /// 8 bytes in a u64 (0x33) file, 4 in a 32-bit (0x22) file. One branch, reused at
-/// every width-varying call site — this concentration (vs an inline `if (u64f)
+/// every width-varying call site - this concentration (vs an inline `if (u64f)
 /// rd64 else rd32` at each site) is load-bearing: it keeps read()'s live-value
 /// count low enough that Zig 0.16's self-hosted x86_64 backend register-allocates
 /// it correctly. Callers guard o+8 ≤ b.len (u64) / o+4 (32-bit) before calling.
@@ -483,7 +483,7 @@ fn rdw(b: []const u8, o: usize, u64f: bool) usize {
 /// high two bytes are 0xFFFF and whose THIRD BE byte is the tag = bitwise-NOT of
 /// the ASCII char: ~'A'=0xBE, ~'Z'=0xA5, ~'.'=0xD1, ~'_'=0xA0 (verified byte-exact
 /// vs pyreadstat on testdata/tagged_na.sas7bdat and the plain-. in hadley.sas7bdat).
-/// So the tag decodes as `char = 0xFF ^ tag`. Any OTHER NaN (no 0xFFFF prefix — an
+/// So the tag decodes as `char = 0xFF ^ tag`. Any OTHER NaN (no 0xFFFF prefix - an
 /// arithmetic NaN, or opensas's own 0x7FF8|code write encoding) stays plain missing.
 /// `encodeNumber` (below) is the write-side inverse, so write→read now round-trips.
 fn readNumber(field: []const u8) Value {
@@ -557,7 +557,7 @@ test "readNumber: full, truncated, and missing" {
 test "read tagged_na.sas7bdat: numeric special missing .A/.H/.Z (GH#54)" {
     // A REAL SAS-authored file (haven test data): one numeric col x = 1 2 3 4 5 .A .H .Z.
     // Oracle (pyreadstat, user_missing=True): [1,2,3,4,5,'A','H','Z']. Asserts on the
-    // decoded VALUE (present number / special-missing letter), not formatted output —
+    // decoded VALUE (present number / special-missing letter), not formatted output -
     // the column carries a user format XFMT absent from any catalog, irrelevant here.
     const t = std.testing;
     const bytes = @embedFile("testdata/tagged_na.sas7bdat");
@@ -581,7 +581,7 @@ test "multi-page: rows accumulate across separate DATA pages (E-sas7read)" {
     // Real CDISC domains spread rows over hundreds of DATA pages; but
     // every committed real file keeps its rows on page 0, so craft a minimal file with
     // one numeric column, a schema-only MIX page, then two DATA pages holding one
-    // row each — proving the page walk reads rows from BOTH data pages, not just the
+    // row each - proving the page walk reads rows from BOTH data pages, not just the
     // first. (Real multi-hundred-page files are verified out of tree.)
     const t = std.testing;
     const hlen = 512;
@@ -629,7 +629,7 @@ test "multi-page: rows accumulate across separate DATA pages (E-sas7read)" {
     try t.expectEqual(@as(usize, 1), ds.columns.items.len);
     try t.expectEqual(@as(usize, 2), ds.rowCount());
     try t.expectEqual(@as(f64, 42), ds.row(0)[0].num); // page 1
-    try t.expectEqual(@as(f64, 99), ds.row(1)[0].num); // page 2 — the multi-page proof
+    try t.expectEqual(@as(f64, 99), ds.row(1)[0].num); // page 2 - the multi-page proof
 }
 
 test "reader attaches a COLUMN_FORMAT name (GH#30)" {
@@ -700,7 +700,7 @@ test "reader attaches a COLUMN_FORMAT name (GH#30)" {
 
 test "read hadley.sas7bdat: real-file COLUMN_FORMAT names (GH#31, non-circular)" {
     // A REAL, externally-authored 32-bit SAS file (tidyverse/haven test data). It
-    // cannot share a wrong offset assumption with the reader — that is the whole
+    // cannot share a wrong offset assumption with the reader - that is the whole
     // point vs the hand-built GH#30 self-test. pyreadstat's oracle:
     //   original_variable_types = {id:None, workshop:'WORKSHOP', gender:'$GENDER',
     //                              q1..q4: None}
@@ -739,7 +739,7 @@ test "real files carry variable LABELS in-file: hadley q1–q4 (GAP-sas7bdatlabe
         "The instructor was well prepared",
         "The instructor communicated well",
         "The course material was helpful",
-        "Overall, I found the workhsop useful", // [sic] — the file's own spelling
+        "Overall, I found the workhsop useful", // [sic] - the file's own spelling
     };
     for (q_labels, 3..) |l, i| try t.expectEqualStrings(l, hadley.columns.items[i].label.?);
 
@@ -789,7 +789,7 @@ test "write → read preserves a char column's DECLARED length over the data max
     defer arena.deinit();
     const a = arena.allocator();
 
-    // `length code $8; code='AB';` — declared 8, widest value 2. The writer
+    // `length code $8; code='AB';` - declared 8, widest value 2. The writer
     // stores 8 as the COLUMN_ATTR width; the reader must restore it as
     // Column.len, not shrink to the data max 2 (SDTM controlled metadata).
     var src = Dataset.init(a, "work.d");
@@ -863,7 +863,7 @@ test "truncated file fails loud: read rows < declared row_count → Damaged (BUG
     try t.expectEqual(@as(f64, 99), full.row(99)[0].num);
 
     // Cut mid-data: header + schema page + 50 of the 100 rows' bytes. The page
-    // walk runs out of bytes at row 50 — Damaged, not a 50-row dataset.
+    // walk runs out of bytes at row 50 - Damaged, not a 50-row dataset.
     const hlen = rd32(bytes, 196);
     const psize = rd32(bytes, 200);
     const mid_data = hlen + psize + 24 + 50 * 8;
@@ -874,8 +874,8 @@ test "truncated file fails loud: read rows < declared row_count → Damaged (BUG
 
     // Schema itself damaged (ROW_SIZE subheader unparseable → row_len 0) with
     // columns present: also loud, never a silently-empty dataset. (Pure
-    // truncation can't reach this branch — our writer lays ROW_SIZE below
-    // COL_ATTR — so clobber the signature instead; same sweep-skip shape.)
+    // truncation can't reach this branch - our writer lays ROW_SIZE below
+    // COL_ATTR - so clobber the signature instead; same sweep-skip shape.)
     const mut = try a.dupe(u8, bytes);
     const sig_at = std.mem.indexOf(u8, mut, &[_]u8{ 0xF7, 0xF7, 0xF7, 0xF7 }).?;
     @memset(mut[sig_at..][0..4], 0);
@@ -905,7 +905,7 @@ test "read test7.sas7bdat: real 64-bit (u64) file (SAS7BDAT-u64, non-circular vs
     // pyreadstat's, so wrong u64 offsets cannot silently pass (the #31/#34 lesson).
     // Exercises the u64 page/subheader/attr/name/format layout end to end. This is
     // ALSO the arch guard: the reader miscompiled the 32-bit fixtures on the
-    // self-hosted x86_64 backend before rdw() concentrated the width branch — the
+    // self-hosted x86_64 backend before rdw() concentrated the width branch - the
     // corpus runs on aarch64 and CI on x86_64, so both must stay green.
     const t = std.testing;
     const bytes = @embedFile("testdata/test7.sas7bdat");

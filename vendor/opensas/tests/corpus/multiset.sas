@@ -1,6 +1,6 @@
 /* MULTISET-impl: real multiple/conditional SET in one DATA step.
-   (1) `set a; set b;` — one-to-one PARALLEL read, each SET with its own cursor.
-   (2) `if _n_=1 then set summary;` — the classic lookup: read once, RETAIN across
+   (1) `set a; set b;` - one-to-one PARALLEL read, each SET with its own cursor.
+   (2) `if _n_=1 then set summary;` - the classic lookup: read once, RETAIN across
    every obs of the driving dataset. SAS 9.4 semantics. Synthesized (no PHI). */
 data a; input x; datalines;
 1

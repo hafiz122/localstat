@@ -2,7 +2,7 @@
    SAS data set with a SET statement that uses the POINT= option has no way to
    detect the end of the input SAS data set. ... Such a DATA step usually
    requires a STOP statement." A step that needs a STOP to end is a step that
-   otherwise KEEPS ITERATING — each direct-access read drives one implicit
+   otherwise KEEPS ITERATING - each direct-access read drives one implicit
    iteration, so the doc's own POINT=+STOP idiom returns ALL 3 rows (it
    returned exactly 1 before the fix). The out-of-range read that a missing
    STOP would cause is pinned separately by set_point_oor (BUG-pointnobs). */

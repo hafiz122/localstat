@@ -1,5 +1,5 @@
 /* BUG-meansoutbydescending (tick364 F1): PROC MEANS/UNIVARIATE OUTPUT OUT=
-   used to sort its summary rows ASCENDING even under BY DESCENDING — a
+   used to sort its summary rows ASCENDING even under BY DESCENDING - a
    dataset our own next DATA step (`set s; by descending g;`) then REFUSED to
    read ("BY variables are not properly sorted"), while the listing, PRINT,
    TRANSPOSE, RANK and TABULATE all emitted descending in the same run. The
@@ -7,7 +7,7 @@
    decodeProcBy already returns). The Procedures Guide is SILENT on OUT= row
    order (its BY chapter, p.74-75, only says BY "orders the output according
    to the BY groups" and defines DESCENDING per key), so this pin is
-   consistency-driven: the ROUND TRIP below is the whole point — the OUT=
+   consistency-driven: the ROUND TRIP below is the whole point - the OUT=
    dataset must be readable by a step with the identical BY, at exit 0.
    Ascending-BY OUT= output is byte-identical to before (re-sort fires only
    when a key descends). */
@@ -44,7 +44,7 @@ run;
 proc print data=z noobs;
 run;
 
-/* 3. UNIVARIATE shares the builder — same rule. */
+/* 3. UNIVARIATE shares the builder - same rule. */
 proc univariate data=d noprint;
   by descending g;
   var x;

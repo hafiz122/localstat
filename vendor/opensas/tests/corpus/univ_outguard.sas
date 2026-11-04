@@ -1,5 +1,5 @@
 /* GAP-meansoutguards (b): PROC UNIVARIATE OUTPUT OUT= with an unimplemented option
-   (pctlpts=/pctlpre=) must fail LOUD (ERROR, non-zero exit, run halts) — never skip
+   (pctlpts=/pctlpre=) must fail LOUD (ERROR, non-zero exit, run halts) - never skip
    the option and silently drop the requested P33/P66 percentile variables. The PROC
    PRINT below is a regression tripwire: if the guard is removed, `o` is built with
    only `med` and leaks to stdout, failing this fixture.

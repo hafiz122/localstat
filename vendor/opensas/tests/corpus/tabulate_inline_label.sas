@@ -1,9 +1,9 @@
 /* BUG-tabinlinelabel: inline `elem='label'` overrides in the TABLE statement
    head the columns. `r='Region'` renames the row var, `v='Value'` the analysis
-   var, and `all='Total'` the ALL column — they used to be silently dropped so
+   var, and `all='Total'` the ALL column - they used to be silently dropped so
    the headers printed the raw names r / v / All. (The bare `all` element has
-   no associated statistic, so it defaults to N — Procedures Guide p.2547:
-   "Otherwise, the default statistic is N" — GAP-tabulateforms #7; it used to
+   no associated statistic, so it defaults to N - Procedures Guide p.2547:
+   "Otherwise, the default statistic is N" - GAP-tabulateforms #7; it used to
    repeat the v block's Sum.) Second table: an inline label WINS over a LABEL
    statement for that table (Amount, not Money). */
 data d;

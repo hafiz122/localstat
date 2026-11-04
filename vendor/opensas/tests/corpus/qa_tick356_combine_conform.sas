@@ -1,4 +1,4 @@
-/* QA tick356 BANKED POSITIVE CONTROL — combining data sets, the shapes whose
+/* QA tick356 BANKED POSITIVE CONTROL - combining data sets, the shapes whose
    answers are silently wrong when they break rather than loud.
    Every shape below was hand-probed this tick and is CONFORMANT today.
 
@@ -53,7 +53,7 @@ data b3; input x z; datalines;
 data _null_; merge a3 b3; put "S3 " x= y= z=; run;
 
 /* S4 the one-to-one READ twin (two SET statements) stops at the FIRST
-   end-of-file — one observation, not three (p.488 Table 20.4 last row). */
+   end-of-file - one observation, not three (p.488 Table 20.4 last row). */
 data _null_; set a3; set b3; put "S4 " x= y= z=; run;
 
 /* S5 UPDATE: a MISSING value in the transaction does not overwrite the master,

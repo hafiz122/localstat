@@ -4,7 +4,7 @@ data t; input id x; datalines;
 ;
 run;
 /* BUG-sqlupdatedropcol: a valid UPDATE/SELECT is unchanged, and DROP TABLE
-   really removes the member (was a silent no-op) — after the drop,
+   really removes the member (was a silent no-op) - after the drop,
    dictionary.tables lists only KEEPME. The loud error paths (unknown SET/SELECT
    column, DROP of an absent table/view) are covered by captured-diag tests in
    src/sql.zig. */

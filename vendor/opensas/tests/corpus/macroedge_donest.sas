@@ -1,4 +1,4 @@
-/* Nested %do loops (2-level grid) — inner counter reset each outer pass. Synthetic. corpus-macroedge. */
+/* Nested %do loops (2-level grid) - inner counter reset each outer pass. Synthetic. corpus-macroedge. */
 %macro grid(rows, cols);
   %do r = 1 %to &rows;
     %do c = 1 %to &cols;

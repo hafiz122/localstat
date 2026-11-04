@@ -1,6 +1,6 @@
 /* BUG-filenameconcatnoop (Language Reference: Concepts Table 21.5, p.517: "FILENAME statement with
    concatenation, wildcard, or piping"): `filename ref ('a.txt' 'b.txt');` was
-   silently accepted and registered NOTHING — the later INFILE then errored
+   silently accepted and registered NOTHING - the later INFILE then errored
    "expected an infile path" byte-identically to an UNDEFINED fileref, pointing
    the user at the wrong statement two lines down. The sibling `pipe` device on
    the same table row already failed loud. No concatenation engine exists, so

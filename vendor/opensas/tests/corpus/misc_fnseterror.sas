@@ -1,5 +1,5 @@
 /* MISC-fnseterror: an invalid function argument sets the automatic _ERROR_=1
-   (SAS 9.4), live in-step, so the validation idiom `if _error_ then …` fires —
+   (SAS 9.4), live in-step, so the validation idiom `if _error_ then …` fires -
    the log NOTE is kept. Covers functions.zig's own sites: SUBSTR nonpositive
    position / length and the shared domErr helper (LOG of a nonpositive).
    Valid calls leave _ERROR_ untouched. NOTEs go to stderr (off the diff). */

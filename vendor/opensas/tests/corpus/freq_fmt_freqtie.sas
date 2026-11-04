@@ -3,7 +3,7 @@
    (sibling of BUG-freqfmtorder, which fixed the ORDER=INTERNAL default). Format
    lf 1='Zzz' 2='Aaa' 3='Mmm' with all three levels at EQUAL frequency: SAS
    emits Zzz/Aaa/Mmm (raw 1/2/3 tie-break), never the label-text Aaa/Mmm/Zzz.
-   The second table shows a DIFFERENT-frequency case — ORDER=FREQ still sorts by
+   The second table shows a DIFFERENT-frequency case - ORDER=FREQ still sorts by
    descending frequency there (raw tie-break only applies WITHIN equal freq). */
 data d;
   input x @@;

@@ -1,5 +1,5 @@
 /* PARSE-twolevelset: an undeclared two-level `libref.member` in SET must not
-   ParseError — the step parses, then fails at execution like real SAS
+   ParseError - the step parses, then fails at execution like real SAS
    ("File ... does not exist", BUG-setmissingquiet). The positive step runs
    FIRST because the error puts the rest of the program in syntax-check mode
    (BUG-errhalt).

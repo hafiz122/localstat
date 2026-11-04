@@ -1,5 +1,5 @@
 /* BUG-sqlconstraints: CREATE TABLE integrity constraints used to parse as
-   phantom `constraint`/`primary` COLUMNS and were never enforced — dup PK,
+   phantom `constraint`/`primary` COLUMNS and were never enforced - dup PK,
    failed CHECK, dup UNIQUE, NULL in NOT NULL all inserted silently.
    Now: the violating INSERT is an ERROR (stderr) and the row is rejected;
    a clean table has exactly its declared columns.
@@ -7,12 +7,12 @@
 proc sql;
   create table pk (id num, primary key(id));
   insert into pk values(1);
-  insert into pk values(1);  /* ERROR: duplicate primary key — row rejected */
+  insert into pk values(1);  /* ERROR: duplicate primary key - row rejected */
   select * from pk;          /* one row, and NO phantom constraint column */
 
   create table nn (a num not null, b char);
   insert into nn values(5, 'x');
-  insert into nn(a) values(6);   /* b stays blank — allowed */
+  insert into nn(a) values(6);   /* b stays blank - allowed */
   insert into nn(b) values('y'); /* ERROR: NOT NULL column a missing */
   select * from nn;
 

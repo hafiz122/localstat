@@ -1,4 +1,4 @@
-//! Lexer — SAS source → `Token` stream. The rebuilt original (it was lost
+//! Lexer - SAS source → `Token` stream. The rebuilt original (it was lost
 //! before ever being committed; see L1). This file OWNS the `Token`/`Tag`
 //! contract: it was seeded in `parser_expr.zig` while no lexer existed and is
 //! hoisted here now that one does. Both the lexer and the parser share it, and
@@ -6,7 +6,7 @@
 //!
 //! SAS names are case-insensitive; the lexer emits their bytes verbatim and
 //! leaves folding to the consumer (the parser's mnemonic check, the PDV). The
-//! word operators AND/OR/NOT/EQ/… are emitted as `.name` on purpose — the
+//! word operators AND/OR/NOT/EQ/… are emitted as `.name` on purpose - the
 //! parser classifies them, so the lexer needs no keyword table.
 //!
 //! Scope: literals, names, `( ) ,`, arithmetic, comparisons (symbolic +
@@ -14,7 +14,7 @@
 //! `^`/`~` (NOT), plus the statement tokens `;`,
 //! `$`, `:` (input informat modifier) and a `datalines`/`cards` raw-line mode
 //! (A2). `/* */` comments are skipped.
-//! ponytail: no `''` in-string escape — add when the corpus hits it.
+//! ponytail: no `''` in-string escape - add when the corpus hits it.
 
 const std = @import("std");
 const diag = @import("diag.zig");
@@ -89,7 +89,7 @@ pub fn tokenize(arena: std.mem.Allocator, src: []const u8, diags: *diag.Diagnost
                     i = try lexNumber(arena, &out, src, i, line);
                 } else if (i + 1 < src.len and (std.ascii.isAlphabetic(src[i + 1]) or src[i + 1] == '_') and !prevIsValue(out.items)) {
                     // special missing `.A`-`.Z` / `._` (only where a value is
-                    // expected — a `.` after a value is member access, e.g. `a.b`).
+                    // expected - a `.` after a value is member access, e.g. `a.b`).
                     // Carry the letter as the `.dot` token's text so it survives
                     // to the parser (member-access dots stay empty-texted).
                     try emit(arena, &out, .dot, src[i + 1 .. i + 2], line);
@@ -106,7 +106,7 @@ pub fn tokenize(arena: std.mem.Allocator, src: []const u8, diags: *diag.Diagnost
                 try emit(arena, &out, .name, text, line);
                 // `datalines;`/`cards;`/`lines;` switches to raw-line capture:
                 // the block's bytes are data, not SAS tokens. But ONLY when it
-                // begins a statement — the token before it is `;` (or it is the
+                // begins a statement - the token before it is `;` (or it is the
                 // first token). When `datalines` instead FOLLOWS another token
                 // (`infile datalines;` device ref, or a var named datalines) it
                 // is not a raw block, so don't switch to raw capture, which would
@@ -130,7 +130,7 @@ pub fn tokenize(arena: std.mem.Allocator, src: []const u8, diags: *diag.Diagnost
                 i += 1;
             },
             // `[`/`]` are array-subscript delimiters, interchangeable with `{`/`}` in
-            // SAS (`array a[n]`, `a[i]`) — the only DATA-step use of brackets, so
+            // SAS (`array a[n]`, `a[i]`) - the only DATA-step use of brackets, so
             // alias them to the brace tokens (BUG-arraybracket).
             '{', '[' => {
                 try emit(arena, &out, .lbrace, "", line);
@@ -146,7 +146,7 @@ pub fn tokenize(arena: std.mem.Allocator, src: []const u8, diags: *diag.Diagnost
                 // to the next `;` (SAS `* … ;`). Statement position = file start or
                 // right after a `;`. Anywhere else `*`/`**` are the multiply/power
                 // operators (lexOp). ponytail: `;`-boundary only, and the content is
-                // consumed raw (so apostrophes / `&` / `%` inside don't lex) — widen
+                // consumed raw (so apostrophes / `&` / `%` inside don't lex) - widen
                 // the boundary set if the corpus needs it.
                 if (out.items.len == 0 or out.items[out.items.len - 1].tag == .semicolon) {
                     while (i < src.len and src[i] != ';') : (i += 1) {
@@ -179,16 +179,16 @@ fn emit(arena: std.mem.Allocator, out: *std.ArrayList(Token), tag: Tag, text: []
 }
 
 /// Digits, an optional decimal point, and an optional `e[+/-]NN` exponent. The
-/// lexer is deliberately permissive — a malformed number (`1.2.3`) is caught by
+/// lexer is deliberately permissive - a malformed number (`1.2.3`) is caught by
 /// the parser's `parseFloat`, which owns the numeric error message.
 fn lexNumber(arena: std.mem.Allocator, out: *std.ArrayList(Token), src: []const u8, start: usize, line: usize) Error!usize {
     // SAS numeric hex constant: a decimal digit, then 0-15 more hex digits (16
-    // total max), immediately followed by `x`/`X` — e.g. `0fx`=15, `9x`=9,
+    // total max), immediately followed by `x`/`X` - e.g. `0fx`=15, `9x`=9,
     // `0b0ax` (Language Reference: Concepts, "Numeric Constants Expressed in Hexadecimal Notation").
     // lexNumber only fires on a leading digit 0-9, so `Fx`/`max`/`xx` stay names.
     // Tried before decimal lexing, but `1.5`/`1e5`/`123` fall through (no trailing
     // x). Guarded so a hex run continued by an ident char (`0fxy`) is not silently
-    // truncated — fall through and let the parser fail loud.
+    // truncated - fall through and let the parser fail loud.
     {
         var h = start;
         while (h < src.len and std.ascii.isHex(src[h])) h += 1;
@@ -264,7 +264,7 @@ fn lexString(arena: std.mem.Allocator, out: *std.ArrayList(Token), src: []const 
     }
     // SAS char constants are NEVER zero-length: a quoted empty literal `''`/`""`
     // is a SINGLE BLANK, not a zero-length string (SAS 9.4 Fns Ref, TRANSTRN
-    // p.1577). Only TRIMN('') — computed, not lexed — yields zero-length. Fixing
+    // p.1577). Only TRIMN('') - computed, not lexed - yields zero-length. Fixing
     // it here, at the one point a quoted literal is materialized, keeps computed
     // empties (trimn/substr/empty columns) and the parser's synthesized
     // omitted-arg `.str=""` genuinely zero-length. GH#60.
@@ -351,7 +351,7 @@ fn isDatalines4Kw(text: []const u8) bool {
 /// to a line whose first non-blank byte is `;`. Each data line becomes a
 /// `.data_line` token (verbatim, sans trailing `\r`); the opening and
 /// terminating `;` are `.semicolon`. `at` indexes the opening `;`. Returns the
-/// index just past the terminator (or EOF, if the block is unterminated — the
+/// index just past the terminator (or EOF, if the block is unterminated - the
 /// parser's trailing `expect(.semicolon)` reports that).
 fn lexDatalines(arena: std.mem.Allocator, out: *std.ArrayList(Token), src: []const u8, at: usize, line: *usize, four: bool) Error!usize {
     try emit(arena, out, .semicolon, "", line.*);
@@ -386,22 +386,22 @@ fn lexDatalines(arena: std.mem.Allocator, out: *std.ArrayList(Token), src: []con
 fn lexOp(arena: std.mem.Allocator, out: *std.ArrayList(Token), src: []const u8, i: usize, line: usize, diags: *diag.Diagnostics) Error!usize {
     if (two(src, i, '*', '*')) return emit2(arena, out, .star2, line, i);
     if (two(src, i, '|', '|')) return emit2(arena, out, .concat, line, i);
-    if (two(src, i, '!', '!')) return emit2(arena, out, .concat, line, i); // `!!` — alt concat
-    // `¦¦` — broken-bar concat; each `¦` is UTF-8 0xC2 0xA6, so the pair is 4 bytes.
+    if (two(src, i, '!', '!')) return emit2(arena, out, .concat, line, i); // `!!` - alt concat
+    // `¦¦` - broken-bar concat; each `¦` is UTF-8 0xC2 0xA6, so the pair is 4 bytes.
     if (i + 3 < src.len and src[i] == 0xC2 and src[i + 1] == 0xA6 and src[i + 2] == 0xC2 and src[i + 3] == 0xA6) {
         try emit(arena, out, .concat, "", line);
         return i + 4;
     }
     if (two(src, i, '<', '=')) return emit2(arena, out, .le, line, i);
     if (two(src, i, '>', '=')) return emit2(arena, out, .ge, line, i);
-    // `=<` / `=>` — the LEGACY spellings of LE / GE, still accepted by SAS 9.4
+    // `=<` / `=>` - the LEGACY spellings of LE / GE, still accepted by SAS 9.4
     // "for compatibility with previous releases of SAS" (Language Reference: Concepts p.127 Table 6.4
     // footnotes 2 and 3). They become the ORDINARY `.le`/`.ge` tokens, so
     // precedence, chained comparison and the `:` modifier all come for free; the
     // spelling rides along in `text` only because the same footnotes say these
     // two are not valid in a WHERE clause, which parser_expr rejects.
     // Maximal munch: both chars must be ADJACENT, and nothing else in the
-    // grammar starts a token with `=` — `x =-1`, `a = <expr>` and the `=*`
+    // grammar starts a token with `=` - `x =-1`, `a = <expr>` and the `=*`
     // sounds-like pair (which lexes `.eq`+`.star`) are untouched.
     if (two(src, i, '=', '<')) {
         try emit(arena, out, .le, "=<", line);
@@ -417,7 +417,7 @@ fn lexOp(arena: std.mem.Allocator, out: *std.ArrayList(Token), src: []const u8, 
     if (two(src, i, '<', '>')) return emit2(arena, out, .max_op, line, i);
     if (two(src, i, '^', '=') or two(src, i, '~', '=')) return emit2(arena, out, .ne, line, i);
     if (two(src, i, '@', '@')) return emit2(arena, out, .atat, line, i); // `@@` double-trailing hold
-    // `¦` / `¬` — the EBCDIC-era OR / NOT glyphs, alternate spellings of `|` /
+    // `¦` / `¬` - the EBCDIC-era OR / NOT glyphs, alternate spellings of `|` /
     // `^` (GAP-whereorbang). Both are multi-byte UTF-8 (0xC2 0xA6 / 0xC2 0xAC),
     // so match the byte pair; the `¦¦` concat above stays concat, like `||`.
     if (src[i] == 0xC2 and i + 1 < src.len) {
@@ -426,7 +426,7 @@ fn lexOp(arena: std.mem.Allocator, out: *std.ArrayList(Token), src: []const u8, 
             return i + 2;
         }
         if (src[i + 1] == 0xAC) {
-            // `¬=` (0xC2 0xAC 0x3D) — the not-sign NOT-EQUAL, one token by
+            // `¬=` (0xC2 0xAC 0x3D) - the not-sign NOT-EQUAL, one token by
             // maximal munch: Language Reference: Concepts p.219 Table 11.3 lists `^= ~= ¬= <>` as the
             // NE spellings and SQL Procedure Table 8.2 group 7 (printed
             // p.403-404) lists `¬=, ^=, <>, ne`. Split as `¬`+`=` it was
@@ -453,7 +453,7 @@ fn lexOp(arena: std.mem.Allocator, out: *std.ArrayList(Token), src: []const u8, 
         '<' => .lt,
         '>' => .gt,
         '|' => .pipe,
-        '!' => .pipe, // `!` — alt OR; the `!!` concat check above already won doubles
+        '!' => .pipe, // `!` - alt OR; the `!!` concat check above already won doubles
         '&' => .amp,
         '^', '~' => .caret,
         '(' => .lparen,
@@ -553,7 +553,7 @@ test "not-sign operators: `¬=` is one NE token, `¬` is NOT, non-ASCII stays lo
     // BUG-sqlnotequalunicode: `¬=` (U+00AC + `=`, bytes 0xC2 0xAC 0x3D) is a
     // NOT-EQUAL spelling (Language Reference: Concepts p.219 Table 11.3; SQL Procedure Table 8.2
     // group 7, printed p.403-404). Maximal munch: ONE .ne token, not .caret+.eq
-    // — split, it was loud in the DATA step but silently kept every row in SQL.
+    // - split, it was loud in the DATA step but silently kept every row in SQL.
     const toks = try tokenize(a, "x ¬= 3", &diags);
     const want = [_]Tag{ .name, .ne, .number, .eof };
     try std.testing.expectEqual(want.len, toks.len);
@@ -649,7 +649,7 @@ test "legacy =< / => lex as LE / GE and carry their spelling (Language Reference
     const want = [_]Tag{ .name, .le, .name, .name, .ge, .name, .eof };
     try std.testing.expectEqual(want.len, toks.len);
     for (want, toks) |w, t| try std.testing.expect(w == t.tag);
-    // the spelling rides in `text` — parser_expr rejects it in a WHERE clause
+    // the spelling rides in `text` - parser_expr rejects it in a WHERE clause
     try std.testing.expectEqualStrings("=<", toks[1].text);
     try std.testing.expectEqualStrings("=>", toks[4].text);
     // the modern spellings are the same tags with no stamp

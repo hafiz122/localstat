@@ -1,4 +1,4 @@
-/* BUG-arraycharinitlen: an explicit `$len` on a CHARACTER array is authoritative —
+/* BUG-arraycharinitlen: an explicit `$len` on a CHARACTER array is authoritative -
    an init constant longer than it is TRUNCATED to it (not silently re-spec'd to the
    constant's length), exactly like an assignment through the array. Without a `$len`
    the element length is inferred from the constants (unchanged). */

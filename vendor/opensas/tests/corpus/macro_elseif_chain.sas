@@ -1,10 +1,10 @@
 /* BUG-macroelseifchain: `%else %if … %then …; %else …;` cascades (the else-if
    idiom, ubiquitous in derivation macros). branchUnit now consumes an
    %if-headed else-branch as a whole nested conditional, so each inner %else
-   binds to its own %if — no truncation at the first `;`, no orphaned %else
+   binds to its own %if - no truncation at the first `;`, no orphaned %else
    running unconditionally, no stray "macro ELSE not resolved" warning. */
 
-/* text-emitting cascade — the taken branch letter is the only text emitted */
+/* text-emitting cascade - the taken branch letter is the only text emitted */
 %macro grade(s);%if &s >= 90 %then A;%else %if &s >= 80 %then B;%else %if &s >= 70 %then C;%else F;%mend;
 data _null_;
   length g $1;

@@ -1,5 +1,5 @@
-/* BUG-datdifbasis: an unsupported day-count basis fails loud — the value goes
-   missing and a NOTE hits the log — instead of silently defaulting to ACT/ACT.
+/* BUG-datdifbasis: an unsupported day-count basis fails loud - the value goes
+   missing and a NOTE hits the log - instead of silently defaulting to ACT/ACT.
    Valid bases (datdif: ACT/ACT, 30/360; yrdif: + ACT/360, ACT/365, AGE) and
    the blank→ACT/ACT default are unchanged. */
 data _null_;

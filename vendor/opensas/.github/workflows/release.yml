@@ -1,4 +1,4 @@
-# AGT-release — on a published GitHub release: gate once, cross-compile all four
+# AGT-release - on a published GitHub release: gate once, cross-compile all four
 # targets IN PARALLEL (matrix, one runner + isolated cache per target), then
 # fan in to attach binaries + SHA256SUMS. Was a single sequential job; the four
 # builds are independent so the matrix trades sum-of-four wall-clock for max-of-four.
@@ -11,7 +11,7 @@ permissions:
   contents: write   # upload assets to the release
 
 jobs:
-  # Run the hermetic suites ONCE — never ship a binary from a red tree. The build
+  # Run the hermetic suites ONCE - never ship a binary from a red tree. The build
   # matrix and publish only run if this is green.
   gate:
     runs-on: ubuntu-latest
@@ -44,7 +44,7 @@ jobs:
           version: 0.16.0
       - name: cross-compile ${{ matrix.target }}
         env:
-          # GH#10 ISS-versionflag: the tag is the authoritative version — passed
+          # GH#10 ISS-versionflag: the tag is the authoritative version - passed
           # straight through to `-Dversion=` (the Makefile forwards it), no git
           # needed on the runner (a shallow checkout carries no tag objects, so
           # `git describe` would be unreliable here).

@@ -1,4 +1,4 @@
-/* GAP-gapsexitingone §5d — RECFM=F (fixed-length records) is a documented
+/* GAP-gapsexitingone §5d - RECFM=F (fixed-length records) is a documented
    FILENAME record form (valid SAS 9.4); opensas's reader is variable-length
    only, so the refusal is a gap → rc 2. A garbage value (recfm=bogus) stays
    rc 1 "Invalid value for the RECFM= FILENAME option." (main.zig §5d test).

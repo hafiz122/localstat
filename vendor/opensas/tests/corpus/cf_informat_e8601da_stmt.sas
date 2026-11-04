@@ -1,4 +1,4 @@
-/* GH#52: e8601da. (ISO yyyy-mm-dd) on the DATA-step INPUT-statement path —
+/* GH#52: e8601da. (ISO yyyy-mm-dd) on the DATA-step INPUT-statement path -
    both the INFORMAT-statement form and the :modifier form must read to a SAS
    day, same as input(x, e8601da.). All three want 23134. */
 data a; informat d e8601da.; input d; datalines;

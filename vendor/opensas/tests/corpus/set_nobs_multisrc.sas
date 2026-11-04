@@ -16,7 +16,7 @@ data b;
 run;
 
 /* GAP-nobsmultisrc: nobs= over multiple SET sources is the a+b TOTAL (5),
-   known before the step iterates — not the per-source count. */
+   known before the step iterates - not the per-source count. */
 data _null_;
   set a b nobs=n;
   if _n_=1 then put n=;

@@ -1,9 +1,9 @@
-/* GAP-wherelow-tick291 (A) — PROBE VERDICT: NOT A DEFECT. The board claimed
+/* GAP-wherelow-tick291 (A) - PROBE VERDICT: NOT A DEFECT. The board claimed
    `where x=1 ! y=9` was "not even lexed" and feared a SILENTLY WRONG ROW SET;
    probing showed the lexer already aliases `!` to the OR token and every
    WHERE route returns the OR rows. Pinned here so the stale line cannot
    come back.
-   Doc: `!` is a legacy OR spelling — DATA Step Statements ref printed
+   Doc: `!` is a legacy OR spelling - DATA Step Statements ref printed
    pp.363-364, the WHERE operator table's footnote 2: "The OR symbol ( | ),
    broken vertical bar ( ¦ ), and exclamation point (!) all indicate a
    logical or"; PROC SQL Table 8.2 group 10 (printed p.404) lists `|, OR`

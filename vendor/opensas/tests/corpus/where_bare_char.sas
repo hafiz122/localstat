@@ -1,9 +1,9 @@
 /* BUG-wherebarechar (doc-finder tick291 F4): a bare CHARACTER variable as a
-   WHERE predicate matched ZERO rows on all four routes — the subsetting-IF
+   WHERE predicate matched ZERO rows on all four routes - the subsetting-IF
    numeric-conversion rule (BUG-charinboolean) had been applied to WHERE.
    Pins the Language Reference: Concepts p.216 rule: "The names of character
    variables can also stand alone. SAS selects observations where the value of
-   the character variable is not blank" — i.e. `where <charvar>;` returns all
+   the character variable is not blank" - i.e. `where <charvar>;` returns all
    values not equal to blank, a DIFFERENT rule from IF. */
 data d;
   length city $8; flag=1;
@@ -18,10 +18,10 @@ proc print data=d noobs; where city; run;
 proc sql; select * from d where city; quit;
 data b; set d; where city; run;
 proc print data=b noobs; run;
-/* control — the explicit spelling p.216 calls equivalent */
+/* control - the explicit spelling p.216 calls equivalent */
 data c; set d; where city ne ' '; run;
 proc print data=c noobs; run;
-/* the sharp observable: '0' is non-blank, so TRUE in WHERE — but FALSE in a
+/* the sharp observable: '0' is non-blank, so TRUE in WHERE - but FALSE in a
    subsetting IF (numeric conversion → 0), which must NOT have moved */
 data z; length s $4; input s $; datalines;
 0

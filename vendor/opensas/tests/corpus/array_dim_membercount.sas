@@ -22,7 +22,7 @@ data _null_;
 run;
 
 data _null_;
-  array small{2} p q r;  /* dim 2 vs 3 members — also an ERROR, but the job is
+  array small{2} p q r;  /* dim 2 vs 3 members - also an ERROR, but the job is
                             already in syntax-check mode, so this step is skipped */
   put 'skipped';
 run;

@@ -1,4 +1,4 @@
-/* BUG-xptcreat-novtable: sashelp.vtable — the dictionary view of the current
+/* BUG-xptcreat-novtable: sashelp.vtable - the dictionary view of the current
    library's members (LIBNAME/MEMNAME/MEMTYPE/NOBS/NVAR, upper-cased). Drives
    %XPT_CREAT's `set Sashelp.Vtable; where libname="TARGET";` member enumeration.
    Here: create a few WORK datasets, then list them from the view. */

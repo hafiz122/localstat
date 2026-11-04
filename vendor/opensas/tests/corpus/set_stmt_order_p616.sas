@@ -2,11 +2,11 @@
    rule ("Loading a Data Set and Using the FIND Method to Retrieve Data",
    Example 2), including the p.613-prescribed `call missing(<key>, <data>);`
    ("Use the CALL MISSING routine with all the key and data variables as
-   parameters" — one of the three sanctioned remedies for uninitialized
+   parameters" - one of the three sanctioned remedies for uninitialized
    variable notes). A three-row lookup table is loaded into the hash on
    _N_=1, then every key of a three-row probe table is looked up with FIND.
    BUG-setstmtorder: the priming block runs BEFORE the SET's read, so
-   `call missing` no longer wipes the key the SET just fetched — the
+   `call missing` no longer wipes the key the SET just fetched - the
    documented result is ALL THREE probe rows matched (7 70 / 8 80 / 9 90);
    the pre-fix order silently dropped the first observation at exit 0. */
 data rates; input code pct; datalines;

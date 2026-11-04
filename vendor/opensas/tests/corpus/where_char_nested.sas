@@ -1,16 +1,16 @@
-/* NOTE-wherecharnested — premise-audit pin. The ticket claimed: "a bare char
+/* NOTE-wherecharnested - premise-audit pin. The ticket claimed: "a bare char
    operand is correctly non-blank-is-true in WHERE, but a char operand NESTED
    inside `and`/`or`/`not` still converts via the shared `truthy()`."
-   Verdict: REPRODUCES — and the premise-audit's first job was a
+   Verdict: REPRODUCES - and the premise-audit's first job was a
    DISCRIMINATING case, which 'abc'/'0' provide (non-blank-is-true keeps
    them; numeric coercion drops them). Bare `where c;` keeps abc/0/1 (Language Reference: Concepts
    p.216 non-blank rule, BUG-wherebarechar); nested `where c and x=1;` keeps
-   only '1' — the two readings provably diverge, so the ticket is NOT
+   only '1' - the two readings provably diverge, so the ticket is NOT
    vacuous. It is also NOT fixed here, deliberately: the oracle is
    ambiguous. DATA Step Statements Ref, WHERE Statement chapter
    (Statements reference, pdf p.373) shows a NESTED numeric
    stand-alone example ('where empnum and ssn;') but for characters says
-   "by itself as a WHERE expression" — a qualifier the numeric paragraph
+   "by itself as a WHERE expression" - a qualifier the numeric paragraph
    does not carry. Flipping nested chars to non-blank on that citation alone
    risks trading one non-conformance for another; the ticket was filed
    needs-oracle and one real SAS run settles it.

@@ -1,10 +1,10 @@
 /* BUG-multiinfilelastwins (doc-finder tick305 F1 + tick312 §8b repros): two
-   INFILE statements in one step — the LAST one used to win for the WHOLE step,
+   INFILE statements in one step - the LAST one used to win for the WHOLE step,
    so the first file was never opened (silent wrong values, up to total data
    loss). Language Reference: Concepts Table 20.4 row 5 (p.488): the step stops "when end-of-file is
    first reached on ANY of the files"; p.489: "DATA steps can use a combination
    of some or all of the sources"; p.517 Table 21.5 row 10: a second
-   `infile datalines` re-selects the SAME instream — no rewind. */
+   `infile datalines` re-selects the SAME instream - no rewind. */
 
 /* two external files: one record from EACH per iteration; EOF on the first
    (3-record) file stops the step → 3 obs */

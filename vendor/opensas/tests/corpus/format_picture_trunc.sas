@@ -1,4 +1,4 @@
-/* BUG-picturetrunc: SAS 9.4 TRUNCATES the scaled value by default — rounding is
+/* BUG-picturetrunc: SAS 9.4 TRUNCATES the scaled value by default - rounding is
    opt-in via the PICTURE (round) option. opensas rounded, so the last digit was
    wrong: 12.35 → `  12.4` (SAS `  12.3`), 99.99 → ` 100.0` (SAS `  99.9`). */
 proc format;

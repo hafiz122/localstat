@@ -1,4 +1,4 @@
-/* Language Reference: Concepts Ch.24 "Using DATA Step Component Objects" — the parts of the chapter
+/* Language Reference: Concepts Ch.24 "Using DATA Step Component Objects" - the parts of the chapter
    verified conformant in the tick293 audit that nothing else pinned.
 
    1. p.615 (PDF 633) Example 1 VERBATIM: ADD twice then FIND('Homer') must
@@ -10,7 +10,7 @@
    3. The EMPTY-hash rc contract: first()/last() are non-zero and leave the
       data variables untouched (the carried-value gotcha), find()/check()
       return 160038, num_items is 0.
-   4. p.622 (PDF 640): output() writes ONLY the defineData variables — a key
+   4. p.622 (PDF 640): output() writes ONLY the defineData variables - a key
       appears only when it is also named in defineData. Asserted here through
       num_items + the retrieved data rather than a second data set, so this
       fixture needs no PROC. */

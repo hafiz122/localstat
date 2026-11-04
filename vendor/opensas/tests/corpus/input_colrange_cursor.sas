@@ -3,7 +3,7 @@
    the range's columns. Control: two absolute ranges in a row were already fine
    and must stay byte-identical. */
 
-/* 1. the ticket repro: range, then a list var — name must read ABC, not 001 */
+/* 1. the ticket repro: range, then a list var - name must read ABC, not 001 */
 data _null_;
   input id 1-3 name $;
   put "id=" id " name=" name;
@@ -22,7 +22,7 @@ datalines;
 ;
 run;
 
-/* 3. control: all absolute ranges — cursor-independent, output unchanged */
+/* 3. control: all absolute ranges - cursor-independent, output unchanged */
 data _null_;
   input a 1-3 b $ 5-7;
   put "a=" a " b=" b;

@@ -1,9 +1,9 @@
-/* Language Reference: Concepts Ch.11 "WHERE-Expression Processing" — the doc's own worked rules that
+/* Language Reference: Concepts Ch.11 "WHERE-Expression Processing" - the doc's own worked rules that
    opensas gets right (doc-finder tick291). Each block cites the book page.
    Deliberately excludes LIKE (BUG-charfixedwidth would move the golden) and
    expression-bounded BETWEEN / multi-token CONTAINS (open tick291 findings). */
 
-/* p.227 "Processing Compound Expressions": NOT, then AND, then OR — so with no
+/* p.227 "Processing Compound Expressions": NOT, then AND, then OR - so with no
    parentheses this means product='GRAPH' OR (product='STAT' AND country='Canada'). */
 data sites;
   length product $6 country $6;
@@ -19,7 +19,7 @@ run;
 proc print data=sites noobs;
   where product='GRAPH' or product='STAT' and country='Canada';
 run;
-/* p.227 "Using Parentheses to Control Order of Evaluation" — the doc's fix. */
+/* p.227 "Using Parentheses to Control Order of Evaluation" - the doc's fix. */
 proc print data=sites noobs;
   where (product='GRAPH' or product='STAT') and country='Canada';
 run;

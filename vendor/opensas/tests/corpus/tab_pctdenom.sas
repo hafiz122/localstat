@@ -10,7 +10,7 @@ run;
    share of the reg ROW subtotal (W×A 30/70≈42.86). Used to die with the bogus
    "unknown statistic 'prod'". A later block in this fixture reaches a
    documented PROC TABULATE feature opensas does not implement, which is a GAP
-   and exits 2 under D-009 — not a user error.
+   and exits 2 under D-009 - not a user error.
    expect-rc: 2 */
 proc tabulate data=s; class reg prod; var amt;
   table reg, prod*amt*(sum pctsum<prod> pctsum<reg>); run;
@@ -22,6 +22,6 @@ proc tabulate data=s; class reg prod;
 proc tabulate data=s; class reg prod; var amt;
   table reg, amt*(sum pctsum<reg>); run;
 /* A denominator outside the TABLE crossing fails loud naming the PCTN/PCTSUM
-   denominator — stderr, exit 2, no table below. */
+   denominator - stderr, exit 2, no table below. */
 proc tabulate data=s; class reg prod; var amt;
   table reg, prod*amt*pctsum<amt>; run;

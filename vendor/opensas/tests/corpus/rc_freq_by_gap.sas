@@ -1,4 +1,4 @@
-/* GAP-gapsexitingone §5b (a129c58f) — the end-to-end half of proc.zig's
+/* GAP-gapsexitingone §5b (a129c58f) - the end-to-end half of proc.zig's
    in-source D-009 pins: a recognized-but-unsupported PROC construct is an
    opensas gap, so the PROCESS exits 2 ("file an opensas issue"), not 1.
    PROC FREQ's BY statement is valid SAS 9.4; per-group tables are simply

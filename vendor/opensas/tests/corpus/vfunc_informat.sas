@@ -1,4 +1,4 @@
-/* V-attribute functions read a variable's INFORMAT — both the by-reference (non-X)
+/* V-attribute functions read a variable's INFORMAT - both the by-reference (non-X)
    and the name-string (X) forms. Unblocked by EXEC-varattr. corpus-vfuncs. */
 data _null_;
   amt = 5;

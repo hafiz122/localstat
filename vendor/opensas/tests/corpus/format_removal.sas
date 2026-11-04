@@ -1,5 +1,5 @@
 /* BUG-formatremoval: a FORMAT/INFORMAT statement name with NO following spec
- * is SAS's removal form — `format x;` CLEARS x's format (reverts to default),
+ * is SAS's removal form - `format x;` CLEARS x's format (reverts to default),
  * it is not a no-op. The parser used to drop spec-less names, silently keeping
  * the old format. FORMAT is declarative, so within a step the LAST statement
  * wins for the whole step (both PUTs below show the cleared default). */

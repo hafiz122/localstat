@@ -1,9 +1,9 @@
 /* PERF-loadrowdual (f537f56) regression guard: loadRow now writes by
    pre-resolved PDV slot via pdv.setAt, and _setobs_ is stamped once per source
    (only when nobs= requested). This fixture locks the OUTPUT of every path that
-   changed — multi-source SET, MERGE (in=, many-to-many), UPDATE, nobs=,
+   changed - multi-source SET, MERGE (in=, many-to-many), UPDATE, nobs=,
    point= random access, KEEP/RENAME on read, char LENGTH truncation on the
-   readback coercion tail — so a future edit to the slot loop that diverges from
+   readback coercion tail - so a future edit to the slot loop that diverges from
    documented SAS behavior turns the corpus red. Filed by QA tick151. */
 
 data a; input k x y; datalines;
@@ -23,7 +23,7 @@ run;
 
 /* multi-source SET: concatenation, slot readback of both schemas. x/y are
    absent from b but auto-RETAINED as SET-read vars (SAS: SET/MERGE/MODIFY/
-   UPDATE auto-retain) — b's rows show a's last values (30/300), not missing
+   UPDATE auto-retain) - b's rows show a's last values (30/300), not missing
    (BUG-setvarretain; this block's golden pre-fix encoded the missing bug). */
 data setcat; set a b; run;
 proc print data=setcat; run;

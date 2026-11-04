@@ -1,19 +1,19 @@
 /* Language Reference: Concepts Ch.23's flagship MODIFY program (p.595, "Example 4: Updating a Master
    Data Set By Adding Observations"; result narrated at p.596 and Figure 23.10)
-   VERBATIM — only today() replaced by a fixed date so the output is diffable.
+   VERBATIM - only today() replaced by a fixed date so the output is diffable.
    p.596: "The REPLACE statement updates observations 4, 7, and 8" (figure
    positions = K89R/KJ66/BV1E) and "The OUTPUT statement adds observations 1, 2,
-   and 5" (transaction positions = AA11/BB22/CC33) — 3+3 = 6 iterations = the
+   and 5" (transaction positions = AA11/BB22/CC33) - 3+3 = 6 iterations = the
    6 TRANSACTION rows (BUG-modifybymasterdriven).  The SEVEN master rows with
    no transaction (BC85 JD03 LK43 M4J7 MN21 NCF3 UYN7) must come out
-   BYTE-IDENTICAL — UPDATE's master-driven driver used to hand each a _SOK
+   BYTE-IDENTICAL - UPDATE's master-driven driver used to hand each a _SOK
    iteration, so the _SOK branch ran Amount_in_Stock + (missing) -> missing
    and REPLACE wiped them IN PLACE.  (p.596 par.4's "Price updated /
    ReceivedDate not updated" prose contradicts the doc's own printed program,
    which sets ReceivedDate=today() and never assigns Price in the _SOK branch;
    the fixture follows the PROGRAM, as transcribed.  The transaction-only
-   columns Add_New_Stock/New_Price still land in the rebuilt descriptor —
-   BUG-modifydescriptor, queued — so the print names the 5 master columns.) */
+   columns Add_New_Stock/New_Price still land in the rebuilt descriptor -
+   BUG-modifydescriptor, queued - so the print names the 5 master columns.) */
 data Inventory;
 input PartNumber $ PartName $ Amount_in_Stock Price ReceivedDate date9. ;
 format Price comma12.2 ReceivedDate mmddyy10.;

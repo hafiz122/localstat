@@ -1,4 +1,4 @@
-/* EBNF-gate tick356 marker evidence — not_expr prefix arms NOT | "^" | "~" |
+/* EBNF-gate tick356 marker evidence - not_expr prefix arms NOT | "^" | "~" |
    "¬" (Language Reference: Concepts Table 6.6): every spelling negates the compare_expr it prefixes;
    `¬` lexes to the caret token (fixture expr_alt_ops landed that). */
 data _null_;

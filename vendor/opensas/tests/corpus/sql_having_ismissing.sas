@@ -1,6 +1,6 @@
 /* BUG-sqlhavingismissing: HAVING <expr> IS [NOT] NULL|MISSING must filter like
    WHERE does ("IS NULL and IS MISSING are used in the WHERE, ON, and HAVING
-   expressions" — SQL Procedure Components, "IS Operator"). Each HAVING form
+   expressions" - SQL Procedure Components, "IS Operator"). Each HAVING form
    sits next to the equivalent WHERE form on the SAME data so the two surfaces
    cannot drift apart again. */
 data d2; x=1; y=.; output; x=2; y=5; output; run;

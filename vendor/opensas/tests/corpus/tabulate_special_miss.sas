@@ -1,6 +1,6 @@
 /* BUG-tabulatespecialmiss: PROC TABULATE with a CLASS var holding SPECIAL
    MISSING values (.a-.z, ._) must keep each distinct payload as its own level
-   (.a->A, .b->B, ._->_ , plain .->.) — it used to collapse them all into one
+   (.a->A, .b->B, ._->_ , plain .->.) - it used to collapse them all into one
    `.` level, merging their N/Sum. Ordering: ._ < . < .a < .b < ... < numbers.
    With `/ missing` the special-missing levels are kept; without it (as in SAS)
    any obs missing on the class var is excluded. */

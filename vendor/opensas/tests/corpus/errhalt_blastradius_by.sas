@@ -1,6 +1,6 @@
-/* SEV-errhaltblastradius (BY twin) — same pin through the pre-existing path:
+/* SEV-errhaltblastradius (BY twin) - same pin through the pre-existing path:
    `proc print data=a; by x;` on UNSORTED input is a user error (rc 1), and
-   every later step is SKIPPED — stdout is EMPTY. This suppression predates
+   every later step is SKIPPED - stdout is EMPTY. This suppression predates
    the rc epic (the `proc means by x` twin did the same at baseline, verified
    by probe), which is the justification for pinning the format twin's
    identical behavior in errhalt_blastradius.sas. A REGRESSION looks like:

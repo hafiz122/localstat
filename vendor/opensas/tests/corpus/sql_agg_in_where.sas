@@ -1,6 +1,6 @@
 /* BUG-sqlaggwherefilter: a summary function (sum/min/max/count/…) in a WHERE
    clause is illegal in SAS 9.4 ("Summary functions are not allowed in the WHERE
-   clause." — aggregates belong in HAVING). It was silently dispatched as the
+   clause." - aggregates belong in HAVING). It was silently dispatched as the
    per-row DATA-step function of the same name (max(v) -> v, so `v >= max(v)`
    kept EVERY row), dropping the filter entirely. It must now fail loud.
    Fail-loud paths are asserted via the captured-diagnostics test in sql.zig;
@@ -20,7 +20,7 @@ proc sql;
   select v from t having v >= max(v);
 quit;
 proc sql;
-  /* a subquery's own aggregate is fine — the outer WHERE stays per-row */
+  /* a subquery's own aggregate is fine - the outer WHERE stays per-row */
   title 'where subquery-agg';
   select v from t where v >= (select max(v) from t);
 quit;

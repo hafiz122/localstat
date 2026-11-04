@@ -1,9 +1,9 @@
 /* BUG-sqlnotequalunicode: `¬=` (U+00AC NOT SIGN + `=`, bytes 0xC2 0xAC 0x3D)
-   is a NOT-EQUAL spelling — Language Reference: Concepts p.219 Table 11.3 lists `^= ~= ¬= <>`
+   is a NOT-EQUAL spelling - Language Reference: Concepts p.219 Table 11.3 lists `^= ~= ¬= <>`
    together as the NE spellings; SQL Procedure User's Guide Table 8.2 group 7
    (printed p.403-404) lists `¬=, ^=, <>, ne`. The lexer advanced ONE byte at a
    time, so the two-byte `¬` split from its `=`: `x ¬= 3` lexed as `x ¬ = 3`
-   (NOT then EQ) — LOUD in the DATA step, but in PROC SQL the predicate
+   (NOT then EQ) - LOUD in the DATA step, but in PROC SQL the predicate
    silently degraded and KEPT EVERY ROW at exit 0 (the BUG-wherene / 295181bb
    `<>` failure mode, second instance). Maximal munch in the lexer now makes
    `¬=` ONE .ne token, so both surfaces share the existing NE path by
@@ -26,7 +26,7 @@ data t;
 run;
 
 proc sql;
-  /* each spelling in a SQL WHERE — all five must agree */
+  /* each spelling in a SQL WHERE - all five must agree */
   select x from t where x ¬= 3;
   select x from t where x ^= 3;
   select x from t where x ~= 3;

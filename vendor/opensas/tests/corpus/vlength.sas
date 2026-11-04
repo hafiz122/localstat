@@ -1,4 +1,4 @@
-/* VLENGTH / VLENGTHX: DECLARED (allocated) storage length — distinct from LENGTH's
+/* VLENGTH / VLENGTHX: DECLARED (allocated) storage length - distinct from LENGTH's
    trimmed value width. Numeric=8. Regression guard for BUG-vlength. Phase-F. */
 data _null_;
   length a $ 20 b $ 5;

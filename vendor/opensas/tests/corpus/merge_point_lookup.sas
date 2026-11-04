@@ -1,16 +1,16 @@
-/* BUG-pointsuppressesalloutput + BUG-pointmergelookup — ONE landing; the two
+/* BUG-pointsuppressesalloutput + BUG-pointmergelookup - ONE landing; the two
    bugs mask each other (fixing the first alone would have turned a zero-row
    failure into a quiet wrong-value one). A DATA step DRIVEN by MERGE or INPUT
    that merely MENTIONS POINT= keeps its automatic output (Language Reference: Concepts p.477 step 5;
    the p.488 no-implicit-OUTPUT rule scopes to "a SET statement that uses the
-   POINT= option" DRIVING the step — 1736df6d keyed it on the MENTION and wrote
+   POINT= option" DRIVING the step - 1736df6d keyed it on the MENTION and wrote
    ZERO observations at exit 0), and the POINT= read beside the driver must
    actually happen (SAS 9.4 Statements ref, SET Example 6: `set revenue; … set
-   expense point=_n_;`) — before, it was parsed and then silently ignored,
+   expense point=_n_;`) - before, it was parsed and then silently ignored,
    leaving the lookup columns missing. Contrast step b: genuinely POINT=-DRIVEN
    with no explicit OUTPUT → still ZERO rows (BUG-pointautooutput, unchanged).
    POINT= with a BY or WHERE statement is invalid SAS (Statements ref, SET
-   POINT= Restrictions) — that fail-loud is pinned by the captured-diagnostics
+   POINT= Restrictions) - that fail-loud is pinned by the captured-diagnostics
    tests in src/exec.zig. */
 data d; input v k $; datalines;
 10 a

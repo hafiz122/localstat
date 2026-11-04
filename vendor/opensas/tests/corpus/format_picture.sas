@@ -1,7 +1,7 @@
 /* PICTURE-format: numeric digit-selector pictures + PREFIX/MULT.
    SAS 9.4 selector rule (BUG-picturedigitsel): a `0` selector SUPPRESSES
    leading zeros (prints a blank); a NONZERO selector (e.g. `9`) PRINTS
-   leading zeros — "nines print zeros, zeros suppress".
+   leading zeros - "nines print zeros, zeros suppress".
    MULT scales the value first; PREFIX is prepended. */
 proc format;
   picture pp 0-999='009';                              /* 42 -> ` 42` (0s suppress) */

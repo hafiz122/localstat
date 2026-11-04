@@ -1,4 +1,4 @@
-/* GAP-ch23med-tick296 F3 — a MODIFY master's DESCRIPTOR IS FROZEN.
+/* GAP-ch23med-tick296 F3 - a MODIFY master's DESCRIPTOR IS FROZEN.
 
    MODIFY updates in place, so the descriptor is not the step's to rewrite.
    DATA Step Statements ref printed p.240 (pdf 251; that page's own footer reads
@@ -8,12 +8,12 @@
        such as adding a variable.
    Language Reference: Concepts printed p.585 (running header "Combining SAS Data Sets: Methods 585")
    repeats it as a Note. Language Reference: Concepts printed p.588 Table 23.3, row "Scope of changes",
-   gives the FULL extent — and this is why the fix freezes the whole descriptor
+   gives the FULL extent - and this is why the fix freezes the whole descriptor
    rather than guarding the add:
        cannot change the data set descriptor information, so changes such as
        adding or deleting variables, variable labels, and so on, are not valid
 
-   NOT AN ERROR — doc-settled, not chosen. Statements ref printed p.253 (footer
+   NOT AN ERROR - doc-settled, not chosen. Statements ref printed p.253 (footer
    "MODIFY Statement 253"), the Example 3 discussion:
        MODIFY does not add NWSTOCK to the INVTY.STOCK data set because that
        would modify the data set descriptor. Thus, it is not necessary to put
@@ -48,7 +48,7 @@ run;
 proc print data=d1 noobs; title "C1 new var absent, its value still applied"; run;
 proc contents data=d1; run;
 
-/* ---- C2: the reference's own Example 3 shape — a TRANSACTION variable
+/* ---- C2: the reference's own Example 3 shape - a TRANSACTION variable
         (NWSTOCK) is not added, and needs no DROP statement ---- */
 data stock; input partno $ instock; datalines;
 K89R 34
@@ -67,7 +67,7 @@ data stock;
 run;
 proc print data=stock noobs; title "C2 p.253 Example 3: summed, nwstock absent"; run;
 
-/* ---- C3: DELETING a variable is forbidden too — Table 23.3 says "adding or
+/* ---- C3: DELETING a variable is forbidden too - Table 23.3 says "adding or
         deleting". This is the worst of the three: opensas used to DROP the
         column from the master and destroy every value in it. ---- */
 data d3; input id x y; datalines;
@@ -108,7 +108,7 @@ proc contents data=fm; run;
 
 /* ---- C6 (D-014 control): ONLY the master is frozen. Statements ref printed
         p.260 Example 8 is `data invty.stock invty.stock95 invty.stock97;
-        modify invty.stock;` — the non-master outputs are BRAND-NEW data sets
+        modify invty.stock;` - the non-master outputs are BRAND-NEW data sets
         and must still take the ordinary full-PDV schema. ---- */
 data mst; input id v; datalines;
 1 5

@@ -10,21 +10,21 @@
 
 %let inner = WORLD;
 
-/* F1 — %SUPERQ masks a raw (unmasked) & fetched from the symbol table, so the
+/* F1 - %SUPERQ masks a raw (unmasked) & fetched from the symbol table, so the
    later &g reference does NOT re-resolve &inner to WORLD. */
 data _null_; call symput('raw', '&inner'); run;
 %let g = %superq(raw);
 
-/* F1 — %SUPERQ of a value WITHOUT specials returns it verbatim (preserve). */
+/* F1 - %SUPERQ of a value WITHOUT specials returns it verbatim (preserve). */
 %let plain = HELLO;
 %let gp = %superq(plain);
 
-/* F2 — %QSYSFUNC masks its result: byte(38) returns '&', which must stay masked
+/* F2 - %QSYSFUNC masks its result: byte(38) returns '&', which must stay masked
    so the trailing x is NOT read as a macro reference (&x would give ZZZ). */
 %let x = ZZZ;
 %let q = %qsysfunc(byte(38))x;
 
-/* F2 — %SYSFUNC unmasks a %nrstr-masked arg so rank() sees the real '&' (=38),
+/* F2 - %SYSFUNC unmasks a %nrstr-masked arg so rank() sees the real '&' (=38),
    not the mask sentinel byte. Plain upcase of plain args is unchanged. */
 %let ra = %sysfunc(rank(%nrstr(&)));
 %let up = %sysfunc(upcase(abc));

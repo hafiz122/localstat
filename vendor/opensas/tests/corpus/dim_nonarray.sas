@@ -2,7 +2,7 @@
    used to silently return the variable's VALUE as the "bound" (charfns'
    generic handler assumed the parser had replaced an array name with its
    element count; a scalar name was never replaced and sailed through).
-   SAS 9.4: the argument must be an ARRAY name — a compile-time ERROR. Now the
+   SAS 9.4: the argument must be an ARRAY name - a compile-time ERROR. Now the
    parser fails loud when the name isn't a registered array. The ERROR is on
    stderr (asserted via captured diagnostics in parser_expr.zig's test);
    stdout pins that step 1's REAL array bounds still fold, and that step 2
@@ -17,6 +17,6 @@ run;
 
 data _null_;
   x = 5;
-  d = dim(x);     /* ERROR: x is a scalar, not an ARRAY name — parse fails here */
+  d = dim(x);     /* ERROR: x is a scalar, not an ARRAY name - parse fails here */
   put 'never-reached';
 run;

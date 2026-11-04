@@ -1,5 +1,5 @@
 /* BUG-sqlremergedetail: a no-GROUP-BY select mixing a detail column with an
-   aggregate REMERGES in SAS 9.4 — the aggregate is computed over the whole
+   aggregate REMERGES in SAS 9.4 - the aggregate is computed over the whole
    table and broadcast across every detail row, so N rows come back, not the
    single collapsed group row. `tot` = 100 on every row; `frac` = x/100 per row.
    Guards: a pure-aggregate select (no detail column) still returns 1 row, and

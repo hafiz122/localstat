@@ -1,4 +1,4 @@
-/* ISS-setdslist (GH#21): SET multi-dataset LIST forms — numbered range and
+/* ISS-setdslist (GH#21): SET multi-dataset LIST forms - numbered range and
    name-prefix wildcard, both valid SAS 9.4 (Language Reference: Concepts SET "list forms").
    Range covers multi-digit, non-1 start/end (real DM programs use `SET DM100-DM136`). */
 data d1; x=1; run;

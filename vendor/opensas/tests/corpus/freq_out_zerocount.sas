@@ -1,5 +1,5 @@
 /* BUG-freqoutzerocount (doc-finder tick276, F2): without ZEROS, OUT= omits a
-   level seen only on zero-weight obs (B) — SAS emits no COUNT=0 row, so the
+   level seen only on zero-weight obs (B) - SAS emits no COUNT=0 row, so the
    OUT= has 2 obs (A, C). With `weight w / zeros` B is re-included at COUNT=0
    (3 obs). Non-zero levels keep their COUNT/PERCENT. */
 data d; input x $ w @@; datalines;

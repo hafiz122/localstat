@@ -15,14 +15,14 @@
    per row, then a later step proving the run survived.
 
    PART 2 pins the ORDERING, not just the values. %PUSH does BOTH halves in one
-   invocation — a %LET (macro language, immediate) and a DATA step (SAS
-   statements, deferred) — and the calling step prints around them. The expected
+   invocation - a %LET (macro language, immediate) and a DATA step (SAS
+   statements, deferred) - and the calling step prints around them. The expected
    stdout is only producible if both timings hold:
      * the %LET ran DURING the calling step: SYMGET reads A, then AB, mid-step,
        in between the calling step's own PUT lines;
      * the generated DATA steps ran AFTER the step ended, FIFO, each carrying the
        accumulator FROZEN at its own CALL EXECUTE moment ("acc was A", then "acc
-       was AB") — i.e. the text was generated at call time, not at drain time.
+       was AB") - i.e. the text was generated at call time, not at drain time.
    A "strip the percent and queue it, expand at drain time" fix prints Part 1 and
    the two deferred lines correctly and still loses both SYMGET lines.
 
@@ -65,7 +65,7 @@ data _null_;
   put 'step: after both calls';
 run;
 
-/* Pure macro language generates NO statements to defer — only the %LET's
+/* Pure macro language generates NO statements to defer - only the %LET's
    effect survives, and open code sees it. */
 data _null_; put "open code: acc = &acc"; run;
 
@@ -78,8 +78,8 @@ data _null_; put "open code: acc = &acc"; run;
 
    This is the GUARD RAIL on the fix: "immediately" means immediately at CALL
    EXECUTE time, which is still AFTER this step was compiled. A later attempt to
-   be helpful here — resolving the step's own &references late, or draining the
-   queue before the step ends — would make SALEITEM come out "football" and break
+   be helpful here - resolving the step's own &references late, or draining the
+   queue before the step ends - would make SALEITEM come out "football" and break
    the doc. The WARNING is on the log (stderr), so only the value is pinned. */
 data prices;
    input code amount;

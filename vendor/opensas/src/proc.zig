@@ -1,5 +1,5 @@
-//! PROC steps beyond the DATA step. Each PROC hand-parses its own token slice —
-//! the DATA-step parser (A2, parser.zig) is off-limits here — and operates on
+//! PROC steps beyond the DATA step. Each PROC hand-parses its own token slice -
+//! the DATA-step parser (A2, parser.zig) is off-limits here - and operates on
 //! datasets already sitting in the `Library`. The CLI (main.zig) dispatches a
 //! `proc <name> …; … run;` step here by name.
 //!
@@ -8,7 +8,7 @@
 //! Order is SAS-default: numeric with missing lowest, char blank-padded ASCII;
 //! a stable sort, so ties keep input order.
 //!
-//! MEANS/SUMMARY. `proc means data=IN; [var …;] [by …;] run;` — N, Mean, Std
+//! MEANS/SUMMARY. `proc means data=IN; [var …;] [by …;] run;` - N, Mean, Std
 //! Dev, Minimum, Maximum for each numeric analysis variable (all numerics, or
 //! the `var` list), rendered as SAS's listing table. Optional BY groups (input
 //! assumed already sorted by the BY vars, as SAS requires).
@@ -43,7 +43,7 @@ const Token = lex.Token;
 
 /// The three deps every PROC handler needs (QL-B, taste #5): one bundle instead
 /// of `(arena, lib, diags)` threaded through all 15 run* signatures. `out` stays
-/// an explicit param on the listing PROCs — its presence self-documents "this
+/// an explicit param on the listing PROCs - its presence self-documents "this
 /// PROC emits listing text".
 pub const ProcCtx = struct { arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, tables: ?*table_result.Collector = null };
 
@@ -66,7 +66,7 @@ const AfterSrc = struct { bvar: ?[]const u8, before: bool = false, body: []const
 // (`#n`, repeated-char, pointer expressions) fail loud (procreport rest3).
 const LineItem = union(enum) {
     lit: []const u8, // a quoted literal
-    at: usize, // `@n` — move the cursor to column n (1-based)
+    at: usize, // `@n` - move the cursor to column n (1-based)
     var_ref: struct { name: []const u8, fmt: ?[]const u8 }, // a numeric var, optional format
 };
 const LineSpec = []const LineItem;
@@ -103,11 +103,11 @@ pub fn procInputObs(arena: std.mem.Allocator, ds: *Dataset, toks: []const Token,
     var optdiags = diag.Diagnostics.init(arena); // local: PROC dataset-option WARNINGS drop here (.err promoted below)
     // ponytail: PROC data= is INPUT, but dataset-option WARNINGS are dropped
     // here (local `optdiags`), so DKRICOND-vs-DKROCOND severity is moot for
-    // them — what input=true buys is the global `options obs=/firstobs=`
+    // them - what input=true buys is the global `options obs=/firstobs=`
     // default range
     // (BUG-globalobsproc); a per-dataset (obs=)/(firstobs=) overrides field by
     // field. The slice is DEFERRED (skip_obs_slice) to below the WHERE-statement
-    // filter (BUG-procwherestmtorder): Language Reference: Concepts p.229 — FIRSTOBS=/OBS= count
+    // filter (BUG-procwherestmtorder): Language Reference: Concepts p.229 - FIRSTOBS=/OBS= count
     // positions WITHIN the WHERE-selected subset, for the WHERE statement and
     // the where= option alike (the where= option already filters first inside
     // applyDatasetOptionsObs, BUG-whereobsorder; mirrors the DATA-step
@@ -116,14 +116,14 @@ pub fn procInputObs(arena: std.mem.Allocator, ds: *Dataset, toks: []const Token,
     if (opts.len > 0)
         try io.applyDatasetOptionsObs(arena, copy, opts, &optdiags, true, true, &srcobs, &.{});
     // BUG-procwhereoptswallow: a where= dataset OPTION whose predicate fails to
-    // parse or names an unknown variable records an `.err` into `optdiags` — and
+    // parse or names an unknown variable records an `.err` into `optdiags` - and
     // used to die in that sink (unknown var → silently 0 rows, malformed →
     // silently the FULL table, both exit 0; SAS 9.4 ERRORs and prints nothing).
     // Promote the first option `.err` to the real diags and abort the step,
-    // mirroring the WHERE-statement path below — EXCEPT the intentional
+    // mirroring the WHERE-statement path below - EXCEPT the intentional
     // DKRICOND drop: an unknown keep=/drop=/rename= name on a PROC input option
     // ("…never been referenced", .err because input=true) stays silent.
-    // ponytail: message-text filter — the only other `.err` this sink can hold;
+    // ponytail: message-text filter - the only other `.err` this sink can hold;
     // a severity/sink split in io.zig would touch exec.zig's paths for no gain.
     for (optdiags.list.items) |d|
         if (d.severity == .err and std.mem.indexOf(u8, d.message, "never been referenced") == null) {
@@ -133,7 +133,7 @@ pub fn procInputObs(arena: std.mem.Allocator, ds: *Dataset, toks: []const Token,
     // WHERE STATEMENT (BUG-procwherestmtsilent): a malformed predicate must fail
     // LOUD and ABORT the step, never silently run on the full table. io.applyWhere
     // records the parse error but swallows the Zig error, so we route it through
-    // the REAL `diags` and propagate error.ParseError when it fires — mirroring the
+    // the REAL `diags` and propagate error.ParseError when it fires - mirroring the
     // DATA-step WHERE, which uses the real diags too (exec.applyWhereStmt).
     if (wstmt) |w| {
         const before = diags.count();
@@ -186,17 +186,17 @@ fn dataOptionToks(toks: []const Token) []const Token {
 }
 
 /// Tokens inside an output dataset's option list `out=NAME(...)` (`keep=`/`drop=`/
-/// `rename=`/`where=`), scanned anywhere in the step — the proc header (SORT/
+/// `rename=`/`where=`), scanned anywhere in the step - the proc header (SORT/
 /// CONTENTS/TRANSPOSE) or an `output out=…` sub-statement (MEANS/UNIVARIATE).
 /// Empty if the first `out=` is unparenthesised (BUG-procoutkeep).
-/// `kw` selects the option keyword — "out", or "dupout" for PROC SORT's
+/// `kw` selects the option keyword - "out", or "dupout" for PROC SORT's
 /// DUPOUT=NAME(...) (BUG-sortdupoutfamily).
 fn outOptionToks(toks: []const Token, kw: []const u8) []const Token {
     var i: usize = 0;
     while (i + 1 < toks.len) : (i += 1) {
         if (!(tkKw(toks[i], kw) and toks[i + 1].tag == .eq)) continue;
         var j = i + 3; // past `out = NAME`
-        if (j >= toks.len or toks[j].tag != .lparen) continue; // unparenthesised — keep scanning
+        if (j >= toks.len or toks[j].tag != .lparen) continue; // unparenthesised - keep scanning
         const start = j + 1;
         var depth: usize = 1;
         j += 1;
@@ -226,7 +226,7 @@ fn applyOutOptions(arena: std.mem.Allocator, ds: *Dataset, toks: []const Token, 
 fn whereStmtToks(arena: std.mem.Allocator, toks: []const Token) !?[]const Token {
     var i: usize = 2;
     while (i < toks.len and toks[i].tag != .semicolon) i += 1; // skip the header
-    // BUG-whereproc-half: SAS 9.4 last-wins — a second plain WHERE replaces the
+    // BUG-whereproc-half: SAS 9.4 last-wins - a second plain WHERE replaces the
     // first, so keep scanning and build from the LAST one (qa-findings-tick147;
     // mirrors the DATA-step half in exec.zig, 09c9583).
     var start: usize = 0;
@@ -250,7 +250,7 @@ fn whereStmtToks(arena: std.mem.Allocator, toks: []const Token) !?[]const Token 
 }
 
 /// Run a `proc sort …; by …; run;` step. `toks` is the whole step, starting at
-/// the `proc` token (no trailing `.eof` required — we walk with bounds checks).
+/// the `proc` token (no trailing `.eof` required - we walk with bounds checks).
 pub fn runSort(cx: ProcCtx, toks: []const Token) diag.Error!void {
     const arena = cx.arena;
     const lib = cx.lib;
@@ -274,12 +274,12 @@ pub fn runSort(cx: ProcCtx, toks: []const Token) diag.Error!void {
             dupout_name = v;
             i += 3;
         } else if (optAt(toks, i, "sortseq")) |v| {
-            // BUG-sortseq: LINGUISTIC changes output order — never drop it silently.
+            // BUG-sortseq: LINGUISTIC changes output order - never drop it silently.
             // ASCII is exactly our byte order; anything else we can't collate.
             if (eqi(v, "linguistic")) {
                 linguistic = true;
                 // LINGUISTIC(...) sub-options (NUMERIC_COLLATION=, STRENGTH=, …)
-                // tune the collation — skipping the parens would silently collate
+                // tune the collation - skipping the parens would silently collate
                 // differently than explicitly requested. Fail loud (D-002, F7).
                 if (i + 3 < toks.len and toks[i + 3].tag == .lparen) {
                     unsupported("PROC SORT: SORTSEQ=LINGUISTIC(...) sub-options are not supported");
@@ -302,16 +302,16 @@ pub fn runSort(cx: ProcCtx, toks: []const Token) diag.Error!void {
             tkKw(toks[i], "threads") or tkKw(toks[i], "nothreads") or tkKw(toks[i], "overwrite") or
             tkKw(toks[i], "datecopy"))
         {
-            // benign: perf/tie-stability/data-stamping hints — none can change the
+            // benign: perf/tie-stability/data-stamping hints - none can change the
             // sort RESULT (THREADS is the SAS default; OVERWRITE/DATECOPY are moot
             // for our replace-always OUT=). Keep this list closed (D-002).
             i += 1;
         } else if (toks[i].tag == .lparen) {
-            i = skipParen(toks, i); // dataset options, e.g. data=d(keep=x) — applied elsewhere
+            i = skipParen(toks, i); // dataset options, e.g. data=d(keep=x) - applied elsewhere
         } else {
             // D-002 fail-loud (BUG-procoptswallow): an unknown header option must
-            // error visibly, not vanish — a typo'd option changes expected output.
-            // BUG-proctypoexits2: split — a documented option we don't implement
+            // error visibly, not vanish - a typo'd option changes expected output.
+            // BUG-proctypoexits2: split - a documented option we don't implement
             // is a gap (rc 2, byte-identical UNSUPPORTED message); any other
             // name is the user's typo (rc 1, same message body via diags).
             if (toks[i].tag == .name) {
@@ -325,7 +325,7 @@ pub fn runSort(cx: ProcCtx, toks: []const Token) diag.Error!void {
         }
     }
 
-    // DUPOUT= names the removed duplicates — meaningless without a dedup pass, so
+    // DUPOUT= names the removed duplicates - meaningless without a dedup pass, so
     // SAS errors when it appears alone. Fail loud, don't silently create nothing.
     if (dupout_name != null and !nodupkey and !noduprec) {
         unsupported("PROC SORT: DUPOUT= requires the NODUPKEY or NODUPRECS option");
@@ -333,32 +333,32 @@ pub fn runSort(cx: ProcCtx, toks: []const Token) diag.Error!void {
     }
 
     const raw = (if (in_name) |n| lib.find(n) else lastDataset(lib)) orelse {
-        // GH#8 ISS-sortmissingerr: SAS 9.4 ERRORS on a missing SORT input —
-        // "ERROR: File WORK.NOPE.DATA does not exist." + the step-halt NOTE —
+        // GH#8 ISS-sortmissingerr: SAS 9.4 ERRORS on a missing SORT input -
+        // "ERROR: File WORK.NOPE.DATA does not exist." + the step-halt NOTE -
         // rc 1 (D-009): a USER error. PROC SORT IS supported; the table just
         // isn't there. The old warn+skip justified itself as "like the
         // DATA-step SET", but that went STALE when BUG-setmissingquiet made
         // SET hard-error the identical shape ("File {s} does not exist",
-        // exec.zig) — SORT now matches it byte-for-byte (D-009b corollary:
+        // exec.zig) - SORT now matches it byte-for-byte (D-009b corollary:
         // same condition, same text, same rc). NOT unsupported(): that would
         // file a rc 2 opensas gap for the user's own missing table.
         // Mechanism mirrors the DUPOUT-collision arm below: a plain .err
         // report (not a fail() propagation), so runExpanded's NOTE parity
         // fires for THIS step ("stopped processing this step because of
-        // errors") and BUG-errhalt syntax-check mode skips every later step —
+        // errors") and BUG-errhalt syntax-check mode skips every later step -
         // a pipeline can no longer flow on an absent input at rc 0.
         diags.report(.err, if (toks.len > 1) toks[1].line else 0, "File {s} does not exist", .{in_name orelse "_last_"}) catch {};
         return;
     };
 
     // D-002 fail-loud (BUG-sortdupoutfamily): DUPOUT= naming the member the
-    // sorted result lands in — the in-place input, or OUT= — lets the dups-only
+    // sorted result lands in - the in-place input, or OUT= - lets the dups-only
     // residue overwrite the sorted data (silent data loss, exit 0 today). A
     // collision is a user mistake with no sane silent outcome, so ERROR + stop.
     if (dupout_name) |dn| {
         const sorted_member = if (out_name != null and !eqi(out_name.?, raw.name)) out_name.? else raw.name;
         if (eqi(dn, sorted_member)) {
-            diags.report(.err, if (toks.len > 1) toks[1].line else 0, "PROC SORT: DUPOUT= dataset {s} is also the sorted output (DATA=/OUT=) — the duplicates would overwrite the sorted result", .{dn}) catch {};
+            diags.report(.err, if (toks.len > 1) toks[1].line else 0, "PROC SORT: DUPOUT= dataset {s} is also the sorted output (DATA=/OUT=) - the duplicates would overwrite the sorted result", .{dn}) catch {};
             return;
         }
     }
@@ -371,10 +371,10 @@ pub fn runSort(cx: ProcCtx, toks: []const Token) diag.Error!void {
     const src = try procInput(arena, raw, toks, diags);
 
     // OUT= produces a sorted copy (sharing the immutable row slices) and leaves the
-    // source untouched; otherwise we sort in place — and if input options produced a
+    // source untouched; otherwise we sort in place - and if input options produced a
     // filtered copy, commit it back over the source so the in-place result persists.
     // OUT=_NULL_ is the SAS discard idiom: the sort AND the dedup still run (so
-    // `out=_null_ nodupkey dupout=g` still extracts dups) — only the final put of
+    // `out=_null_ nodupkey dupout=g` still extracts dups) - only the final put of
     // the sorted result is skipped (F5).
     const out_null = out_name != null and eqi(out_name.?, "_null_");
     const target = if (out_name != null and !eqi(out_name.?, src.name)) blk: {
@@ -392,13 +392,13 @@ pub fn runSort(cx: ProcCtx, toks: []const Token) diag.Error!void {
     // SAS validates the BY statement (missing BY, bad BY var, empty BY list)
     // regardless of row count, so we DON'T short-circuit past validation for a
     // 0-obs input anymore (NOTE-sort0obsvalidation). Exception: a truly SCHEMALESS
-    // empty dataset (0 rows AND 0 columns — e.g. a `set` of an absent table
+    // empty dataset (0 rows AND 0 columns - e.g. a `set` of an absent table
     // produced no rows and no columns) has no columns to check a BY var against,
     // so it stays tolerant (SORT-emptytol). A 0-obs input WITH a schema falls
     // through to BY parsing/validation, then returns before the no-op sort.
     if (target.rows.items.len == 0 and target.columns.items.len == 0) return;
 
-    // ── the `by` statement:  by [descending] name … ;  — find it past the header,
+    // ── the `by` statement:  by [descending] name … ;  - find it past the header,
     // skipping any WHERE / other statements that precede it (any statement order).
     if (atTag(toks, i, .semicolon)) i += 1; // past the header ';'
     while (i < toks.len and toks[i].tag != .eof) {
@@ -407,17 +407,17 @@ pub fn runSort(cx: ProcCtx, toks: []const Token) diag.Error!void {
             while (i < toks.len and toks[i].tag != .semicolon) i += 1; // procInput applies it
         } else if (toks[i].tag == .name and @import("parser.zig").isMidStepSkippable(toks[i].text)) {
             // D-014a mid-step globals: skip exactly what the top level HANDLES
-            // mid-step — hoisted TITLE/FOOTNOTE/OPTIONS and (since
+            // mid-step - hoisted TITLE/FOOTNOTE/OPTIONS and (since
             // BUG-filenamemidstep) FILENAME/ODS, the inert batch-unobservables,
             // LIBNAME via the parseLibnames pre-pass.
             while (i < toks.len and toks[i].tag != .semicolon) i += 1;
         } else if (toks[i].tag == .name) {
             // D-002 fail-loud (GAP-procsubstmtswallow): an unknown sub-statement
             // used to be token-swallowed here while this PROC's own OPTION loop
-            // already errored — one PROC, two policies.
+            // already errored - one PROC, two policies.
             return diags.fail(error.ParseError, toks[i].line, "PROC SORT statement {s} is not supported", .{toks[i].text});
         } else i += 1; // stray punctuation (incl. a null statement's `;`)
-        // BUG-sortstraysemi: GUARDED like the four sibling loops — the else arm
+        // BUG-sortstraysemi: GUARDED like the four sibling loops - the else arm
         // already consumed the stray token, so an UNCONDITIONAL advance ate the
         // NEXT token too (the `by`), and the loop then failed loud on the BY
         // variable. Exactly one token per path.
@@ -452,14 +452,14 @@ pub fn runSort(cx: ProcCtx, toks: []const Token) diag.Error!void {
             continue;
         }
         // GROUPFORMAT is a real SAS SORT BY option (sort/group by the
-        // FORMATTED values) — result-changing, never a variable name. Naming
+        // FORMATTED values) - result-changing, never a variable name. Naming
         // it beats the misleading "BY variable groupformat is not in dataset"
         // below (GAP-dsmgmt-tick262 F6); honoring it needs format-aware keys.
         if (eqi(toks[i].text, "groupformat")) {
             unsupported("PROC SORT: BY GROUPFORMAT (sort by formatted values) is not supported");
             return;
         }
-        // NOTSORTED is flatly illegal here — "You cannot use the NOTSORTED
+        // NOTSORTED is flatly illegal here - "You cannot use the NOTSORTED
         // option in a PROC SORT step" (Base SAS Procedures Guide p.75). SAS
         // ERRORs, so we error too; only the old phantom "BY variable notsorted
         // is not in dataset" message was wrong (NOTE-sortnotsortedmsg).
@@ -473,7 +473,7 @@ pub fn runSort(cx: ProcCtx, toks: []const Token) diag.Error!void {
         desc = false;
     }
     // GAP-procsubstmtswallow: statements AFTER the BY list get the identical
-    // policy — WHERE (procInput already applied it) and the D-014a mid-step
+    // policy - WHERE (procInput already applied it) and the D-014a mid-step
     // globals skip honestly; any other statement fails loud. One PROC, one
     // policy.
     while (i < toks.len and toks[i].tag != .eof) {
@@ -490,8 +490,8 @@ pub fn runSort(cx: ProcCtx, toks: []const Token) diag.Error!void {
         return;
     }
 
-    // BY validated. A 0-observation (with-schema) input sorts to itself — nothing
-    // to reorder — so return before the no-op sort/dedup (NOTE-sort0obsvalidation).
+    // BY validated. A 0-observation (with-schema) input sorts to itself - nothing
+    // to reorder - so return before the no-op sort/dedup (NOTE-sort0obsvalidation).
     if (target.rows.items.len == 0) return;
 
     // every sort key indexes a real column of the target (indexOf guaranteed it);
@@ -525,7 +525,7 @@ pub fn runSort(cx: ProcCtx, toks: []const Token) diag.Error!void {
         }
         // DUPOUT=: materialize the removed duplicate rows into their own dataset.
         // Outside the len>1 guard (BUG-sortdupoutfamily): SAS creates DUPOUT
-        // (0 obs, full schema) whenever NODUP*/DUPOUT= is given — a 1-obs input
+        // (0 obs, full schema) whenever NODUP*/DUPOUT= is given - a 1-obs input
         // has no possible dups but the dataset must still exist.
         if (dupout_name) |dn| {
             const d = try arena.create(Dataset);
@@ -533,7 +533,7 @@ pub fn runSort(cx: ProcCtx, toks: []const Token) diag.Error!void {
             for (target.columns.items) |c| try d.columns.append(arena, c); // full struct: keep format/informat/label
             try d.rows.appendSlice(arena, dups.items);
             try lib.put(dn, d);
-            // dupout=X(keep=/drop=/rename=) — same option path as out= (F4).
+            // dupout=X(keep=/drop=/rename=) - same option path as out= (F4).
             try applyOutOptions(arena, d, toks, diags, "dupout");
         }
     }
@@ -543,7 +543,7 @@ pub fn runSort(cx: ProcCtx, toks: []const Token) diag.Error!void {
     if (out_name != null) try applyOutOptions(arena, target, toks, diags, "out");
 }
 
-/// Equal on EVERY column — the NODUPREC "exact duplicate row" test.
+/// Equal on EVERY column - the NODUPREC "exact duplicate row" test.
 fn fullEqual(l: []const Value, r: []const Value) bool {
     if (l.len != r.len) return false;
     for (l, r) |lv, rv| if (cmpValue(lv, rv) != .eq) return false;
@@ -559,7 +559,7 @@ fn sameKey(l: []const Value, r: []const Value, keys: []const SortKey) bool {
 /// Stable sort of observation rows by the given keys (in place). MUST be
 /// std.sort.block (stable), not std.mem.sort (pdq, UNSTABLE at real-data
 /// sizes). SAS 9.4 actually defaults to NOEQUALS (tie order unspecified), so
-/// an always-stable sort is a VALID SAS outcome — and downstream SEQ
+/// an always-stable sort is a VALID SAS outcome - and downstream SEQ
 /// numbering locks tie order into the output, so stability is required to
 /// match golden: an unstable sort made gen2 AE's value-identical rows land
 /// in a different order than golden (qa tick-37 / TRIAGE-gen2values).
@@ -593,7 +593,7 @@ fn cmpValue(x: Value, y: Value) std.math.Order {
 }
 
 /// cmpValue with a collation: `ling` compares character values case-folded.
-/// pub: THE one collation-aware Value compare — sql.zig delegates here
+/// pub: THE one collation-aware Value compare - sql.zig delegates here
 /// (NOTE-collationduplicated landed in 2362f653: its private `cmpValColl`
 /// copy was verified byte-equivalent and deleted). This decides SORT ORDER
 /// (PROC SORT/BY merges here; DISTINCT/GROUP BY/ORDER BY there), so the body
@@ -628,7 +628,7 @@ fn cmpStr(a: []const u8, b: []const u8) std.math.Order {
 
 /// SORTSEQ=LINGUISTIC dictionary order: letters compare case-folded, so `apple`
 /// sorts before `Banana` (BUG-sortseq). ponytail: ASCII case-fold only, no
-/// locale weights/ICU — add when a study needs locale-specific collation.
+/// locale weights/ICU - add when a study needs locale-specific collation.
 fn cmpStrLing(a: []const u8, b: []const u8) std.math.Order {
     const n = @max(a.len, b.len);
     var i: usize = 0;
@@ -675,7 +675,7 @@ const Stats = struct {
     p5: f64 = std.math.nan(f64),
     p10: f64 = std.math.nan(f64),
     // GAP-meanspctlkeywords: the rest of the documented percentile keyword set
-    // (pp.1491–1492) — P20/P30/P40/P60/P70/P80.
+    // (pp.1491–1492) - P20/P30/P40/P60/P70/P80.
     p20: f64 = std.math.nan(f64),
     p30: f64 = std.math.nan(f64),
     p40: f64 = std.math.nan(f64),
@@ -707,11 +707,11 @@ fn varDefFromName(v: []const u8) ?VarDef {
 }
 
 /// The statistics a MEANS request can name, in SAS's listing order. SAS exposes a
-/// FIXED percentile keyword set — arbitrary `Pnn` is not a MEANS keyword, so it is
+/// FIXED percentile keyword set - arbitrary `Pnn` is not a MEANS keyword, so it is
 /// intentionally not accepted (BUG-meanspctlmore). The documented quantile set
 /// (Base SAS 9.4 Procedures Guide, PROC MEANS statement, printed pp.1491–1492) is
 /// P1/P5/P10/P20/P25(Q1)/P30/P40/P50(MEDIAN)/P60/P70/P75(Q3)/P80/P90/P95/P99 plus
-/// QRANGE — all decoded below (GAP-meanspctlkeywords added the middle six).
+/// QRANGE - all decoded below (GAP-meanspctlkeywords added the middle six).
 const StatKind = enum { n, mean, std, min, max, sum, sumwgt, nmiss, median, q1, q3, var_, cv, stderr, range, p1, p5, p10, p20, p30, p40, p60, p70, p80, p90, p95, p99, qrange, mode, css, uss, lclm, uclm, t, probt, skewness, kurtosis };
 
 fn statFromKw(text: []const u8) ?StatKind {
@@ -721,12 +721,12 @@ fn statFromKw(text: []const u8) ?StatKind {
     if (eqi(text, "min")) return .min;
     if (eqi(text, "max")) return .max;
     if (eqi(text, "sum")) return .sum;
-    // SUMWGT (GAP-sumwgtkeyword): a DOCUMENTED PROC MEANS statistic-keyword —
+    // SUMWGT (GAP-sumwgtkeyword): a DOCUMENTED PROC MEANS statistic-keyword -
     // printed p.1491 lists it under "Descriptive statistic keywords", and Table 2.1
     // p.70 scopes it to "MEANS or SUMMARY, REPORT, SQL, TABULATE, UNIVARIATE". It
     // was absent here, so `proc means sumwgt` WARNED "statistic-keyword sumwgt is
-    // not recognized and is ignored" — a false statement about a real keyword, and
-    // a silently dropped column — while UNIVARIATE's `output out= sumwgt=` failed
+    // not recognized and is ignored" - a false statement about a real keyword, and
+    // a silently dropped column - while UNIVARIATE's `output out= sumwgt=` failed
     // loud through the same decoder. Both surfaces route through statFromKw, so one
     // entry fixes both. The value already existed on Stats (Σwᵢ, p.2745 "SUMWGT is
     // the sum of the weights, W, computed as Σwᵢ").
@@ -745,7 +745,7 @@ fn statFromKw(text: []const u8) ?StatKind {
     if (eqi(text, "p10")) return .p10;
     // GAP-meanspctlkeywords: P20–P80, documented at printed pp.1491–1492 (MEANS),
     // p.1504 (MEANS OUTPUT), p.2178 (REPORT), p.2556 (TABULATE). NOT in
-    // UNIVARIATE's OUTPUT table (Table 4.14, printed p.354) — see
+    // UNIVARIATE's OUTPUT table (Table 4.14, printed p.354) - see
     // univariateRejectsStatKw.
     if (eqi(text, "p20")) return .p20;
     if (eqi(text, "p30")) return .p30;
@@ -765,11 +765,11 @@ fn statFromKw(text: []const u8) ?StatKind {
     if (eqi(text, "lclm")) return .lclm;
     if (eqi(text, "uclm")) return .uclm;
     if (eqi(text, "t")) return .t;
-    // PRT is a documented ALIAS of PROBT everywhere in the MEANS family — the
+    // PRT is a documented ALIAS of PROBT everywhere in the MEANS family - the
     // hypothesis-testing keyword line reads "PROBT | PRT   T" in the PROC MEANS
     // statement (printed p.1492), REPORT (p.2178) and TABULATE (p.2556). It was
     // absent here, so `proc means prt` hit the warn-and-ignore arm and dropped the
-    // column (GAP-meanspctlkeywords). NOT accepted by UNIVARIATE's OUTPUT — see
+    // column (GAP-meanspctlkeywords). NOT accepted by UNIVARIATE's OUTPUT - see
     // univariateRejectsStatKw.
     if (eqi(text, "probt") or eqi(text, "prt")) return .probt;
     // GAP-meansskewkurt: SKEWNESS/KURTOSIS (SAS abbreviations SKEW/KURT).
@@ -782,12 +782,12 @@ fn statFromKw(text: []const u8) ?StatKind {
 /// does NOT (GAP-meanspctlkeywords). statFromKw is shared by MEANS, MEANS OUTPUT,
 /// TABULATE, REPORT and UNIVARIATE OUTPUT, but the doc does NOT give them one
 /// keyword set: UNIVARIATE's own OUTPUT keyword table (Table 4.14, Statistical
-/// Procedures printed p.354) lists PROBT with NO PRT alias — and it does spell
+/// Procedures printed p.354) lists PROBT with NO PRT alias - and it does spell
 /// aliases out elsewhere in the same table ("KURTOSIS | KURT", "Q1 | P25"), so the
 /// omission is meaningful. The MEANS family carries the wider set: "PROBT | PRT"
 /// at printed p.1492 (MEANS), p.2178 (REPORT), p.2556 (TABULATE).
 ///
-/// Matching on TEXT rather than StatKind is not a shortcut — it is required. PRT
+/// Matching on TEXT rather than StatKind is not a shortcut - it is required. PRT
 /// decodes to .probt, which UNIVARIATE *does* support, so the alias is invisible
 /// once decoded and only the spelling can tell `prt=` from `probt=`.
 ///
@@ -804,8 +804,8 @@ fn univariateRejectsStatKw(text: []const u8) bool {
 /// so they must not trip the unrecognized-keyword warning (BUG-meanspctlmore).
 fn isMeansOptionFlag(kw: []const u8) bool {
     // DESCENDING/COMPLETETYPES were dropped from this whitelist (BUG-meansoptnoop):
-    // DESCENDING is implemented, COMPLETETYPES fails loud — both handled upstream.
-    // THREADS/NOTHREADS (GAP-procopts): SAS 9.4 PROC MEANS statement doc —
+    // DESCENDING is implemented, COMPLETETYPES fails loud - both handled upstream.
+    // THREADS/NOTHREADS (GAP-procopts): SAS 9.4 PROC MEANS statement doc -
     // parallelization toggles; opensas's aggregation is single-threaded and
     // result-identical either way → genuinely inert, so no warning.
     inline for (.{ "missing", "nonobs", "noprint", "nway", "print", "chartype", "exclnpwgt", "threads", "nothreads" }) |o| {
@@ -814,7 +814,7 @@ fn isMeansOptionFlag(kw: []const u8) bool {
     return false;
 }
 
-/// Documented bare-name PROC MEANS/SUMMARY flags opensas does NOT honour —
+/// Documented bare-name PROC MEANS/SUMMARY flags opensas does NOT honour -
 /// the doc-truth arm of the bare-keyword warning (BUG-meansflagmsg). The
 /// catch-all warn called these "not recognized", a false statement about
 /// options the Summary of Optional Arguments itself enumerates as bare flags
@@ -828,7 +828,7 @@ fn isMeansDocFlag(kw: []const u8) bool {
 }
 
 /// Documented SAS 9.4 PROC MEANS `name = value` options opensas does NOT
-/// implement — the catch-all's gap arm (rc 2); anything else landing there is
+/// implement - the catch-all's gap arm (rc 2); anything else landing there is
 /// the user's typo (rc 1). The set is CLOSED: the PROC MEANS statement's
 /// "Summary of Optional Arguments" (Base SAS 9.4 Procedures Guide, 7th ed.,
 /// printed pp. 1482-1484, === pdf 1531/1532/1533 ===) enumerates every
@@ -841,7 +841,7 @@ fn isMeansGapOption(kw: []const u8) bool {
     return false;
 }
 
-/// The two valid-in-MEANS statements opensas doesn't implement — ATTRIB and
+/// The two valid-in-MEANS statements opensas doesn't implement - ATTRIB and
 /// LABEL, named by the Syntax section's own Tip ("You can use the ATTRIB,
 /// FORMAT, LABEL, and WHERE statements", printed p. 1481, === pdf 1530 ===);
 /// every other statement the section lists is handled. Gap arm of the
@@ -850,7 +850,7 @@ fn isMeansGapStmt(kw: []const u8) bool {
     return eqi(kw, "attrib") or eqi(kw, "label");
 }
 
-/// Documented PROC MEANS OUTPUT `/` options opensas doesn't implement — the
+/// Documented PROC MEANS OUTPUT `/` options opensas doesn't implement - the
 /// OUTPUT statement dictionary closes the set (printed pp. 1503-1511,
 /// === pdf 1552…1560 ===): OUT=/AUTONAME are handled, leaving AUTOLABEL,
 /// KEEPLEN, LEVELS, NOINHERIT, WAYS. Gap arm (rc 2); a typo stays rc 1.
@@ -871,7 +871,7 @@ fn statHeader(k: StatKind) []const u8 {
         // ponytail: the doc's own DESCRIPTION text ("Sum of weights", Table 2.1
         // printed p.70; "SUMWGT is the sum of the weights" p.2745). SAS's actual
         // listing abbreviation for this column is printed in NONE of the nine
-        // acquired volumes — there is no worked example with a SUMWGT column — so
+        // acquired volumes - there is no worked example with a SUMWGT column - so
         // this label is doc-described rather than doc-quoted. Swap it if a printed
         // weighted-MEANS listing ever turns up. Same standing as the neighbouring
         // "Coeff of Variation"/"Lower Quartile", which are also absent from the docs.
@@ -910,7 +910,7 @@ fn statHeader(k: StatKind) []const u8 {
 }
 
 /// CLM confidence-percent text for the column header: 100·(1−ALPHA) with no
-/// trailing zeros — "95" for the 0.05 default, "90" for ALPHA=0.1 (BUG-meansoptnoop).
+/// trailing zeros - "95" for the 0.05 default, "90" for ALPHA=0.1 (BUG-meansoptnoop).
 fn clmPct(arena: std.mem.Allocator, alpha: f64) ![]const u8 {
     const p = 100.0 * (1.0 - alpha);
     return if (p == @trunc(p))
@@ -930,7 +930,7 @@ fn statHeaderA(arena: std.mem.Allocator, k: StatKind, alpha: f64) ![]const u8 {
 /// Column width per statistic in the combined table: counts are narrow, the
 /// decimal stats use the 16.7 field. ponytail: widths tuned to the SAS listing
 /// the corpus pins (proc_means_var); a value wider than the field is not re-fit.
-/// `hdr` is the (ALPHA-aware) header text — a longer label widens the column.
+/// `hdr` is the (ALPHA-aware) header text - a longer label widens the column.
 fn statWidth(k: StatKind, hdr: []const u8) usize {
     return switch (k) {
         .n, .nmiss => 6,
@@ -1012,7 +1012,7 @@ fn statValueA(k: StatKind, s: Stats, alpha: f64) f64 {
 
 // ── Student-t distribution (MEANS-cistat) ────────────────────────────────────
 // A compact CDF via the regularized incomplete beta function (Numerical Recipes
-// betacf/betai) plus a bisection inverse — enough for PROC MEANS CLM/T/PROBT.
+// betacf/betai) plus a bisection inverse - enough for PROC MEANS CLM/T/PROBT.
 // ponytail: kept local to proc.zig rather than exposing functions.zig internals;
 // ~1e-10 accurate, which the corpus fixtures (tinv 0.975,df=n−1) confirm.
 
@@ -1088,7 +1088,7 @@ fn tQuantile(p: f64, df: f64) f64 {
 /// (a paren group is ONE factor, so `(a b)` alone expands to the singles a and
 /// b, and `(a b)*(c d)` to a*c a*d b*c b*d). `()` alone is the overall
 /// (_TYPE_=0) table; an empty factor mixed into a crossing (`()*a`) is not a
-/// valid request — fail loud, never guess.
+/// valid request - fail loud, never guess.
 fn flushTypesTerm(arena: std.mem.Allocator, diags: *diag.Diagnostics, line_no: usize, factors: *std.ArrayList([]const []const u8), combos: *std.ArrayList([]const []const u8)) diag.Error!void {
     defer factors.clearRetainingCapacity();
     if (factors.items.len == 0) return;
@@ -1114,17 +1114,17 @@ fn flushTypesTerm(arena: std.mem.Allocator, diags: *diag.Diagnostics, line_no: u
 }
 
 /// Parse a TYPES statement body (BUG-meanstypescross): `i` just past `types`,
-/// left at the `;`. Each request is a crossing term — factors joined by `*`,
-/// a factor being one class-var name or a parenthesized name group — expanded
+/// left at the `;`. Each request is a crossing term - factors joined by `*`,
+/// a factor being one class-var name or a parenthesized name group - expanded
 /// per the doc (Base SAS 9.4 Procedures Guide, 7th ed., printed p. 1512:
 /// `types (A B)*(C D);` = `types A*C A*D B*C B*D;`, `types A*(B C);` =
 /// `types A*B A*C;`; `()` requests the overall total). The loop this replaces
 /// treated ANY `(` as the overall combo and any name-after-name as a new
 /// combo, so `(a b)*(c d)` silently emitted spurious _TYPE_=0 tables plus
-/// unrequested singles — valid SAS, wrong output (the silent-wrong class).
+/// unrequested singles - valid SAS, wrong output (the silent-wrong class).
 fn parseTypesReqs(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const Token, i: *usize, combos: *std.ArrayList([]const []const u8)) diag.Error!void {
     var factors: std.ArrayList([]const []const u8) = .empty; // the open term's factors
-    var closed = false; // a factor just closed — only `*` may continue the term
+    var closed = false; // a factor just closed - only `*` may continue the term
     while (i.* < toks.len and toks[i.*].tag != .semicolon) {
         const tk = toks[i.*];
         switch (tk.tag) {
@@ -1184,44 +1184,44 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
             in_name = v;
             i += 3;
         } else if (optAt(toks, i, "vardef")) |v| {
-            // VARDEF= selects the variance divisor (BUG-statvardef) — fail loud
+            // VARDEF= selects the variance divisor (BUG-statvardef) - fail loud
             // on a bad value rather than silently defaulting to DF.
             vardef = varDefFromName(v) orelse
-                return diags.fail(error.ParseError, toks[i].line, "PROC MEANS: VARDEF={s} is not valid — expected DF, N, WDF, or WEIGHT", .{v});
+                return diags.fail(error.ParseError, toks[i].line, "PROC MEANS: VARDEF={s} is not valid - expected DF, N, WDF, or WEIGHT", .{v});
             i += 3;
         } else if (i + 2 < toks.len and tkKw(toks[i], "maxdec") and
             toks[i + 1].tag == .eq and toks[i + 2].tag == .number)
         {
-            // MAXDEC=n — decimals for the printed stats (GAP-meansmaxdec). SAS range 0–8.
+            // MAXDEC=n - decimals for the printed stats (GAP-meansmaxdec). SAS range 0–8.
             maxdec = std.fmt.parseInt(u8, toks[i + 2].text, 10) catch null;
             if (maxdec == null or maxdec.? > 8)
-                return diags.fail(error.ParseError, toks[i].line, "PROC MEANS: MAXDEC={s} is not valid — expected 0 to 8", .{toks[i + 2].text});
+                return diags.fail(error.ParseError, toks[i].line, "PROC MEANS: MAXDEC={s} is not valid - expected 0 to 8", .{toks[i + 2].text});
             i += 3;
         } else if (tkKw(toks[i], "alpha") and i + 2 < toks.len and toks[i + 1].tag == .eq) {
-            // ALPHA=p — confidence level for CLM is (1−p)·100% (BUG-meansoptnoop). SAS: 0<p<1.
+            // ALPHA=p - confidence level for CLM is (1−p)·100% (BUG-meansoptnoop). SAS: 0<p<1.
             const a = if (toks[i + 2].tag == .number) std.fmt.parseFloat(f64, toks[i + 2].text) catch -1 else -1;
             if (!(a > 0 and a < 1))
-                return diags.fail(error.ParseError, toks[i].line, "PROC MEANS: ALPHA={s} is not valid — expected a value between 0 and 1", .{toks[i + 2].text});
+                return diags.fail(error.ParseError, toks[i].line, "PROC MEANS: ALPHA={s} is not valid - expected a value between 0 and 1", .{toks[i + 2].text});
             alpha = a;
             i += 3;
         } else if (tkKw(toks[i], "order") and i + 2 < toks.len and toks[i + 1].tag == .eq and toks[i + 2].tag == .name) {
-            // ORDER=INTERNAL|DATA|FREQ — the CLASS level order (BUG-meansoptnoop).
+            // ORDER=INTERNAL|DATA|FREQ - the CLASS level order (BUG-meansoptnoop).
             const v = toks[i + 2].text;
             if (eqi(v, "internal")) class_order = .internal //
             else if (eqi(v, "data")) class_order = .data //
             else if (eqi(v, "freq")) class_order = .freq //
             else if (eqi(v, "formatted") or eqi(v, "external"))
-                // ORDER=FORMATTED/EXTERNAL are valid SAS 9.4 — a gap (rc 2);
+                // ORDER=FORMATTED/EXTERNAL are valid SAS 9.4 - a gap (rc 2);
                 // the else below is the typo arm and stays the user's rc 1.
                 return failGap(diags, toks[i].line, "PROC MEANS: ORDER={s} is not supported yet", .{v})
             else
-                return diags.fail(error.ParseError, toks[i].line, "PROC MEANS: ORDER={s} is not valid — expected INTERNAL, DATA, or FREQ", .{v});
+                return diags.fail(error.ParseError, toks[i].line, "PROC MEANS: ORDER={s} is not valid - expected INTERNAL, DATA, or FREQ", .{v});
             i += 3;
         } else if (toks[i].tag == .lparen) {
-            // data=d(keep=/where=…) dataset options — applied via procInput.
+            // data=d(keep=/where=…) dataset options - applied via procInput.
             // Must be SKIPPED as a group: the old walk-through read `keep`
             // inside the parens as a stat keyword and even WARNED
-            // "statistic-keyword keep is not recognized" on legal input —
+            // "statistic-keyword keep is not recognized" on legal input -
             // and with the fail-loud arm below it would error outright.
             i = skipParen(toks, i);
         } else {
@@ -1247,13 +1247,13 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
                 } else if (statFromKw(kw)) |sk| try stats.append(arena, sk)
                 else if (is_opt) {
                     // SUMSIZE= is a memory-allowance tuning knob (SAS 9.4 PROC
-                    // MEANS statement doc) — opensas's aggregation has no memory
+                    // MEANS statement doc) - opensas's aggregation has no memory
                     // budget to tune → genuinely inert. Every OTHER `name = value`
-                    // here is UNKNOWN: a typo (`maxddec=2` — MAXDEC= silently
+                    // here is UNKNOWN: a typo (`maxddec=2` - MAXDEC= silently
                     // unapplied) or a real option nobody honours (FW=, IDMIN,
-                    // QMETHOD= — percentile-method, result-changing). PROC PRINT
+                    // QMETHOD= - percentile-method, result-changing). PROC PRINT
                     // failed loud on this exact class while MEANS silently
-                    // skipped it (GAP-procopts internal inconsistency, D-002) —
+                    // skipped it (GAP-procopts internal inconsistency, D-002) -
                     // converge on loud, naming the option.
                     if (eqi(kw, "sumsize")) {
                         i += 3;
@@ -1261,7 +1261,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
                     }
                     // SPLIT (the 342b8305 shape): a name in the doc's closed
                     // PROC MEANS option set is a recognized gap (rc 2); any
-                    // other name (`maxddec=2`) is the user's typo (rc 1) —
+                    // other name (`maxddec=2`) is the user's typo (rc 1) -
                     // same message body, only the rc signal differs.
                     if (isMeansGapOption(kw))
                         return failGap(diags, toks[i].line, "PROC MEANS: option {s} is not supported", .{kw});
@@ -1280,10 +1280,10 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
     var vars: std.ArrayList([]const u8) = .empty;
     var bys: std.ArrayList([]const u8) = .empty;
     var classes: std.ArrayList([]const u8) = .empty;
-    var weight_var: ?[]const u8 = null; // `weight w;` — weighted stats (BUG-meansweight)
-    var freq_var: ?[]const u8 = null; // `freq f;` — each obs counts f times (BUG-meansfreqstmt)
-    var fmt_specs: std.ArrayList(VarSpec) = .empty; // `format v spec;` — CLASS groups by formatted value (NOTE-freqtablesfmt)
-    // One record PER OUTPUT statement — each builds its OWN dataset with its
+    var weight_var: ?[]const u8 = null; // `weight w;` - weighted stats (BUG-meansweight)
+    var freq_var: ?[]const u8 = null; // `freq f;` - each obs counts f times (BUG-meansfreqstmt)
+    var fmt_specs: std.ArrayList(VarSpec) = .empty; // `format v spec;` - CLASS groups by formatted value (NOTE-freqtablesfmt)
+    // One record PER OUTPUT statement - each builds its OWN dataset with its
     // OWN stat list (BUG-meansoutmultistmt); SAS never merges two OUTPUT statements.
     var out_stmts: std.ArrayList(OutStmt) = .empty;
     var id_names: std.ArrayList([]const u8) = .empty; // `id v …;` vars carried into OUTPUT (BUG-meansidnoop)
@@ -1295,7 +1295,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
         if (tkKw(toks[i], "run")) break;
         if (tkKw(toks[i], "var")) {
             i += 1;
-            // A repeated VAR statement REPLACES the prior list — SAS last-wins
+            // A repeated VAR statement REPLACES the prior list - SAS last-wins
             // (BUG-meansstmtreplace); the old append kept both → extra analysis vars.
             vars.clearRetainingCapacity();
             while (i < toks.len and toks[i].tag != .semicolon) : (i += 1)
@@ -1308,7 +1308,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
             classes.clearRetainingCapacity(); // repeated CLASS replaces (BUG-meansstmtreplace)
             while (i < toks.len and toks[i].tag != .semicolon) : (i += 1) {
                 if (toks[i].tag == .slash) {
-                    // `class v / missing …` — the MISSING option re-includes the
+                    // `class v / missing …` - the MISSING option re-includes the
                     // missing CLASS level (BUG-meansclassmiss); other options ignored.
                     while (i < toks.len and toks[i].tag != .semicolon) : (i += 1) {
                         if (toks[i].tag == .name and eqi(toks[i].text, "missing")) missing_opt = true;
@@ -1318,26 +1318,26 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
                 if (toks[i].tag == .name) try appendVarListName(arena, toks, &i, &classes); // GAP-varcolonprefix-procs: keep `pfx:`
             }
         } else if (tkKw(toks[i], "weight")) {
-            i += 1; // `weight w;` — the (single) weight variable
+            i += 1; // `weight w;` - the (single) weight variable
             while (i < toks.len and toks[i].tag != .semicolon) : (i += 1) {
                 if (toks[i].tag == .name) weight_var = toks[i].text;
             }
         } else if (tkKw(toks[i], "freq")) {
-            i += 1; // `freq f;` — the frequency-count variable (BUG-meansfreqstmt)
+            i += 1; // `freq f;` - the frequency-count variable (BUG-meansfreqstmt)
             while (i < toks.len and toks[i].tag != .semicolon) : (i += 1) {
                 if (toks[i].tag == .name) freq_var = toks[i].text;
             }
         } else if (tkKw(toks[i], "id")) {
-            i += 1; // `id v …;` — carry each id var's within-group MAX into OUTPUT (BUG-meansidnoop)
+            i += 1; // `id v …;` - carry each id var's within-group MAX into OUTPUT (BUG-meansidnoop)
             id_names.clearRetainingCapacity(); // repeated ID replaces (BUG-meansstmtreplace)
             while (i < toks.len and toks[i].tag != .semicolon) : (i += 1)
                 if (toks[i].tag == .name) try appendVarListName(arena, toks, &i, &id_names); // GAP-varcolonprefix-procs: keep `pfx:`
         } else if (tkKw(toks[i], "output")) {
-            // `output out=NAME  stat [(varlist)] = name1 name2 … ;` — one output col
+            // `output out=NAME  stat [(varlist)] = name1 name2 … ;` - one output col
             // per name, each mapping to its own analysis var (BUG-meansoutmulti).
             i += 1;
             var oname: ?[]const u8 = null;
-            var oautoname = false; // `/ autoname` — name omitted stats var_Stat (BUG-meansautoname)
+            var oautoname = false; // `/ autoname` - name omitted stats var_Stat (BUG-meansautoname)
             var ogroups: std.ArrayList(OutGroup) = .empty; // raw specs, resolved after acols
             var oopts: []const Token = &.{}; // `out=NAME(keep=/…)` option tokens
             while (i < toks.len and toks[i].tag != .semicolon) {
@@ -1345,7 +1345,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
                     oname = toks[i + 2].text;
                     i += 3;
                     if (atTag(toks, i, .lparen)) {
-                        // `out=NAME(keep=/drop=/…)` — applied post-build via oopts;
+                        // `out=NAME(keep=/drop=/…)` - applied post-build via oopts;
                         // skip the parens here so option names aren't misread as
                         // stat keywords (po_means_out_keep).
                         const start = i + 1;
@@ -1361,14 +1361,14 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
                         if (i < toks.len) i += 1; // past ')'
                     }
                 } else if (toks[i].tag == .slash) {
-                    // `/ autoname` — omitted stat names become var_Stat (BUG-meansautoname).
+                    // `/ autoname` - omitted stat names become var_Stat (BUG-meansautoname).
                     i += 1;
                     while (i < toks.len and toks[i].tag == .name and
                         statFromKw(toks[i].text) == null and !tkKw(toks[i], "out")) : (i += 1)
                     {
                         if (eqi(toks[i].text, "autoname")) oautoname = true //
                         else if (isMeansOutGapOption(toks[i].text))
-                            // a documented OUTPUT option we don't honor — gap (rc 2)
+                            // a documented OUTPUT option we don't honor - gap (rc 2)
                             return failGap(diags, toks[i].line, "PROC MEANS: OUTPUT / {s} is not yet supported", .{toks[i].text})
                         else return diags.fail(error.ParseError, toks[i].line, "PROC MEANS: OUTPUT / {s} is not yet supported", .{toks[i].text});
                     }
@@ -1393,25 +1393,25 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
                         }
                         try ogroups.append(arena, .{ .stat = sk, .evars = evars.items, .names = names.items });
                     } else if (tkKw(toks[i], "out")) {
-                        i += 1; // a bare `out` without `=` — lenient skip, as before
+                        i += 1; // a bare `out` without `=` - lenient skip, as before
                     } else {
                         // An unrecognized stat keyword was silently DROPPED, and an
                         // all-invalid spec list then fell through to the default
-                        // long form — SAS errors instead (BUG-meansoutmultistmt).
+                        // long form - SAS errors instead (BUG-meansoutmultistmt).
                         return diags.fail(error.ParseError, toks[i].line, "PROC MEANS: OUTPUT statistic-keyword {s} is not recognized", .{toks[i].text});
                     }
                 } else i += 1;
             }
             try out_stmts.append(arena, .{ .name = oname, .autoname = oautoname, .groups = ogroups, .stats = .empty, .opts = oopts });
         } else if (tkKw(toks[i], "types")) {
-            // `types () a a*b (a b)*(c d) …;` — the requested _TYPE_ combos
+            // `types () a a*b (a b)*(c d) …;` - the requested _TYPE_ combos
             // (BUG-meanstypes); paren-group crossing expands per the doc
             // (BUG-meanstypescross).
             types_seen = true;
             i += 1;
             try parseTypesReqs(arena, diags, toks, &i, &type_combos);
         } else if (tkKw(toks[i], "ways")) {
-            // `ways 1 …;` — every combination of the named degree(s) (BUG-meansways).
+            // `ways 1 …;` - every combination of the named degree(s) (BUG-meansways).
             ways_seen = true;
             i += 1;
             while (i < toks.len and toks[i].tag != .semicolon) : (i += 1) {
@@ -1446,7 +1446,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
 
     const raw = (if (in_name) |n| lib.find(n) else lastDataset(lib)) orelse {
         // BUG-procmissingrc2: a MISSING input table is a USER error (D-009 rc
-        // 1), never an opensas gap — the PROC is supported, the table just
+        // 1), never an opensas gap - the PROC is supported, the table just
         // isn't there. Same absent-input arm runSort got at GH#8, byte-identical
         // to the DATA-step SET (BUG-setmissingquiet): real SAS 9.4 errors
         // "ERROR: File WORK.NOPE.DATA does not exist." and ends the step with
@@ -1461,7 +1461,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
     var ds = try procInput(arena, raw, toks, diags); // WHERE stmt / data= options (BUG-procwhere)
 
     // GAP-varcolonprefix-procs: expand `pfx:` entries now that the dataset is
-    // known (PDV order — see expandVarPrefixes). ONE point, ahead of every
+    // known (PDV order - see expandVarPrefixes). ONE point, ahead of every
     // ds.indexOf consumer below (groupFormats' CLASS scan included); a prefix
     // matching nothing is a loud rc 1 here, never a silently absent variable.
     try expandVarListPrefixes(arena, ds, &vars, diags, toks[0].line, "PROC MEANS");
@@ -1483,7 +1483,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
 
     // EXCLNPWGT: drop nonpositive-weight obs from the WHOLE analysis (the opt-in
     // that overrides the default of counting ≤0-weight obs in N / MIN/MAX). Done
-    // once here so every path — listing, CLASS, OUTPUT, _FREQ_ — sees the reduced
+    // once here so every path - listing, CLASS, OUTPUT, _FREQ_ - sees the reduced
     // sample; the default (no EXCLNPWGT) keeps them via weightAt (BUG-meanszeroweight).
     if (exclnpwgt) if (wcol) |wc| {
         ds = try dropNonpositiveWeight(arena, ds, wc);
@@ -1497,13 +1497,13 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
     var fmt_levels: std.ArrayList(FmtLevels) = .empty; // raw-value order per format-grouped CLASS col (BUG-freqfmtorder)
     if (classes.items.len > 0) ds = try groupFormats(arena, ds, classes.items, fmt_specs.items, &fmt_levels, diags);
 
-    // BY: decode scanByList's wire encoding ONCE — clean names for every
+    // BY: decode scanByList's wire encoding ONCE - clean names for every
     // indexOf below, per-key directions + NOTSORTED for the sortedness guard
     // (GAP-procbydescending).
     const pb = try decodeProcBy(arena, bys.items);
 
     // analysis columns: the `var` list, else every numeric column NOT named in
-    // CLASS/BY/FREQ/WEIGHT/ID (REOPEN-meansdefvar — SAS's default analysis set
+    // CLASS/BY/FREQ/WEIGHT/ID (REOPEN-meansdefvar - SAS's default analysis set
     // excludes any var another statement claimed).
     var acols: std.ArrayList(usize) = .empty;
     if (vars.items.len > 0) {
@@ -1513,7 +1513,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
                 continue;
             };
             // A char var in the analysis list is a SAS type ERROR, not a column to
-            // fabricate stats for (REOPEN-meansdefvar) — same message as main.zig.
+            // fabricate stats for (REOPEN-meansdefvar) - same message as main.zig.
             if (ds.columns.items[idx].type != .num)
                 return diags.fail(error.ParseError, 0, "Variable {s} in list does not match type prescribed for this list.", .{std.ascii.allocUpperString(arena, vn) catch vn});
             try acols.append(arena, idx);
@@ -1534,14 +1534,14 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
         return;
     }
 
-    // The requested statistics (default 5 when none named) — honored by both the
+    // The requested statistics (default 5 when none named) - honored by both the
     // single-var block and the multi-var combined table.
     const chosen: []const StatKind = if (stats.items.len > 0) stats.items else &default_stats;
 
     // CLASS variable column indices (order = declaration order).
     var ccols: std.ArrayList(usize) = .empty;
     for (classes.items) |cn| if (ds.indexOf(cn)) |idx| try ccols.append(arena, idx);
-    // BY variable column indices — OUTPUT OUT= emits one row per BY group.
+    // BY variable column indices - OUTPUT OUT= emits one row per BY group.
     var obcols: std.ArrayList(usize) = .empty;
     var obdesc: std.ArrayList(bool) = .empty; // BY direction per obcols entry (BUG-meansoutbydescending)
     for (pb.names, 0..) |bn, k| if (ds.indexOf(bn)) |idx| {
@@ -1550,7 +1550,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
     };
     // BUG-meansbyunsorted: BY demands sorted data. A backward step between
     // contiguous groups (which any repeated non-adjacent key forces) ERRORs
-    // like SAS — mirrors the TABULATE/TRANSPOSE guard. Without it an unsorted
+    // like SAS - mirrors the TABULATE/TRANSPOSE guard. Without it an unsorted
     // BY silently POOLED the out-of-order groups in OUT= and printed duplicate
     // sections in the listing. BY DESCENDING flips the check per key
     // (byOrderViolation; GAP-procbydescending); NOTSORTED drops it (Statements
@@ -1566,7 +1566,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
             s = e;
         }
     }
-    // ID variable column indices — carried into OUTPUT (BUG-meansidnoop).
+    // ID variable column indices - carried into OUTPUT (BUG-meansidnoop).
     var icols: std.ArrayList(usize) = .empty;
     for (id_names.items) |nm| {
         const idx = ds.indexOf(nm) orelse
@@ -1575,13 +1575,13 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
     }
 
     // BUG-meansclassmiss: SAS excludes obs with a missing CLASS value from the
-    // WHOLE analysis (grand total, every _TYPE_, the listing) — the MISSING option
+    // WHOLE analysis (grand total, every _TYPE_, the listing) - the MISSING option
     // re-includes them. Filter once, before any grouping, so all paths (listing +
     // OUTPUT) see the same rows. BY is unaffected (missing BY groups are real).
     if (ccols.items.len > 0 and !missing_opt) ds = try dropMissingClass(arena, ds, ccols.items);
 
     // TYPES/WAYS: resolve the requested sub-types to class column-index sets
-    // (BUG-meanstypes/BUG-meansways) — before OUTPUT so both paths see them.
+    // (BUG-meanstypes/BUG-meansways) - before OUTPUT so both paths see them.
     var combos: std.ArrayList([]const usize) = .empty;
     const combos_req = types_seen or ways_seen;
     if (combos_req) {
@@ -1615,7 +1615,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
             for (ways_degs.items) |k| {
                 if (k > n)
                     return diags.fail(error.ParseError, 0, "PROC MEANS: WAYS {d} exceeds the number of CLASS variables", .{k});
-                // ponytail: bitmask enumeration — 2^n masks, n = #CLASS vars (tiny).
+                // ponytail: bitmask enumeration - 2^n masks, n = #CLASS vars (tiny).
                 var mask: usize = 0;
                 while (mask < (@as(usize, 1) << @intCast(n))) : (mask += 1) {
                     if (@popCount(mask) != k) continue;
@@ -1630,11 +1630,11 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
     // Resolve each OUTPUT group to (stat, name, acol) triples: the k-th name maps
     // to the k-th explicit `(varlist)` var, else the k-th analysis var (the VAR
     // list order). Each output column then computes from its OWN var (BUG-meansoutmulti).
-    // Per OUTPUT statement — each builds from its OWN spec list (BUG-meansoutmultistmt).
+    // Per OUTPUT statement - each builds from its OWN spec list (BUG-meansoutmultistmt).
     for (out_stmts.items) |*os| {
         for (os.groups.items) |g| {
             if (g.names.len == 0) {
-                // Omitted name(s): SAS uses the analysis-variable name(s) — one
+                // Omitted name(s): SAS uses the analysis-variable name(s) - one
                 // column per var (the explicit (varlist), else every VAR var).
                 // /AUTONAME names them var_Stat instead
                 // (BUG-meansoutemptyname / BUG-meansautoname).
@@ -1643,7 +1643,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
                         // Unknown (varlist) name → loud ERROR (SAS 9.4), never the
                         // old silent remap to the first analysis var
                         // (BUG-meansoutevarunknown). A dataset var NOT in the VAR
-                        // statement stays legal — only absence from the dataset fails.
+                        // statement stays legal - only absence from the dataset fails.
                         const acol = ds.indexOf(ev) orelse
                             return diags.fail(error.ParseError, 0, "PROC MEANS: OUTPUT variable {s} not in {s}", .{ ev, ds.name });
                         try os.stats.append(arena, .{ .stat = g.stat, .name = try outStatName(arena, ds.columns.items[acol].name, g.stat, os.autoname), .acol = acol });
@@ -1655,7 +1655,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
                 continue;
             }
             // SAS errors when the name count ≠ the analysis-var count (the explicit
-            // (varlist), else every VAR var) — the old @min clamp silently dropped
+            // (varlist), else every VAR var) - the old @min clamp silently dropped
             // vars / cloned values into duplicate columns (BUG-meansoutnamecount).
             const nvars: usize = if (g.evars.len > 0) g.evars.len else acols.items.len;
             if (g.names.len != nvars)
@@ -1671,11 +1671,11 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
         }
     }
 
-    // OUTPUT OUT=ds — one dataset PER OUTPUT statement, each with its OWN stat
+    // OUTPUT OUT=ds - one dataset PER OUTPUT statement, each with its OWN stat
     // columns (per BY group, per CLASS group, or one row) (BUG-meansoutmultistmt).
     for (out_stmts.items) |os| {
         const oname = os.name orelse continue; // no OUT= → nothing to build (as before)
-        // Restricting the OUTPUT dataset to the requested _TYPE_s isn't wired —
+        // Restricting the OUTPUT dataset to the requested _TYPE_s isn't wired -
         // emit nothing rather than a silently unfiltered dataset.
         if (combos_req)
             return diags.fail(error.ParseError, 0, "PROC MEANS: TYPES/WAYS with OUTPUT OUT= is not yet supported", .{});
@@ -1693,7 +1693,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
         } else
             try buildMeansOutput(arena, diags, lib, oname, ds, ccols.items, obcols.items, obdesc.items, wcol, icols.items, os.stats.items, nway, true, vardef, class_order, descending, alpha, fmt_levels.items);
         if (os.opts.len > 0) if (lib.find(oname)) |od|
-            try io.applyDatasetOptions(arena, od, os.opts, diags, false); // out=X(keep=/drop=) — BUG-procoutkeep
+            try io.applyDatasetOptions(arena, od, os.opts, diags, false); // out=X(keep=/drop=) - BUG-procoutkeep
     }
 
     // NOPRINT suppresses the listing (but OUTPUT above still ran).
@@ -1705,7 +1705,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
     // pooled paths below stay byte-identical. obcols doubles as the listing's BY key.
     const slices = try bySlices(arena, ds.rows.items, obcols.items);
 
-    // CLASS / TYPES / WAYS — one stats table per class level, per BY group
+    // CLASS / TYPES / WAYS - one stats table per class level, per BY group
     // (levels collected within the group, no sort of the input required;
     // emitted in ascending order).
     if (combos_req or ccols.items.len > 0) {
@@ -1742,7 +1742,7 @@ pub fn runMeans(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.
 
     try out.appendSlice(arena, title);
 
-    // Single analysis variable — the "Analysis Variable :" block per BY group
+    // Single analysis variable - the "Analysis Variable :" block per BY group
     // (input assumed already sorted by the BY vars, as SAS requires).
     for (slices) |bs| {
         if (bs.rep) |r| try appendByLine(arena, out, ds, r, obcols.items);
@@ -1846,7 +1846,7 @@ fn appendRule(arena: std.mem.Allocator, out: *std.ArrayList(u8), n: usize) !void
 }
 
 /// PROC MEANS with CLASS → one combined table: a left-justified column per class
-/// var (its value per level), then the requested stats, ONE row per class level —
+/// var (its value per level), then the requested stats, ONE row per class level -
 /// SAS's layout, replacing the old per-level "Analysis Variable" blocks
 /// (BUG-meansclass-layout). ponytail: SAS's separate "N Obs" column is dropped
 /// (the requested N stat carries the count); one analysis var per table, so a
@@ -1982,11 +1982,11 @@ fn skewKurtDf(n: usize, sd: f64, m3: f64, m4: f64) SkewKurt {
 }
 
 /// NMISS on the p.408 list-2 BASIS (BUG-univnmissweightbasis): the delivered
-/// rows with a MISSING analysis value — NOT rows.len − s.n. N (list 1) also
+/// rows with a MISSING analysis value - NOT rows.len − s.n. N (list 1) also
 /// excludes a PRESENT value whose WEIGHT is missing; the missing-count basis
 /// does not. The basis's own pre-exclusions are already gone from `rows`:
-/// nonpositive FREQ via expandFreq, and missing/nonpositive WEIGHT — only
-/// under EXCLNPWGT — via dropNonpositiveWeight. So the two formulas differ
+/// nonpositive FREQ via expandFreq, and missing/nonpositive WEIGHT - only
+/// under EXCLNPWGT - via dropNonpositiveWeight. So the two formulas differ
 /// exactly on a missing-weight/present-value obs, and counting the missing
 /// cells directly is list 2 in every case. Statistical Procedures p.408,
 /// === pdf 411 ===. (TABULATE's tabCellValue keeps obs − n: it has no WEIGHT
@@ -2005,7 +2005,7 @@ fn computeStats(rows: []const []const Value, col: usize, wcol: ?usize) Stats {
 
 fn computeStatsV(rows: []const []const Value, col: usize, wcol: ?usize, vardef: VarDef) Stats {
     if (rows.len > 0) assert(col < rows[0].len); // analysis column aligns with the row schema
-    // WEIGHT column too — a bad weight index reads a wrong cell per row and every
+    // WEIGHT column too - a bad weight index reads a wrong cell per row and every
     // weighted Mean/Sum/Std comes out silently wrong (TASTE-asserts).
     if (rows.len > 0) if (wcol) |wc| assert(wc < rows[0].len);
     const nan = std.math.nan(f64);
@@ -2028,14 +2028,14 @@ fn computeStatsV(rows: []const []const Value, col: usize, wcol: ?usize, vardef: 
         if (x > hi) hi = x;
     }
     // Zero nonmissing values: every DATA-derived statistic is missing, but the SUM
-    // OF THE WEIGHTS is not derived from the data — Statistical Procedures p.410
+    // OF THE WEIGHTS is not derived from the data - Statistical Procedures p.410
     // defines it as Σwᵢ and states "If there is no WEIGHT variable, the sum of the
     // weights is n", and n itself is computed regardless of missingness
     // (Procedures Guide p.72: "N and NMISS do not require any nonmissing
     // observations"). n==0 ⇒ Σwᵢ==0, so Sum Weights prints 0 next to N 0.
     // SUM/USS/CSS stay MISSING and that is CONFORMANT, not an oversight: p.72 and
-    // p.2749 both name them — "SUM, MEAN, MAX, MIN, RANGE, USS, and CSS require at
-    // least one nonmissing observation" — and SUMWGT is in neither list
+    // p.2749 both name them - "SUM, MEAN, MAX, MIN, RANGE, USS, and CSS require at
+    // least one nonmissing observation" - and SUMWGT is in neither list
     // (NOTE-univallmiss).
     if (n == 0) return .{ .n = 0, .sumw = 0, .mean = nan, .std = nan, .min = nan, .max = nan, .sum = nan, .median = nan, .q1 = nan, .q3 = nan };
     const mean = sumwx / sumw;
@@ -2074,7 +2074,7 @@ fn computeStatsV(rows: []const []const Value, col: usize, wcol: ?usize, vardef: 
     // median: sort the non-missing values. A stack buffer handles the common
     // (small) group; larger groups spill to a short-lived heap buffer so median/
     // quantiles/mode don't silently vanish on clinical-scale data (BUG-meanspctl4k
-    // — the old fixed [4096] cap returned missing above 4096 obs). All results are
+    // - the old fixed [4096] cap returned missing above 4096 obs). All results are
     // scalars copied into Stats, so the buffer is freed before return.
     var median: f64 = nan;
     var q1: f64 = nan;
@@ -2084,7 +2084,7 @@ fn computeStatsV(rows: []const []const Value, col: usize, wcol: ?usize, vardef: 
     var mbuf: [4096]f64 = undefined;
     const heap: ?[]f64 = if (n > mbuf.len) (std.heap.page_allocator.alloc(f64, n) catch null) else null;
     defer if (heap) |h| std.heap.page_allocator.free(h);
-    const buf: []f64 = heap orelse mbuf[0..]; // ponytail: page_allocator — no arena threaded here; short-lived
+    const buf: []f64 = heap orelse mbuf[0..]; // ponytail: page_allocator - no arena threaded here; short-lived
     if (n <= buf.len) {
         var k: usize = 0;
         for (rows) |r| {
@@ -2186,25 +2186,25 @@ fn byLess(l: []const Value, r: []const Value, bcols: []const usize) bool {
 }
 
 /// The BY-key index where group `nxt` steps BACKWARD from group `cur` in the
-/// BY-specified order — ascending per key by default, inverted where BY
+/// BY-specified order - ascending per key by default, inverted where BY
 /// DESCENDING applies (GAP-procbydescending; the same inversion rule as
-/// exec.cmpBy, so DATA-step and PROC sortedness checks cannot disagree) —
+/// exec.cmpBy, so DATA-step and PROC sortedness checks cannot disagree) -
 /// else null. Equality cannot occur: the two rows head DIFFERENT groups.
 /// With no descending keys this is exactly `byLess(nxt, cur)` made
 /// index-returning (Statements ref p.40: DESCENDING means the data set is
 /// sorted descending BY THAT VARIABLE, so the check flips per key).
 ///
 /// BUG-sortseq-byverify: the comparison runs under the SAME collation the
-/// sort used — `options sortseq=linguistic;` (io.global_sortseq_linguistic,
-/// the same seed runSort reads) folds case via cmpColl — because the data the
+/// sort used - `options sortseq=linguistic;` (io.global_sortseq_linguistic,
+/// the same seed runSort reads) folds case via cmpColl - because the data the
 /// user presents IS linguistically ordered (apple < Banana < Zebra; A a b B c
 /// with the mixed-case pairs fold-equal). Byte-comparing here rejected that
-/// valid order as "not sorted in ascending sequence" at rc 1 — a valid
+/// valid order as "not sorted in ascending sequence" at rc 1 - a valid
 /// program killed, and BUG-errhalt then skipped every later step (Language
 /// Reference: Concepts printed p.533 Note: "The BY statement honors the
 /// linguistic collation of sorted data when you use the SORT procedure with
 /// the SORTSEQ=LINGUISTIC option."). The fold can make two DISTINCT groups
-/// (A vs a) compare .eq — that is a PASS on this key, not an equality claim:
+/// (A vs a) compare .eq - that is a PASS on this key, not an equality claim:
 /// grouping stays byte-exact (byEqual is untouched), so the groups stay
 /// separate; only the ORDER check folds. The DESCENDING inversion is
 /// orthogonal and applies unchanged to the folded comparison.
@@ -2273,7 +2273,7 @@ fn cellText(arena: std.mem.Allocator, v: Value) ![]const u8 {
 // ── CLASS grouping + OUTPUT OUT= (BUG-meansclass / BUG-meansoutput) ───────────
 
 /// One output column: a statistic of analysis column `acol`, written under `name`
-/// (BUG-meansoutmulti — each output var computes from its OWN analysis variable).
+/// (BUG-meansoutmulti - each output var computes from its OWN analysis variable).
 const OutStat = struct { stat: StatKind, name: []const u8, acol: usize = 0 };
 
 /// Output-column name for an omitted `stat=` name: the analysis-var name, or
@@ -2305,9 +2305,9 @@ fn statSasName(k: StatKind) []const u8 {
 }
 
 /// FREQ expansion (BUG-meansfreqstmt): a dataset shallow-copy where each obs
-/// appears trunc(f) times (rows are shared cell slices — only the pointers
+/// appears trunc(f) times (rows are shared cell slices - only the pointers
 /// repeat). A missing or <1 count drops the obs, as SAS does.
-/// ponytail: O(Σf) row pointers, capped below — a weight-based path if
+/// ponytail: O(Σf) row pointers, capped below - a weight-based path if
 /// frequencies get huge.
 fn expandFreq(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Dataset, fcol: usize) diag.Error!*Dataset {
     const copy = try arena.create(Dataset);
@@ -2331,7 +2331,7 @@ const OutGroup = struct { stat: StatKind, evars: []const []const u8, names: []co
 
 /// One parsed OUTPUT statement: its own OUT= name, /AUTONAME flag, raw groups →
 /// resolved stats, and out=(…) option tokens. EACH statement builds its OWN
-/// output dataset — two OUTPUT statements never share a stat list
+/// output dataset - two OUTPUT statements never share a stat list
 /// (BUG-meansoutmultistmt).
 const OutStmt = struct {
     name: ?[]const u8,
@@ -2346,7 +2346,7 @@ const MeansGroup = struct { rep: []const Value, rows: []const []const Value };
 
 /// Drop rows with a missing value in any CLASS column (BUG-meansclassmiss). Returns
 /// a shallow copy (columns + row *pointers* shared, cells untouched) so the source
-/// dataset in the library is never disturbed — procInput may hand back the original.
+/// dataset in the library is never disturbed - procInput may hand back the original.
 fn dropMissingClass(arena: std.mem.Allocator, ds: *Dataset, ccols: []const usize) !*Dataset {
     const copy = try arena.create(Dataset);
     copy.* = Dataset.init(arena, ds.name);
@@ -2360,7 +2360,7 @@ fn dropMissingClass(arena: std.mem.Allocator, ds: *Dataset, ccols: []const usize
 
 /// EXCLNPWGT: shallow copy of `ds` with every ≤0-or-missing-weight row dropped
 /// (BUG-meanszeroweight). Row pointers shared, cells untouched, source library
-/// dataset undisturbed — mirrors dropMissingClass. Only reached under EXCLNPWGT;
+/// dataset undisturbed - mirrors dropMissingClass. Only reached under EXCLNPWGT;
 /// the default counts nonpositive-weight obs (see weightAt).
 fn dropNonpositiveWeight(arena: std.mem.Allocator, ds: *Dataset, wcol: usize) !*Dataset {
     const copy = try arena.create(Dataset);
@@ -2374,7 +2374,7 @@ fn dropNonpositiveWeight(arena: std.mem.Allocator, ds: *Dataset, wcol: usize) !*
     return copy;
 }
 
-/// Group `ds`'s rows by the CLASS columns — one group per distinct level
+/// Group `ds`'s rows by the CLASS columns - one group per distinct level
 /// combination, in ascending key order. Unlike BY, CLASS collects across the
 /// whole dataset, so the input need not be sorted (BUG-meansclass).
 fn collectGroups(arena: std.mem.Allocator, ds: *Dataset, ccols: []const usize) ![]MeansGroup {
@@ -2411,7 +2411,7 @@ const GroupKeyCtx = struct {
 
 const GroupIndex = std.HashMapUnmanaged([]const Value, usize, GroupKeyCtx, std.hash_map.default_max_load_percentage);
 
-/// As `collectGroups`, but over an arbitrary row slice — lets OUTPUT OUT= group a
+/// As `collectGroups`, but over an arbitrary row slice - lets OUTPUT OUT= group a
 /// single BY group's rows by CLASS (BUG-meansoutputby). O(rows) via a hash index
 /// on the class-key tuple (PERF-groupscan); the ordered `reps`/`buckets` lists
 /// stay the store so output order is unchanged (append order, then sorted below).
@@ -2461,7 +2461,7 @@ fn groupLess(ccols: []const usize, l: MeansGroup, r: MeansGroup) bool {
     return false;
 }
 
-/// groupLess with a per-key direction (BUG-meansoutbydescending) — desc[k]
+/// groupLess with a per-key direction (BUG-meansoutbydescending) - desc[k]
 /// flips key k's comparison, so mixed-direction BY lists sort per key exactly
 /// like the DATA-step guard (exec.cmpBy's inversion rule).
 const GroupDirCtx = struct { ccols: []const usize, desc: []const bool };
@@ -2476,7 +2476,7 @@ fn groupLessDir(ctx: GroupDirCtx, l: MeansGroup, r: MeansGroup) bool {
 /// collectGroups sorts ascending, but OUT= rows must go out in the BY's OWN
 /// order: a descending key emits its groups descending, else the dataset we
 /// write is one our own next step (`data z; set s; by descending g;`) refuses
-/// to read (BUG-meansoutbydescending). DOC-SILENT in the Procedures Guide —
+/// to read (BUG-meansoutbydescending). DOC-SILENT in the Procedures Guide -
 /// consistency-driven: the listing/PRINT/TRANSPOSE already emit the BY order
 /// (p.74 "Orders the output according to the BY groups"). Re-sort only when
 /// some key descends, so ascending/no-BY output stays byte-identical.
@@ -2487,7 +2487,7 @@ fn sortByGroupsByDir(bygroups: []MeansGroup, bycols: []const usize, by_desc: []c
 
 /// Re-order ORDER=INTERNAL CLASS groups so a VALUE.-format band sorts by its
 /// smallest raw value, not label text (BUG-freqfmtorder). A formatted class col
-/// compares by fmtRank; a non-formatted one falls back to cmpValue — so mixed
+/// compares by fmtRank; a non-formatted one falls back to cmpValue - so mixed
 /// formatted/plain CLASS lists stay multi-key correct. No-op when no col is
 /// format-grouped.
 fn reorderGroupsFmt(groups: []MeansGroup, ccols: []const usize, levels: []const FmtLevels) void {
@@ -2518,14 +2518,14 @@ const VarSpec = struct { name: []const u8, spec: []const u8 };
 /// Vars accumulate until a spec run (`[$]name.` / `[$]w[.d]`) assigns them all;
 /// names still pending at `;` strip their format (BUG-formatremoval's form).
 /// Leaves `i` AT the `;` (the caller's loop tail consumes it). ponytail: no
-/// `d1-d3` var ranges (a `-` falls through and both endpoints get the spec) —
+/// `d1-d3` var ranges (a `-` falls through and both endpoints get the spec) -
 /// add when a proc-level fixture uses one.
 fn parseProcFormat(arena: std.mem.Allocator, toks: []const Token, i: *usize, specs: *std.ArrayList(VarSpec)) !void {
     i.* += 1; // past `format`
     var pending: std.ArrayList([]const u8) = .empty;
     while (i.* < toks.len and toks[i.*].tag != .semicolon) {
         const tk = toks[i.*];
-        // spec shape: optional `$`, a name/number, `.`, optional decimals —
+        // spec shape: optional `$`, a name/number, `.`, optional decimals -
         // `agf.` `8.` `comma10.2` `$sex.` `$3.` (a var name is never followed
         // by `.` in this statement, so name+dot unambiguously starts a spec).
         if (tk.tag == .dollar or tk.tag == .number or
@@ -2547,16 +2547,16 @@ fn parseProcFormat(arena: std.mem.Allocator, toks: []const Token, i: *usize, spe
 }
 
 /// NOTE-freqtablesfmt (tick185 + tick167:176): a format associated with a
-/// grouping var — a FORMAT statement in the proc (wins), else the column's
-/// DATA-step-persisted format — makes SAS group by the FORMATTED value: raw
+/// grouping var - a FORMAT statement in the proc (wins), else the column's
+/// DATA-step-persisted format - makes SAS group by the FORMATTED value: raw
 /// values sharing a label collapse into ONE level, displayed as the label.
 /// Rewrite each such column's cells to their formatted text in a FRESH row set
-/// (proc input rows are shared with the library dataset — never mutate in
+/// (proc input rows are shared with the library dataset - never mutate in
 /// place), flip the column to .str, and clear the stored spec so nothing
 /// formats twice. Missing stays missing (blank str) so the default missing
 /// exclusion still bites. Returns `ds` unchanged when nothing applies.
 /// ponytail: level ORDER follows the formatted text (SAS's ORDER=INTERNAL
-/// orders by the smallest raw value per collapsed group — switch the sort if a
+/// orders by the smallest raw value per collapsed group - switch the sort if a
 /// live-SAS golden disagrees); OUT= datasets carry the formatted text (SAS
 /// stores a raw value + the attached format there); a var in BOTH VAR and
 /// CLASS with a format sees its stats count as nmiss (split raw/formatted
@@ -2572,7 +2572,7 @@ fn groupFormats(arena: std.mem.Allocator, ds: *Dataset, varnames: []const []cons
             break;
         };
         const s = spec orelse continue;
-        // NOTE-fmtnumoncharcoerce: the grouping rewrite formats every cell — a
+        // NOTE-fmtnumoncharcoerce: the grouping rewrite formats every cell - a
         // numeric format on a char column (or `$` on numeric) silently turned
         // the level into '.'. Same compile-time type check as PROC PRINT's
         // FORMAT statement, before a single row is rewritten.
@@ -2655,11 +2655,11 @@ fn fmtLabelsByRaw(arena: std.mem.Allocator, ds: *Dataset, ci: usize, spec: []con
 /// Raw-value ORDER=INTERNAL for one FORMAT-grouped column (BUG-freqfmtorder):
 /// its distinct labels in ascending underlying-raw order. Consumers re-order
 /// their level list by this rank instead of the lexical label compare.
-/// One FORMAT-grouped column's raw-ordered distinct labels, plus — for OUT=
-/// builders (NOTE-freqfmtoutraw) — `raws`: the LOWEST raw value mapping to each
+/// One FORMAT-grouped column's raw-ordered distinct labels, plus - for OUT=
+/// builders (NOTE-freqfmtoutraw) - `raws`: the LOWEST raw value mapping to each
 /// label (parallel to `labels`; SAS stores the lowest internal value of a
 /// format-collapsed group, MEANS CLASS stmt Tip, Procedures Guide printed
-/// p.1497 — the Tip sits under `=== pdf 1546 ===` and the volume's offset is
+/// p.1497 - the Tip sits under `=== pdf 1546 ===` and the volume's offset is
 /// +49 exactly as its provenance header states; the `1496 Chapter 40` footer
 /// just ABOVE that marker belongs to the PRECEDING page, which is the trap),
 /// `ty`: the column's type BEFORE the label-string rewrite, and
@@ -2682,11 +2682,11 @@ fn fmtRank(fl: FmtLevels, label: []const u8) i64 {
 
 /// The raw value an OUT= dataset stores for a format-collapsed group showing
 /// `label`: the LOWEST internal value (doc cite on FmtLevels). null ⇒ no raw
-/// produced this label — the blank missing group (missing raws never enter
+/// produced this label - the blank missing group (missing raws never enter
 /// fmtLabelsByRaw), so the caller stores a missing of the ORIGINAL type.
 /// ponytail: a real raw formatting to a label byte-equal to another's is
 /// impossible here (labels are deduped); a blank-LABELLED raw and a missing
-/// share the blank group and the raw wins — split them if a golden ever needs it.
+/// share the blank group and the raw wins - split them if a golden ever needs it.
 fn fmtRawFor(fl: FmtLevels, label: []const u8) ?Value {
     for (fl.labels, 0..) |l, i| if (std.mem.eql(u8, l, label)) return fl.raws[i];
     return null;
@@ -2712,10 +2712,10 @@ fn applyFmtOrder(cats: []Value, fl: ?FmtLevels, order: FreqOrder) void {
     }.less);
 }
 
-/// OUTPUT OUT=ds — the summary dataset. With a CLASS, SAS adds the automatic
+/// OUTPUT OUT=ds - the summary dataset. With a CLASS, SAS adds the automatic
 /// `_TYPE_` (0 = overall, all-classes = the finest grouping) and `_FREQ_` (obs
 /// per group) variables and, unless NWAY, emits every `_TYPE_` level 0…2^k-1
-/// (overall … full cross, in _TYPE_ order — BUG-meansouttype-multiclass). Each
+/// (overall … full cross, in _TYPE_ order - BUG-meansouttype-multiclass). Each
 /// output stat column computes from its OWN analysis var (BUG-meansoutmulti).
 fn buildMeansOutput(arena: std.mem.Allocator, diags: *diag.Diagnostics, lib: *Library, oname: []const u8, ds: *Dataset, ccols: []const usize, bycols: []const usize, by_desc: []const bool, wcol: ?usize, icols: []const usize, out_stats: []const OutStat, nway: bool, emit_meta: bool, vardef: VarDef, order: GroupOrder, descending: bool, alpha: f64, fmt_levels: []const FmtLevels) !void {
     const o = try arena.create(Dataset);
@@ -2723,7 +2723,7 @@ fn buildMeansOutput(arena: std.mem.Allocator, diags: *diag.Diagnostics, lib: *Li
     for (bycols) |ci| try meansOutCol(diags, o, oname, ds.columns.items[ci].name, ds.columns.items[ci].type);
     // NOTE-freqfmtoutraw: a FORMAT-grouped class col arrives REWRITTEN to label
     // strings (groupFormats). SAS stores the RAW value with the format ATTACHED
-    // (the proc must not change the column's TYPE because it carries a format —
+    // (the proc must not change the column's TYPE because it carries a format -
     // a downstream read-back/merge sees the descriptor, not the rendering), so
     // declare the ORIGINAL type and attach the format; cells map label→lowest
     // raw at fill time below. An unrewritten col keeps its own type + format.
@@ -2749,7 +2749,7 @@ fn buildMeansOutput(arena: std.mem.Allocator, diags: *diag.Diagnostics, lib: *Li
     const nid = icols.len;
     const ncol = bycols.len + ccols.len + nid + meta + out_stats.len;
     const fillStats = struct {
-        // each output column computes from its OWN analysis var (os.acol) — a
+        // each output column computes from its OWN analysis var (os.acol) - a
         // multi-var `output mean=a b` maps a→var1, b→var2 (BUG-meansoutmulti).
         fn f(cells: []Value, base: usize, rows: []const []const Value, wc: ?usize, oss: []const OutStat, vd: VarDef, al: f64) void {
             for (oss, 0..) |os, k| {
@@ -2815,7 +2815,7 @@ fn buildMeansOutput(arena: std.mem.Allocator, diags: *diag.Diagnostics, lib: *Li
     try lib.put(oname, o);
 }
 
-/// Add one OUTPUT column, failing LOUD on a duplicate name — a second same-named
+/// Add one OUTPUT column, failing LOUD on a duplicate name - a second same-named
 /// column builds a structurally broken dataset (BUG-meansoutdupname; mirrors the
 /// PROC SQL CREATE TABLE dup guard).
 fn meansOutCol(diags: *diag.Diagnostics, o: *Dataset, oname: []const u8, name: []const u8, ty: VarType) !void {
@@ -2883,14 +2883,14 @@ fn buildMeansOutputDefault(arena: std.mem.Allocator, lib: *Library, oname: []con
 // One-way and two-way frequency tables, reproducing SAS's listing layout by
 // absolute column placement (each line is a space-filled buffer we stamp fields
 // into, then trim). ponytail: the column geometry is fixed for the default
-// widths — small counts, ≤"100.00" percents, short category values (the corpus
+// widths - small counts, ≤"100.00" percents, short category values (the corpus
 // fixtures); a very wide count/value would need SAS's width-growth logic. Title
 // centering is hard-set per table shape rather than derived from LINESIZE.
 
 // Titles are centered over each table's own width (SAS varies it by shape), so
 // the lead differs: full one-way is widest, the `nocum` table (no cumulative
 // columns) is narrowest, two-way in between. ponytail: hard-set per shape rather
-// than derived — a wider table (bigger counts) would shift these.
+// than derived - a wider table (bigger counts) would shift these.
 const ONEWAY_TITLE = (" " ** 38) ++ "The FREQ Procedure\n";
 const ONEWAY_NOCUM_TITLE = (" " ** 22) ++ "The FREQ Procedure\n";
 const TWOWAY_TITLE = (" " ** 24) ++ "The FREQ Procedure\n";
@@ -2900,7 +2900,7 @@ const NLEVELS_TITLE = (" " ** 21) ++ "The FREQ Procedure\n"; // narrow NLEVELS t
 /// measure of association, or extra cell statistic we do not compute. These MUST
 /// fail loud rather than silently print a table without the requested numbers
 /// (FREQ-hardening). Display options we currently tolerate as no-ops (list,
-/// nopercent, norow, nocol, nofreq) are deliberately NOT here — ponytail: they
+/// nopercent, norow, nocol, nofreq) are deliberately NOT here - ponytail: they
 /// change layout only, add them (or honor them) when a fixture needs it.
 fn isUnsupportedFreqStat(kw: []const u8) bool {
     inline for (.{
@@ -2923,7 +2923,7 @@ fn isUnsupportedFreqStat(kw: []const u8) bool {
 }
 
 /// The REMAINING documented SAS 9.4 TABLES-statement options beyond
-/// isUnsupportedFreqStat's association/exact/cell list — Table 3.9 closes the
+/// isUnsupportedFreqStat's association/exact/cell list - Table 3.9 closes the
 /// whole TABLES option set in one place (Base SAS 9.4 Procedures Guide:
 /// Statistical Procedures, printed pp. 104-106, === pdf 107/108/109 ===), and
 /// NOCUM/MISSING/NOPRINT/NOFREQ/NOPERCENT/NOROW/NOCOL/OUTCUM/LIST/OUT= are
@@ -2941,22 +2941,22 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
     const diags = cx.diags;
     var in_name: ?[]const u8 = null;
     var order: FreqOrder = .internal; // ORDER=FREQ|DATA|INTERNAL|FORMATTED (BUG-freqorder)
-    var noprint = false; // proc-level or TABLES `/ noprint` — suppress the listing
-    var nlevels = false; // proc-level NLEVELS — emit the "Number of Variable Levels" table (BUG-freqnlevels)
+    var noprint = false; // proc-level or TABLES `/ noprint` - suppress the listing
+    var nlevels = false; // proc-level NLEVELS - emit the "Number of Variable Levels" table (BUG-freqnlevels)
     var i: usize = 2; // past `proc freq`
     while (i < toks.len and toks[i].tag != .semicolon) {
         if (optAt(toks, i, "data")) |v| {
             in_name = v;
             i += 3;
         } else if (optAt(toks, i, "order")) |v| {
-            // ORDER=FREQ|DATA|INTERNAL|FORMATTED — an invalid value must not
+            // ORDER=FREQ|DATA|INTERNAL|FORMATTED - an invalid value must not
             // silently become INTERNAL (BUG-freqweightorder F3; mirrors the
             // PROC MEANS ORDER= validation).
             order = if (eqi(v, "freq")) .freq //
             else if (eqi(v, "data")) .data //
             else if (eqi(v, "internal")) .internal //
             else if (eqi(v, "formatted")) .formatted //
-            else return diags.fail(error.ParseError, toks[i].line, "PROC FREQ: ORDER={s} is not valid — expected FREQ, DATA, INTERNAL, or FORMATTED", .{v});
+            else return diags.fail(error.ParseError, toks[i].line, "PROC FREQ: ORDER={s} is not valid - expected FREQ, DATA, INTERNAL, or FORMATTED", .{v});
             i += 3;
         } else if (tkKw(toks[i], "noprint")) {
             noprint = true;
@@ -2967,47 +2967,47 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
         } else if (tkKw(toks[i], "compress") or tkKw(toks[i], "page")) {
             // INERT pagination (SAS 9.4 Proc Guide, PROC FREQ statement):
             // COMPRESS packs one-way tables onto a shared page, PAGE forces a
-            // new page per table — a non-paginating batch listing observes
+            // new page per table - a non-paginating batch listing observes
             // neither. Enumerated explicitly so the chain ends in a real else.
             i += 1;
         } else if (optAny(toks, i, "formchar")) |_| {
-            i += 3; // INERT: crosstab outline characters — the grid geometry is hard-set.
+            i += 3; // INERT: crosstab outline characters - the grid geometry is hard-set.
         } else {
             // GAP-freqlow-tick276 F6 (residual of tick255 F1): the old final
-            // else `i += 1`'d ANY token — a typo'd option (`odrer=freq`) or an
+            // else `i += 1`'d ANY token - a typo'd option (`odrer=freq`) or an
             // unsupported real one silently ran with defaults, while the TABLES
             // `/` loop below already failed loud on the same situation
             // (GAP-freqignoreopt). Name the option (D-002).
             // ALREADY-CORRECT at rc 1 (§5b re-verdict): Table 3.4 (Statistical
             // Procedures printed p. 78, === pdf 81 ===) closes the PROC FREQ
-            // statement option set at seven — COMPRESS/DATA=/FORMCHAR=/
-            // NLEVELS/NOPRINT/ORDER=/PAGE — and every one is handled above,
+            // statement option set at seven - COMPRESS/DATA=/FORMCHAR=/
+            // NLEVELS/NOPRINT/ORDER=/PAGE - and every one is handled above,
             // so only invalid SAS (a typo) can reach this arm.
             return diags.fail(error.ParseError, toks[i].line, "PROC FREQ: option {s} is not supported", .{toks[i].text});
         }
     }
     if (atTag(toks, i, .semicolon)) i += 1;
 
-    // `tables v1[*v2*…] [/ nocum missing noprint out=DS];` — 1 var = one-way,
+    // `tables v1[*v2*…] [/ nocum missing noprint out=DS];` - 1 var = one-way,
     // 2 = crosstab, ≥3 = per-stratum crosstabs (GAP-freqnway); `weight w;`
-    // BUG-freqmultitables: EACH TABLES statement is an independent request —
+    // BUG-freqmultitables: EACH TABLES statement is an independent request -
     // `tables g; tables h;` renders TWO one-way tables, never a merged g*h
     // crosstab. Only `*` WITHIN one statement is a genuine crosstab.
     const FreqRequest = struct {
         vars: std.ArrayList([]const u8) = .empty,
         nocum: bool = false,
         disp: FreqDisp = .{}, // nofreq/nopercent/norow/nocol (FREQ-crosstabpct)
-        missing: bool = false, // `/ missing` — include the missing level as a category (BUG-freqmissing)
-        out_name: ?[]const u8 = null, // `/ out=DS` — COUNT/PERCENT dataset (GAP-freqnway)
+        missing: bool = false, // `/ missing` - include the missing level as a category (BUG-freqmissing)
+        out_name: ?[]const u8 = null, // `/ out=DS` - COUNT/PERCENT dataset (GAP-freqnway)
         out_opts: []const Token = &.{}, // out=DS(rename=/keep=…) paren list, applied per request
-        outcum: bool = false, // `/ outcum` — CUM_FREQ/CUM_PCT columns in a one-way OUT= (GAP-freqignoreopt)
-        list: bool = false, // `/ list` — no-op on one-way (already list form); n-way fails loud (NOTE-freqlistfmt)
-        noprint: bool = false, // TABLES `/ noprint` — suppress THIS statement's table
+        outcum: bool = false, // `/ outcum` - CUM_FREQ/CUM_PCT columns in a one-way OUT= (GAP-freqignoreopt)
+        list: bool = false, // `/ list` - no-op on one-way (already list form); n-way fails loud (NOTE-freqlistfmt)
+        noprint: bool = false, // TABLES `/ noprint` - suppress THIS statement's table
     };
     var requests: std.ArrayList(FreqRequest) = .empty;
-    var weight_var: ?[]const u8 = null; // `weight w;` — Frequency = Σweight (BUG-freqweight)
-    var weight_zeros = false; // `weight w / zeros;` — re-include zero-weight levels (BUG-freqweightorder F2)
-    var fmt_specs: std.ArrayList(VarSpec) = .empty; // `format v spec;` — group by formatted value (NOTE-freqtablesfmt)
+    var weight_var: ?[]const u8 = null; // `weight w;` - Frequency = Σweight (BUG-freqweight)
+    var weight_zeros = false; // `weight w / zeros;` - re-include zero-weight levels (BUG-freqweightorder F2)
+    var fmt_specs: std.ArrayList(VarSpec) = .empty; // `format v spec;` - group by formatted value (NOTE-freqtablesfmt)
     while (i < toks.len and toks[i].tag != .eof) {
         if (tkKw(toks[i], "run")) break;
         if (tkKw(toks[i], "tables") or tkKw(toks[i], "table")) {
@@ -3026,7 +3026,7 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
                     var names: std.ArrayList([]const u8) = .empty;
                     if (atTag(toks, i, .name)) {
                         // GAP-varcolonprefix-procs: keep a `pfx:` factor as ONE
-                        // wire entry — it expands below once the dataset is
+                        // wire entry - it expands below once the dataset is
                         // known (one-way requests; a `*` crossing stays loud).
                         try appendVarListName(arena, toks, &i, &names);
                         i += 1;
@@ -3042,7 +3042,7 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
                     } else return diags.fail(error.ParseError, toks[i].line, "PROC FREQ: expected a variable in the TABLES statement", .{});
                     try factors.append(arena, names.items);
                     if (atTag(toks, i, .star)) {
-                        // NOTE-freqdanglingcross: `tables g*;` / `g* / opt;` — a
+                        // NOTE-freqdanglingcross: `tables g*;` / `g* / opt;` - a
                         // dangling crosstab operator. SAS errors; silently degrading
                         // to a one-way table on g is the clinical worst class.
                         if (!atTag(toks, i + 1, .name) and !atTag(toks, i + 1, .lparen))
@@ -3083,13 +3083,13 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
                 if (tkKw(toks[i], "norow")) { req.disp.norow = true; continue; }
                 if (tkKw(toks[i], "nocol")) { req.disp.nocol = true; continue; }
                 if (tkKw(toks[i], "outcum")) { req.outcum = true; continue; }
-                // LIST: a DOCUMENTED no-op on a ONE-way table — the SAS 9.4
+                // LIST: a DOCUMENTED no-op on a ONE-way table - the SAS 9.4
                 // PROC FREQ TABLES-statement doc scopes LIST to "two-way to
                 // n-way tables" (a one-way table is list-form already), so
                 // there is no layout to change (GAP-tableopt; the audit's
                 // "accepted but INERT" is the doc's own semantics, cited).
                 // On an n-way request the listing would have to switch from
-                // the grid to the one-row-per-cell list layout — not modeled,
+                // the grid to the one-row-per-cell list layout - not modeled,
                 // so the render loop fails loud instead of silently
                 // substituting the grid (NOTE-freqlistfmt, tick221 F4's fix).
                 if (tkKw(toks[i], "list")) { req.list = true; continue; }
@@ -3099,19 +3099,19 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
                 } else if (isUnsupportedFreqStat(toks[i].text)) {
                     // Association / exact / cell-statistic options aren't computed.
                     // Silently ignoring `/ chisq` (etc.) emits a table WITHOUT the
-                    // requested statistics — a silent drop of requested analysis, the
+                    // requested statistics - a silent drop of requested analysis, the
                     // clinical worst class. Fail loud (FREQ-hardening). The guard is
                     // a closed list of documented SAS 9.4 TABLES options, so every
-                    // hit is a recognized gap (rc 2) — a typo can't be in the list.
-                    return failGap(diags, toks[i].line, "PROC FREQ: TABLES option {s} (association/exact/cell statistics) is not yet supported — refusing to emit a table without the requested statistics", .{toks[i].text});
+                    // hit is a recognized gap (rc 2) - a typo can't be in the list.
+                    return failGap(diags, toks[i].line, "PROC FREQ: TABLES option {s} (association/exact/cell statistics) is not yet supported - refusing to emit a table without the requested statistics", .{toks[i].text});
                 } else if (isFreqTablesGapOption(toks[i].text)) {
                     // The rest of Table 3.9's closed set (MISSPRINT, NOSPARSE,
-                    // PLOTS=, ALPHA=, …) — documented but unimplemented, so a
+                    // PLOTS=, ALPHA=, …) - documented but unimplemented, so a
                     // recognized gap (rc 2); the message stays byte-identical.
                     return failGap(diags, toks[i].line, "PROC FREQ: TABLES option {s} is not supported", .{toks[i].text});
                 } else {
                     // GAP-freqignoreopt: an unrecognized TABLES option is a typo or a
-                    // real-but-unsupported option — silently dropping it hid both.
+                    // real-but-unsupported option - silently dropping it hid both.
                     // Fail loud (house rule), like PROC PRINT's option scan (F4).
                     return diags.fail(error.ParseError, toks[i].line, "PROC FREQ: TABLES option {s} is not supported", .{toks[i].text});
                 }
@@ -3122,15 +3122,15 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
                 try requests.append(arena, r);
             }
         } else if (tkKw(toks[i], "weight")) {
-            i += 1; // `weight w;` — the (single) weight variable
+            i += 1; // `weight w;` - the (single) weight variable
             if (atTag(toks, i, .name)) {
                 weight_var = toks[i].text;
                 i += 1;
             }
-            // `weight w / zeros;` — ZEROS re-includes zero-weight levels (SAS
+            // `weight w / zeros;` - ZEROS re-includes zero-weight levels (SAS
             // drops them by default). Any other WEIGHT option is a typo or
             // unsupported: fail loud like the TABLES option scan
-            // (BUG-freqweightorder F2) — silently swallowing it hid both.
+            // (BUG-freqweightorder F2) - silently swallowing it hid both.
             if (atTag(toks, i, .slash)) {
                 i += 1;
                 while (i < toks.len and toks[i].tag != .semicolon) : (i += 1) {
@@ -3139,14 +3139,14 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
                         weight_zeros = true;
                         continue;
                     }
-                    return diags.fail(error.ParseError, toks[i].line, "PROC FREQ: WEIGHT option {s} is not supported — expected ZEROS", .{toks[i].text});
+                    return diags.fail(error.ParseError, toks[i].line, "PROC FREQ: WEIGHT option {s} is not supported - expected ZEROS", .{toks[i].text});
                 }
             }
         } else if (tkKw(toks[i], "format")) {
             try parseProcFormat(arena, toks, &i, &fmt_specs); // leaves i at the `;`
         } else if (tkKw(toks[i], "by")) {
             // BY-group FREQ isn't modeled (per-group tables); silently ignoring
-            // it emitted ONE global table — silent wrong output
+            // it emitted ONE global table - silent wrong output
             // (PROCBY-printfreq). FAIL LOUD until per-group tables exist. BY is a
             // valid SAS 9.4 PROC FREQ statement → a gap (rc 2), not the user's 1.
             return failGap(diags, toks[i].line, "PROC FREQ: BY-group processing is not yet supported", .{});
@@ -3158,7 +3158,7 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
             while (i < toks.len and toks[i].tag != .semicolon) i += 1;
         } else if (tkKw(toks[i], "exact") or tkKw(toks[i], "output") or tkKw(toks[i], "test")) {
             // EXACT/OUTPUT/TEST are valid SAS 9.4 PROC FREQ statements we don't
-            // model — an opensas gap (rc 2), never lumped with a typo'd name.
+            // model - an opensas gap (rc 2), never lumped with a typo'd name.
             return failGap(diags, toks[i].line, "PROC FREQ statement {s} is not supported", .{toks[i].text});
         } else if (toks[i].tag == .name) {
             // D-002 fail-loud (GAP-procsubstmtswallow): an unknown sub-statement
@@ -3171,21 +3171,21 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
 
     const raw = (if (in_name) |n| lib.find(n) else lastDataset(lib)) orelse {
         // BUG-procmissingrc2: missing table = user error (D-009 rc 1), not a
-        // gap — the runSort (GH#8) absent-input arm: "File {s} does not
+        // gap - the runSort (GH#8) absent-input arm: "File {s} does not
         // exist" + the runExpanded step-halt NOTE, rc 1. NOT unsupported().
         diags.report(.err, if (toks.len > 1) toks[1].line else 0, "File {s} does not exist", .{in_name orelse "_last_"}) catch {};
         return;
     };
     var ds = try procInput(arena, raw, toks, diags); // WHERE stmt / data= options (BUG-procwhere)
     // GAP-varcolonprefix-procs: expand `pfx:` factors now that the dataset is
-    // known (PDV order — see expandVarPrefixes). A ONE-WAY request position is
+    // known (PDV order - see expandVarPrefixes). A ONE-WAY request position is
     // an ordinary variable list (`tables x:` ≡ `tables x1 x2;`, one table
-    // each) — the unambiguous case. A prefix inside a `*` crossing (the
+    // each) - the unambiguous case. A prefix inside a `*` crossing (the
     // request's vars.len > 1 here: only `*` joins factors into one request) is
-    // NOT settled by the doc — Statistical Procedures 6th ed. printed p.103
+    // NOT settled by the doc - Statistical Procedures 6th ed. printed p.103
     // (TABLES requests) and its Table 3.8 document grouping syntax
     // distributing PARENTHESIZED and NAME-RANGE lists over crossings, never
-    // the name-prefix form — so the crossing stays LOUD (rc 2 gap), never
+    // the name-prefix form - so the crossing stays LOUD (rc 2 gap), never
     // guessed.
     var exreqs: std.ArrayList(FreqRequest) = .empty;
     for (requests.items) |r| {
@@ -3201,7 +3201,7 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
             continue;
         }
         if (r.vars.items.len > 1)
-            return failGap(diags, toks[0].line, "PROC FREQ: a name prefix (x:) inside a TABLES '*' crossing is not supported — the doc settles grouping for '(a b)' and name-range lists only (Statistical Procedures 6th ed. p.103 Table 3.8)", .{});
+            return failGap(diags, toks[0].line, "PROC FREQ: a name prefix (x:) inside a TABLES '*' crossing is not supported - the doc settles grouping for '(a b)' and name-range lists only (Statistical Procedures 6th ed. p.103 Table 3.8)", .{});
         const expanded = try expandVarPrefixes(arena, ds, r.vars.items, diags, toks[0].line, "PROC FREQ");
         for (expanded) |vn| { // one independent one-way request per match
             var nr = r; // shares the statement's `/` options
@@ -3251,7 +3251,7 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
         };
         if (req.out_name) |on| {
             try buildFreqOutput(arena, lib, on, ds, vcols, wcol, weight_zeros, req.missing, req.outcum, fmt_levels.items);
-            // out=X(rename=/keep=…) — SDTM PC programs rename COUNT; the paren list was
+            // out=X(rename=/keep=…) - SDTM PC programs rename COUNT; the paren list was
             // captured from THIS statement's `/` options (applyDatasetOptions's)
             if (lib.find(on)) |od| if (req.out_opts.len > 0) try io.applyDatasetOptions(arena, od, req.out_opts, diags, false);
         }
@@ -3260,13 +3260,13 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
         // one-row-per-cell list layout; we only have the grid. Fail loud (house
         // rule) rather than silently emit the wrong layout. One-way is already
         // list form; OUT= datasets are unaffected by LIST either way.
-        // GAP-ebnfrcwrongclass: LIST is a DOCUMENTED TABLES option — Table 3.9
+        // GAP-ebnfrcwrongclass: LIST is a DOCUMENTED TABLES option - Table 3.9
         // (Base SAS 9.4 Procedures Guide: Statistical Procedures, printed
         // p.105, === pdf 108 ===: "LIST Displays two-way to n-way tables in
-        // list format") — so refusing it is OUR gap, rc 2 (D-009/D-009b(i)),
+        // list format") - so refusing it is OUR gap, rc 2 (D-009/D-009b(i)),
         // not rc 1 "your SAS is broken"; the message already NAMES list.
         if (req.list and req.vars.items.len > 1)
-            return failGap(diags, 0, "PROC FREQ: TABLES option list (n-way list layout) is not yet supported — refusing to emit the crosstab grid in its place", .{});
+            return failGap(diags, 0, "PROC FREQ: TABLES option list (n-way list layout) is not yet supported - refusing to emit the crosstab grid in its place", .{});
         if (rendered) try out.append(arena, '\n');
         switch (req.vars.items.len) {
             1 => try oneWayFreq(arena, out, ds, req.vars.items[0], req.nocum, wcol, weight_zeros, req.missing, order, req.disp.nopercent, fmt_levels.items, cx.tables),
@@ -3278,7 +3278,7 @@ pub fn runFreq(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
 }
 
 /// PROC FREQ `NLEVELS` (proc-statement option, BUG-freqnlevels): the "Number of
-/// Variable Levels" table — one row per analysis variable, `Levels` = the count
+/// Variable Levels" table - one row per analysis variable, `Levels` = the count
 /// of DISTINCT non-missing values (SAS default: a missing value is NOT counted as
 /// a level unless the MISSING option is set). Reuses oneWayLevels so the count is
 /// exactly what the frequency table lists. Printed BEFORE the frequency tables.
@@ -3318,7 +3318,7 @@ fn freqNLevels(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, 
 /// independent SAS TABLES option: NOFREQ drops cell frequencies, NOPERCENT drops
 /// the cell percent (of the whole table), NOROW drops row percents, NOCOL drops
 /// column percents. (Real SAS: NOPERCENT suppresses only the cell percent, not
-/// row/col — those have their own options.)
+/// row/col - those have their own options.)
 const FreqDisp = struct {
     nofreq: bool = false,
     nopercent: bool = false,
@@ -3335,7 +3335,7 @@ fn nWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, var
     // Strata walk in the requested ORDER= (FREQ → descending stratum size, DATA
     // → first appearance); FORMATTED folds to ascending as in oneWayLevels (the
     // cells already hold label text). ponytail: FREQ counts ROWS per stratum,
-    // not weights — switch to a weighted sort if a weighted golden needs it.
+    // not weights - switch to a weighted sort if a weighted golden needs it.
     const strata_order: GroupOrder = switch (order) {
         .internal, .formatted => .internal,
         .data => .data,
@@ -3348,7 +3348,7 @@ fn nWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, var
         // own stratum (SAS prints "Controlling for a=."); default still drops it.
         if (!keep_missing) for (scols) |ci| if (isFreqMissing(st.rep[ci])) continue :next_stratum;
         // GAP-freqlow-tick276 F5: a stratum whose obs ALL have zero weight has
-        // NO observations (zero-weight obs are excluded by default — the same
+        // NO observations (zero-weight obs are excluded by default - the same
         // weightKeepsRow rule the cells/levels apply), so SAS prints no table
         // for it. Rendering one anyway produced a phantom empty grid with a
         // nonsensical "Total 0 / 100.00" a reader cannot tell from a real
@@ -3364,7 +3364,7 @@ fn nWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, var
         tno += 1;
         if (tno > 1) try out.append(arena, '\n');
         // stratum view: same schema, only this stratum's rows (cells are arena-
-        // owned and immutable, so sharing them is safe — the dupDataset precedent)
+        // owned and immutable, so sharing them is safe - the dupDataset precedent)
         const sub = try arena.create(Dataset);
         sub.* = Dataset.init(arena, ds.name);
         for (ds.columns.items) |c| try sub.columns.append(arena, c);
@@ -3376,9 +3376,9 @@ fn nWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, var
     }
 }
 
-/// TABLES `/ OUT=` — the frequency dataset: the TABLES variables (in request
+/// TABLES `/ OUT=` - the frequency dataset: the TABLES variables (in request
 /// order), then COUNT and PERCENT (SAS's column order). One observation per
-/// OBSERVED level combination, ascending — zero cells are absent (no SPARSE),
+/// OBSERVED level combination, ascending - zero cells are absent (no SPARSE),
 /// and a combination seen ONLY on zero-weight obs is absent too unless
 /// `weight w / zeros` re-includes it (BUG-freqoutzerocount; same weightKeepsRow
 /// filter the listing applies, so listing and OUT= agree). PERCENT is of the
@@ -3388,7 +3388,7 @@ fn nWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, var
 fn buildFreqOutput(arena: std.mem.Allocator, lib: *Library, oname: []const u8, ds: *Dataset, vcols: []const usize, wcol: ?usize, zeros: bool, keep_missing: bool, outcum: bool, fmt_levels: []const FmtLevels) !void {
     const o = try arena.create(Dataset);
     o.* = Dataset.init(arena, oname);
-    // NOTE-freqfmtoutraw: same raw-value+attached-format rule as MEANS — a
+    // NOTE-freqfmtoutraw: same raw-value+attached-format rule as MEANS - a
     // format-grouped TABLES col is declared with its ORIGINAL type and the
     // format attached; cells map label→lowest raw at fill time below.
     for (vcols) |ci| {
@@ -3399,7 +3399,7 @@ fn buildFreqOutput(arena: std.mem.Allocator, lib: *Library, oname: []const u8, d
     _ = try o.addColumn("COUNT", .num);
     _ = try o.addColumn("PERCENT", .num);
     // `/ outcum` (GAP-freqignoreopt): CUM_FREQ/CUM_PCT running totals. SAS scopes
-    // OUTCUM to one-way OUT= datasets — an n-way table ignores it there too.
+    // OUTCUM to one-way OUT= datasets - an n-way table ignores it there too.
     const cum = outcum and vcols.len == 1;
     if (cum) {
         _ = try o.addColumn("CUM_FREQ", .num);
@@ -3482,11 +3482,11 @@ const LevelValueCtx = struct {
     }
 };
 
-/// PERF-freqoneway: ONE pass over the rows — each kept cell is hashed once, a
+/// PERF-freqoneway: ONE pass over the rows - each kept cell is hashed once, a
 /// new level appended on first sight, its weighted count accumulated (the sum
 /// catWeight used to rescan the whole table for). The old distinctSorted
 /// (linear dedup scan per row) + per-level catWeight (full rescan per level)
-/// was O(N·L) — measured 5.2× time per 2× N. The count for a level adds the
+/// was O(N·L) - measured 5.2× time per 2× N. The count for a level adds the
 /// same row weights in the same row order as catWeight did, and the sorts are
 /// the old comparators verbatim, so output (totals/cumulatives included) is
 /// byte-identical.
@@ -3506,7 +3506,7 @@ fn oneWayLevels(arena: std.mem.Allocator, ds: *Dataset, col: usize, keep_missing
     }
     const cats = list.items;
     switch (order) {
-        .data => {}, // keep first-appearance order — no sort
+        .data => {}, // keep first-appearance order - no sort
         .internal, .formatted => std.mem.sort(LevelCount, cats, {}, struct {
             fn less(_: void, l: LevelCount, r: LevelCount) bool {
                 return cmpValue(l.v, r.v) == .lt;
@@ -3529,10 +3529,10 @@ fn oneWayLevels(arena: std.mem.Allocator, ds: *Dataset, col: usize, keep_missing
     return cats;
 }
 
-/// catWeight re-scans the whole table per level — only the n-way path still
+/// catWeight re-scans the whole table per level - only the n-way path still
 /// uses it. One-way levels carry their count from oneWayLevels (PERF-freqoneway).
 fn catWeight(ds: *Dataset, col: usize, cat: Value, wcol: ?usize) f64 {
-    // both indices read a cell on every row — out-of-range = a silently wrong
+    // both indices read a cell on every row - out-of-range = a silently wrong
     // frequency count, not a crash (TASTE-asserts).
     assert(col < ds.columns.items.len);
     if (wcol) |wc| assert(wc < ds.columns.items.len);
@@ -3573,7 +3573,7 @@ fn oneWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, v
     };
     // Default: missing is not a category (percents over non-missing, a
     // `Frequency Missing = n` line below). `/ missing` re-includes it as a level
-    // (percents over the full total, no trailing line) — BUG-freqmissing.
+    // (percents over the full total, no trailing line) - BUG-freqmissing.
     const cats = try oneWayLevels(arena, ds, col, keep_missing, order, wcol, zeros, fmtLevelsFor(fmt_levels, col));
     // raw-value order for VALUE.-format groups (BUG-freqfmtorder)
     if (order == .internal) if (fmtLevelsFor(fmt_levels, col)) |f| {
@@ -3587,23 +3587,23 @@ fn oneWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, v
     for (cats) |c| total += c.w;
     // All-missing TABLES variable: no levels to list, but SAS still "displays
     // the number of missing observations following each table" (Base SAS 9.4
-    // Procedures Guide: Statistical Procedures, FREQ "Missing Values", p.156) —
+    // Procedures Guide: Statistical Procedures, FREQ "Missing Values", p.156) -
     // the count line prints even when the table itself is empty (NOTE-
     // freqallmissnone). An empty or all-zero-weight table has no missing obs →
     // the line is a no-op. Whether SAS also prints the table SHELL here is not
-    // settled by the chapter — we print no shell, matching the zero-weight "no
+    // settled by the chapter - we print no shell, matching the zero-weight "no
     // phantom empty table" call (GAP-freqlow-tick276 F5).
     //
     // NOTE-freqallmissnoheader, searched and still DOC-SILENT: the bare
     // `Frequency Missing = n` line also carries NO "The FREQ Procedure" heading,
     // which looks like an omission but is the SAME unsettled question, not a new
-    // one — that heading is emitted from inside the table body below (ONEWAY_TITLE),
+    // one - that heading is emitted from inside the table body below (ONEWAY_TITLE),
     // so there is no header without a shell to hang it on. No volume prints an
     // all-missing FREQ output: the chapter's only Missing Values example (Figure
     // 3.12, printed pp.156–157) has two nonmissing levels, and "displays the number
     // of missing observations following each table" (p.156) says where the count
     // goes relative to a table, not what happens when there is none. Deliberately
-    // NOT pinned by a test — asserting the heading's absence would freeze a
+    // NOT pinned by a test - asserting the heading's absence would freeze a
     // doc-silent guess and make a future correct fix look like a regression.
     if (total == 0) {
         if (!keep_missing) try appendFreqMissing(arena, out, freqMissingWeight(ds, &.{col}, wcol));
@@ -3641,7 +3641,7 @@ fn oneWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, v
 
     // NOPERCENT drops the Percent columns (and, with NOCUM, everything but
     // Frequency). ponytail: column geometry for these variants is best-effort SAS
-    // — the common default/NOCUM paths are unchanged (FREQ-crosstabpct/displayopts).
+    // - the common default/NOCUM paths are unchanged (FREQ-crosstabpct/displayopts).
     if (nopercent) return oneWayFreqNoPercent(arena, out, ds, col, varname, cats, keep_missing, nocum, wcol);
     if (nocum) return oneWayFreqNoCum(arena, out, ds, col, varname, cats, total, keep_missing, wcol);
 
@@ -3686,7 +3686,7 @@ fn oneWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, v
 
 /// SAS prints `Frequency Missing = N` after the table when the TABLES
 /// variable(s) had any missing values (a no-op when there were none). N is the
-/// WEIGHTED frequency under a WEIGHT statement — the chapter's own worked
+/// WEIGHTED frequency under a WEIGHT statement - the chapter's own worked
 /// example counts one missing obs with Freq=2 as `Frequency Missing = 2`
 /// (Figure 3.12, p.157).
 fn appendFreqMissing(arena: std.mem.Allocator, out: *std.ArrayList(u8), miss: f64) !void {
@@ -3695,7 +3695,7 @@ fn appendFreqMissing(arena: std.mem.Allocator, out: *std.ArrayList(u8), miss: f6
     try out.appendSlice(arena, try std.fmt.allocPrint(arena, "{s}Frequency Missing = {s}\n", .{ " " ** 6, try freqText(arena, miss) }));
 }
 
-/// `tables v / nocum;` — Frequency + Percent only (no cumulative pair, no super-
+/// `tables v / nocum;` - Frequency + Percent only (no cumulative pair, no super-
 /// header). The narrower table shifts the title and the column headers.
 fn oneWayFreqNoCum(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, col: usize, varname: []const u8, cats: []const LevelCount, total: f64, keep_missing: bool, wcol: ?usize) !void {
     try out.appendSlice(arena, ONEWAY_NOCUM_TITLE);
@@ -3722,7 +3722,7 @@ fn oneWayFreqNoCum(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Datas
     if (!keep_missing) try appendFreqMissing(arena, out, freqMissingWeight(ds, &.{col}, wcol));
 }
 
-/// `tables v / nopercent;` — Frequency (+ Cumulative Frequency unless NOCUM), no
+/// `tables v / nopercent;` - Frequency (+ Cumulative Frequency unless NOCUM), no
 /// Percent columns. ponytail: geometry is best-effort SAS (Cumulative Frequency
 /// placed compactly beside Frequency) pending gate verification against real SAS.
 fn oneWayFreqNoPercent(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, col: usize, varname: []const u8, cats: []const LevelCount, keep_missing: bool, nocum: bool, wcol: ?usize) !void {
@@ -3761,7 +3761,7 @@ fn oneWayFreqNoPercent(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *D
 /// One crosstab. `table_no`/`control` are the n-way stratum headers: table_no 0
 /// prints the plain `Table of v1 by v2`; N > 0 prints `Table N of v1 by v2` plus
 /// the `Controlling for …` line (GAP-freqnway). Each cell shows the SAS-default
-/// stack — Frequency, Percent (of grand total), Row Pct, Col Pct — trimmed by the
+/// stack - Frequency, Percent (of grand total), Row Pct, Col Pct - trimmed by the
 /// `disp` suppression options, with a legend box and marginal totals
 /// (FREQ-crosstabpct). Row/Col percents are blank in the Total column, and the
 /// marginal Total row carries only Frequency + Percent (SAS layout).
@@ -3778,7 +3778,7 @@ fn twoWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, v
     // the missing levels as categories (FREQ-crosstabpct).
     // PERF-freq2waymem: per-dim levels via the same one-pass hashing the one-way
     // path uses (was distinctSorted's O(N·L) dedup scan + an O(N) catWeight
-    // rescan per level-pair under ORDER=FREQ) — identical filters/comparators, so
+    // rescan per level-pair under ORDER=FREQ) - identical filters/comparators, so
     // the level sets and orders are unchanged.
     const rlevels = try oneWayLevels(arena, ds, c1, keep_missing, order, wcol, zeros, fmtLevelsFor(fmt_levels, c1));
     const clevels = try oneWayLevels(arena, ds, c2, keep_missing, order, wcol, zeros, fmtLevelsFor(fmt_levels, c2));
@@ -3791,16 +3791,16 @@ fn twoWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, v
     applyFmtOrder(rows, fmtLevelsFor(fmt_levels, c1), order); // each dim's VALUE.-format groups order by raw value (BUG-freqfmtorder)
     applyFmtOrder(cols, fmtLevelsFor(fmt_levels, c2), order);
     // Value -> final level index, hashed once (was catIndex's O(L) linear scan
-    // per row per dim — O(N·L) total). Built AFTER applyFmtOrder reorders.
+    // per row per dim - O(N·L) total). Built AFTER applyFmtOrder reorders.
     var ridx: std.HashMapUnmanaged(Value, usize, LevelValueCtx, std.hash_map.default_max_load_percentage) = .empty;
     var cidx: std.HashMapUnmanaged(Value, usize, LevelValueCtx, std.hash_map.default_max_load_percentage) = .empty;
     for (rows, 0..) |v, i| try ridx.put(arena, v, i);
     for (cols, 0..) |v, i| try cidx.put(arena, v, i);
 
     // Weighted counts (BUG-freqweight2way): each cell is Σweight, 1/obs without
-    // a WEIGHT statement — the one-way path already did this, this path silently
+    // a WEIGHT statement - the one-way path already did this, this path silently
     // dropped the weight (clinical worst class: wrong counts, no diagnostic).
-    // PERF-freq2waymem: cells live in a sparse (ri,ci) -> count hash — only
+    // PERF-freq2waymem: cells live in a sparse (ri,ci) -> count hash - only
     // populated cells are stored; the old dense nr*nc matrix OOMed on
     // high-cardinality crosses (20k×20k). An absent cell reads back as the 0 the
     // dense matrix held, so printing (incl. empty cells) is unchanged; weights
@@ -3813,13 +3813,13 @@ fn twoWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, v
     var grand: f64 = 0;
     // both TABLES variables index real columns (indexOf guaranteed it); the loop
     // reads r[c1]/r[c2] on every row, so an out-of-range index = wrong crosstab.
-    // Two simple asserts, not one compound — a failure names the guilty index.
+    // Two simple asserts, not one compound - a failure names the guilty index.
     assert(c1 < ds.columns.items.len);
     assert(c2 < ds.columns.items.len);
     if (wcol) |wc| assert(wc < ds.columns.items.len);
     for (ds.rows.items) |r| {
         const w = rowWeight(r, wcol);
-        if (w == 0) continue; // adding 0 changes no cell or total — skip the hashing
+        if (w == 0) continue; // adding 0 changes no cell or total - skip the hashing
         const ri = ridx.get(r[c1]) orelse continue;
         const ci = cidx.get(r[c2]) orelse continue;
         const gop = try cells.getOrPut(arena, (@as(u64, @intCast(ri)) << 32) | @as(u64, @intCast(ci)));
@@ -4035,7 +4035,7 @@ fn twoWayFreq(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, v
         try flush(arena, out, b);
     }
     if (!keep_missing) {
-        // obs missing in EITHER variable were excluded — report the (weighted)
+        // obs missing in EITHER variable were excluded - report the (weighted)
         // count, the same rule as the one-way line (SAS).
         try appendFreqMissing(arena, out, freqMissingWeight(ds, &.{ c1, c2 }, wcol));
     }
@@ -4065,7 +4065,7 @@ fn isFreqMissing(v: Value) bool {
     };
 }
 
-/// Σweight over the observations missing in ANY of `cols` (1/obs unweighted) —
+/// Σweight over the observations missing in ANY of `cols` (1/obs unweighted) -
 /// the weighted `Frequency Missing` count (see appendFreqMissing).
 fn freqMissingWeight(ds: *Dataset, cols: []const usize, wcol: ?usize) f64 {
     var sum: f64 = 0;
@@ -4079,12 +4079,12 @@ fn freqMissingWeight(ds: *Dataset, cols: []const usize, wcol: ?usize) f64 {
 }
 
 /// PROC FREQ level ordering (ORDER= option). INTERNAL → ascending value (the
-/// default); FORMATTED → ascending FORMATTED (decode) value — for a
+/// default); FORMATTED → ascending FORMATTED (decode) value - for a
 /// format-grouped col the cells already hold the label text, so the ascending
 /// sort IS the label order (BUG-freqweightorder F1); FREQ → descending count;
 /// DATA → first-appearance order.
 /// ponytail: FORMATTED on an ungrouped (no-format) numeric col sorts by value,
-/// not by right-justified BEST12 text — differs from SAS only for negative or
+/// not by right-justified BEST12 text - differs from SAS only for negative or
 /// fractional values with no format; switch the comparator if a golden needs
 /// the text sort.
 const FreqOrder = enum { internal, freq, data, formatted };
@@ -4096,7 +4096,7 @@ fn weightKeepsRow(r: []const Value, wcol: ?usize, zeros: bool) bool {
     const wc = wcol orelse return true;
     return switch (r[wc]) {
         .num => |x| x > 0 or (zeros and x == 0),
-        .str => false, // missing weight — excluded either way, as SAS does
+        .str => false, // missing weight - excluded either way, as SAS does
     };
 }
 
@@ -4146,7 +4146,7 @@ fn flush(arena: std.mem.Allocator, out: *std.ArrayList(u8), b: []u8) !void {
 //
 // `proc transpose data=IN out=OUT [prefix=P] [name=N]; [var …;] [id v;] [by …;]`.
 // Each VAR variable becomes one output row; each input observation (within a BY
-// group) becomes one output column — named by the ID value if `id` is given,
+// group) becomes one output column - named by the ID value if `id` is given,
 // else `prefix`+1,2,… (default prefix "COL"); SUFFIX= is appended to every
 // generated name. LET suppresses the duplicate-ID error and keeps the LAST
 // value, as SAS does. The `name=` column (default
@@ -4212,11 +4212,11 @@ pub fn runTranspose(cx: ProcCtx, toks: []const Token) diag.Error!void {
             label_col = v; // LABEL=name renames the _LABEL_ output column (GAP-transposelabel)
             i += 3;
         } else if (toks[i].tag == .lparen) {
-            i = skipParen(toks, i); // data=d(where=/keep=/…) dataset options — applied via procInput
+            i = skipParen(toks, i); // data=d(where=/keep=/…) dataset options - applied via procInput
         } else {
             // D-002 fail-loud (BUG-transposeoptswallow): an unknown header option
-            // must error visibly, not vanish — a typo'd `prefx=` changes output.
-            // BUG-proctypoexits2: split — INDB= is the one documented option we
+            // must error visibly, not vanish - a typo'd `prefx=` changes output.
+            // BUG-proctypoexits2: split - INDB= is the one documented option we
             // don't implement (gap, rc 2); any other name is the user's typo (rc 1).
             if (toks[i].tag == .name) {
                 if (isTransposeGapOption(toks[i].text)) {
@@ -4234,7 +4234,7 @@ pub fn runTranspose(cx: ProcCtx, toks: []const Token) diag.Error!void {
     var bys: std.ArrayList([]const u8) = .empty;
     var ids: std.ArrayList([]const u8) = .empty; // ID accepts MULTIPLE vars (BUG-transposemultiid)
     var copys: std.ArrayList([]const u8) = .empty; // COPY vars pass through unchanged (BUG-transposecopy)
-    var idlabel_name: ?[]const u8 = null; // IDLABEL var — labels each ID-named column (GAP-transposeidlabel)
+    var idlabel_name: ?[]const u8 = null; // IDLABEL var - labels each ID-named column (GAP-transposeidlabel)
     while (i < toks.len and toks[i].tag != .eof) {
         if (tkKw(toks[i], "run") or tkKw(toks[i], "quit")) break;
         if (tkKw(toks[i], "var")) {
@@ -4272,7 +4272,7 @@ pub fn runTranspose(cx: ProcCtx, toks: []const Token) diag.Error!void {
             try parseProcBy(arena, diags, toks, &i, &bys);
         } else if (tkKw(toks[i], "idlabel")) {
             // IDLABEL <var>: that var's value (from the same row that supplies
-            // the ID column NAME) becomes the generated column's LABEL —
+            // the ID column NAME) becomes the generated column's LABEL -
             // captured here, applied when the out columns are built below.
             i += 1;
             if (i < toks.len and toks[i].tag == .name) {
@@ -4281,18 +4281,18 @@ pub fn runTranspose(cx: ProcCtx, toks: []const Token) diag.Error!void {
             }
             while (i < toks.len and toks[i].tag != .semicolon) i += 1;
         } else if (tkKw(toks[i], "label")) {
-            // LABEL <var="text" …> — cosmetic metadata we don't carry through
+            // LABEL <var="text" …> - cosmetic metadata we don't carry through
             // the transpose build; parsed and skipped, never an error.
             while (i < toks.len and toks[i].tag != .semicolon) i += 1;
         } else if (tkKw(toks[i], "where")) {
             while (i < toks.len and toks[i].tag != .semicolon) i += 1; // procInput applies it
         } else if (toks[i].tag == .name and @import("parser.zig").isMidStepSkippable(toks[i].text)) {
             // D-014a mid-step globals: skip exactly what the top level HANDLES
-            // here — a hoisted TITLE/FOOTNOTE/OPTIONS (main.zig hoists it to
+            // here - a hoisted TITLE/FOOTNOTE/OPTIONS (main.zig hoists it to
             // its own global segment; its tokens STAY in the step) and the
             // batch-unobservable inert set (GOPTIONS/DM/SASFILE/PAGE/…).
             // LIBNAME executed in the up-front parseLibnames pre-pass, so its
-            // skip is honest. Unhoisted ODS/FILENAME are NOT skipped — never
+            // skip is honest. Unhoisted ODS/FILENAME are NOT skipped - never
             // executed mid-step, so a skip would be a silent no-op; they fail
             // loud below (BUG-transposeglobalstmt: one legal TITLE errored and
             // errhalt then killed every later step).
@@ -4307,7 +4307,7 @@ pub fn runTranspose(cx: ProcCtx, toks: []const Token) diag.Error!void {
 
     const raw = (if (in_name) |n| lib.find(n) else lastDataset(lib)) orelse {
         // BUG-procmissingrc2: missing table = user error (D-009 rc 1), not a
-        // gap — the runSort (GH#8) absent-input arm: "File {s} does not
+        // gap - the runSort (GH#8) absent-input arm: "File {s} does not
         // exist" + the runExpanded step-halt NOTE, rc 1. NOT unsupported().
         diags.report(.err, if (toks.len > 1) toks[1].line else 0, "File {s} does not exist", .{in_name orelse "_last_"}) catch {};
         return;
@@ -4403,7 +4403,7 @@ pub fn runTranspose(cx: ProcCtx, toks: []const Token) diag.Error!void {
     var val_labels: std.ArrayList([]const u8) = .empty; // IDLABEL text per ID column, parallel to val_names (empty without IDLABEL)
     var name_index: std.StringHashMapUnmanaged(usize) = .empty;
     if (has_id) {
-        // ID columns name every transposed output column — a bad index would
+        // ID columns name every transposed output column - a bad index would
         // mislabel the whole transpose, silently (TASTE-asserts).
         for (idIdx.items) |ii| assert(ii < ds.columns.items.len);
         for (rows) |r| {
@@ -4421,7 +4421,7 @@ pub fn runTranspose(cx: ProcCtx, toks: []const Token) diag.Error!void {
     }
 
     // SAS adds a `_LABEL_` char column holding each VAR's label, right after
-    // _NAME_ — but ONLY when at least one transposed var carries a label; with
+    // _NAME_ - but ONLY when at least one transposed var carries a label; with
     // none, the column is absent entirely (GAP-transposelabel).
     var any_label = false;
     for (varIdx.items) |vx| {
@@ -4450,7 +4450,7 @@ pub fn runTranspose(cx: ProcCtx, toks: []const Token) diag.Error!void {
     for (groups.items) |g| {
         // SAS errors when an ID value repeats within a BY group: two rows would map
         // to the same output column, silently keeping only the last (data loss,
-        // BUG-transposedupid). Fail loud instead — unless LET is given, which is
+        // BUG-transposedupid). Fail loud instead - unless LET is given, which is
         // SAS's explicit "keep the LAST value, no error" (GAP-transposelet); the
         // fill loop's later write already wins, so LET just skips this check.
         // A per-group folded seen-set makes this O(group), not the former O(group²)
@@ -4469,7 +4469,7 @@ pub fn runTranspose(cx: ProcCtx, toks: []const Token) diag.Error!void {
             const cells = try arena.alloc(Value, nby + 1 + nlabel + ncol + ncopy);
             // A 0-row input (e.g. a where= that matched nothing) is one empty
             // group [0,0): there is no first obs to source BY/COPY values from.
-            // Emit missings — the same row the no-COPY empty case already emits —
+            // Emit missings - the same row the no-COPY empty case already emits -
             // never index row 0 of an empty table (BUG-transposecopyempty).
             const first: ?usize = if (g[0] < g[1]) g[0] else null;
             for (byIdx.items, 0..) |bx, bi| cells[bi] = if (first) |f| rows[f][bx] else missingOf(ds.columns.items[bx].type);
@@ -4480,7 +4480,7 @@ pub fn runTranspose(cx: ProcCtx, toks: []const Token) diag.Error!void {
             for (copyIdx.items, 0..) |cix, ci| cells[nby + 1 + nlabel + ncol + ci] = if (first) |f| rows[f][cix] else missingOf(ds.columns.items[cix].type);
             var r = g[0];
             while (r < g[1]) : (r += 1) {
-                // The lookup name must be decorated EXACTLY as in val_names above —
+                // The lookup name must be decorated EXACTLY as in val_names above -
                 // the former raw-value lookup silently fell back to the positional
                 // index for any PREFIX=/_ name, which maps a LET-deduped row to the
                 // WRONG column (or past the cells) once dupes collapse val_names.
@@ -4494,7 +4494,7 @@ pub fn runTranspose(cx: ProcCtx, toks: []const Token) diag.Error!void {
             try out.appendRow(cells);
         }
     }
-    // out=X(drop=/keep=/rename=/where=) — applied once, on the full output while
+    // out=X(drop=/keep=/rename=/where=) - applied once, on the full output while
     // _NAME_ + all value columns are present (BUG-procoutkeep; no more double-apply).
     try applyOutOptions(arena, out, toks, diags, "out");
     try lib.put(oname, out);
@@ -4506,12 +4506,12 @@ fn idxIn(list: []const usize, x: usize) bool {
 }
 
 /// The TRANSPOSE output-column name for one ID value: an explicit PREFIX= is
-/// ATTACHED to the ID value (`prefix=dt_ id obsid` → dt_1) — that's SAS's way of
+/// ATTACHED to the ID value (`prefix=dt_ id obsid` → dt_1) - that's SAS's way of
 /// making numeric IDs valid names; a real EPOCH macro's six transposes are
 /// distinguished ONLY by it (QA-transprefixid). Without PREFIX=, a numeric ID
-/// value ("1") isn't a valid SAS name — SAS prepends `_` (`_1`, BUG-transnumid).
+/// value ("1") isn't a valid SAS name - SAS prepends `_` (`_1`, BUG-transnumid).
 /// SUFFIX= is appended last (BUG-transposesuffix). Name generation and the fill
-/// loop MUST agree on this — hence one helper.
+/// loop MUST agree on this - hence one helper.
 fn idColName(arena: std.mem.Allocator, prefix: []const u8, prefix_set: bool, suffix: []const u8, raw: []const u8) ![]const u8 {
     var txt = raw;
     if (prefix_set) {
@@ -4520,16 +4520,16 @@ fn idColName(arena: std.mem.Allocator, prefix: []const u8, prefix_set: bool, suf
         txt = try std.fmt.allocPrint(arena, "_{s}", .{txt});
     }
     if (suffix.len > 0) txt = try std.fmt.allocPrint(arena, "{s}{s}", .{ txt, suffix });
-    // BUG-transposeidmangle: the decorated name must be a VALID V7 name — route
+    // BUG-transposeidmangle: the decorated name must be a VALID V7 name - route
     // through the same mangling PROC IMPORT uses (validName): non-alnum/_ chars
     // → `_`, leading digit → `_` prefix, ≤32 bytes. Two ID values that mangle to
     // the same name collapse onto one column via the val_names/name_index dedup
-    // above — SAS's reuse-the-same-column behavior, no duplicate/illegal column.
+    // above - SAS's reuse-the-same-column behavior, no duplicate/illegal column.
     return io.validName(arena, txt, 0);
 }
 
 /// The ID-value text a column is named from: SAS 9.4 names transposed columns
-/// from the ID var's FORMATTED value (BUG-transposeidfmt — `id dt` with
+/// from the ID var's FORMATTED value (BUG-transposeidfmt - `id dt` with
 /// `format dt date9.` names `_01JAN2020`, not the raw `_21915`). Unformatted
 /// keeps the compact cellText rendering (tick208-verified). Width-padded
 /// formatted text is blank-trimmed before idColName mangles it.
@@ -4572,7 +4572,7 @@ fn nameIndex(list: []const []const u8, name: []const u8) ?usize {
 // not its exact format-driven width; ACROSS/COMPUTED/BREAK/RBREAK/BY and proc options
 // beyond NOWD fail loud (D-002) until their increments land.
 
-/// One `define VAR / …;` — its header label and REPORT usage (GROUP collapses to
+/// One `define VAR / …;` - its header label and REPORT usage (GROUP collapses to
 /// one row per level; a stat marks an analysis column aggregated over the group).
 /// SAS 9.4 PROC REPORT doc, DEFINE statement: ORDER "orders the rows of the
 /// report according to the values" of the ORDER vars (left to right) and a
@@ -4584,9 +4584,9 @@ const Define = struct {
     group: bool = false,
     order: bool = false,
     desc: bool = false,
-    display: bool = false, // explicit DISPLAY usage — keeps the report a detail listing (BUG-reportanalysis)
-    computed: bool = false, // COMPUTED usage — value comes from a `compute` block, not a source column (FEAT-procreport-2)
-    noprint: bool = false, // NOPRINT — column is computed/grouped/ordered but omitted from output (tick240 F4)
+    display: bool = false, // explicit DISPLAY usage - keeps the report a detail listing (BUG-reportanalysis)
+    computed: bool = false, // COMPUTED usage - value comes from a `compute` block, not a source column (FEAT-procreport-2)
+    noprint: bool = false, // NOPRINT - column is computed/grouped/ordered but omitted from output (tick240 F4)
     order_mode: GroupOrder = .internal, // ORDER=INTERNAL|DATA|FREQ|FORMATTED sub-ordering (tick240 F3)
     stat: ?StatKind = null,
     width: ?usize = null,
@@ -4607,9 +4607,9 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
             in_name = v;
             i += 3;
         } else if (tkKw(toks[i], "nowd") or tkKw(toks[i], "nowindows")) {
-            i += 1; // the windowing toggle is meaningless under this harness — the one accepted no-op
+            i += 1; // the windowing toggle is meaningless under this harness - the one accepted no-op
         } else if (toks[i].tag == .name) {
-            // HEADLINE/HEADSKIP/NOCENTER/… change the page layout we don't model —
+            // HEADLINE/HEADSKIP/NOCENTER/… change the page layout we don't model -
             // fail loud (D-002), never silently emit the plain layout (FEAT-procreport-1).
             unsupported("PROC REPORT: proc-statement options (HEADLINE/HEADSKIP/NOCENTER/…)");
             return;
@@ -4620,12 +4620,12 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
     var cols: std.ArrayList([]const u8) = .empty;
     var defs: std.ArrayList(Define) = .empty;
     // ACROSS crossing (`define x / across;`) and comma-nested columns
-    // (`column reg prod,sales;`) build a crosstab we don't implement — fail loud
+    // (`column reg prod,sales;`) build a crosstab we don't implement - fail loud
     // rather than emit a plausible-but-wrong collapsed table (BUG-reportacross).
     var across = false;
     var break_after: ?[]const u8 = null; // BREAK AFTER <var> / SUMMARIZE subtotal target (FEAT-procreport-2)
     var rbreak_after = false; // RBREAK AFTER / SUMMARIZE grand-total line
-    var break_before: ?[]const u8 = null; // BREAK BEFORE <var> / SUMMARIZE — subtotal BEFORE each group (procreport rest3)
+    var break_before: ?[]const u8 = null; // BREAK BEFORE <var> / SUMMARIZE - subtotal BEFORE each group (procreport rest3)
     var rbreak_before = false; // RBREAK BEFORE / SUMMARIZE grand-total line, before all rows
     var computes: std.ArrayList(Compute) = .empty; // `compute <col>; … endcomp;` blocks (FEAT-procreport-2)
     var after_computes: std.ArrayList(AfterSrc) = .empty; // `compute after [<var>]; … endcomp;` break-attached (compute-at-break)
@@ -4633,9 +4633,9 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
         if (tkKw(toks[i], "run") or tkKw(toks[i], "quit")) break;
         if (tkKw(toks[i], "break") or tkKw(toks[i], "rbreak")) {
             // `break before|after <var> / summarize;` + `rbreak before|after / summarize;`
-            // — subtotal + grand-total lines (FEAT-procreport-2, BEFORE added in rest3).
+            // - subtotal + grand-total lines (FEAT-procreport-2, BEFORE added in rest3).
             // Everything else in the break family (OL/UL/SKIP/PAGE/SUPPRESS, no SUMMARIZE)
-            // is a later increment — fail loud (D-002), never a silently-dropped break.
+            // is a later increment - fail loud (D-002), never a silently-dropped break.
             const is_r = tkKw(toks[i], "rbreak");
             i += 1;
             const is_before = i < toks.len and tkKw(toks[i], "before");
@@ -4677,7 +4677,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
             continue;
         }
         if (tkKw(toks[i], "by")) {
-            // BY-group reporting (one report per group) is FEAT-procreport-2 — fail
+            // BY-group reporting (one report per group) is FEAT-procreport-2 - fail
             // loud (D-002), never silently emit one merged report (BUG-procreportby).
             unsupported("PROC REPORT BY-group processing is not supported");
             return;
@@ -4742,7 +4742,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
                 else if (eqi(kw, "order") and atTag(toks, i + 1, .eq) and atTag(toks, i + 2, .name)) {
                     // ORDER=INTERNAL|DATA|FREQ|FORMATTED is the level-sequencing OPTION
                     // (valid with GROUP/ORDER/ACROSS usage); it does NOT itself confer
-                    // ORDER usage — that's the bare `order` keyword below (tick240 F3).
+                    // ORDER usage - that's the bare `order` keyword below (tick240 F3).
                     const v = toks[i + 2].text;
                     d.order_mode = if (eqi(v, "internal")) .internal //
                         else if (eqi(v, "data")) .data //
@@ -4755,8 +4755,8 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
                     i += 2;
                 } else if (eqi(kw, "order")) d.order = true // bare ORDER usage: sorts rows, blanks repeats
                 else if (eqi(kw, "descending")) d.desc = true // DESCENDING on an ORDER/GROUP var
-                else if (eqi(kw, "across")) across = true // crosstab dimension — unsupported
-                else if (eqi(kw, "computed")) d.computed = true // derived col — value from a compute block (FEAT-procreport-2)
+                else if (eqi(kw, "across")) across = true // crosstab dimension - unsupported
+                else if (eqi(kw, "computed")) d.computed = true // derived col - value from a compute block (FEAT-procreport-2)
                 else if (eqi(kw, "analysis")) {} // usage marker; the stat word carries the stat (bare = SUM default)
                 else if (eqi(kw, "noprint")) d.noprint = true // omit column from output (tick240 F4)
                 else if (eqi(kw, "width") and atTag(toks, i + 1, .eq) and atTag(toks, i + 2, .number)) {
@@ -4767,12 +4767,12 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
                     if (end > i + 2) d.format = try joinFmt(arena, toks[i + 2 .. end]);
                     i = end - 1; // the loop's own += 1 lands on the next attribute
                 } else if (eqi(kw, "spacing") and atTag(toks, i + 1, .eq) and atTag(toks, i + 2, .number)) {
-                    i += 2; // page-layout knob we don't model — accept + skip (was already a no-op)
+                    i += 2; // page-layout knob we don't model - accept + skip (was already a no-op)
                 } else if (eqi(kw, "display")) d.display = true // explicit DISPLAY usage (BUG-reportanalysis)
                 else if (statFromKw(kw)) |sk| d.stat = sk // sum/mean/min/max/n → analysis stat
                 else {
                     // tick240 F2/F5 (shared root): the DEFINE-option scan used to DROP
-                    // any unrecognized token — a garbage option (`zonk`) OR an analysis
+                    // any unrecognized token - a garbage option (`zonk`) OR an analysis
                     // STATISTIC we don't render (PCTSUM/PCTN/PCT) both fell through and
                     // the report silently defaulted to SUM. Fail loud instead.
                     unsupported("PROC REPORT: unsupported DEFINE option/statistic");
@@ -4789,7 +4789,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
     }
     const raw = (if (in_name) |n| lib.find(n) else lastDataset(lib)) orelse {
         // BUG-procmissingrc2: missing table = user error (D-009 rc 1), not a
-        // gap — the runSort (GH#8) absent-input arm: "File {s} does not
+        // gap - the runSort (GH#8) absent-input arm: "File {s} does not
         // exist" + the runExpanded step-halt NOTE, rc 1. NOT unsupported().
         diags.report(.err, if (toks.len > 1) toks[1].line else 0, "File {s} does not exist", .{in_name orelse "_last_"}) catch {};
         return;
@@ -4797,7 +4797,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
     const ds = try procInput(arena, raw, toks, diags); // WHERE stmt / data= options (BUG-procwhere)
 
     // Output columns in COLUMN order. `src[j]` is the source ds index, or null for
-    // a COMPUTED column (`define / computed`, or the target of a `compute` block) —
+    // a COMPUTED column (`define / computed`, or the target of a `compute` block) -
     // its value is filled per row from the compute expression below (FEAT-procreport-2).
     var src: std.ArrayList(?usize) = .empty;
     var onames: std.ArrayList([]const u8) = .empty; // output column name (headers + compute refs)
@@ -4848,7 +4848,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
         if (maybe_ix == null) has_computed = true;
     }
     // A compute block that ASSIGNS a computed column not in the COLUMN list would
-    // be a silent no-op — fail loud. A `compute after|before` that only holds LINE
+    // be a silent no-op - fail loud. A `compute after|before` that only holds LINE
     // statements (no `=` assignment) needs no computed column, so it is allowed.
     var assigns_a_col = computes.items.len > 0;
     for (after_computes.items) |ac| {
@@ -4888,7 +4888,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
         if (meta[j].group) try gcols.append(arena, .{ .ix = ix, .desc = meta[j].desc, .mode = meta[j].order_mode });
     };
     // A GROUP report with a PLAIN per-row COMPUTE (or a computed column with no
-    // break to attach a summary line to) runs the compute over aggregated rows — a
+    // break to attach a summary line to) runs the compute over aggregated rows - a
     // later increment (fail loud). A break-attached `compute after` is allowed: it
     // fills the SUMMARIZE rows only, handled below (compute-at-break).
     const any_break = break_after != null or rbreak_after or break_before != null or rbreak_before;
@@ -4898,11 +4898,11 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
     }
 
     // ORDER usage: stable-sort a COPY of the rows by the ORDER columns (left to
-    // right in the COLUMN list) — a REPORT never reorders its input dataset.
+    // right in the COLUMN list) - a REPORT never reorders its input dataset.
     var okeys: std.ArrayList(SortKey) = .empty;
     for (src.items, 0..) |maybe_ix, j| if (maybe_ix) |ix| {
         if (meta[j].order) {
-            // ORDER=FREQ/DATA/FORMATTED sequences by frequency/appearance/label — the
+            // ORDER=FREQ/DATA/FORMATTED sequences by frequency/appearance/label - the
             // ORDER-usage detail path only knows value sort. Honored on GROUP vars
             // (collectGroupsRows) but fail loud here rather than silently value-sort.
             // ponytail: ORDER-usage FREQ/DATA needs per-value counts; deferred.
@@ -4924,7 +4924,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
     // Summary rows are interleaved into `body` after it is built (below).
     const needs_break = any_break;
     // compute-at-break: a `compute after|before` block with no matching break to
-    // attach to would be a silent no-op — fail loud, and pin each block to a break.
+    // attach to would be a silent no-op - fail loud, and pin each block to a break.
     if (after_computes.items.len > 0 and !needs_break) {
         unsupported("PROC REPORT COMPUTE AFTER/BEFORE without a matching BREAK/RBREAK");
         return;
@@ -4942,7 +4942,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
         // compute-at-break: a computed column on a break/rbreak report is supported
         // ONLY via `compute after|before` blocks that fill the SUMMARIZE rows. A
         // plain per-row COMPUTE alongside a break, or a computed column with no
-        // `compute after|before` to drive it, is a later increment — fail loud.
+        // `compute after|before` to drive it, is a later increment - fail loud.
         if (computes.items.len > 0 or after_computes.items.len == 0) {
             unsupported("PROC REPORT BREAK/RBREAK with a plain COMPUTE or an undriven computed column");
             return;
@@ -4967,7 +4967,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
         // ORDER columns (DESCENDING-aware) then the GROUP columns. Without this the
         // grouping key was GROUP-only, collapsing rows across ORDER values, dropping
         // later ORDER levels and mislabelling the survivors. Group-only (no ORDER)
-        // keeps the exact .internal sort on the group cols — byte-identical.
+        // keeps the exact .internal sort on the group cols - byte-identical.
         const gidx = try arena.alloc(usize, gcols.items.len);
         for (gcols.items, 0..) |g, k| gidx[k] = g.ix;
         const groups = if (okeys.items.len > 0) blk: {
@@ -4979,7 +4979,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
             }
             for (gcols.items) |g| {
                 // FREQ/DATA group sequencing can't compose with the ORDER value sort
-                // here — fail loud rather than emit a wrong table (ponytail: deferred).
+                // here - fail loud rather than emit a wrong table (ponytail: deferred).
                 if (g.mode != .internal) {
                     unsupported("PROC REPORT: GROUP ORDER=FREQ/DATA with an ORDER column is unsupported");
                     return;
@@ -4993,7 +4993,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
             // Group-only sequencing (tick240 F1/F3). Default INTERNAL-ascending is the
             // historical .internal sort (byte-identical). FREQ/DATA sequence the whole
             // group set; INTERNAL+DESCENDING pre-sorts rows by the group keys (desc-aware)
-            // then keeps that order via .data. FORMATTED needs format bands — fail loud.
+            // then keeps that order via .data. FORMATTED needs format bands - fail loud.
             var freq = false;
             var data = false;
             var any_desc = false;
@@ -5027,7 +5027,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
             var group_changed = prev_rep == null; // GROUP repeat-blanking tracks GROUP cols only
             for (src.items, 0..) |maybe_ix, j| {
                 const ix = maybe_ix orelse {
-                    // COMPUTED column on a GROUP body row: blank — only the break's
+                    // COMPUTED column on a GROUP body row: blank - only the break's
                     // `compute after` fills it, on the SUMMARIZE line (compute-at-break).
                     texts[j] = "";
                     continue;
@@ -5039,7 +5039,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
                     texts[j] = if (!order_changed) "" else try rptCell(arena, g.rep[ix], meta[j], ds.columns.items[ix]);
                 } else if (meta[j].group) {
                     // GROUP value prints only when it or a GROUP col to its LEFT
-                    // changed vs the previous row; else SAS blanks the repeat —
+                    // changed vs the previous row; else SAS blanks the repeat -
                     // Procedures Guide 7th ed printed p.2094: "PROC REPORT does not
                     // repeat the values of a group variable from one row to the next
                     // if the value does not change, unless a group variable to its
@@ -5059,7 +5059,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
             }
         }
     } else {
-        // ALL-analysis report — no GROUP/ORDER column and no DISPLAY column, i.e.
+        // ALL-analysis report - no GROUP/ORDER column and no DISPLAY column, i.e.
         // every column an analysis variable: SAS 9.4 collapses the listing to ONE
         // summary row, default statistic SUM ("a report that contains only analysis
         // variables has one row") (BUG-reportanalysis). A char column defaults to
@@ -5080,7 +5080,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
             }
             try body.append(arena, .{ .cells = texts });
         } else {
-            // Detail listing — the one path that carries COMPUTED columns. Parse the
+            // Detail listing - the one path that carries COMPUTED columns. Parse the
             // compute blocks ONCE (arithmetic over displayed numeric columns), then
             // per row bind the source values into a PDV and evaluate (FEAT-procreport-2).
             var pdv = Pdv.init(arena);
@@ -5094,7 +5094,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
             for (rows) |row| {
                 const texts = try arena.alloc([]const u8, n);
                 // An ORDER column's value prints only when it or an ORDER column to
-                // its LEFT changes — SAS listing blanks the repeats (doc, above).
+                // its LEFT changes - SAS listing blanks the repeats (doc, above).
                 var changed = prev == null;
                 if (has_computed) {
                     // bind this row's source columns, then run each `col = expr;`
@@ -5173,8 +5173,8 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
                 }
             }
         }
-        // grand total over ALL detail rows — SUM/MEAN over raw obs, not over subtotals.
-        // rbreakemptybody: an empty (zero-obs / WHERE-filtered) report is header-only —
+        // grand total over ALL detail rows - SUM/MEAN over raw obs, not over subtotals.
+        // rbreakemptybody: an empty (zero-obs / WHERE-filtered) report is header-only -
         // skip the grand total rather than emit a spurious line of missings.
         if (rbreak_after and body.items.len > 0) {
             try final.append(arena, .{ .cells = try reportSummary(arena, src.items, meta, onames.items, is_num, ds, rows, null, null, afterAssigns(after_blocks, null, false), pdv_p, ev_p) });
@@ -5202,7 +5202,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
             w = @max(w, row.cells[j].len);
         };
         // A numeric column WITHOUT a format gets SAS's wider default (+2); a column
-        // with an explicit FORMAT= renders at exactly the format width — the same
+        // with an explicit FORMAT= renders at exactly the format width - the same
         // width PROC PRINT uses (BUG-reportnumwidth). rptCell already padded the cell
         // to the format width, so dropping the +2 leaves the SAS-correct width; the
         // 2-blank inter-column gutter is separate (emitReportLine, SPACING=2).
@@ -5235,7 +5235,7 @@ pub fn runReport(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag
 /// (SUM default, or the DEFINE's `analysis <stat>`) over `accum` (the break group's
 /// raw detail rows, or the whole report for a grand total); the break variable
 /// shows its value (`bix`/`rep`, both null for RBREAK); every other column is blank
-/// — SAS's summary-line layout (FEAT-procreport-2).
+/// - SAS's summary-line layout (FEAT-procreport-2).
 fn reportSummary(arena: std.mem.Allocator, src: []const ?usize, meta: []const Define, onames: []const []const u8, is_num: []const bool, ds: *Dataset, accum: []const []const Value, bix: ?usize, rep: ?[]const Value, assigns: []const Assign, pdv: ?*Pdv, ev: ?*eval.Evaluator) diag.Error![]const []const u8 {
     const texts = try arena.alloc([]const u8, src.len);
     // Reset the compute PDV so a numeric column absent from THIS summary row
@@ -5308,7 +5308,7 @@ fn pdvColNames(arena: std.mem.Allocator, src: []const ?usize, onames: []const []
 /// Resolve a `_c<n>_` absolute column reference to the PDV name of the Nth
 /// COLUMN-list column (1-based). Returns null when `text` is not the `_cN_` form,
 /// N is out of range, or that column is not a referenceable numeric column
-/// (char/unavailable) — the caller then fails loud (FEAT-procreport rest4).
+/// (char/unavailable) - the caller then fails loud (FEAT-procreport rest4).
 fn resolveCn(text: []const u8, pdvNames: []const []const u8) ?[]const u8 {
     if (text.len < 4 or text[0] != '_' or text[text.len - 1] != '_') return null;
     if (!(text[1] == 'c' or text[1] == 'C')) return null;
@@ -5333,7 +5333,7 @@ const AfterBlock = struct { bvar: ?[]const u8, before: bool, assigns: []const As
 const BreakKey = struct { j: usize, key: []const usize };
 
 /// Resolve BREAK var `bvar` to its COLUMN position and break-boundary key (the
-/// group/order source columns at or left of it — a run shares these values). Fails
+/// group/order source columns at or left of it - a run shares these values). Fails
 /// LOUD + returns null when `bvar` is not a displayed GROUP/ORDER column.
 fn breakKey(arena: std.mem.Allocator, onames: []const []const u8, meta: []const Define, src: []const ?usize, n: usize, bvar: []const u8) diag.Error!?BreakKey {
     const bj = colPosReport(onames, bvar);
@@ -5363,8 +5363,8 @@ fn loadComputePdv(pdv: *Pdv, src: []const ?usize, onames: []const []const u8, ds
 /// to `out`). Supports simple arithmetic (`+ - * / ( )`, numeric literals),
 /// referenceable column names, and `_c<n>_` absolute column refs (rewritten to
 /// the Nth column's PDV name via `pdvNames`; FEAT-procreport rest4). Anything
-/// else — IF/THEN, CALL DEFINE, functions, character ops, a `.stat` aggregate
-/// ref, an unresolvable reference — fails LOUD via `unsupported()` and returns
+/// else - IF/THEN, CALL DEFINE, functions, character ops, a `.stat` aggregate
+/// ref, an unresolvable reference - fails LOUD via `unsupported()` and returns
 /// false (no partial/wrong report). LINE is allowed only in after/before blocks
 /// (out_lines non-null). The parser/evaluator are the shared DATA-step stack.
 fn parseComputeBody(arena: std.mem.Allocator, diags: *diag.Diagnostics, pdv: *Pdv, pdvNames: []const []const u8, body: []const Token, out: *std.ArrayList(Assign), out_lines: ?*std.ArrayList(LineSpec)) diag.Error!bool {
@@ -5374,7 +5374,7 @@ fn parseComputeBody(arena: std.mem.Allocator, diags: *diag.Diagnostics, pdv: *Pd
             k += 1;
             continue;
         }
-        // LINE statement (basic) — only in a `compute after|before` break block
+        // LINE statement (basic) - only in a `compute after|before` break block
         // (out_lines non-null); a LINE in a plain per-row `compute <col>` has no
         // summary position and fails loud below via the assignment guard.
         if (body[k].tag == .name and eqi(body[k].text, "line") and out_lines != null) {
@@ -5401,7 +5401,7 @@ fn parseComputeBody(arena: std.mem.Allocator, diags: *diag.Diagnostics, pdv: *Pd
         const etoks = try arena.dupe(Token, body[estart..k]);
         // Arithmetic-only guard: reject anything that isn't a number, a
         // + - * / ( ) operator, or a name that resolves to a referenceable
-        // numeric column — this is what makes an unresolvable reference or an
+        // numeric column - this is what makes an unresolvable reference or an
         // unsupported form fail LOUD rather than bind to silent missing.
         for (etoks) |*tok| switch (tok.tag) {
             .number, .plus, .minus, .star, .slash, .lparen, .rparen => {},
@@ -5440,7 +5440,7 @@ fn parseComputes(arena: std.mem.Allocator, diags: *diag.Diagnostics, pdv: *Pdv, 
     try loadComputePdv(pdv, src, onames, ds);
     const pdv_names = try pdvColNames(arena, src, onames, ds);
     // SAS 9.4 runs COMPUTE blocks in COLUMN order (left-to-right in the COLUMN
-    // statement), NOT source-text order — a block for a later column can be
+    // statement), NOT source-text order - a block for a later column can be
     // physically written before the block it depends on and must still see that
     // earlier column's just-computed value (BUG-reportcomputeorder). Stable-sort
     // the blocks by their target column's position in the column list; a genuine
@@ -5481,7 +5481,7 @@ fn afterMatch(b: AfterBlock, bvar: ?[]const u8, before: bool) bool {
     return if (bvar) |v| (b.bvar != null and eqi(b.bvar.?, v)) else b.bvar == null;
 }
 
-/// The assignments for a given break placement; empty when no block matches —
+/// The assignments for a given break placement; empty when no block matches -
 /// its computed cells stay blank.
 fn afterAssigns(blocks: []const AfterBlock, bvar: ?[]const u8, before: bool) []const Assign {
     for (blocks) |b| if (afterMatch(b, bvar, before)) return b.assigns;
@@ -5552,7 +5552,7 @@ fn parseLine(arena: std.mem.Allocator, pdv: *Pdv, body: []const Token, k: *usize
 }
 
 /// End of a LINE format spec `[$]name[.d] | number` that ENDS in a period; returns
-/// `start` (no format) when there's no trailing dot — so `line a b;` reads two vars
+/// `start` (no format) when there's no trailing dot - so `line a b;` reads two vars
 /// while `line a dollar8.;` reads var `a` formatted (rest3). Mirrors fmtSpecEnd but
 /// requires the dot that disambiguates a format from a following variable.
 fn lineFmtEnd(body: []const Token, start: usize) usize {
@@ -5606,7 +5606,7 @@ fn rptCell(arena: std.mem.Allocator, v: Value, d: Define, col: Column) ![]const 
     return cellText(arena, v);
 }
 
-/// End of a FORMAT= spec value in a DEFINE: `[$]name[w][.[d]]` — mirrors
+/// End of a FORMAT= spec value in a DEFINE: `[$]name[w][.[d]]` - mirrors
 /// main.zig's skipFormatValue so the define scan stays aligned with the next
 /// attribute. Never advances past `start` on an odd token (caller guards).
 fn fmtSpecEnd(toks: []const Token, start: usize) usize {
@@ -5615,7 +5615,7 @@ fn fmtSpecEnd(toks: []const Token, start: usize) usize {
     if (atTag(toks, i, .name)) {
         i += 1;
         // Named format's `.d`: the lexer emits `comma10.2` as name(`comma10`) +
-        // number(`.2`) — the decimals ride the number token (BUG-reportfmtdec).
+        // number(`.2`) - the decimals ride the number token (BUG-reportfmtdec).
         // A bare `8.2` is a single number token, handled by the else branch.
         if (atTag(toks, i, .number) and toks[i].text.len > 0 and toks[i].text[0] == '.') i += 1;
     } else if (atTag(toks, i, .number)) i += 1;
@@ -5647,7 +5647,7 @@ fn emitReportLine(arena: std.mem.Allocator, out: *std.ArrayList(u8), texts: []co
 
 // ── PROC UNIVARIATE ─────────────────────────────────────────────────────────
 //
-// `proc univariate data=IN; var v1 v2 …; run;` — SAS 9.4's default report per
+// `proc univariate data=IN; var v1 v2 …; run;` - SAS 9.4's default report per
 // analysis variable, in order: Moments (N, Mean, Std Dev, Variance, Skewness,
 // Kurtosis, USS/CSS, Coeff Variation, Std Error Mean), Basic Statistical
 // Measures (Location: Mean/Median/Mode; Variability: Std Dev/Variance/Range/
@@ -5655,11 +5655,11 @@ fn emitReportLine(arena: std.mem.Allocator, out: *std.ArrayList(u8), texts: []co
 // p-value), Quantiles (100% Max / 99 / 95 / 75 Q3 / 50 Median / 25 Q1 / 5 / 1 /
 // 0% Min, PCTLDEF=5), and Extreme Observations (5 lowest + 5 highest values
 // with obs numbers). BUG-univreport: the middle/end sections were previously
-// omitted SILENTLY — the report stopped after Quantiles.
+// omitted SILENTLY - the report stopped after Quantiles.
 // ponytail: no plots or BY; values match SAS, column widths are house-clean.
 
 /// Documented SAS 9.4 PROC UNIVARIATE statement options opensas does NOT
-/// implement — the catch-all's gap arm (rc 2); anything else is the user's
+/// implement - the catch-all's gap arm (rc 2); anything else is the user's
 /// typo (rc 1). The set is CLOSED by the PROC UNIVARIATE Statement dictionary
 /// (Base SAS 9.4 Procedures Guide: Statistical Procedures, printed
 /// pp. 300-306, === pdf 303…309 ===); DATA=/VARDEF=/PCTLDEF=/MU0=/NOPRINT are
@@ -5674,7 +5674,7 @@ fn isUnivGapOption(kw: []const u8) bool {
 /// two doc-closed sets (Statistical Procedures): the percentile-options
 /// (printed pp. 356-358, === pdf 359…361 ===) and the Table 4.14 statistical
 /// keywords statFromKw doesn't decode (printed pp. 354-356,
-/// === pdf 357/358/359 ===) — GEOMEAN/HARMEAN/NOBS/Q2/the robust QN…STD_SN/
+/// === pdf 357/358/359 ===) - GEOMEAN/HARMEAN/NOBS/Q2/the robust QN…STD_SN/
 /// hypothesis-testing MSIGN…PROBS families. Gap arm (rc 2); a typo stays rc 1.
 fn isUnivOutGapOption(kw: []const u8) bool {
     inline for (.{ "cipctldf", "ciquantdf", "cipctlnormal", "ciquantnormal", "pctlgroup", "pctlname", "pctlndec", "pctlpre", "pctlpts", "geomean", "harmean", "nobs", "q2", "gini", "mad", "qn", "sn", "std_gini", "std_mad", "std_qn", "std_qrange", "std_sn", "msign", "normaltest", "signrank", "probm", "probn", "probs" }) |opt|
@@ -5698,14 +5698,14 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
             i += 3;
         } else if (optAt(toks, i, "vardef")) |v| {
             vardef = varDefFromName(v) orelse
-                return diags.fail(error.ParseError, toks[i].line, "PROC UNIVARIATE: VARDEF={s} is not valid — expected DF, N, WDF, or WEIGHT", .{v});
+                return diags.fail(error.ParseError, toks[i].line, "PROC UNIVARIATE: VARDEF={s} is not valid - expected DF, N, WDF, or WEIGHT", .{v});
             i += 3;
         } else if (i + 2 < toks.len and tkKw(toks[i], "pctldef") and toks[i + 1].tag == .eq) {
             // the value is a .number token (optAt only takes names)
             const v = toks[i + 2];
             const pd: u8 = if (v.tag == .number) std.fmt.parseInt(u8, v.text, 10) catch 0 else 0;
             if (pd < 1 or pd > 5)
-                return diags.fail(error.ParseError, v.line, "PROC UNIVARIATE: PCTLDEF={s} is not valid — expected an integer 1-5", .{v.text});
+                return diags.fail(error.ParseError, v.line, "PROC UNIVARIATE: PCTLDEF={s} is not valid - expected an integer 1-5", .{v.text});
             pctldef = pd;
             i += 3;
         } else if (i + 2 < toks.len and tkKw(toks[i], "mu0") and toks[i + 1].tag == .eq) {
@@ -5724,7 +5724,7 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
             noprint = true;
             i += 1;
         } else if (toks[i].tag == .lparen) {
-            // data=d(keep=/where=…) dataset options — applied via procInput.
+            // data=d(keep=/where=…) dataset options - applied via procInput.
             // Skip as a group (MEANS' arm verbatim): the fall-through errored
             // rc 1 with a DEGENERATE empty name (the lparen token's text) on
             // valid SAS.
@@ -5748,9 +5748,9 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
     var class_missing = false; // `class v / missing` re-includes the missing level
     var out_name: ?[]const u8 = null; // OUTPUT OUT= target (BUG-univoutput)
     var out_stats: std.ArrayList(OutStat) = .empty;
-    var weight_var: ?[]const u8 = null; // `weight w;` — weighted moments/quantiles (WEIGHT-uni-impl)
-    var freq_var: ?[]const u8 = null; // `freq f;` — each obs counts trunc(f) times (F2)
-    var fmt_specs: std.ArrayList(VarSpec) = .empty; // `format v spec;` — CLASS groups by formatted value (NOTE-freqtablesfmt)
+    var weight_var: ?[]const u8 = null; // `weight w;` - weighted moments/quantiles (WEIGHT-uni-impl)
+    var freq_var: ?[]const u8 = null; // `freq f;` - each obs counts trunc(f) times (F2)
+    var fmt_specs: std.ArrayList(VarSpec) = .empty; // `format v spec;` - CLASS groups by formatted value (NOTE-freqtablesfmt)
     while (i < toks.len and toks[i].tag != .eof) {
         if (tkKw(toks[i], "run") or tkKw(toks[i], "quit")) break;
         if (tkKw(toks[i], "var")) {
@@ -5760,17 +5760,17 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
         } else if (tkKw(toks[i], "by")) {
             try parseProcBy(arena, diags, toks, &i, &bys);
         } else if (tkKw(toks[i], "weight")) {
-            i += 1; // `weight w;` — the (single) weight variable (WEIGHT-uni-impl)
+            i += 1; // `weight w;` - the (single) weight variable (WEIGHT-uni-impl)
             while (i < toks.len and toks[i].tag != .semicolon) : (i += 1) {
                 if (toks[i].tag == .name) weight_var = toks[i].text;
             }
         } else if (tkKw(toks[i], "freq")) {
-            i += 1; // `freq f;` — frequency var; expanded like PROC MEANS (F2)
+            i += 1; // `freq f;` - frequency var; expanded like PROC MEANS (F2)
             while (i < toks.len and toks[i].tag != .semicolon) : (i += 1) {
                 if (toks[i].tag == .name) freq_var = toks[i].text;
             }
         } else if (tkKw(toks[i], "output")) {
-            // `output out=NAME <stat = var> …;` — one summary row of the requested stats
+            // `output out=NAME <stat = var> …;` - one summary row of the requested stats
             i += 1;
             while (i < toks.len and toks[i].tag != .semicolon) {
                 if (toks[i].tag == .name and i + 2 < toks.len and toks[i + 1].tag == .eq) {
@@ -5778,11 +5778,11 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
                     const val = toks[i + 2].text;
                     if (eqi(key, "out")) out_name = val else if (statFromKw(key)) |sk| {
                         // Decodes for the MEANS family but is NOT a UNIVARIATE OUTPUT
-                        // keyword (Table 4.14, printed p.354) — SAS rejects it here too,
+                        // keyword (Table 4.14, printed p.354) - SAS rejects it here too,
                         // so accepting it would be worse than the old error: we would
                         // silently honour syntax SAS refuses (GAP-meanspctlkeywords).
                         if (univariateRejectsStatKw(key))
-                            return diags.fail(error.ParseError, toks[i].line, "PROC UNIVARIATE: OUTPUT keyword {s}= is not a UNIVARIATE statistic — Table 4.14 lists PROBT (no PRT alias) and stops at P1/P5/P10/P25/P50/P75/P90/P95/P99; use PCTLPTS= for other percentiles", .{key});
+                            return diags.fail(error.ParseError, toks[i].line, "PROC UNIVARIATE: OUTPUT keyword {s}= is not a UNIVARIATE statistic - Table 4.14 lists PROBT (no PRT alias) and stops at P1/P5/P10/P25/P50/P75/P90/P95/P99; use PCTLPTS= for other percentiles", .{key});
                         try out_stats.append(arena, .{ .stat = sk, .name = val });
                     }
                     // Any other OUTPUT option (pctlpts=/pctlpre= and friends) is unimplemented;
@@ -5791,15 +5791,15 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
                     // (GAP-meansoutguards). SPLIT: the doc closes the keyword set, so a
                     // documented name is the recognized gap (rc 2); a typo stays rc 1.
                     else if (isUnivOutGapOption(key))
-                        return failGap(diags, toks[i].line, "PROC UNIVARIATE: OUTPUT OUT= option {s}= is not yet supported — refusing to silently drop requested output (e.g. pctlpts/pctlpre percentiles)", .{key})
-                    else return diags.fail(error.ParseError, toks[i].line, "PROC UNIVARIATE: OUTPUT OUT= option {s}= is not yet supported — refusing to silently drop requested output (e.g. pctlpts/pctlpre percentiles)", .{key});
+                        return failGap(diags, toks[i].line, "PROC UNIVARIATE: OUTPUT OUT= option {s}= is not yet supported - refusing to silently drop requested output (e.g. pctlpts/pctlpre percentiles)", .{key})
+                    else return diags.fail(error.ParseError, toks[i].line, "PROC UNIVARIATE: OUTPUT OUT= option {s}= is not yet supported - refusing to silently drop requested output (e.g. pctlpts/pctlpre percentiles)", .{key});
                     i += 3;
                 } else i += 1;
             }
         } else if (tkKw(toks[i], "format")) {
             try parseProcFormat(arena, toks, &i, &fmt_specs); // leaves i at the `;` (as MEANS)
         } else if (tkKw(toks[i], "class")) {
-            // per-level analysis (BUG-univclass) — swallowing CLASS pooled the stats.
+            // per-level analysis (BUG-univclass) - swallowing CLASS pooled the stats.
             i += 1;
             while (i < toks.len and toks[i].tag != .semicolon) : (i += 1) {
                 if (toks[i].tag == .slash) {
@@ -5812,10 +5812,10 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
                 if (toks[i].tag == .name) try appendVarListName(arena, toks, &i, &classes); // GAP-varcolonprefix-procs: keep `pfx:`
             }
         } else if (tkKw(toks[i], "id")) {
-            // ID labels extreme observations — a table we never print, so honoring
+            // ID labels extreme observations - a table we never print, so honoring
             // it silently is impossible; fail loud instead of swallowing (BUG-univclass).
             // ID is a valid SAS 9.4 PROC UNIVARIATE statement → a gap (rc 2).
-            return failGap(diags, toks[i].line, "PROC UNIVARIATE: ID statement is not yet supported (extreme-observation labeling) — refusing to silently ignore it", .{});
+            return failGap(diags, toks[i].line, "PROC UNIVARIATE: ID statement is not yet supported (extreme-observation labeling) - refusing to silently ignore it", .{});
         } else if (tkKw(toks[i], "histogram") or tkKw(toks[i], "cdfplot") or tkKw(toks[i], "qqplot") or tkKw(toks[i], "ppplot") or tkKw(toks[i], "probplot")) {
             // Plot statements produce graphics we never render; swallowing them
             // silently no-op'd a requested plot (BUG-univplotnoop). Fail loud, as
@@ -5825,18 +5825,18 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
         } else if (tkKw(toks[i], "inset")) {
             // INSET is a valid SAS 9.4 PROC UNIVARIATE statement (the Syntax
             // block's own list, Statistical Procedures printed p. 298,
-            // === pdf 301 ===) — a gap (rc 2); the catch-all keeps typos at rc 1.
+            // === pdf 301 ===) - a gap (rc 2); the catch-all keeps typos at rc 1.
             return failGap(diags, toks[i].line, "PROC UNIVARIATE: {s} statement is not supported", .{toks[i].text});
         } else if (tkKw(toks[i], "where")) {
             // WHERE is documented WITH UNIVARIATE ("Procedures That Support
             // the WHERE Statement", printed p. 89, === pdf 138 ===, lists it)
-            // — MEANS' arm verbatim: skip to `;`, procInput applies it. Was
+            // - MEANS' arm verbatim: skip to `;`, procInput applies it. Was
             // rc 1 on a universal statement.
             while (i < toks.len and toks[i].tag != .semicolon) i += 1;
         } else if (toks[i].tag == .name and @import("parser.zig").isMidStepSkippable(toks[i].text)) {
             // D-014 arm this loop never had: skip exactly the mid-step globals
             // the top level handles (hoisted TITLE/FOOTNOTE/OPTIONS + the
-            // inert set) — `proc univariate; title "t"; var x; run;` errored
+            // inert set) - `proc univariate; title "t"; var x; run;` errored
             // at exit 1 on the legal TITLE and errhalt killed every later
             // step. LIBNAME ran in the pre-pass; unhoisted ODS/FILENAME fail
             // loud below.
@@ -5851,18 +5851,18 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
 
     const raw = (if (in_name) |n| lib.find(n) else lastDataset(lib)) orelse {
         // BUG-procmissingrc2: missing table = user error (D-009 rc 1), not a
-        // gap — the runSort (GH#8) absent-input arm: "File {s} does not
+        // gap - the runSort (GH#8) absent-input arm: "File {s} does not
         // exist" + the runExpanded step-halt NOTE, rc 1. NOT unsupported().
         diags.report(.err, if (toks.len > 1) toks[1].line else 0, "File {s} does not exist", .{in_name orelse "_last_"}) catch {};
         return;
     };
     var ds = try procInput(arena, raw, toks, diags); // WHERE stmt / data= options (BUG-procwhere)
     // GAP-varcolonprefix-procs: expand `pfx:` entries now that the dataset is
-    // known (PDV order — see expandVarPrefixes). ONE point, ahead of every
+    // known (PDV order - see expandVarPrefixes). ONE point, ahead of every
     // ds.indexOf consumer below (groupFormats' CLASS scan included).
     try expandVarListPrefixes(arena, ds, &vars, diags, toks[0].line, "PROC UNIVARIATE");
     try expandVarListPrefixes(arena, ds, &classes, diags, toks[0].line, "PROC UNIVARIATE");
-    // FREQ f; — expand each obs to trunc(f) copies so N=Σf and every moment /
+    // FREQ f; - expand each obs to trunc(f) copies so N=Σf and every moment /
     // quantile / test is over the frequency-weighted sample (F2, mirrors MEANS).
     if (freq_var) |fv| {
         const fcol = ds.indexOf(fv) orelse
@@ -5870,11 +5870,11 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
         ds = try expandFreq(arena, diags, ds, fcol);
     }
 
-    // A format on a CLASS var groups by the FORMATTED value — the SAME
+    // A format on a CLASS var groups by the FORMATTED value - the SAME
     // groupFormats rewrite MEANS/SUMMARY/FREQ run, not a parallel grouping
     // (BUG-univclassrawgroup: grouping by the RAW value split one formatted
     // level into several, printing the same label twice with per-raw n;
-    // Procedures Guide MEANS CLASS stmt Tip, printed p.1497 — a collapsing
+    // Procedures Guide MEANS CLASS stmt Tip, printed p.1497 - a collapsing
     // format REDUCES the number of levels).
     var fmt_levels: std.ArrayList(FmtLevels) = .empty; // raw-value order per format-grouped CLASS col (BUG-freqfmtorder)
     if (classes.items.len > 0) ds = try groupFormats(arena, ds, classes.items, fmt_specs.items, &fmt_levels, diags);
@@ -5885,7 +5885,7 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
     for (classes.items) |cn| if (ds.indexOf(cn)) |idx| try ccols.append(arena, idx);
     const cds = if (ccols.items.len > 0 and !class_missing) try dropMissingClass(arena, ds, ccols.items) else ds;
 
-    // the VAR list, else every numeric column (as MEANS does) — but never a CLASS
+    // the VAR list, else every numeric column (as MEANS does) - but never a CLASS
     // variable: SAS excludes CLASS vars from the default analysis list.
     var acols: std.ArrayList(usize) = .empty;
     if (vars.items.len > 0) {
@@ -5908,15 +5908,15 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
     // named-but-absent weight var errors (BUG-weightvarcheck).
     const wcol: ?usize = try resolveWeightCol(ds, weight_var, diags, toks[0].line);
 
-    // SAS computes weighted percentiles with definition 5 only — say so rather
+    // SAS computes weighted percentiles with definition 5 only - say so rather
     // than silently honoring PCTLDEF= on the weighted path (BUG-univpctldef).
     if (wcol != null and pctldef != 5)
-        diags.warn(toks[0].line, "PROC UNIVARIATE: PCTLDEF= is ignored with a WEIGHT statement — weighted percentiles use Definition 5", .{}) catch {};
+        diags.warn(toks[0].line, "PROC UNIVARIATE: PCTLDEF= is ignored with a WEIGHT statement - weighted percentiles use Definition 5", .{}) catch {};
     if (vardef != .df)
-        diags.warn(toks[0].line, "PROC UNIVARIATE: Skewness/Kurtosis are implemented for VARDEF=DF only — printed as missing under VARDEF={s}", .{@tagName(vardef)}) catch {};
+        diags.warn(toks[0].line, "PROC UNIVARIATE: Skewness/Kurtosis are implemented for VARDEF=DF only - printed as missing under VARDEF={s}", .{@tagName(vardef)}) catch {};
 
-    // BY: decode scanByList's wire encoding ONCE — clean names + per-key
-    // directions + NOTSORTED (GAP-procbydescending) — shared by OUTPUT OUT=
+    // BY: decode scanByList's wire encoding ONCE - clean names + per-key
+    // directions + NOTSORTED (GAP-procbydescending) - shared by OUTPUT OUT=
     // (one row per group, BUG-meansoutputby) and the listing (one block set
     // per group, BUG-univignoresby), so the two surfaces cannot disagree.
     const pb = try decodeProcBy(arena, bys.items);
@@ -5927,7 +5927,7 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
         try obdesc.append(arena, pb.desc[k]);
     };
     // BY demands sorted data: a backward step between contiguous groups ERRORs
-    // like SAS — the same guard MEANS/TRANSPOSE run (BUG-meansbyunsorted),
+    // like SAS - the same guard MEANS/TRANSPOSE run (BUG-meansbyunsorted),
     // joined here per NOTE-procsortguards. Without it an unsorted BY silently
     // POOLED out-of-order groups (listing) and emitted duplicate OUT= rows.
     // DESCENDING flips the check per key; NOTSORTED drops it.
@@ -5943,31 +5943,31 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
         }
     }
 
-    // OUTPUT OUT= — the requested stats of the first analysis variable, one row
+    // OUTPUT OUT= - the requested stats of the first analysis variable, one row
     // total or one per BY group (BUG-univoutput / BUG-meansoutputby); with a CLASS,
-    // one row per level with the CLASS var retained (BUG-univclass — SAS UNIVARIATE
+    // one row per level with the CLASS var retained (BUG-univclass - SAS UNIVARIATE
     // emits only the full cross, no _TYPE_=0 overall row, so nway=has_class).
     if (out_name) |on| {
         // The shared MEANS output builder computes quantiles UNWEIGHTED (SAS MEANS
         // ignores weights for percentiles); UNIVARIATE weights them, so a weighted
-        // OUTPUT percentile via this path would be silently wrong — fail loud instead.
+        // OUTPUT percentile via this path would be silently wrong - fail loud instead.
         if (wcol != null) for (out_stats.items) |os| if (isQuantileStat(os.stat))
-            return diags.fail(error.ParseError, toks[0].line, "PROC UNIVARIATE: weighted OUTPUT percentile/quantile statistics are not yet supported — refusing to emit unweighted percentiles silently", .{});
+            return diags.fail(error.ParseError, toks[0].line, "PROC UNIVARIATE: weighted OUTPUT percentile/quantile statistics are not yet supported - refusing to emit unweighted percentiles silently", .{});
         // UNIVARIATE is single-analysis-var: every requested stat is of acols[0].
         for (out_stats.items) |*os| os.acol = acols.items[0];
         try buildMeansOutput(arena, diags, lib, on, cds, ccols.items, obcols.items, obdesc.items, wcol, &.{}, out_stats.items, ccols.items.len > 0, false, vardef, .internal, false, 0.05, fmt_levels.items); // UNIVARIATE: no _TYPE_/_FREQ_ (BUG-univclass); fmt_levels stores a collapsed group's LOWEST raw + attaches the format (NOTE-freqfmtoutraw)
-        if (lib.find(on)) |od| try applyOutOptions(arena, od, toks, diags, "out"); // out=X(keep=/drop=) — BUG-procoutkeep
+        if (lib.find(on)) |od| try applyOutOptions(arena, od, toks, diags, "out"); // out=X(keep=/drop=) - BUG-procoutkeep
     }
 
     if (noprint) return; // NOPRINT suppresses the Moments/Quantiles listing
     try out.appendSlice(arena, (" " ** 33) ++ "The UNIVARIATE Procedure\n");
     // One block set PER BY GROUP (BUG-univignoresby: BY was parsed and then
-    // ignored — the listing printed ONE pooled Moments block over ALL obs, the
+    // ignored - the listing printed ONE pooled Moments block over ALL obs, the
     // number formatted exactly like the per-group answer asked for). bySlices
     // yields one null-rep slice without BY, so the pooled path is byte-identical.
     for (try bySlices(arena, cds.rows.items, obcols.items)) |bs| {
         if (bs.rep) |r| try appendByLine(arena, out, ds, r, obcols.items);
-        // Shallow per-group view (columns shared, rows = the slice's) — the same
+        // Shallow per-group view (columns shared, rows = the slice's) - the same
         // idiom the CLASS arm uses per level below.
         const bd = try arena.create(Dataset);
         bd.* = Dataset.init(arena, ds.name);
@@ -5977,7 +5977,7 @@ pub fn runUnivariate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) 
             for (acols.items) |ix| try emitUnivariate(arena, out, bd, ix, wcol, vardef, pctldef, mu0);
         } else {
             // CLASS: one Moments/Quantiles block per level (BUG-univclass), headed by
-            // `classvar=formatted-level` as SAS does — levels collected WITHIN the
+            // `classvar=formatted-level` as SAS does - levels collected WITHIN the
             // BY group.
             const groups = try collectGroups(arena, bd, ccols.items);
             reorderGroupsFmt(groups, ccols.items, fmt_levels.items); // collapsed bands in raw-value order, as the MEANS listing (BUG-freqfmtorder)
@@ -6030,7 +6030,7 @@ fn emitUnivariate(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Datase
     // weight factors are 1 and these collapse to the unweighted formulas.
     var m3: f64 = 0; // Σ wᵢ^{3/2}(xᵢ−x̄w)³
     var m4: f64 = 0; // Σ wᵢ²(xᵢ−x̄w)⁴
-    // Arena-sized to the row count — a fixed [4096] cap silently computed the
+    // Arena-sized to the row count - a fixed [4096] cap silently computed the
     // quantiles over only the first 4096 obs while moments used all of them, so
     // any group >4096 got wrong percentiles/median/Q1/Q3 (BUG-univarpctl4k).
     const xw = try arena.alloc(XW, ds.rows.items.len);
@@ -6058,7 +6058,7 @@ fn emitUnivariate(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Datase
     const cv = if (s.mean != 0) 100 * s.std / s.mean else nan;
     // The skew/kurt formulas above are the VARDEF=DF forms; SAS uses different
     // coefficients per divisor, so under another VARDEF our values would not
-    // match SAS — emit missing (warned once in runUnivariate) instead of
+    // match SAS - emit missing (warned once in runUnivariate) instead of
     // silent-wrong stats (BUG-statvardef).
     const skew_out = if (vardef == .df) skew else nan;
     const kurt_out = if (vardef == .df) kurt else nan;
@@ -6068,7 +6068,7 @@ fn emitUnivariate(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Datase
 
     // Weighted quantiles (SAS UNIVARIATE computes them; MEANS does not). PCTLDEF=5
     // is weight-aware; definitions 1–4 use the sorted values only (SAS restricts
-    // them to unweighted data — a WEIGHT statement forces 5) (BUG-univpctldef).
+    // them to unweighted data - a WEIGHT statement forces 5) (BUG-univpctldef).
     const edef: u8 = if (wcol != null) 5 else pctldef;
     const pairs = xw[0..k];
     std.mem.sort(XW, pairs, {}, struct {
@@ -6089,7 +6089,7 @@ fn emitUnivariate(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Datase
     try out.append(arena, '\n');
     // A LABELLED analysis variable carries its label in parentheses after the name:
     // "Variable: Score (Exam Score)" (Output 4.2.1, printed p.473) and "Variable:
-    // LoanToValueRatio (Loan to Value Ratio)" (Getting Started, printed p.291) — the
+    // LoanToValueRatio (Loan to Value Ratio)" (Getting Started, printed p.291) - the
     // rule holds across 20+ printed Variable: lines in the chapter, and an UNLABELLED
     // variable prints the bare name ("Variable: Systolic", Output 4.1.1 p.471), which
     // is the control (NOTE-univvarlabel). PROC PRINT already resolves the same label,
@@ -6128,16 +6128,16 @@ fn emitUnivariate(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Datase
     try momentLine(arena, out, "Median", med, "Variance", variance);
     const mi = modeInfo(vals);
     try momentLine(arena, out, "Mode", if (mi.count < 2) nan else mi.mode, "Range", s.max - s.min);
-    try out.appendSlice(arena, " " ** 34); // no fourth Location stat — blank pair
+    try out.appendSlice(arena, " " ** 34); // no fourth Location stat - blank pair
     try uPair(arena, out, "Interquartile Range", q3 - q1);
     try out.append(arena, '\n');
     // A TIE for the most frequent value: SAS displays the smallest mode and says so
     // immediately below this table. Exact wording and placement from three printed
-    // outputs in Base SAS 9.4 Procedures Guide: Statistical Procedures — Output
+    // outputs in Base SAS 9.4 Procedures Guide: Statistical Procedures - Output
     // 4.1.1 p.471 ("smallest of 2 modes with a count of 4"), Output 4.2.2 p.473
     // ("of 3 modes with a count of 4") and Output 4.13.1 p.491 ("of 2 modes with a
     // count of 2"); the tie rule itself is "Calculating the Mode", p.413. The note
-    // is NOT gated on the MODES option — p.473's is the *default* output.
+    // is NOT gated on the MODES option - p.473's is the *default* output.
     // count < 2 must stay suppressed: with every value unique, every run is length
     // 1 and nmodes is the number of distinct values, but p.413 says "When no
     // repetitions occur in the data ... the procedure does not report the mode".
@@ -6149,7 +6149,7 @@ fn emitUnivariate(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Datase
         ));
 
     // ── Tests for Location: Mu0=0 (BUG-univreport) ───────────────────────────
-    // Student's t = mean/(std/√Σw), df = n−1 — the MEANS T/PROBT convention.
+    // Student's t = mean/(std/√Σw), df = n−1 - the MEANS T/PROBT convention.
     // Sign & Wilcoxon signed-rank are count/rank tests SAS does not compute
     // under WEIGHT, so the weighted path prints the t row only.
     var tstat = nan;
@@ -6186,7 +6186,7 @@ fn emitUnivariate(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Datase
             const hc = @max(nplus, nstar - nplus);
             mp = @min(1.0, 2.0 * betai(@floatFromInt(hc), @floatFromInt(nstar - hc + 1), 0.5));
         }
-        // Average ranks of |x| — a tie run covering sorted positions [lo..hi]
+        // Average ranks of |x| - a tie run covering sorted positions [lo..hi]
         // (0-based) has rank (lo+hi)/2+1, so 2·rank = lo+hi+2 is always integral
         // (the exact signed-rank DP below stays in integers).
         std.mem.sort(NZ, nz.items, {}, struct {
@@ -6208,7 +6208,7 @@ fn emitUnivariate(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Datase
                 lo = hi + 1;
             }
         }
-        // SAS S = Σr⁺ − n(n+1)/4 = (2·Σ(2r⁺) − Σ(2r))/4 — a quarter-integer.
+        // SAS S = Σr⁺ − n(n+1)/4 = (2·Σ(2r⁺) − Σ(2r))/4 - a quarter-integer.
         var dsum: i64 = 0;
         var dpos: i64 = 0;
         for (dranks, 0..) |d2, j| {
@@ -6237,7 +6237,7 @@ fn emitUnivariate(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Datase
     // ── Extreme Observations (BUG-univreport) ────────────────────────────────
     // The 5 lowest/highest nonmissing values with 1-based observation numbers.
     // ponytail: lowest ties keep data order (stable sort); highest ties list
-    // latest-obs-first (the sorted buffer walked back) — SAS's tie order here is
+    // latest-obs-first (the sorted buffer walked back) - SAS's tie order here is
     // undocumented.
     const m = @min(5, k);
     try out.appendSlice(arena, "\n" ++ (" " ** 23) ++ "Extreme Observations\n\n");
@@ -6323,8 +6323,8 @@ fn signedRankP(arena: std.mem.Allocator, d: []const i64, tobs: i64, tiecorr: f64
     return 2.0 * (1.0 - normCdf(z));
 }
 
-/// Standard normal CDF — Abramowitz–Stegun 7.1.26 (|ε| ≤ 1.5e-7). Only the
-/// signed-rank asymptotic p-value uses it, printed to 4 decimals — far inside
+/// Standard normal CDF - Abramowitz–Stegun 7.1.26 (|ε| ≤ 1.5e-7). Only the
+/// signed-rank asymptotic p-value uses it, printed to 4 decimals - far inside
 /// the error bound.
 fn normCdf(z: f64) f64 {
     if (z < 0) return 1 - normCdf(-z);
@@ -6340,7 +6340,7 @@ test "UNIVARIATE tests-for-location: exact signed-rank DP + p-value formatting (
     // Hand case (pinned in univ_report_full.sas): |x| = 2,3,3,4,5,7,8,9,10 →
     // doubled ranks d = 2,5,5,8,10,12,14,16,18; the sole negative is |−4| (d=8),
     // so S = (2·82−90)/4 = 18.5 and 4S = 74. Exact: |T| ≥ 74 needs one sign side
-    // summing ≤ 8 — subsets {},2,5,5,8,2+5,2+5 = 7 per tail → p = 14/512.
+    // summing ≤ 8 - subsets {},2,5,5,8,2+5,2+5 = 7 per tail → p = 14/512.
     const d = [_]i64{ 2, 5, 5, 8, 10, 12, 14, 16, 18 };
     try std.testing.expectApproxEqAbs(14.0 / 512.0, try signedRankP(arena, &d, 74, 18), 1e-12);
     // Sign-test tail identity: 2·P(Bin(9,½) ≥ 8) = 2·I_½(8,2) = 20/512.
@@ -6381,13 +6381,13 @@ fn univPercentile(pairs: []const XW, p: f64, pctldef: u8) f64 {
 }
 
 /// SAS PCTLDEF=1–4 quantiles over the sorted values, `pairs` ascending by `.x`
-/// (weights ignored — SAS restricts these definitions to unweighted data). With
+/// (weights ignored - SAS restricts these definitions to unweighted data). With
 /// t = p/100, n = # values, and 1-based x₁…xₙ (indexes clamp at the extremes,
 /// x₀≡x₁ and x_{n+1}≡xₙ, so 0%/100% stay Min/Max):
-///   1 — linear interpolation at position n·t:        Q = (1−g)xⱼ + g·xⱼ₊₁
-///   2 — the observation closest to n·t (ties to the EVEN index)
-///   3 — empirical distribution:                      Q = xⱼ if n·t integer else xⱼ₊₁
-///   4 — linear interpolation at position (n+1)·t
+///   1 - linear interpolation at position n·t:        Q = (1−g)xⱼ + g·xⱼ₊₁
+///   2 - the observation closest to n·t (ties to the EVEN index)
+///   3 - empirical distribution:                      Q = xⱼ if n·t integer else xⱼ₊₁
+///   4 - linear interpolation at position (n+1)·t
 /// (SAS 9.4 UNIVARIATE, "Calculating Percentiles".)
 fn pctldefPercentile(pairs: []const XW, p: f64, def: u8) f64 {
     const n = pairs.len;
@@ -6458,7 +6458,7 @@ fn quantLine(arena: std.mem.Allocator, out: *std.ArrayList(u8), label: []const u
 }
 
 /// A moment/quantile value: missing → ".", an integer prints plainly, else round
-/// to 8 significant figures (trailing zeros trimmed) — enough to match SAS's
+/// to 8 significant figures (trailing zeros trimmed) - enough to match SAS's
 /// listing precision without its exact format-driven width.
 fn uNum(arena: std.mem.Allocator, x: f64) ![]const u8 {
     if (!std.math.isFinite(x)) return ".";
@@ -6474,16 +6474,16 @@ fn uNum(arena: std.mem.Allocator, x: f64) ![]const u8 {
 // `proc rank data=IN out=OUT [descending] [groups=k] [ties=mean|low|high|dense];
 //    [by b…;] var v1 v2 …; [ranks r1 r2 …;] run;`
 // Ranks each VAR variable across observations (within BY groups), writing the
-// rank to the matching RANKS variable — or replacing the VAR value in-place when
+// rank to the matching RANKS variable - or replacing the VAR value in-place when
 // no RANKS statement is given. GROUPS=k buckets into quantile groups 0..k-1
-// (deciles/quartiles). ponytail: no PARTIAL, no per-var DESCENDING — the common
+// (deciles/quartiles). ponytail: no PARTIAL, no per-var DESCENDING - the common
 // quantile-grouping shape. The unimplemented score options (FRACTION/PERCENT/
 // NPLUS1/NORMAL=/SAVAGE) and an unrecognized TIES= ParseError instead of silently
 // emitting ordinal ranks (GAP-rankguards); add scores when a study needs them.
 
 const TiesKind = enum { mean, low, high, dense };
 
-/// null = an unrecognized TIES= value — the caller must fail LOUD rather than
+/// null = an unrecognized TIES= value - the caller must fail LOUD rather than
 /// silently defaulting to MEAN and shipping the wrong tie handling (GAP-rankguards).
 fn tiesFromKw(text: []const u8) ?TiesKind {
     if (eqi(text, "mean")) return .mean;
@@ -6495,11 +6495,11 @@ fn tiesFromKw(text: []const u8) ?TiesKind {
 
 /// PROC RANK score-transform options we do NOT implement. They must ParseError,
 /// never fall through and emit plain ordinal ranks where a fraction/percent/
-/// normal score was requested (silent wrong numbers — GAP-rankguards).
+/// normal score was requested (silent wrong numbers - GAP-rankguards).
 /// BLOM/TUKEY/VW are the three documented NORMAL= score names (Base SAS 9.4
 /// Procedures Guide, 7th ed., printed p. 2048, === pdf 2097 ===): the SAS form
 /// is NORMAL=BLOM (the `normal` entry already gaps that), but a BARE score name
-/// can only be a score request — never a typo of anything else — so it takes
+/// can only be a score request - never a typo of anything else - so it takes
 /// the same recognized-keyword arm (BUG-proctypoexits2 follow-on, §5b).
 fn isUnimplRankScore(text: []const u8) bool {
     return eqi(text, "fraction") or eqi(text, "percent") or
@@ -6507,7 +6507,7 @@ fn isUnimplRankScore(text: []const u8) bool {
         eqi(text, "blom") or eqi(text, "tukey") or eqi(text, "vw");
 }
 
-/// PRESERVERAWBYVALUES — the one documented SAS 9.4 PROC RANK option neither
+/// PRESERVERAWBYVALUES - the one documented SAS 9.4 PROC RANK option neither
 /// implemented nor already gap-guarded above (Base SAS 9.4 Procedures Guide,
 /// 7th ed., printed p. 2047, === pdf 2096 ===; the full set is DATA=/OUT=/
 /// TIES=/GROUPS=/DESCENDING + the score transforms). Gap arm (rc 2).
@@ -6537,7 +6537,7 @@ pub fn runRank(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
             ties = tiesFromKw(v) orelse return diags.fail(error.ParseError, toks[i].line, "PROC RANK TIES={s} is not recognized (use MEAN|LOW|HIGH|DENSE)", .{v});
             i += 3;
         } else if (toks[i].tag == .name and isUnimplRankScore(toks[i].text)) {
-            return failGap(diags, toks[i].line, "PROC RANK {s} is not yet supported — refusing to emit plain ordinal ranks where a score was requested (GAP-rankguards)", .{toks[i].text});
+            return failGap(diags, toks[i].line, "PROC RANK {s} is not yet supported - refusing to emit plain ordinal ranks where a score was requested (GAP-rankguards)", .{toks[i].text});
         } else if (tkKw(toks[i], "groups") and i + 2 < toks.len and
             toks[i + 1].tag == .eq and toks[i + 2].tag == .number)
         {
@@ -6547,11 +6547,11 @@ pub fn runRank(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
             descending = true;
             i += 1;
         } else if (toks[i].tag == .lparen) {
-            i = skipParen(toks, i); // out=x(keep=…) — applied by applyOutOptions
+            i = skipParen(toks, i); // out=x(keep=…) - applied by applyOutOptions
         } else if (toks[i].tag == .name) {
             // GAP-procopts: an unknown header option (a typo like `grups=4`,
             // or a BLOM/TUKEY/VW score request outside the guard list) used to
-            // be silently skipped — RANK's whole output is the rank values, so
+            // be silently skipped - RANK's whole output is the rank values, so
             // a swallowed option IS the wrong result. Name it (D-002).
             // SPLIT: PRESERVERAWBYVALUES is documented (rc 2); a typo stays rc 1.
             if (isRankGapOption(toks[i].text))
@@ -6582,7 +6582,7 @@ pub fn runRank(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
 
     const raw = (if (in_name) |n| lib.find(n) else lastDataset(lib)) orelse {
         // BUG-procmissingrc2: missing table = user error (D-009 rc 1), not a
-        // gap — the runSort (GH#8) absent-input arm: "File {s} does not
+        // gap - the runSort (GH#8) absent-input arm: "File {s} does not
         // exist" + the runExpanded step-halt NOTE, rc 1. NOT unsupported().
         diags.report(.err, if (toks.len > 1) toks[1].line else 0, "File {s} does not exist", .{in_name orelse "_last_"}) catch {};
         return;
@@ -6613,16 +6613,16 @@ pub fn runRank(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
     // BY column indices (input assumed sorted by them, as SAS requires)
     const pb = try decodeProcBy(arena, bys.items);
     var bcols: std.ArrayList(usize) = .empty;
-    var bdesc: std.ArrayList(bool) = .empty; // BY direction per bcols entry — this decode SKIPS missing names, so pb.desc alone would misalign
+    var bdesc: std.ArrayList(bool) = .empty; // BY direction per bcols entry - this decode SKIPS missing names, so pb.desc alone would misalign
     for (pb.names, 0..) |bn, k| if (ds.indexOf(bn)) |ix| {
         try bcols.append(arena, ix);
         try bdesc.append(arena, pb.desc[k]);
     }; // GAP-procbydescending: clean names (contiguous-run grouping is direction-neutral)
     // BY demands sorted data: a backward step between contiguous groups ERRORs
-    // like SAS — the same guard MEANS/TRANSPOSE/UNIVARIATE run
+    // like SAS - the same guard MEANS/TRANSPOSE/UNIVARIATE run
     // (BUG-meansbyunsorted), joined here per NOTE-procsortguards. Without it an
     // unsorted BY silently split a repeated key into two contiguous runs and
-    // ranked within each run — plausible-looking WRONG ranks at exit 0.
+    // ranked within each run - plausible-looking WRONG ranks at exit 0.
     // DESCENDING flips the check per key; NOTSORTED drops it.
     if (bcols.items.len > 0 and !pb.notsorted) {
         const rows = ds.rows.items;
@@ -6651,7 +6651,7 @@ pub fn runRank(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.E
     }
 
     for (cells) |row| try o.appendRow(row);
-    try applyOutOptions(arena, o, toks, diags, "out"); // out=X(keep=/drop=) — BUG-procoutkeep
+    try applyOutOptions(arena, o, toks, diags, "out"); // out=X(keep=/drop=) - BUG-procoutkeep
     try lib.put(oname, o);
 }
 
@@ -6700,14 +6700,14 @@ fn rankRange(arena: std.mem.Allocator, ds: *Dataset, start: usize, end: usize, v
 // Standardizes each VAR variable (default: every numeric non-BY column) within
 // each BY group to the target MEAN=/STD=:
 //     new = (x − groupMean)/groupStd × S + M        (groupStd = n−1 sample std)
-// Defaults: OMITTED MEAN= / STD= leave that moment UNSET — the target is the
+// Defaults: OMITTED MEAN= / STD= leave that moment UNSET - the target is the
 // BY group's SAMPLE mean/std, so both unset → output == input and REPLACE
 // imputes the sample mean (the clinical mean-imputation idiom, BUG-stdnodefault).
 // Explicit MEAN=0 STD=1 → z-scores (GAP-procstandard). REPLACE
 // fills a missing cell with the target mean; without it missing stays missing
 // (special missings preserved). No OUT= → replace the input dataset (the RANK
 // convention). A BY group whose sample std is 0 or undefined (constant column /
-// n<2) maps every non-missing value to the target mean — (x−μ)=0 for all of them.
+// n<2) maps every non-missing value to the target mean - (x−μ)=0 for all of them.
 // ponytail: VARDEF=/FREQ/WEIGHT/PRINT and unknown options/statements fail LOUD
 // at parse rather than being silently swallowed.
 
@@ -6719,7 +6719,7 @@ pub fn runStandard(cx: ProcCtx, toks: []const Token) diag.Error!void {
     var out_name: ?[]const u8 = null;
     var target_mean: f64 = 0;
     var target_std: f64 = 1;
-    // BUG-stdnodefault: MEAN=/STD= OMITTED leaves that moment UNSET — the target
+    // BUG-stdnodefault: MEAN=/STD= OMITTED leaves that moment UNSET - the target
     // falls back to the BY group's SAMPLE mean/std (so both unset = identity,
     // and REPLACE imputes the sample mean), never 0/1.
     var mean_set = false;
@@ -6758,7 +6758,7 @@ pub fn runStandard(cx: ProcCtx, toks: []const Token) diag.Error!void {
             replace = true;
             i += 1;
         } else if (toks[i].tag == .lparen) {
-            // data=X(…) / out=X(…) dataset-option group — applyOutOptions and
+            // data=X(…) / out=X(…) dataset-option group - applyOutOptions and
             // dataOptionToks read them from the token slice; just step over.
             var depth: usize = 0;
             while (i < toks.len and toks[i].tag != .semicolon and toks[i].tag != .eof) : (i += 1) {
@@ -6796,7 +6796,7 @@ pub fn runStandard(cx: ProcCtx, toks: []const Token) diag.Error!void {
 
     const raw = (if (in_name) |n| lib.find(n) else lastDataset(lib)) orelse {
         // BUG-procmissingrc2: missing table = user error (D-009 rc 1), not a
-        // gap — the runSort (GH#8) absent-input arm: "File {s} does not
+        // gap - the runSort (GH#8) absent-input arm: "File {s} does not
         // exist" + the runExpanded step-halt NOTE, rc 1. NOT unsupported().
         diags.report(.err, if (toks.len > 1) toks[1].line else 0, "File {s} does not exist", .{in_name orelse "_last_"}) catch {};
         return;
@@ -6811,10 +6811,10 @@ pub fn runStandard(cx: ProcCtx, toks: []const Token) diag.Error!void {
             return diags.fail(error.ParseError, toks[0].line, "PROC STANDARD: BY variable {s} is not in the dataset", .{bn});
         try bcols.append(arena, ix);
     }
-    // BY demands sorted data — the same guard MEANS/TRANSPOSE/UNIVARIATE run
+    // BY demands sorted data - the same guard MEANS/TRANSPOSE/UNIVARIATE run
     // (BUG-meansbyunsorted), joined here per NOTE-procsortguards. Without it an
     // unsorted BY silently standardized within each contiguous run: a repeated
-    // key got TWO different group means — plausible-looking WRONG values at
+    // key got TWO different group means - plausible-looking WRONG values at
     // exit 0. DESCENDING flips the check per key; NOTSORTED drops it.
     if (bcols.items.len > 0 and !pb.notsorted) {
         const rows = ds.rows.items;
@@ -6853,7 +6853,7 @@ pub fn runStandard(cx: ProcCtx, toks: []const Token) diag.Error!void {
     const oname = out_name orelse ds.name;
     const o = try dupDataset(arena, ds);
     o.name = oname;
-    // mutable row copies — the dup shares ds's const row slices
+    // mutable row copies - the dup shares ds's const row slices
     const cells = try arena.alloc([]Value, o.rows.items.len);
     for (o.rows.items, 0..) |row, r| {
         cells[r] = try arena.dupe(Value, row);
@@ -6867,7 +6867,7 @@ pub fn runStandard(cx: ProcCtx, toks: []const Token) diag.Error!void {
         while (end < rows.len and byEqual(rows[start], rows[end], bcols.items)) end += 1;
         for (vcols.items) |vidx| {
             const s = computeStats(rows[start..end], vidx, null); // n−1 sample std (VARDEF=DF)
-            if (s.n == 0) continue; // all missing — no mean to standardize or REPLACE with
+            if (s.n == 0) continue; // all missing - no mean to standardize or REPLACE with
             // unset moment -> keep the group's sample moment (BUG-stdnodefault)
             const tm = if (mean_set) target_mean else s.mean;
             const ts = if (std_set) target_std else s.std;
@@ -6884,13 +6884,13 @@ pub fn runStandard(cx: ProcCtx, toks: []const Token) diag.Error!void {
         start = end;
     }
 
-    try applyOutOptions(arena, o, toks, diags, "out"); // out=X(keep=/drop=) — BUG-procoutkeep
+    try applyOutOptions(arena, o, toks, diags, "out"); // out=X(keep=/drop=) - BUG-procoutkeep
     try lib.put(oname, o);
 }
 
 // ── PROC CONTENTS ────────────────────────────────────────────────────────────
 //
-// `proc contents data=IN [out=OUT] [noprint]; run;` — the dataset's metadata:
+// `proc contents data=IN [out=OUT] [noprint]; run;` - the dataset's metadata:
 // observation and variable counts, then the alphabetic variable table (position,
 // name, type, length, format, informat, label). OUT= writes one row per variable.
 // ponytail: length is 8 for a numeric and the widest stored value for a char (we
@@ -6899,7 +6899,7 @@ pub fn runStandard(cx: ProcCtx, toks: []const Token) diag.Error!void {
 
 /// A numeric is stored in 8 bytes. A character's length is its declared length
 /// when a `$w.` character format pins it (the only place the declared length
-/// survives on the dataset — BUG-contentsmeta); otherwise the widest value seen.
+/// survives on the dataset - BUG-contentsmeta); otherwise the widest value seen.
 fn contentsLen(ds: *Dataset, ci: usize, is_num: bool) usize {
     // a declared numeric LENGTH<8 (3..7) reaches the descriptor as col.len (GH#59
     // NUMLEN-meta); no declared len → the full 8-byte double.
@@ -6951,7 +6951,7 @@ pub fn runContents(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
             i += 1;
         } else if (optAt(toks, i, "order")) |v| {
             // ORDER=VARNUM lists in creation order; COLLATE/CASECOLLATE/
-            // IGNORECASE are collation variants of the alphabetic default —
+            // IGNORECASE are collation variants of the alphabetic default -
             // accept, listing stays alphabetic. ponytail: case-insensitive
             // collation only, add locale collation if a study ever needs it.
             if (eqi(v, "varnum")) varnum = true;
@@ -6966,10 +6966,10 @@ pub fn runContents(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
             short = true;
             i += 1;
         } else if (toks[i].tag == .lparen) {
-            i = skipParen(toks, i); // out=x(keep=…) — applied by applyOutOptions
+            i = skipParen(toks, i); // out=x(keep=…) - applied by applyOutOptions
         } else {
             // D-002 fail-loud (BUG-procoptswallow): unknown options error visibly.
-            // BUG-proctypoexits2: split — a documented option we don't implement
+            // BUG-proctypoexits2: split - a documented option we don't implement
             // is a gap (rc 2, byte-identical UNSUPPORTED message); any other
             // name is the user's typo (rc 1, same message body via diags).
             if (toks[i].tag == .name) {
@@ -6983,7 +6983,7 @@ pub fn runContents(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
         }
     }
 
-    // SAS PROC CONTENTS has NO sub-statements — so anything between the header
+    // SAS PROC CONTENTS has NO sub-statements - so anything between the header
     // and `run;` other than a D-014a mid-step global (skip exactly what the
     // top level handles) is an unknown statement and fails loud
     // (GAP-procsubstmtswallow); it used to be silently ignored because no loop
@@ -7000,7 +7000,7 @@ pub fn runContents(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
         if (atTag(toks, i, .semicolon)) i += 1;
     }
 
-    // `data=[libref.]_ALL_` — a CONTENTS section per member of the library
+    // `data=[libref.]_ALL_` - a CONTENTS section per member of the library
     // (BUG-contents-all). ponytail: the printed listing only; OUT= over _ALL_
     // (a combined member×variable table) is not built.
     if (in_name) |n| if (contentsAllLib(n)) |prefix| {
@@ -7016,15 +7016,15 @@ pub fn runContents(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
 
     const ds = (if (in_name) |n| lib.find(n) else lastDataset(lib)) orelse {
         // BUG-procmissingrc2: missing table = user error (D-009 rc 1), not a
-        // gap — the runSort (GH#8) absent-input arm: "File {s} does not
+        // gap - the runSort (GH#8) absent-input arm: "File {s} does not
         // exist" + the runExpanded step-halt NOTE, rc 1. NOT unsupported().
-        // (The no-DATA= library-listing arm above is a different condition —
-        // an empty library has no member to name — it stays as it is.)
+        // (The no-DATA= library-listing arm above is a different condition -
+        // an empty library has no member to name - it stays as it is.)
         diags.report(.err, if (toks.len > 1) toks[1].line else 0, "File {s} does not exist", .{in_name orelse "_last_"}) catch {};
         return;
     };
 
-    // OUT= — one observation per variable (NAME, TYPE, LENGTH, VARNUM, FORMAT, LABEL)
+    // OUT= - one observation per variable (NAME, TYPE, LENGTH, VARNUM, FORMAT, LABEL)
     if (out_name) |on| {
         const o = try arena.create(Dataset);
         o.* = Dataset.init(arena, on);
@@ -7069,7 +7069,7 @@ pub fn runContents(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
                 .{ .str = c.label orelse "" }, // BUG-contentsmeta: labels now persist
             });
         }
-        try applyOutOptions(arena, o, toks, diags, "out"); // out=X(keep=/drop=) — BUG-procoutkeep
+        try applyOutOptions(arena, o, toks, diags, "out"); // out=X(keep=/drop=) - BUG-procoutkeep
         try lib.put(on, o);
     }
 
@@ -7115,7 +7115,7 @@ fn printOneContents(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Data
         }
     }.lt);
 
-    // SHORT: just the names, space-separated — no attribute table.
+    // SHORT: just the names, space-separated - no attribute table.
     if (short) {
         for (order, 0..) |ci, j| {
             if (j > 0) try out.append(arena, ' ');
@@ -7190,12 +7190,12 @@ fn dsRename(lib: *Library, old: []const u8, new: []const u8) bool {
 }
 
 /// Drop a library member (DELETE ds …;). Returns false if it wasn't present.
-/// PROC DATASETS ... KILL — remove every member of `libname` (default WORK).
+/// PROC DATASETS ... KILL - remove every member of `libname` (default WORK).
 /// WORK members are unqualified names; a named library's members are `lib.member`
 /// (as coalesceLibrefs folds them), so kill by that prefix.
 /// Qualify a PROC DATASETS member with the LIB= libname: a directory libname keys
 /// its members `<libname>.<member>` (as `data lib.m` / SET / PRINT do), so MODIFY/
-/// DELETE/CHANGE/APPEND must look them up qualified — not just in WORK
+/// DELETE/CHANGE/APPEND must look them up qualified - not just in WORK
 /// (GAP-datasetsmodifylib). WORK (or no LIB=) uses the bare, unqualified name.
 fn dsQualify(arena: std.mem.Allocator, libname: ?[]const u8, member: []const u8) diag.Error![]const u8 {
     // An already-two-level member (`data TGT.DM` keys as `TGT.DM`) must not be
@@ -7208,10 +7208,10 @@ fn dsQualify(arena: std.mem.Allocator, libname: ?[]const u8, member: []const u8)
     return member;
 }
 
-/// True if `name` is the `_ALL_` delete/kill wildcard — bare `_all_` or
+/// True if `name` is the `_ALL_` delete/kill wildcard - bare `_all_` or
 /// `libref._all_` (case-insensitive). SAS 9.4: DELETE _ALL_ / PROC DELETE
 /// DATA=_all_ removes every member of the (target) library, not a literal
-/// member named "_all_" (BUG-datasetsdeleteall — a silent no-op before).
+/// member named "_all_" (BUG-datasetsdeleteall - a silent no-op before).
 fn isAllWildcard(name: []const u8) bool {
     const dot = std.mem.indexOfScalar(u8, name, '.');
     return eqi(if (dot) |d| name[d + 1 ..] else name, "_all_");
@@ -7258,7 +7258,7 @@ fn dsDelete(arena: std.mem.Allocator, lib: *Library, name: []const u8) bool {
         found = true;
         break;
     };
-    // The on-disk member file too — else the EXIST disk probe (84242c4) still
+    // The on-disk member file too - else the EXIST disk probe (84242c4) still
     // finds it and a later SET resurrects the deleted data (BUG-datasetsdeletedisk).
     if (unlinkDisk(arena, name, false) > 0) found = true;
     return found;
@@ -7266,7 +7266,7 @@ fn dsDelete(arena: std.mem.Allocator, lib: *Library, name: []const u8) bool {
 
 /// Unlink `lr.member`'s files under a directory libname (`prefix` = the DELETE
 /// `pfx:` wildcard / KILL sweep). One-level/WORK names have no disk side.
-/// ponytail: a single-file libname (path ends .sas7bdat/.xpt) is skipped —
+/// ponytail: a single-file libname (path ends .sas7bdat/.xpt) is skipped -
 /// deleting a member of a file-libname waits for a real program to need it.
 fn unlinkDisk(arena: std.mem.Allocator, name: []const u8, prefix: bool) usize {
     const dot = std.mem.indexOfScalar(u8, name, '.') orelse return 0;
@@ -7276,7 +7276,7 @@ fn unlinkDisk(arena: std.mem.Allocator, name: []const u8, prefix: bool) usize {
     return io.deleteMemberFiles(arena, dir, name[dot + 1 ..], prefix);
 }
 
-/// Delete every member whose (WORK-stripped) name starts with `pfx` — the
+/// Delete every member whose (WORK-stripped) name starts with `pfx` - the
 /// `DELETE tmp_:;` wildcard (GAP-datasetsdeletecolon), in memory AND on disk
 /// (BUG-datasetsdeletedisk). Returns how many members/files went.
 fn dsDeletePrefix(arena: std.mem.Allocator, lib: *Library, pfx: []const u8) usize {
@@ -7293,14 +7293,14 @@ fn dsDeletePrefix(arena: std.mem.Allocator, lib: *Library, pfx: []const u8) usiz
     return removed + unlinkDisk(arena, pfx, true);
 }
 
-/// Drop a leading `work.` from a (possibly two-level) dataset name — mirrors
+/// Drop a leading `work.` from a (possibly two-level) dataset name - mirrors
 /// exec.Library's own WORK-default resolution.
 fn stripWorkPrefix(name: []const u8) []const u8 {
     return if (name.len >= 5 and eqi(name[0..5], "work.")) name[5..] else name;
 }
 
 /// Documented SAS 9.4 PROC DELETE statement options opensas does NOT
-/// implement — the gap arm of the option catch-all (rc 2); anything else is
+/// implement - the gap arm of the option catch-all (rc 2); anything else is
 /// the user's typo (rc 1). Closed set from the PROC DELETE Statement
 /// dictionary (printed pp. 786-787, === pdf 835/836 ===); LIB= is the doc's
 /// own alias of LIBRARY=.
@@ -7311,11 +7311,11 @@ fn isDeleteGapOption(kw: []const u8) bool {
 }
 
 /// The options the doc puts IN PARENS after each file name (a subset of the
-/// statement set — LIBRARY=/LIB= are statement-level only): "You use the
+/// statement set - LIBRARY=/LIB= are statement-level only): "You use the
 /// option in parentheses after the name of each SAS file" (GENNUM= entry,
 /// printed p. 787, === pdf 837 ===). A name in this set is a documented,
 /// unimplemented option → failGap (rc 2); anything else in the parens keeps
-/// the old silent skip — the doc names nothing else there, and D-018's
+/// the old silent skip - the doc names nothing else there, and D-018's
 /// stay-put direction keeps a possibly-legal spelling from a false rc.
 fn isDeleteParenGapOption(kw: []const u8) bool {
     inline for (.{ "gennum", "memtype", "encryptkey", "alter" }) |opt|
@@ -7323,7 +7323,7 @@ fn isDeleteParenGapOption(kw: []const u8) bool {
     return false;
 }
 
-/// `proc delete data=ds1 ds2 …;` — drop each named dataset from the library
+/// `proc delete data=ds1 ds2 …;` - drop each named dataset from the library
 /// (SAS's between-step cleanup). Absent members warn (not fail-loud): the
 /// real-world shape is a program that unconditionally deletes its scratch
 /// tables, some of which a conditional branch never created (PROC-delete).
@@ -7337,7 +7337,7 @@ pub fn runDelete(cx: ProcCtx, toks: []const Token) diag.Error!void {
             i += 2;
             while (atTag(toks, i, .name)) {
                 // A name FOLLOWED BY `=` is a statement option (MEMTYPE=,
-                // LIB=, …), not another dataset — stop the file list so the
+                // LIB=, …), not another dataset - stop the file list so the
                 // option reaches the catch-all's split guard below (was:
                 // eaten as a dataset, warned 'not found', and the VALUE hit
                 // the catch-all at rc 1 with a nonsense name).
@@ -7350,11 +7350,11 @@ pub fn runDelete(cx: ProcCtx, toks: []const Token) diag.Error!void {
                     name = try std.fmt.allocPrint(arena, "{s}.{s}", .{ name, toks[i + 1].text });
                     i += 2;
                 }
-                // `name(GENNUM=/MEMTYPE=/ENCRYPTKEY=/ALTER=)` — the doc's OWN
+                // `name(GENNUM=/MEMTYPE=/ENCRYPTKEY=/ALTER=)` - the doc's OWN
                 // spelling (the syntax diagram closes that paren set at those
                 // four, printed pp. 786-787, === pdf 835/836/837 ===). The old
                 // lparen-skip ate the group whole: `data=x(gennum=all)` ran
-                // rc 0 with no diagnostic while x vanished — a silent drop on
+                // rc 0 with no diagnostic while x vanished - a silent drop on
                 // a DESTRUCTIVE request (BUG-deletegennumsilent, D-002's worst
                 // case; opensas has no generation model, so honouring
                 // GENNUM=ALL is out of scope and failing loud is the answer).
@@ -7369,7 +7369,7 @@ pub fn runDelete(cx: ProcCtx, toks: []const Token) diag.Error!void {
                     }
                     i = j;
                 }
-                // `data=_all_` (or `lib._all_`) — sweep every member of that
+                // `data=_all_` (or `lib._all_`) - sweep every member of that
                 // library like KILL (BUG-datasetsdeleteall); bare _all_ = WORK.
                 if (isAllWildcard(name)) {
                     dsKill(arena, lib, allWildcardLib(name));
@@ -7377,10 +7377,10 @@ pub fn runDelete(cx: ProcCtx, toks: []const Token) diag.Error!void {
                     diags.warn(toks[i - 1].line, "PROC DELETE: dataset {s} not found", .{name}) catch {};
             }
         } else if (toks[i].tag == .lparen) {
-            i = skipParen(toks, i); // data=x(…) — never read back, but don't false-fire on `keep`
+            i = skipParen(toks, i); // data=x(…) - never read back, but don't false-fire on `keep`
         } else if (toks[i].tag == .name) {
             // GAP-procopts: LIB=/MEMTYPE= or a typo'd option used to vanish
-            // here — name it (D-002), mirroring PROC APPEND.
+            // here - name it (D-002), mirroring PROC APPEND.
             // SPLIT: the PROC DELETE statement dictionary closes the option
             // set (Base SAS 9.4 Procedures Guide, 7th ed., printed
             // pp. 786-787, === pdf 835/836 ===): DATA= is handled, so
@@ -7399,7 +7399,7 @@ fn colRename(ds: *Dataset, old: []const u8, new: []const u8) void {
     if (ds.indexOf(old)) |idx| ds.columns.items[idx].name = new;
 }
 
-/// APPEND's BASE=: the existing member, or — when it doesn't exist — a fresh
+/// APPEND's BASE=: the existing member, or - when it doesn't exist - a fresh
 /// empty dataset with DATA='s schema, which appendRows then fills: SAS
 /// auto-creates BASE= as a copy of DATA= (append-to-nothing = create)
 /// (BUG-datasetschange F3). Column attributes ride along via addColumnLike.
@@ -7414,22 +7414,22 @@ fn appendTarget(cx: ProcCtx, bn: []const u8, data: *const Dataset) diag.Error!*D
 /// APPEND BASE=b DATA=d: add each DATA row to BASE, matching by variable NAME
 /// (a BASE column absent from DATA gets a type-appropriate missing).
 /// Shared APPEND body for PROC APPEND and PROC DATASETS' APPEND (one statement
-/// in SAS 9.4 — BUG-datasetsappendtype: DATASETS used to copy columns by name
+/// in SAS 9.4 - BUG-datasetsappendtype: DATASETS used to copy columns by name
 /// with no type check, landing char values in numeric columns silently).
 /// Structural reconciliation (Base SAS 9.4 Procedures Guide, DATASETS APPEND
-/// Statement — FORCE on printed p.588 [pdf 637]: a DATA= variable "not in the
+/// Statement - FORCE on printed p.588 [pdf 637]: a DATA= variable "not in the
 /// BASE= data set", of a different type, or "longer than the variables in the
 /// BASE= data set"; and "Appending to Data Sets That Contain Variables with
 /// Different Attributes" printed pp.594-595 [pdf 643-644]: "The length of the
 /// variables in the BASE= data set takes precedence. SAS truncates values from
 /// the DATA= data set to fit them into the length that is specified in the
 /// BASE= data set."): without FORCE any of the three ERRORs and nothing is
-/// appended; FORCE reconciles — incompatible values take missing, extra DATA=
-/// vars drop, over-length values truncate to the BASE= length — each with a
+/// appended; FORCE reconciles - incompatible values take missing, extra DATA=
+/// vars drop, over-length values truncate to the BASE= length - each with a
 /// warning. A BASE= var with no DATA= match takes missing values either way.
 /// A SHORTER DATA= var needs nothing: char storage is dynamic, so the doc's
 /// "pad" is a no-op (GAP-sqldatatypewidth). `proc` labels the messages.
-/// Char/numeric width IS tracked now (Column.len) — an earlier ponytail here
+/// Char/numeric width IS tracked now (Column.len) - an earlier ponytail here
 /// claimed it wasn't and declared the LENGTH case unreachable; it wasn't,
 /// and PROC APPEND stored 8 bytes under a Char 3 descriptor with no diagnostic
 /// (BUG-appendcharwidth). The declared-length check catches descriptor-vs-
@@ -7452,7 +7452,7 @@ fn appendRows(cx: ProcCtx, proc: []const u8, bn: []const u8, base: *Dataset, dat
             const dc = data.columns.items[di];
             if (dc.type == bc.type) {
                 compat[k] = true;
-                // LENGTH — the third FORCE criterion (doc p.588): DATA= longer
+                // LENGTH - the third FORCE criterion (doc p.588): DATA= longer
                 // than BASE=. char: both sides' declared widths; num: len
                 // null = full 8 bytes. BASE= len null declares no width, so
                 // there is nothing to violate.
@@ -7478,7 +7478,7 @@ fn appendRows(cx: ProcCtx, proc: []const u8, bn: []const u8, base: *Dataset, dat
         diags.warn(ln, "{s}: variable {s} not in BASE= dropped (FORCE)", .{ proc, dc.name }) catch {};
     };
 
-    // BASE is mutated in place like PROC SORT's no-OUT= target — guard the
+    // BASE is mutated in place like PROC SORT's no-OUT= target - guard the
     // read-only libref BEFORE touching rows (GH#15 pattern, main.zig runSort).
     if (lib.readonlyOut(bn)) return lib.failReadonly(bn);
     for (data.rows.items) |dr| {
@@ -7489,7 +7489,7 @@ fn appendRows(cx: ProcCtx, proc: []const u8, bn: []const u8, base: *Dataset, dat
             // char clips to len bytes; num keeps only the high len bytes of
             // the double (pdv.truncNum, GH#46). Declared mismatches already
             // warned/errored above; this also clips a wider cell from an
-            // untracked-width DATA= column (len null) — a stored cell wider
+            // untracked-width DATA= column (len null) - a stored cell wider
             // than its own descriptor is the failure class itself (2a4a2b6a),
             // so clip here and every reader agrees by construction.
             if (bc.len) |n| {
@@ -7514,7 +7514,7 @@ fn appendRows(cx: ProcCtx, proc: []const u8, bn: []const u8, base: *Dataset, dat
     try lib.put(bn, saved);
 }
 
-/// Documented SAS 9.4 PROC APPEND options opensas does NOT implement — the
+/// Documented SAS 9.4 PROC APPEND options opensas does NOT implement - the
 /// gap arm of the option catch-all (rc 2); anything else is the user's typo
 /// (rc 1). Closed set from the APPEND syntax diagram (printed p. 110,
 /// === pdf 159 ===): BASE=/DATA=/FORCE are handled.
@@ -7524,16 +7524,16 @@ fn isAppendGapOption(kw: []const u8) bool {
     return false;
 }
 
-/// PROC APPEND BASE=b DATA=d [FORCE]; — add DATA='s rows to BASE= IN PLACE; the
+/// PROC APPEND BASE=b DATA=d [FORCE]; - add DATA='s rows to BASE= IN PLACE; the
 /// step itself lists nothing (FEAT-procappend). SAS 9.4 "PROC APPEND" doc:
 /// without FORCE a DATA= variable absent from BASE=, or type-incompatible with
-/// its BASE= match, ERRORs and nothing is appended; FORCE reconciles — extra
+/// its BASE= match, ERRORs and nothing is appended; FORCE reconciles - extra
 /// DATA= vars are dropped and incompatible vars take missing values, each with
 /// a warning. A BASE= var with no DATA= match takes missing values either way
 /// (the doc needs no FORCE for that). DATA= defaults to the last-created
 /// dataset, as with the other procs. The LENGTH case the old ponytail here
 /// declared unreachable is live (width is tracked): DATA= longer than BASE=
-/// ERRORs without FORCE and truncates with FORCE — see appendRows
+/// ERRORs without FORCE and truncates with FORCE - see appendRows
 /// (BUG-appendcharwidth).
 pub fn runAppend(cx: ProcCtx, toks: []const Token) diag.Error!void {
     const arena = cx.arena;
@@ -7598,7 +7598,7 @@ fn joinFmt(arena: std.mem.Allocator, toks: []const Token) ![]const u8 {
 /// (CLIN-datasets). ponytail: char columns aren't width-tracked, so LENGTH on
 /// MODIFY is accepted but has no stored effect.
 /// Documented SAS 9.4 PROC DATASETS statement options opensas does NOT
-/// implement — the gap arm of the header catch-all (rc 2); anything else is
+/// implement - the gap arm of the header catch-all (rc 2); anything else is
 /// the user's typo (rc 1). Closed set from the "Summary of Optional
 /// Arguments" (printed pp. 578-579, === pdf 627/628 ===).
 fn isDatasetsGapOption(kw: []const u8) bool {
@@ -7626,20 +7626,20 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
         } else if (tkKw(toks[i], "nolist") or tkKw(toks[i], "details") or tkKw(toks[i], "nodetails")) {
             // INERT (SAS 9.4 PROC DATASETS statement doc): NOLIST suppresses
             // the automatic library directory listing, DETAILS/NODETAILS only
-            // decorates it — opensas's DATASETS never prints that listing
+            // decorates it - opensas's DATASETS never prints that listing
             // (the CONTENTS sub-statement is the only printer), so all three
             // are unobservable. Enumerated (real clinical idioms) so the chain
             // ends in a real else.
             i += 1;
         } else if (tkKw(toks[i], "memtype") and i + 2 < toks.len and toks[i + 1].tag == .eq and toks[i + 2].tag == .name) {
-            // MEMTYPE=DATA is inert — data is the only member type opensas
+            // MEMTYPE=DATA is inert - data is the only member type opensas
             // stores, so the filter matches everything it would anyway. Any
             // OTHER type scopes the step's DELETE/CHANGE to member kinds we
             // can't distinguish (a MEMTYPE=CATALOG DELETE must touch nothing)
             // → LOUD, never silently mis-scope a delete (GAP-procopts).
             if (!eqi(toks[i + 2].text, "data")) {
                 // ALL/CATALOG/VIEW are documented SAS 9.4 member types we can't
-                // scope to — a gap (rc 2); anything else is the user's typo (rc 1).
+                // scope to - a gap (rc 2); anything else is the user's typo (rc 1).
                 if (isDatasetMemberType(toks[i + 2].text))
                     return failGap(diags, toks[i].line, "PROC DATASETS: MEMTYPE={s} is not supported (only DATA)", .{toks[i + 2].text});
                 return diags.fail(error.ParseError, toks[i].line, "PROC DATASETS: MEMTYPE={s} is not a valid member type (expected DATA)", .{toks[i + 2].text});
@@ -7647,7 +7647,7 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
             i += 3;
         } else if (toks[i].tag == .name) {
             // GAP-procopts: the header loop's `: (i += 1)` postlude silently
-            // skipped every other token — a typo'd `kll` or an unhonoured
+            // skipped every other token - a typo'd `kll` or an unhonoured
             // ALTER= vanished while the sub-statement chain below fails loud.
             // SPLIT: the PROC DATASETS statement's "Summary of Optional
             // Arguments" closes the set (printed pp. 578-579,
@@ -7661,7 +7661,7 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
         } else i += 1;
     }
     if (i < toks.len) i += 1; // past ';'
-    // KILL: delete every member of the target library (BUG-datasetskill — the
+    // KILL: delete every member of the target library (BUG-datasetskill - the
     // end-of-program WORK-clear idiom, 80 of 164 real programs).
     if (kill) dsKill(arena, lib, libname);
 
@@ -7683,7 +7683,7 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
             if (cur == null) {
                 unsupported("PROC DATASETS: MODIFY member not found");
             } else {
-                // `modify d (label='…')` — set the dataset label (BUG-datasetsstrip)
+                // `modify d (label='…')` - set the dataset label (BUG-datasetsstrip)
                 for (stmt[2..], 2..) |tk, k| {
                     if (tkKw(tk, "label") and k + 2 < stmt.len and stmt[k + 1].tag == .eq and stmt[k + 2].tag == .string) {
                         cur.?.label = try arena.dupe(u8, stmt[k + 2].text);
@@ -7692,7 +7692,7 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
                 }
             }
         } else if (tkKw(kw, "attrib")) {
-            // `attrib _all_ format=;` / `attrib _all_ informat=;` — the SDTM XPORT
+            // `attrib _all_ format=;` / `attrib _all_ informat=;` - the SDTM XPORT
             // clean-up idiom. An empty FORMAT strips every column's display format
             // and an empty INFORMAT strips every column's read informat
             // (BUG-datasetsstrip, BUG-datasetsinformatstrip).
@@ -7705,7 +7705,7 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
             var k: usize = 1;
             while (k < stmt.len) : (k += 1) {
                 if (stmt[k].tag != .name) continue;
-                // `delete _all_;` (or `lib._all_`) — every member of the target
+                // `delete _all_;` (or `lib._all_`) - every member of the target
                 // library, like KILL (BUG-datasetsdeleteall). Bare _all_ honors
                 // the LIB= scope; before, a literal member "_all_" lookup found
                 // none and silently succeeded, leaving stale datasets.
@@ -7714,7 +7714,7 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
                     continue;
                 }
                 if (k + 1 < stmt.len and stmt[k + 1].tag == .colon) {
-                    // `delete pfx:;` — every member with the name prefix
+                    // `delete pfx:;` - every member with the name prefix
                     // (GAP-datasetsdeletecolon). Zero matches warns, not fails:
                     // the idiom clears scratch families that may never exist.
                     if (dsDeletePrefix(arena, lib, try dsQualify(arena, libname, stmt[k].text)) == 0)
@@ -7722,7 +7722,7 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
                     k += 1; // past ':'
                 } else if (!dsDelete(arena, lib, try dsQualify(arena, libname, stmt[k].text))) {
                     // Real SAS notes a never-existed member on DELETE and moves on
-                    // ("...was not found, but appears on a DELETE statement") — the
+                    // ("...was not found, but appears on a DELETE statement") - the
                     // member is provably absent everywhere (memory + disk, dsDelete
                     // checks both), so nothing silent is lost. UNSUPPORTED here
                     // exit-2-polluted count-equal domains (GAP-vtabledisk #2).
@@ -7735,7 +7735,7 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
                 if (stmt[k].tag == .name and stmt[k + 1].tag == .eq and stmt[k + 2].tag == .name) {
                     const newq = try dsQualify(arena, libname, stmt[k + 2].text);
                     // BUG-datasetschange F1: SAS errors when the target name is
-                    // already taken — renaming anyway produced two same-named
+                    // already taken - renaming anyway produced two same-named
                     // members (one shadowed/destroyed). A free target renames as before.
                     if (lib.find(newq) != null)
                         return diags.fail(error.ExecError, stmt[k].line, "PROC DATASETS: cannot CHANGE {s} to {s}: a member named {s} already exists", .{ stmt[k].text, stmt[k + 2].text, stmt[k + 2].text });
@@ -7760,7 +7760,7 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
                 unsupported("PROC DATASETS: APPEND needs BASE= and DATA=");
                 continue;
             }
-            // BUG-datasetsappendtype: same body as PROC APPEND — type check +
+            // BUG-datasetsappendtype: same body as PROC APPEND - type check +
             // FORCE gate; the old dsAppend copied by name, silent corruption.
             const bn = try dsQualify(arena, libname, base.?);
             const dn = try dsQualify(arena, libname, data.?);
@@ -7779,11 +7779,11 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
                 while (k + 2 <= stmt.len) : (k += 3) {
                     if (stmt[k].tag == .name and stmt[k + 1].tag == .eq and stmt[k + 2].tag == .name) {
                         // BUG-datasetschange F2: SAS errors "Variable x not
-                        // found" — a typo'd target used to silently no-op.
+                        // found" - a typo'd target used to silently no-op.
                         if (ds.indexOf(stmt[k].text) == null)
                             return diags.fail(error.ExecError, stmt[k].line, "PROC DATASETS: MODIFY {s}: variable {s} not found", .{ ds.name, stmt[k].text });
                         // BUG-datasetsrenamecollide: SAS errors when the new name
-                        // already names a variable — renaming anyway left the
+                        // already names a variable - renaming anyway left the
                         // dataset with two same-named columns (silent-wrong).
                         if (!eqi(stmt[k].text, stmt[k + 2].text) and ds.indexOf(stmt[k + 2].text) != null)
                             return diags.fail(error.ExecError, stmt[k].line, "PROC DATASETS: MODIFY {s}: cannot rename {s} to {s}: a variable named {s} already exists", .{ ds.name, stmt[k].text, stmt[k + 2].text, stmt[k + 2].text });
@@ -7819,7 +7819,7 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
                         for (ds.columns.items) |*c| c.format = spec;
                     } else if (ds.indexOf(stmt[k].text)) |ix| {
                         // NOTE-fmtnumoncharcoerce: the descriptor edit gets the
-                        // same type check as the FORMAT statement — else the
+                        // same type check as the FORMAT statement - else the
                         // poisoned descriptor coerces every later print to '.'.
                         if (spec) |sp| {
                             const col_char = ds.columns.items[ix].type == .char;
@@ -7839,14 +7839,14 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
                 // GAP-datasetsinformatstmt: the INFORMAT statement, mirror of the
                 // FORMAT arm above. Base SAS 9.4 Procedures Guide 7th ed. printed
                 // p.640 (=== pdf 690 ===): "INFORMAT variable-1 <informat-1>
-                // <variable-2 <informat-2> …>;" — "If you do not specify an
+                // <variable-2 <informat-2> …>;" - "If you do not specify an
                 // informat, the INFORMAT statement removes any existing informats
                 // for the variables in variable-list." Same accepted shape as
                 // FORMAT: ONE trailing spec applies to EVERY listed var, no spec ⇒
                 // strip, `_all_` targets every column. NO numeric/character type
                 // check (unlike FORMAT): a stored informat is descriptor metadata
                 // that never re-renders a stored value, so a mismatched one cannot
-                // silently coerce a later print to '.' — the ATTRIB INFORMAT=
+                // silently coerce a later print to '.' - the ATTRIB INFORMAT=
                 // arm's settled reasoning (2724b755, BUG-datasetsinformatstrip).
                 var fs: usize = stmt.len; // where the informat spec begins (== len ⇒ none)
                 for (stmt[1..], 1..) |tk, k| {
@@ -7888,20 +7888,20 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
         } else if (tkKw(kw, "length")) {
             // BUG-datasetslengthstmtnoop: was a SILENT no-op ("parsed but a
             // no-op (char width not tracked here)") while the sibling ATTRIB
-            // LENGTH= arm failed loud (2724b755) — the same user intent loud
+            // LENGTH= arm failed loud (2724b755) - the same user intent loud
             // one way and silent the other (D-002). Real SAS REJECTS the
             // statement here: Base SAS 9.4 Procedures Guide 7th ed. printed
             // p.563 (DATASETS restrictions): "You cannot change the length of
             // a variable using the LENGTH statement or the LENGTH= option in
-            // an ATTRIB statement" — and LENGTH is not among MODIFY's
+            // an ATTRIB statement" - and LENGTH is not among MODIFY's
             // subordinate statements (the p.576 syntax diagram runs ATTRIB …
             // XATTR with no LENGTH). rc 1, not 2: the user's SAS is wrong,
-            // not an opensas gap — the ATTRIB LENGTH= arm's verdict (D-009;
+            // not an opensas gap - the ATTRIB LENGTH= arm's verdict (D-009;
             // D-009b's corollary: the tree has already voted). Same message
             // vocabulary as that arm so the family reads consistently.
-            return diags.fail(error.ExecError, kw.line, "PROC DATASETS: the LENGTH statement is not valid in the DATASETS procedure (a variable's length cannot be changed after creation — use a DATA step)", .{});
+            return diags.fail(error.ExecError, kw.line, "PROC DATASETS: the LENGTH statement is not valid in the DATASETS procedure (a variable's length cannot be changed after creation - use a DATA step)", .{});
         } else if (tkKw(kw, "contents")) {
-            // `CONTENTS DATA=member [VARNUM] [NOPRINT] [OUT=ds];` — the same
+            // `CONTENTS DATA=member [VARNUM] [NOPRINT] [OUT=ds];` - the same
             // variable/metadata listing PROC CONTENTS renders (GH#8). NOPRINT
             // (the SE/DM idiom) suppresses output and has no dataset effect → a
             // safe no-op. Without NOPRINT we print the listing, routing to the same
@@ -7917,7 +7917,7 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
                 if (optAt(stmt, k, "data")) |v| data_name = v;
             }
             if (has_out) {
-                // CONTENTS OUT= is valid SAS 9.4 (the output dataset) — a gap
+                // CONTENTS OUT= is valid SAS 9.4 (the output dataset) - a gap
                 // (rc 2); the step still errors loud and creates nothing.
                 diag.markGap();
                 try diags.report(.err, 0, "PROC DATASETS: CONTENTS OUT= is not supported (the output dataset is not created)", .{});
@@ -7927,12 +7927,12 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
                 const qn = try dsQualify(arena, libname, dn);
                 if (isAllWildcard(qn)) {
                     // SAS: CONTENTS DATA=_ALL_ (and bare CONTENTS' whole-library
-                    // default) lists EVERY member of the procedure library — not
+                    // default) lists EVERY member of the procedure library - not
                     // modeled. Name the gap; "member not found" misreads it as a
                     // typo'd member name (GAP-dsmgmt-tick262 F7). Whole-library
                     // CONTENTS is valid SAS 9.4 → a gap (rc 2), not the user's 1.
                     diag.markGap();
-                    try diags.report(.err, 0, "PROC DATASETS: CONTENTS {s} (whole-library contents) is not supported — name a single DATA= member", .{qn});
+                    try diags.report(.err, 0, "PROC DATASETS: CONTENTS {s} (whole-library contents) is not supported - name a single DATA= member", .{qn});
                 } else if (lib.find(qn)) |ds|
                     try printOneContents(arena, out, ds, false, false)
                 else
@@ -7941,10 +7941,10 @@ pub fn runDatasets(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
                 try diags.report(.err, 0, "PROC DATASETS: CONTENTS requires DATA=", .{});
             }
         } else if (kw.tag == .name and @import("parser.zig").isMidStepSkippable(kw.text)) {
-            // D-014/D-014a: skip exactly what the top level HANDLES mid-step —
+            // D-014/D-014a: skip exactly what the top level HANDLES mid-step -
             // the main-hoisted globals (TITLE/FOOTNOTE/OPTIONS, hoisted to
             // their own segment with the tokens LEFT in the step) plus the
-            // batch-unobservable inert set (GOPTIONS/DM/SASFILE/PAGE/…) — or
+            // batch-unobservable inert set (GOPTIONS/DM/SASFILE/PAGE/…) - or
             // one legal `proc datasets; title "t"; …` kills the step at exit
             // 2. LIBNAME executed in the parseLibnames pre-pass; unhoisted
             // ODS/FILENAME keep hitting the loud else,
@@ -8011,13 +8011,13 @@ fn applyAttrib(arena: std.mem.Allocator, ds: *Dataset, toks: []const Token, diag
             // be a hard-coded no-op, justified by a comment claiming informats
             // "aren't stored". That claim went stale: `Dataset.Column.informat`
             // carries one, PROC CONTENTS prints an Informat column and xport.zig
-            // writes it into the .xpt descriptor — so the no-op shipped a
+            // writes it into the .xpt descriptor - so the no-op shipped a
             // "stripped" dataset still advertising every old informat, at rc 0.
             // Procedures Guide 7th ed. p.641: "To remove all informats from a data
             // set, use the ATTRIB statement ... and the _ALL_ keyword"; p.691's own
             // sample uses the bare empty-value spelling. Same shape as FORMAT= above.
             // ponytail: no numeric/character type check here (the FORMAT arm's
-            // NOTE-fmtnumoncharcoerce guard) — a stored informat is descriptor
+            // NOTE-fmtnumoncharcoerce guard) - a stored informat is descriptor
             // metadata, it never re-renders a stored value, so a mismatched one
             // cannot silently coerce a later print to '.'.
             const spec: ?[]const u8 = if (val.len == 0) null else try joinFmt(arena, val);
@@ -8032,7 +8032,7 @@ fn applyAttrib(arena: std.mem.Allocator, ds: *Dataset, toks: []const Token, diag
             } else for (targets) |tk| if (tk.tag == .name) ds.setLabel(tk.text, val[0].text);
         } else if (eqi(opt, "length")) {
             // D-002: LENGTH= is NOT one of the three options ATTRIB accepts inside
-            // DATASETS (p.598) — real SAS rejects it, and silently dropping it left
+            // DATASETS (p.598) - real SAS rejects it, and silently dropping it left
             // the user believing a width change happened. rc 1, not 2: this is the
             // user's SAS being wrong, not an opensas gap (D-009 / D-009b(ii)).
             return diags.fail(error.ExecError, toks[k].line, "PROC DATASETS: ATTRIB LENGTH= is not valid in the DATASETS procedure (only FORMAT=, INFORMAT= and LABEL= are)", .{});
@@ -8047,7 +8047,7 @@ const CompCol = struct { bi: usize, ci: usize, name: []const u8, cname: []const 
 const CompPair = struct { br: usize, cr: usize };
 const CompDiff = struct { p: CompPair, col: CompCol };
 
-/// BUG-comparetypemismatch: pair the columns only when the TYPES match — SAS
+/// BUG-comparetypemismatch: pair the columns only when the TYPES match - SAS
 /// requires matching variables be the same type and never cross-compares a
 /// numeric against a character column (cmpValue would coerce the char via
 /// toNum and call base 10 EQUAL to "10", a false green on a QC tool). A
@@ -8061,12 +8061,12 @@ fn compPairCol(arena: std.mem.Allocator, b: *const Dataset, c: *const Dataset, b
     try cols.append(arena, .{ .bi = bi, .ci = ci, .name = b.columns.items[bi].name, .cname = c.columns.items[ci].name });
 }
 
-/// PROC COMPARE METHOD= — how CRITERION=γ bounds the numeric difference
+/// PROC COMPARE METHOD= - how CRITERION=γ bounds the numeric difference
 /// (BUG-comparecriterion).
 const CompMethod = enum { absolute, relative, percent };
 
 /// COMPARE's equality judgement: exact equality (incl. both-missing) always
-/// passes; otherwise numerics are fuzzed per METHOD= — ABSOLUTE |a-b|<=γ,
+/// passes; otherwise numerics are fuzzed per METHOD= - ABSOLUTE |a-b|<=γ,
 /// RELATIVE (default) |a-b|/max(|a|,|b|)<=γ, PERCENT that ratio×100<=γ.
 /// Chars and one-side-missing never fuzz away. Default γ=1e-8: SAS's default
 /// comparison is not bit-exact, so exact-but-noise diffs aren't flagged.
@@ -8096,11 +8096,11 @@ fn idKey(arena: std.mem.Allocator, ds: *const Dataset, idcols: []const usize, ro
     return buf.items;
 }
 
-/// `proc compare base=B compare=C [var …];` — the clinical double-programming QC
+/// `proc compare base=B compare=C [var …];` - the clinical double-programming QC
 /// report: compare two datasets and summarise variable / observation overlap and
 /// a value-level verdict (the all-equal note, or the count of unequal values).
 /// ponytail: observations are matched by POSITION (ID-key matching not modeled)
-/// and the report is a compact summary, not SAS's full multi-panel listing — the
+/// and the report is a compact summary, not SAS's full multi-panel listing - the
 /// QC signal (exactly-equal vs how many values differ) is complete.
 pub fn runCompare(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.Error!void {
     const arena = cx.arena;
@@ -8108,7 +8108,7 @@ pub fn runCompare(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) dia
     const diags = cx.diags;
     var base_name: ?[]const u8 = null;
     var comp_name: ?[]const u8 = null;
-    var criterion: f64 = 1e-8; // SAS's default fuzz — the comparison is not bit-exact (BUG-comparecriterion)
+    var criterion: f64 = 1e-8; // SAS's default fuzz - the comparison is not bit-exact (BUG-comparecriterion)
     var method: CompMethod = .relative;
     var out_name: ?[]const u8 = null; // BUG-compareout
     var out_base = false;
@@ -8118,7 +8118,7 @@ pub fn runCompare(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) dia
     var out_noequal = false;
     var b_novalues = false; // NOVALUES: suppress the value-difference detail (NOTE-compareoptsnoop)
     var b_nosummary = false; // NOSUMMARY: suppress the summary sections
-    var b_brief = false; // BRIEF: compact report — summaries suppressed, value diffs only
+    var b_brief = false; // BRIEF: compact report - summaries suppressed, value diffs only
     var i: usize = 2; // past `proc compare`
     while (i < toks.len and toks[i].tag != .semicolon) {
         if (optAt(toks, i, "base") orelse optAt(toks, i, "data")) |v| {
@@ -8165,24 +8165,24 @@ pub fn runCompare(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) dia
         } else if (tkKw(toks[i], "listall") or tkKw(toks[i], "printall") or
             tkKw(toks[i], "transpose") or tkKw(toks[i], "clist"))
         {
-            // NOTE-compareoptsnoop: these reshape the VALUE listing — LISTALL/
-            // PRINTALL print equal values too, TRANSPOSE/CLIST re-panel it — none
+            // NOTE-compareoptsnoop: these reshape the VALUE listing - LISTALL/
+            // PRINTALL print equal values too, TRANSPOSE/CLIST re-panel it - none
             // modeled by the compact report. Fail loud, never silently accept-and-
             // ignore (a QC tool that drops a requested layout is a false green).
             unsupported(try std.fmt.allocPrint(arena, "PROC COMPARE: {s} is not supported", .{toks[i].text}));
             return;
         } else if (tkKw(toks[i], "maxprint") and i + 1 < toks.len and toks[i + 1].tag == .eq) {
-            // MAXPRINT= caps the per-variable listing — accepted, the compact
+            // MAXPRINT= caps the per-variable listing - accepted, the compact
             // summary never lists individual values anyway.
             i += 2;
             if (i < toks.len and toks[i].tag == .lparen) i = skipParen(toks, i) else i += 1;
         } else {
             // D-002 fail-loud (BUG-comparesilentopts), mirroring PROC CONTENTS:
-            // an unknown option errors visibly — a typo'd criterionn= used to
+            // an unknown option errors visibly - a typo'd criterionn= used to
             // vanish, silently re-arming the default 1e-8 fuzz and flipping the
             // verdict (a silent-wrong clinical result).
             if (toks[i].tag == .name) {
-                // BUG-proctypoexits2: split — a documented option we don't
+                // BUG-proctypoexits2: split - a documented option we don't
                 // implement is a gap (rc 2, byte-identical UNSUPPORTED message);
                 // any other name is the user's typo (rc 1, same body via diags).
                 if (isCompareGapOption(toks[i].text)) {
@@ -8218,7 +8218,7 @@ pub fn runCompare(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) dia
         } else if (toks[i].tag == .name and @import("parser.zig").isMidStepSkippable(toks[i].text)) {
             // Mid-step global statement the top level actually handles here:
             // hoisted (TITLE/FOOTNOTE/OPTIONS, applied via the global segment)
-            // or inert-unobservable (GOPTIONS/SASFILE/PAGE/…) — skip, same as
+            // or inert-unobservable (GOPTIONS/SASFILE/PAGE/…) - skip, same as
             // TRANSPOSE. LIBNAME ran in the parseLibnames pre-pass; unhoisted
             // ODS/FILENAME fail loud below.
             while (i < toks.len and toks[i].tag != .semicolon) i += 1;
@@ -8235,8 +8235,8 @@ pub fn runCompare(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) dia
     }
 
     // BUG-procmissingrc2: a NAMED but absent BASE=/COMPARE= member is the
-    // user's error (D-009 rc 1) — real SAS errors "ERROR: File WORK.X.DATA
-    // does not exist." — so it takes the runSort (GH#8) .err arm (step-halt
+    // user's error (D-009 rc 1) - real SAS errors "ERROR: File WORK.X.DATA
+    // does not exist." - so it takes the runSort (GH#8) .err arm (step-halt
     // NOTE, BUG-errhalt later-step skip, rc 1), never unsupported()/rc 2.
     // Only the option-itself-absent case keeps the `required` arms below: no
     // member was named, so there is no missing table to point at.
@@ -8262,14 +8262,14 @@ pub fn runCompare(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) dia
     };
 
     // compared columns: the VAR list (if any), else every variable common to both
-    // — but never the ID variables (those key the match, they are not compared).
+    // - but never the ID variables (those key the match, they are not compared).
     var cols: std.ArrayList(CompCol) = .empty;
     var type_mism: std.ArrayList([]const u8) = .empty; // BUG-comparetypemismatch: same-name vars with conflicting types, excluded
     if (withlist.items.len > 0) {
-        // BUG-comparewith: WITH pairs positionally with VAR — base.VAR[k] is
+        // BUG-comparewith: WITH pairs positionally with VAR - base.VAR[k] is
         // compared against compare.WITH[k]. A shorter WITH leaves the trailing
         // VAR items compared by same name (SAS semantics); a longer one, or a
-        // WITH/VAR name missing from its dataset, fails loud — a silently
+        // WITH/VAR name missing from its dataset, fails loud - a silently
         // dropped comparison is a false green on a QC tool. No VAR → each
         // WITH var compares against the same-named base var.
         if (varlist.items.len > 0 and withlist.items.len > varlist.items.len)
@@ -8362,7 +8362,7 @@ pub fn runCompare(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) dia
     const pair_unequal = try arena.alloc(bool, pairs.items.len); // OUTNOEQUAL filter
     @memset(pair_unequal, false);
     for (cols.items) |col| {
-        // the matched pair must index real columns on BOTH sides — a bad pair
+        // the matched pair must index real columns on BOTH sides - a bad pair
         // here is a wrong EQUAL/UNEQUAL verdict from the QC tool itself, the
         // most expensive silent error in the repo (TASTE-asserts).
         assert(col.bi < b.columns.items.len);
@@ -8380,10 +8380,10 @@ pub fn runCompare(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) dia
     }
 
     // BUG-compareout: OUT= materializes the comparison as a dataset for
-    // downstream QC steps — per matched pair one row per requested _TYPE_
+    // downstream QC steps - per matched pair one row per requested _TYPE_
     // (BASE by default when no OUTxxx option is given; COMP/DIF/PCT on
     // demand), keyed by the ID vars + _OBS_. DIF = compare−base (SAS: Diff =
-    // comparison − base — BUG-comparedifsign), PCT = dif/base×100 (char
+    // comparison − base - BUG-comparedifsign), PCT = dif/base×100 (char
     // columns and a zero base → missing).
     // ponytail: observations in one side only are not written.
     if (out_name) |on| {
@@ -8438,7 +8438,7 @@ pub fn runCompare(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) dia
 
     try out.appendSlice(arena, "\n" ++ " " ** 26 ++ "The COMPARE Procedure\n");
     try out.appendSlice(arena, try std.fmt.allocPrint(arena, "  Comparison of {s} with {s}\n\n", .{ b.name, c.name }));
-    // Summary reports — suppressed by NOSUMMARY / BRIEF (NOTE-compareoptsnoop).
+    // Summary reports - suppressed by NOSUMMARY / BRIEF (NOTE-compareoptsnoop).
     // BRIEF is NOSUMMARY in the compact report: our value section is already the
     // one-line-per-diff short form BRIEF would produce, so both leave only the
     // header + value differences.
@@ -8456,7 +8456,7 @@ pub fn runCompare(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) dia
                 if (k > 0) try names.appendSlice(arena, ", ");
                 try names.appendSlice(arena, nm);
             }
-            try out.appendSlice(arena, try std.fmt.allocPrint(arena, "  NOTE: {d} variable(s) not compared — type differs between base and compare: {s}\n", .{ type_mism.items.len, names.items }));
+            try out.appendSlice(arena, try std.fmt.allocPrint(arena, "  NOTE: {d} variable(s) not compared - type differs between base and compare: {s}\n", .{ type_mism.items.len, names.items }));
         }
     }
 
@@ -8465,7 +8465,7 @@ pub fn runCompare(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) dia
         return;
     }
     // per-difference detail: which observation (by ID key, or obs number) and
-    // variable differ, with the base vs compare value. Suppressed by NOVALUES —
+    // variable differ, with the base vs compare value. Suppressed by NOVALUES -
     // the summaries still report the counts (NOTE-compareoptsnoop).
     if (b_novalues) return;
     try out.appendSlice(arena, "\n  Value Comparison Results\n\n");
@@ -8492,20 +8492,20 @@ pub fn runCompare(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) dia
 // ── PROC TABULATE ──────────────────────────────────────────────────────────
 
 /// The one TABULATE shape the corpus pins: `class R; var V; table R, V*STAT;`
-/// — one class variable down the rows, one analysis variable × one statistic
+/// - one class variable down the rows, one analysis variable × one statistic
 /// across a single data column, drawn as a boxed table.
-/// ponytail: exactly this shape — no nested/crossed dimensions, multiple stats,
+/// ponytail: exactly this shape - no nested/crossed dimensions, multiple stats,
 /// `ALL`, or cell formats. Grow when a fixture needs it.
 pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.Error!void {
     const arena = cx.arena;
     const lib = cx.lib;
     const diags = cx.diags;
     var in_name: ?[]const u8 = null;
-    var proc_fmt: ?[]const u8 = null; // proc-level `format=8.2` — default cell format (GAP-tabformat)
+    var proc_fmt: ?[]const u8 = null; // proc-level `format=8.2` - default cell format (GAP-tabformat)
     var missing_opt = false; // MISSING: keep obs with a missing CLASS value (BUG-tabulatemissclass)
     var class_order: GroupOrder = .internal; // ORDER=INTERNAL|FORMATTED|DATA|FREQ (GAP-tabulateopts)
-    var var_labels: std.ArrayList(NameLabel) = .empty; // LABEL stmt — variable header text (GAP-tabulateopts)
-    var key_labels: std.ArrayList(NameLabel) = .empty; // KEYLABEL stmt — statistic-keyword header text
+    var var_labels: std.ArrayList(NameLabel) = .empty; // LABEL stmt - variable header text (GAP-tabulateopts)
+    var key_labels: std.ArrayList(NameLabel) = .empty; // KEYLABEL stmt - statistic-keyword header text
     var i: usize = 2; // past `proc tabulate`
     while (i < toks.len and toks[i].tag != .semicolon) {
         if (optAt(toks, i, "data")) |v| {
@@ -8519,7 +8519,7 @@ pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
             missing_opt = true;
             i += 1;
         } else if (tkKw(toks[i], "order") and atTag(toks, i + 1, .eq) and i + 2 < toks.len and toks[i + 2].tag == .name) {
-            // ORDER=INTERNAL|FORMATTED|DATA|FREQ — the CLASS level order
+            // ORDER=INTERNAL|FORMATTED|DATA|FREQ - the CLASS level order
             // (GAP-tabulateopts); was silently ignored. A bad value fails loud.
             const v = toks[i + 2].text;
             if (eqi(v, "internal")) class_order = .internal //
@@ -8527,21 +8527,21 @@ pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
             else if (eqi(v, "data")) class_order = .data //
             else if (eqi(v, "freq")) class_order = .freq //
             else {
-                unsupported(try std.fmt.allocPrint(arena, "PROC TABULATE: ORDER={s} is not valid — expected INTERNAL, FORMATTED, DATA, or FREQ", .{v}));
+                unsupported(try std.fmt.allocPrint(arena, "PROC TABULATE: ORDER={s} is not valid - expected INTERNAL, FORMATTED, DATA, or FREQ", .{v}));
                 return;
             }
             i += 3;
         } else if (tkKw(toks[i], "order") and atTag(toks, i + 1, .eq)) {
             // `order=;` with NO value fell to the catch-all and was silently
-            // ignored (NOTE-tabulateorderempty) — fail loud, like a bad value.
+            // ignored (NOTE-tabulateorderempty) - fail loud, like a bad value.
             unsupported("PROC TABULATE: ORDER= requires a value (DATA/FREQ/FORMATTED/INTERNAL)");
             return;
         } else if (toks[i].tag == .lparen) {
-            i = skipParen(toks, i); // data=d(where=/keep=/…) dataset options — applied via procInput
+            i = skipParen(toks, i); // data=d(where=/keep=/…) dataset options - applied via procInput
         } else if (toks[i].tag == .name) {
             // D-002 fail-loud (GAP-tabprocopt): an unknown proc option (NOSEPS,
             // FORMCHAR=, a typo, …) used to fall through here and vanish silently
-            // — a swallowed option changes expected output. Error visibly, mirroring
+            // - a swallowed option changes expected output. Error visibly, mirroring
             // the SORT header + the TABLE `/`-option fail-loud.
             unsupported(try std.fmt.allocPrint(arena, "PROC TABULATE: proc option {s} is not supported yet", .{toks[i].text}));
             return;
@@ -8549,23 +8549,23 @@ pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
     }
     if (atTag(toks, i, .semicolon)) i += 1;
 
-    var classes: std.ArrayList([]const u8) = .empty; // CLASS vars — tell a class column from an analysis one
-    var miss_classes: std.ArrayList([]const u8) = .empty; // class vars with `/ missing` — keep their missing level (BUG-tabulatemed)
+    var classes: std.ArrayList([]const u8) = .empty; // CLASS vars - tell a class column from an analysis one
+    var miss_classes: std.ArrayList([]const u8) = .empty; // class vars with `/ missing` - keep their missing level (BUG-tabulatemed)
     var class_orders: std.ArrayList(ClassOrder) = .empty; // per-class `/ order=` overrides (BUG-tabulatemed)
-    var specs: std.ArrayList(TabSpec) = .empty; // one spec per TABLE statement — each renders its own table (BUG-tabulatemed)
-    var bys: std.ArrayList([]const u8) = .empty; // `by v …;` — one table per BY group (BUG-tabulatebyfreq)
-    var freq_var: ?[]const u8 = null; // `freq f;` — each obs counts trunc(f) times (BUG-tabulatebyfreq)
+    var specs: std.ArrayList(TabSpec) = .empty; // one spec per TABLE statement - each renders its own table (BUG-tabulatemed)
+    var bys: std.ArrayList([]const u8) = .empty; // `by v …;` - one table per BY group (BUG-tabulatebyfreq)
+    var freq_var: ?[]const u8 = null; // `freq f;` - each obs counts trunc(f) times (BUG-tabulatebyfreq)
     while (i < toks.len and toks[i].tag != .eof) {
         if (tkKw(toks[i], "run")) break;
         if (tkKw(toks[i], "class")) {
             i += 1;
-            const c0 = classes.items.len; // the vars of THIS statement — `/` options apply to all of them
+            const c0 = classes.items.len; // the vars of THIS statement - `/` options apply to all of them
             while (i < toks.len and toks[i].tag != .semicolon) : (i += 1) {
                 if (toks[i].tag == .slash) {
                     // CLASS `/` options (BUG-tabulatemed): `/ missing` keeps the
                     // missing level of these vars (per-var proc-MISSING), `/ order=`
                     // overrides their level order. `/ mlf` (multilabel) and unknown
-                    // options FAIL LOUD — they used to be silently swallowed as
+                    // options FAIL LOUD - they used to be silently swallowed as
                     // phantom class names (`missing`/`order`/`freq` "variables").
                     i += 1;
                     while (i < toks.len and toks[i].tag != .semicolon) {
@@ -8588,7 +8588,7 @@ pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
                             else if (eqi(v, "data")) .data //
                             else if (eqi(v, "freq")) .freq //
                             else {
-                                unsupported(try std.fmt.allocPrint(arena, "PROC TABULATE: class option ORDER={s} is not valid — expected INTERNAL, FORMATTED, DATA, or FREQ", .{v}));
+                                unsupported(try std.fmt.allocPrint(arena, "PROC TABULATE: class option ORDER={s} is not valid - expected INTERNAL, FORMATTED, DATA, or FREQ", .{v}));
                                 return;
                             };
                             for (classes.items[c0..]) |cn| try class_orders.append(arena, .{ .name = cn, .order = ord });
@@ -8616,9 +8616,9 @@ pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
             if (!try parseTable(arena, diags, toks[ts..i], &spec, classes.items)) return; // failed loud already
             try specs.append(arena, spec);
         } else if (tkKw(toks[i], "label") or tkKw(toks[i], "keylabel")) {
-            // LABEL v='…' / KEYLABEL kw='…' — header text for the named variable /
+            // LABEL v='…' / KEYLABEL kw='…' - header text for the named variable /
             // statistic keyword (GAP-tabulateopts); both were silently ignored.
-            // A bare name RESETS the heading to the default — already our default.
+            // A bare name RESETS the heading to the default - already our default.
             const into = if (tkKw(toks[i], "keylabel")) &key_labels else &var_labels;
             i += 1;
             while (i < toks.len and toks[i].tag != .semicolon) {
@@ -8630,7 +8630,7 @@ pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
         } else if (tkKw(toks[i], "by")) {
             try parseProcBy(arena, diags, toks, &i, &bys); // one table per BY group (BUG-tabulatebyfreq)
         } else if (tkKw(toks[i], "freq")) {
-            i += 1; // `freq f;` — the frequency-count variable (BUG-tabulatebyfreq)
+            i += 1; // `freq f;` - the frequency-count variable (BUG-tabulatebyfreq)
             while (i < toks.len and toks[i].tag != .semicolon) : (i += 1) {
                 if (toks[i].tag == .name) freq_var = toks[i].text;
             }
@@ -8640,7 +8640,7 @@ pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
 
     const raw = (if (in_name) |n| lib.find(n) else lastDataset(lib)) orelse {
         // BUG-procmissingrc2: missing table = user error (D-009 rc 1), not a
-        // gap — the runSort (GH#8) absent-input arm: "File {s} does not
+        // gap - the runSort (GH#8) absent-input arm: "File {s} does not
         // exist" + the runExpanded step-halt NOTE, rc 1. NOT unsupported().
         diags.report(.err, if (toks.len > 1) toks[1].line else 0, "File {s} does not exist", .{in_name orelse "_last_"}) catch {};
         return;
@@ -8655,19 +8655,19 @@ pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
         ds = try expandFreq(arena, diags, ds, fcol);
     }
     // GAP-varcolonprefix-procs: expand `pfx:` entries in the CLASS list now
-    // that the dataset is known (PDV order — see expandVarPrefixes). ONE
+    // that the dataset is known (PDV order - see expandVarPrefixes). ONE
     // point, ahead of the miss-class filter and every render-time lookup;
     // parseTable ran pre-dataset, so IT matched class names against the wire
     // form (nameOrPrefixListed).
     try expandVarListPrefixes(arena, ds, &classes, diags, toks[0].line, "PROC TABULATE");
     // BUG-tabulatemissclass: SAS excludes obs with a missing value on ANY class
     // variable from the whole table (cells AND pctn/pctsum denominators) unless
-    // the MISSING option — the same once-up-front filter MEANS/FREQ use. Applies
+    // the MISSING option - the same once-up-front filter MEANS/FREQ use. Applies
     // to the cross path too: runTabulateCross receives this filtered view.
     if (!missing_opt and classes.items.len > 0) {
         var ccols: std.ArrayList(usize) = .empty;
         for (classes.items) |cn| {
-            // `/ missing` copied the PRE-expansion entry — a `pfx:` there
+            // `/ missing` copied the PRE-expansion entry - a `pfx:` there
             // covers every var it expanded to (nameOrPrefixListed).
             if (nameOrPrefixListed(miss_classes.items, cn)) continue; // `/ missing`: keep this var's missing level (BUG-tabulatemed)
             if (ds.indexOf(cn)) |idx| try ccols.append(arena, idx);
@@ -8675,12 +8675,12 @@ pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
         if (ccols.items.len > 0) ds = try dropMissingClass(arena, ds, ccols.items);
     }
     if (specs.items.len == 0) return unsupported("PROC TABULATE: no TABLE row variable");
-    // Validate every TABLE's row var up front — the same errors, in the same
+    // Validate every TABLE's row var up front - the same errors, in the same
     // order, as the old single-table path, never after a printed BY line.
     for (specs.items) |*spec| {
         // GAP-tabulateforms #8: an ALL-only row dimension (`table all, v*sum`)
         // is documented (p.2547: two dimensions → rows, columns; ALL is a
-        // dimension element) — one grand-total row. Anything else row-less
+        // dimension element) - one grand-total row. Anything else row-less
         // stays loud.
         if (spec.row_var == null and !spec.row_all) return unsupported("PROC TABULATE: no TABLE row variable");
         if (spec.row_var) |rv| {
@@ -8691,12 +8691,12 @@ pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
     // BY groups (BUG-tabulatebyfreq): one table per group over the SORTED input,
     // exactly like PROC MEANS. No BY → one null-rep slice over all rows, so the
     // dispatch below is byte-identical to the pre-BY single-table path. Every
-    // TABLE statement renders per group — each its own table (BUG-tabulatemed #5).
+    // TABLE statement renders per group - each its own table (BUG-tabulatemed #5).
     var obcols: std.ArrayList(usize) = .empty;
     const pb = try decodeProcBy(arena, bys.items); // GAP-procbydescending: clean names + directions
     for (pb.names) |bn|
         try obcols.append(arena, ds.indexOf(bn) orelse return unsupported("PROC TABULATE: BY variable not found"));
-    // BY demands sorted data (SAS errors otherwise) — a backward step between
+    // BY demands sorted data (SAS errors otherwise) - a backward step between
     // contiguous groups is the tell (mirrors TRANSPOSE's SET/BY guard), per key
     // under BY DESCENDING; BY NOTSORTED drops the check (Statements ref p.41).
     if (obcols.items.len > 0 and !pb.notsorted) {
@@ -8717,8 +8717,8 @@ pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
         const gds = if (obcols.items.len == 0) ds else try subsetRows(arena, ds, bs.rows);
         for (specs.items) |*spec| {
             const rname: ?[]const u8 = spec.row_var; // null = an ALL-only row dimension (GAP-tabulateforms #8)
-            const ridx: ?usize = if (spec.row_var) |rv| ds.indexOf(rv).? else null; // gds shares ds's columns — same index
-            // LABEL/KEYLABEL header text (GAP-tabulateopts) — display only; dataset
+            const ridx: ?usize = if (spec.row_var) |rv| ds.indexOf(rv).? else null; // gds shares ds's columns - same index
+            // LABEL/KEYLABEL header text (GAP-tabulateopts) - display only; dataset
             // lookups keep the real variable names. A TABLE *f= wins over FORMAT=.
             // Inline TABLE `elem='label'` (BUG-tabinlinelabel) wins over LABEL/KEYLABEL
             // for THIS table: prepend the per-spec overrides so labelFor's first-match
@@ -8741,7 +8741,7 @@ pub fn runTabulate(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) di
 
 /// A shallow copy of `ds` restricted to `rows` (columns + row pointers shared,
 /// cells untouched) so a BY-group slice can be handed to the per-table renderers
-/// without disturbing the library dataset — mirrors dropMissingClass.
+/// without disturbing the library dataset - mirrors dropMissingClass.
 fn subsetRows(arena: std.mem.Allocator, ds: *Dataset, rows: []const []const Value) !*Dataset {
     const copy = try arena.create(Dataset);
     copy.* = Dataset.init(arena, ds.name);
@@ -8751,7 +8751,7 @@ fn subsetRows(arena: std.mem.Allocator, ds: *Dataset, rows: []const []const Valu
 }
 
 /// One TABULATE table: rows are the `rname` class levels; the column dimension
-/// is the parsed block list — one block per concatenated segment, each with its
+/// is the parsed block list - one block per concatenated segment, each with its
 /// own analysis variable and statistics (GAP-tabulateforms #7), plus at most
 /// one ALL subtotal block. Split out of runTabulate so BUG-tabulatebyfreq can
 /// render it once per BY group.
@@ -8777,7 +8777,7 @@ fn runTabulateSingle(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dat
 
     // group the rows by class value, keeping the full per-group row list so we
     // can compute the *requested* statistic (not just a running sum).
-    // The CLASS index keys every row into its group — out-of-range = the whole
+    // The CLASS index keys every row into its group - out-of-range = the whole
     // table grouped on a wrong cell, silently (TASTE-asserts).
     var keys: std.ArrayList([]const u8) = .empty;
     var groups: std.ArrayList(std.ArrayList([]const Value)) = .empty;
@@ -8802,7 +8802,7 @@ fn runTabulateSingle(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dat
             }
         }
     } else {
-        // GAP-tabulateforms #8: the row dimension is ALL alone — one
+        // GAP-tabulateforms #8: the row dimension is ALL alone - one
         // grand-total row over the whole table.
         try keys.append(arena, all_text);
         var g: std.ArrayList([]const Value) = .empty;
@@ -8810,7 +8810,7 @@ fn runTabulateSingle(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dat
         try groups.append(arena, g);
     }
 
-    // value matrix: vals[group][column] — the columns are the blocks in
+    // value matrix: vals[group][column] - the columns are the blocks in
     // source order, each block's own statistics side by side (#7).
     var vals: std.ArrayList([]f64) = .empty;
     for (groups.items) |g| {
@@ -8820,7 +8820,7 @@ fn runTabulateSingle(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dat
     }
 
     // order class values (GAP-tabulateopts ORDER=): INTERNAL = numerically when the
-    // class is numeric (BUG-tabnumorder: MEANS orders 1,2,10 numerically — TABULATE
+    // class is numeric (BUG-tabnumorder: MEANS orders 1,2,10 numerically - TABULATE
     // must too, not lexical 1,10,2), FORMATTED = the display string, DATA = first
     // appearance (grouping appended in order), FREQ = descending group size. The
     // insertion sort is stable, so FREQ ties keep first-appearance order. Parallel
@@ -8847,9 +8847,9 @@ fn runTabulateSingle(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dat
         }
     }
 
-    // ALL grand-total row (BUG-tabulateall): every block over the whole table —
+    // ALL grand-total row (BUG-tabulateall): every block over the whole table -
     // appended after the sort so it stays last; its pctn/pctsum are 100 by
-    // construction. (An ALL-ONLY row dimension — #8 — already drew that row as
+    // construction. (An ALL-ONLY row dimension - #8 - already drew that row as
     // its single group above; appending again would double it.)
     if (row_all and ridx != null) {
         try keys.append(arena, all_text);
@@ -8898,7 +8898,7 @@ fn runTabulateSingle(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dat
     var data_w: usize = ncols - 1; // the internal `|` separators
     for (wcol) |w| data_w += w;
     // each block's span fits its heading (the analysis var's name or the ALL
-    // text), widening the block's last column when it doesn't — for one block
+    // text), widening the block's last column when it doesn't - for one block
     // of one stat this reproduces the old `w2 = max(cname, label, values) + 2`.
     const bwidth = try arena.alloc(usize, nblocks);
     {
@@ -8923,7 +8923,7 @@ fn runTabulateSingle(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dat
     // header row 1: the block headings (analysis var / ALL text) spanning their
     // stat columns; the corner cell holds the `/ box='…'` text when given
     // (GAP-tabulateopts). Skipped when NO block carries a heading (a stat-only
-    // table like `table a, n` — GAP-tabulateforms #9).
+    // table like `table a, n` - GAP-tabulateforms #9).
     if (any_heading) {
         const corner = dress.box_text orelse "";
         var h1: std.ArrayList(Cell) = .empty;
@@ -8957,11 +8957,11 @@ fn runTabulateSingle(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dat
 }
 
 /// One data row of the 1-way table (GAP-tabulateforms #7): every block's own
-/// statistics over `rows` — a class-level slice, or the whole table for the
+/// statistics over `rows` - a class-level slice, or the whole table for the
 /// ALL row (so the ALL row and an ALL block are row-restricted by
 /// construction, BUG-tabulatemed #4). `grands[bi]` is the block's grand-total
 /// Stats, the default pctn/pctsum denominator. A var-less block (a bare `all`
-/// subtotal — default N, p.2547) takes the frequency path and never reads an
+/// subtotal - default N, p.2547) takes the frequency path and never reads an
 /// analysis column.
 fn tabSingleVals(arena: std.mem.Allocator, blocks: []const TabBlock, bidx: []const ?usize, grands: []const Stats, rname: ?[]const u8, rows: []const []const Value, total_rows: usize, rowv: []f64) diag.Error!void {
     var f: usize = 0;
@@ -8971,7 +8971,7 @@ fn tabSingleVals(arena: std.mem.Allocator, blocks: []const TabBlock, bidx: []con
             for (b.stats.items, 0..) |kw, si| {
                 const dn: ?[]const u8 = if (si < b.denoms.items.len) b.denoms.items[si] else null;
                 // an ALL-only row dimension (#8) has no row var a `<rowvar>`
-                // clause could name — tabBasis1's "" never matches, so such a
+                // clause could name - tabBasis1's "" never matches, so such a
                 // clause hits its loud arm, exactly like a bogus denominator.
                 const basis = (try tabBasis1(arena, dn, rname orelse "", s, grands[bi])) orelse return;
                 rowv[f] = tabCellValue(kw, s, basis, rows.len) orelse return unsupported("PROC TABULATE: unknown statistic");
@@ -9020,7 +9020,7 @@ const LevelCtx = struct {
     }
 };
 
-/// Case-insensitive string-key map context — TABULATE class levels dedup with
+/// Case-insensitive string-key map context - TABULATE class levels dedup with
 /// eqi, so the PERF-tabulatecross bucket maps must hash/compare the same way.
 const CICtx = struct {
     pub fn hash(_: CICtx, k: []const u8) u64 {
@@ -9043,9 +9043,9 @@ const CICtx = struct {
 /// 2-way cross: rows are the `rname` class levels, columns are the `ccname`
 /// class levels each holding the crossing block's statistics (or a count when
 /// there is no analysis var), plus at most one trailing ALL subtotal block
-/// carrying its OWN statistics (GAP-tabulateforms #7 — the old shared stat
+/// carrying its OWN statistics (GAP-tabulateforms #7 - the old shared stat
 /// list unioned `all*v*(…)`'s statistics into every class-level block and
-/// rendered extra columns). Populates every cell — BUG-tabulatecross.
+/// rendered extra columns). Populates every cell - BUG-tabulatecross.
 fn runTabulateCross(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Dataset, rname: ?[]const u8, ridx: ?usize, ccname: []const u8, blocks: []const TabBlock, row_all: bool, cell_fmt: ?[]const u8, dress: TabOpts, tables: ?*table_result.Collector, section: []const u8) diag.Error!void {
     const ccidx = ds.indexOf(ccname) orelse return unsupported("PROC TABULATE: column class variable not found");
     // parseTable's shape constraints guarantee exactly one crossing block plus
@@ -9057,9 +9057,9 @@ fn runTabulateCross(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Data
     }
     const aidx: ?usize = if (xb.variable) |an| (ds.indexOf(an) orelse return unsupported("PROC TABULATE: analysis variable not found")) else null;
     const aidx_all: ?usize = if (allb) |ab| (if (ab.variable) |an| (ds.indexOf(an) orelse return unsupported("PROC TABULATE: analysis variable not found")) else null) else null;
-    // LABEL/KEYLABEL header text (GAP-tabulateopts) — display only.
+    // LABEL/KEYLABEL header text (GAP-tabulateopts) - display only.
     const rname_d: []const u8 = if (rname) |rn| labelFor(dress.var_labels, rn) orelse rn else "";
-    const rname_s: []const u8 = rname orelse ""; // "" matches no <dim> denominator — an ALL-only row (#8) has no row var to name
+    const rname_s: []const u8 = rname orelse ""; // "" matches no <dim> denominator - an ALL-only row (#8) has no row var to name
     const ccname_d = labelFor(dress.var_labels, ccname) orelse ccname;
     const an_d: ?[]const u8 = if (xb.variable) |an| labelFor(dress.var_labels, an) orelse an else null;
     const an_all_d: ?[]const u8 = if (allb) |ab| (if (ab.variable) |an| labelFor(dress.var_labels, an) orelse an else null) else null;
@@ -9067,9 +9067,9 @@ fn runTabulateCross(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Data
     const stat_kws: []const []const u8 = xb.stats.items;
     const nstats = stat_kws.len;
     const astats: usize = if (allb) |ab| ab.stats.items.len else 0; // the ALL block's own stat count
-    // without an analysis var only N/PCTN are computable — anything else must fail
+    // without an analysis var only N/PCTN are computable - anything else must fail
     // loud, not silently render a frequency (or read an uninitialised cell).
-    // (parseTable rejects those first with rc 1 — this is the unreachable backstop.)
+    // (parseTable rejects those first with rc 1 - this is the unreachable backstop.)
     if (aidx == null) for (stat_kws) |kw| {
         if (!eqi(kw, "n") and !eqi(kw, "pctn")) return unsupported("PROC TABULATE: statistic requires an analysis variable");
     };
@@ -9085,7 +9085,7 @@ fn runTabulateCross(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Data
     var rkeys: std.ArrayList([]const u8) = .empty;
     var ckeys: std.ArrayList([]const u8) = .empty;
     for (ds.rows.items, 0..) |row, k| {
-        rk[k] = if (ridx) |ri| try levelKey(arena, row[ri]) else all_text; // no row var: an ALL-only row (#8) — every row in the one group
+        rk[k] = if (ridx) |ri| try levelKey(arena, row[ri]) else all_text; // no row var: an ALL-only row (#8) - every row in the one group
         ck[k] = try levelKey(arena, row[ccidx]);
         try addUniqueKey(arena, &rkeys, rk[k]);
         try addUniqueKey(arena, &ckeys, ck[k]);
@@ -9097,9 +9097,9 @@ fn runTabulateCross(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Data
     try orderLevels(arena, rkeys.items, rk, rnum, orderFor(dress.class_orders, rname orelse "") orelse dress.order);
     try orderLevels(arena, ckeys.items, ck, cnum, orderFor(dress.class_orders, ccname) orelse dress.order);
     // ALL grand-total row (BUG-tabulateall): a trailing "All" level that
-    // matches every row — appended after sorting so it stays last. The ALL
+    // matches every row - appended after sorting so it stays last. The ALL
     // column is no longer a level: it is the ALL block's own column group (#7).
-    // (an ALL-ONLY row dimension — #8 — already keyed every row into the one
+    // (an ALL-ONLY row dimension - #8 - already keyed every row into the one
     // "All" group above; appending again would double the row.)
     const row_all_appended = row_all and ridx != null;
     if (row_all_appended) try rkeys.append(arena, all_text);
@@ -9113,7 +9113,7 @@ fn runTabulateCross(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Data
     // so that 0-obs path renders unchanged.)
     if (ndata == 0) return;
 
-    // PERF-tabulatecross: ONE pass buckets every row into its (ri, ci) cell — the
+    // PERF-tabulatecross: ONE pass buckets every row into its (ri, ci) cell - the
     // old nr×nc×N rescan is O(N·Ca·Cb) (quadratic in class cardinality: N=100k
     // C=200 → 38s, N=1M timed out). Buckets preserve row order, so computeStats
     // sees the exact same slice as the old per-cell `match` scan → byte-identical
@@ -9128,7 +9128,7 @@ fn runTabulateCross(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Data
     const buckets = try arena.alloc(std.ArrayList([]const Value), nr * nc);
     for (buckets) |*b| b.* = .empty;
     // the ALL block's cells: one row-restricted slice per table row (the whole
-    // table on the ALL row) — the old col_all bucket column, unknotted from
+    // table on the ALL row) - the old col_all bucket column, unknotted from
     // the level grid (#7). Skipped entirely without an ALL block so the
     // PERF-tabulatecross bucketing stays a single pass.
     const all_buckets = try arena.alloc(std.ArrayList([]const Value), if (allb != null) nr else 0);
@@ -9145,7 +9145,7 @@ fn runTabulateCross(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Data
     }
 
     // GAP-tabdenom: a PCTN/PCTSUM `<dim>` clause divides each cell by the named
-    // dimension's subtotal — `<rowvar>` = the row subtotal, `<colvar>` = the column
+    // dimension's subtotal - `<rowvar>` = the row subtotal, `<colvar>` = the column
     // subtotal, `<all>` = the grand total (the no-clause default). The dimension
     // must be part of this TABLE's crossing (SAS errors otherwise); a bogus one
     // fails loud naming the denominator, never "unknown statistic". Row/column
@@ -9207,7 +9207,7 @@ fn runTabulateCross(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Data
                 vals[ri][ci * nstats + si] = tabCellFreq(kw, match.len, dcnt) orelse return unsupported("PROC TABULATE: unknown statistic");
             }
         }
-        // the ALL block's own columns (a row-restricted slice — the cross-path
+        // the ALL block's own columns (a row-restricted slice - the cross-path
         // form of BUG-tabulatemed #4): its OWN statistics, never the crossing
         // block's (#7).
         if (allb) |ab| {
@@ -9220,7 +9220,7 @@ fn runTabulateCross(arena: std.mem.Allocator, out: *std.ArrayList(u8), ds: *Data
                         if (eqi(d, rname_s)) {
                             basis = computeStats(row_lists.?[ri].items, ai, null); // one column: no basis cache needed
                         } else if (eqi(d, ccname)) {
-                            basis = s; // the ALL column spans every column level — its own subtotal is the basis
+                            basis = s; // the ALL column spans every column level - its own subtotal is the basis
                         }
                     }
                     vals[ri][nc * nstats + si] = tabCellValue(kw, s, basis, match.len) orelse return unsupported("PROC TABULATE: unknown statistic");
@@ -9387,15 +9387,15 @@ const TabOpts = struct {
 /// One column-dimension BLOCK of a TABLE statement (GAP-tabulateforms #7):
 /// the concatenation (blank) operator splits the column expression into
 /// segments, and each segment renders as ONE block with its OWN analysis
-/// variable and statistics — Base SAS 9.4 Procedures Guide printed p.2548
+/// variable and statistics - Base SAS 9.4 Procedures Guide printed p.2548
 /// (pdf 2597), the blank operator "places the output for each element
 /// immediately after the output for the preceding element". The old flat
 /// stats list unioned every segment's statistics onto the LAST analysis
-/// variable: `table r, a*sum b*mean` rendered b×(Sum,Mean) — an extra,
+/// variable: `table r, a*sum b*mean` rendered b×(Sum,Mean) - an extra,
 /// unrequested column and a silently dropped one. `variable == null` is a
 /// var-less block (N/PCTN only, p.2548's restriction); `is_all` marks the
 /// universal class variable ALL crossed into the segment (a subtotal block,
-/// p.2547) — rendered like any other block (the row-crossing restricts it),
+/// p.2547) - rendered like any other block (the row-crossing restricts it),
 /// only its heading is the ALL text.
 const TabBlock = struct {
     variable: ?[]const u8 = null,
@@ -9406,7 +9406,7 @@ const TabBlock = struct {
 
 /// One parsed TABLE statement: row var (+ALL), optional column class (2-way
 /// cross), the column blocks (one per concatenated segment), cell format,
-/// corner box. runTabulate renders one table per spec — SAS emits each TABLE
+/// corner box. runTabulate renders one table per spec - SAS emits each TABLE
 /// statement as a SEPARATE table (BUG-tabulatemed #5); the old shared
 /// accumulator silently merged them.
 const TabSpec = struct {
@@ -9416,8 +9416,8 @@ const TabSpec = struct {
     row_all: bool = false,
     table_fmt: ?[]const u8 = null,
     box_text: ?[]const u8 = null,
-    inline_labels: std.ArrayList(NameLabel) = .empty, // TABLE `r='Region'` — per-table var header text; wins over LABEL (BUG-tabinlinelabel)
-    all_label: ?[]const u8 = null, // TABLE `all='Total'` — inline grand-total heading (BUG-tabinlinelabel)
+    inline_labels: std.ArrayList(NameLabel) = .empty, // TABLE `r='Region'` - per-table var header text; wins over LABEL (BUG-tabinlinelabel)
+    all_label: ?[]const u8 = null, // TABLE `all='Total'` - inline grand-total heading (BUG-tabinlinelabel)
 };
 
 /// A per-class `/ order=` override from a CLASS statement (BUG-tabulatemed #6).
@@ -9428,7 +9428,7 @@ fn orderFor(list: []const ClassOrder, name: []const u8) ?GroupOrder {
     for (list) |co| {
         if (eqi(co.name, name)) return co.order;
         // GAP-varcolonprefix-procs: a CLASS `/ order=` copied the PRE-expansion
-        // `pfx:` entry — it covers every var the prefix expanded to.
+        // `pfx:` entry - it covers every var the prefix expanded to.
         if (co.name.len > 0 and co.name[co.name.len - 1] == ':' and std.ascii.startsWithIgnoreCase(name, co.name[0 .. co.name.len - 1])) return co.order;
     }
     return null;
@@ -9436,7 +9436,7 @@ fn orderFor(list: []const ClassOrder, name: []const u8) ?GroupOrder {
 
 /// One var-less TABULATE cell value: N is the cell's row count, PCTN its
 /// share of the denominator count (the frequency path of a crossing with no
-/// analysis variable — same semantics as runTabulateCross's var-less cells).
+/// analysis variable - same semantics as runTabulateCross's var-less cells).
 /// null = a statistic that cannot stand without an analysis variable;
 /// parseTable rejects those first, so render sites treat null as fail-loud.
 fn tabCellFreq(kw: []const u8, cnt: usize, dcnt: usize) ?f64 {
@@ -9489,11 +9489,11 @@ fn orderLevels(arena: std.mem.Allocator, keys: [][]const u8, row_keys: []const [
 /// (BUG-tabulateall). The column dimension is a `*`-separated crossing whose
 /// terms are classified against the CLASS list: a class var → the column-class
 /// (2-way split), a stat keyword (or TABULATE-only pctn/pctsum, each with an
-/// optional `<dim>` denominator clause — GAP-tabdenom) → a statistic,
+/// optional `<dim>` denominator clause - GAP-tabdenom) → a statistic,
 /// `all` → a grand-total column, `(s1 s2 …)` → several statistics, anything
 /// else → the analysis var. `denoms` stays parallel to `stats` (null = default
 /// grand-total basis). Returns false after failing loud (unknown statistic
-/// in an explicit stat list — never silently summed, BUG-tabpctsum).
+/// in an explicit stat list - never silently summed, BUG-tabpctsum).
 /// TABLE inline `elem='label'` (BUG-tabinlinelabel): a dimension element name
 /// followed by `= 'string'` carries a per-table header override. Returns the
 /// label text when toks[i+1..] is `= <string>`; the caller advances i by 2.
@@ -9505,17 +9505,17 @@ fn inlineLabelAt(toks: []const Token, i: usize) ?[]const u8 {
 
 fn parseTable(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const Token, spec: *TabSpec, classes: []const []const u8) diag.Error!bool {
     var i: usize = 0;
-    // row dimension: names up to the comma — `all` → grand-total row, the first
+    // row dimension: names up to the comma - `all` → grand-total row, the first
     // other name → the row var.
     // ponytail: single row var only. A 2nd non-ALL row name (stacked `table g h,`
     // or crossed `table g*h,`) FAILS LOUD rather than silently dropping the extra
-    // class — the render path here draws exactly one row-label column, and a silent
+    // class - the render path here draws exactly one row-label column, and a silent
     // drop is indistinguishable from a valid single-var table (BUG-tabulaterowdim).
     // Mirrors how PROC REPORT rejects ACROSS. Upgrade path: nested row rendering.
     while (i < toks.len and toks[i].tag != .comma and toks[i].tag != .slash) : (i += 1) {
         // GAP-varcolonprefix-procs: a `pfx:` inside the TABLE EXPRESSION is a
         // crossing position the doc never settles (the TABLES-analogous
-        // grouping doc lists parens and name ranges, not prefixes) — LOUD gap,
+        // grouping doc lists parens and name ranges, not prefixes) - LOUD gap,
         // never the old silent skip that read `x:` as a phantom row var `x`.
         if (toks[i].tag == .colon) {
             unsupported("PROC TABULATE: a name prefix (x:) in a TABLE expression is not supported");
@@ -9523,7 +9523,7 @@ fn parseTable(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const 
         }
         if (toks[i].tag != .name) continue;
         if (eqi(toks[i].text, "f") and atTag(toks, i + 1, .eq)) {
-            // `table g*f=8., …` formats the row LABELS — not modeled; fail loud
+            // `table g*f=8., …` formats the row LABELS - not modeled; fail loud
             // instead of misreading `f` as a second row variable (GAP-tabformat).
             unsupported("PROC TABULATE: row-dimension *f= formats are not supported");
             return false;
@@ -9546,10 +9546,10 @@ fn parseTable(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const 
         }
     }
     // no comma → a one-dimensional table (`table g;` / `table v;`): an
-    // unsupported shape (GAP-tabulateopts). Fail loud NAMING it — the old
+    // unsupported shape (GAP-tabulateopts). Fail loud NAMING it - the old
     // fall-through died later with a confusing "no TABLE analysis variable".
     if (i >= toks.len or toks[i].tag == .slash) {
-        unsupported("PROC TABULATE: one-dimensional tables are not supported yet — expected `table rowdim, coldim;`");
+        unsupported("PROC TABULATE: one-dimensional tables are not supported yet - expected `table rowdim, coldim;`");
         return false;
     }
     i += 1; // past the comma → into the column dimension
@@ -9559,7 +9559,7 @@ fn parseTable(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const 
     // block with its OWN statistics (Procedures Guide printed p.2548, pdf
     // 2597: blank "places the output for each element immediately after the
     // output for the preceding element"). The old flat stats list unioned
-    // every segment's statistics onto the LAST analysis variable —
+    // every segment's statistics onto the LAST analysis variable -
     // `table r, a*sum b*mean` rendered b×(Sum,Mean), an extra unrequested
     // column and a silently dropped one. `after_star` tracks the operator: a
     // name/paren reached across a blank closes the current segment.
@@ -9575,7 +9575,7 @@ fn parseTable(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const 
         }
         if (tag == .comma) {
             // a SECOND top-level comma starts the page dimension (p.2537's
-            // `<<page-expression,> row-expression,> column-expression`) — it
+            // `<<page-expression,> row-expression,> column-expression`) - it
             // used to be silently swallowed into the column crossing, drawing
             // the wrong table with no diagnostic.
             unsupported("PROC TABULATE: page dimensions (a third comma-separated TABLE dimension) are not supported yet");
@@ -9583,7 +9583,7 @@ fn parseTable(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const 
         }
         if (tag == .slash) {
             // TABLE `/ options` (GAP-tabulateopts): `box='…'` is honored (the corner
-            // box text); every other option fails loud NAMING itself — the old
+            // box text); every other option fails loud NAMING itself - the old
             // fall-through mis-parsed `box`/`rts` as the analysis variable and died
             // with the bogus "analysis variable not found".
             i += 1;
@@ -9622,7 +9622,7 @@ fn parseTable(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const 
         }
         after_star = false;
         seg_open = true;
-        if (tag == .lparen) { // `(s1 s2 …)` explicit stat list — validate every name
+        if (tag == .lparen) { // `(s1 s2 …)` explicit stat list - validate every name
             i += 1;
             while (i < toks.len and toks[i].tag != .rparen) : (i += 1)
                 if (toks[i].tag == .name) {
@@ -9646,7 +9646,7 @@ fn parseTable(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const 
             if (eqi(nm, "f") and atTag(toks, i + 1, .eq)) {
                 // cell format `*f=6.2` (GAP-tabformat): applies to every data cell
                 // of the crossing. A second, DIFFERENT spec would be a per-element
-                // format we don't model — fail loud, never silently pick one.
+                // format we don't model - fail loud, never silently pick one.
                 // (`f` unfollowed by `=` stays a plain variable name.)
                 const end = fmtSpecEnd(toks, i + 2);
                 if (end == i + 2) {
@@ -9671,7 +9671,7 @@ fn parseTable(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const 
                 // a CLASS var → the column split. A 2nd DISTINCT one is a nested
                 // column dimension the renderer doesn't model: it used to fall
                 // through to the analysis slot, silently merging cells over it
-                // (wrong sums, no diagnostic — BUG-tabnestcol). Mirror the
+                // (wrong sums, no diagnostic - BUG-tabnestcol). Mirror the
                 // row-dimension guard (BUG-tabulaterowdim): fail loud.
                 if (spec.col_class == null) {
                     spec.col_class = nm;
@@ -9696,7 +9696,7 @@ fn parseTable(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const 
                 i = dc.next - 1;
             } else if (isUnsupportedTabStat(nm)) {
                 // COLPCTN/ROWPCTN/REPPCTN/*PCTSUM/…: real SAS statistics we don't
-                // compute (GAP-tabulateopts). Fail loud naming the statistic — never
+                // compute (GAP-tabulateopts). Fail loud naming the statistic - never
                 // a wrong value, never the old bogus "analysis variable not found".
                 unsupported(try std.fmt.allocPrint(arena, "PROC TABULATE: statistic '{s}' is not supported yet", .{nm}));
                 return false;
@@ -9708,17 +9708,17 @@ fn parseTable(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const 
                 }
             } else {
                 // a 2nd analysis var IN ONE CROSSING (`a*b*sum`): valid SAS we
-                // don't render — used to silently overwrite the first var and
+                // don't render - used to silently overwrite the first var and
                 // draw the wrong table. (Concatenated vars, `a*sum b*mean`, are
-                // the supported form — they close the segment at the blank.)
-                unsupported(try std.fmt.allocPrint(arena, "PROC TABULATE: multiple analysis variables in one crossing ('{s}' then '{s}') are not supported yet — concatenate them instead (a*sum b*mean)", .{ seg.variable.?, nm }));
+                // the supported form - they close the segment at the blank.)
+                unsupported(try std.fmt.allocPrint(arena, "PROC TABULATE: multiple analysis variables in one crossing ('{s}' then '{s}') are not supported yet - concatenate them instead (a*sum b*mean)", .{ seg.variable.?, nm }));
                 return false;
             }
         }
     }
     if (!try closeTabSegment(arena, diags, &seg, seg_class, &spec.blocks)) return false;
 
-    // Shape constraints over the block list — valid SAS forms this renderer
+    // Shape constraints over the block list - valid SAS forms this renderer
     // doesn't draw yet (gaps, rc 2 D-009), never a silently wrong table.
     if (spec.blocks.items.len == 0) {
         unsupported("PROC TABULATE: no TABLE analysis variable");
@@ -9738,7 +9738,7 @@ fn parseTable(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const 
         return false;
     }
     if (spec.col_class == null) for (spec.blocks.items) |b| {
-        // GAP-tabulateforms #9: a stat-only 1-way column (`table a, n`) — N/PCTN
+        // GAP-tabulateforms #9: a stat-only 1-way column (`table a, n`) - N/PCTN
         // need no analysis variable (p.2548), the renderer just doesn't yet.
         if (!b.is_all and b.variable == null) {
             unsupported("PROC TABULATE: no TABLE analysis variable");
@@ -9749,12 +9749,12 @@ fn parseTable(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const 
 }
 
 /// Close one concatenation segment into block(s) (GAP-tabulateforms #7):
-/// applies the default statistic (SUM for an analysis variable, else N —
+/// applies the default statistic (SUM for an analysis variable, else N -
 /// printed p.2547 "For analysis variables, the default statistic is SUM.
 /// Otherwise, the default statistic is N."), enforces p.2548's restriction
 /// that only N (and, by the pinned `prod*(n pctn)` idiom, PCTN) can stand
-/// without an analysis variable — anything else is malformed SAS, a user
-/// error (rc 1, D-009) — and splits a segment naming BOTH the column class
+/// without an analysis variable - anything else is malformed SAS, a user
+/// error (rc 1, D-009) - and splits a segment naming BOTH the column class
 /// and ALL into a cross block plus a subtotal block (`c*all*v*sum` ≡
 /// `c*v*sum all*v*sum`). Returns false after failing loud.
 fn closeTabSegment(arena: std.mem.Allocator, diags: *diag.Diagnostics, seg: *TabBlock, seg_class: bool, blocks: *std.ArrayList(TabBlock)) diag.Error!bool {
@@ -9765,7 +9765,7 @@ fn closeTabSegment(arena: std.mem.Allocator, diags: *diag.Diagnostics, seg: *Tab
     }
     if (seg.variable == null) for (seg.stats.items) |kw| {
         if (!eqi(kw, "n") and !eqi(kw, "pctn"))
-            return diags.fail(error.ParseError, 0, "PROC TABULATE: statistic '{s}' requires an analysis variable — only N and PCTN can stand without one", .{kw});
+            return diags.fail(error.ParseError, 0, "PROC TABULATE: statistic '{s}' requires an analysis variable - only N and PCTN can stand without one", .{kw});
     };
     if (seg_class and seg.is_all) {
         const cross = seg.*;
@@ -9785,7 +9785,7 @@ const DenomClause = struct { denom: ?[]const u8, next: usize };
 /// Optional PCTN/PCTSUM `<dim>` denominator definition at toks[i] (GAP-tabdenom).
 /// No `<` follows → null denom, next = i+1. A `<` on any other statistic, or a
 /// clause that isn't exactly `<name>` (empty, unterminated, compound `<a*b>`),
-/// fails loud with a message that names PCTN<>/PCTSUM<> — never the old bogus
+/// fails loud with a message that names PCTN<>/PCTSUM<> - never the old bogus
 /// "unknown statistic 'grp'" (the `<...>` used to be mis-parsed as a stat name).
 fn denomClauseAt(arena: std.mem.Allocator, toks: []const Token, i: usize) !?DenomClause {
     if (i + 1 >= toks.len or toks[i + 1].tag != .lt) return .{ .denom = null, .next = i + 1 };
@@ -9802,7 +9802,7 @@ fn denomClauseAt(arena: std.mem.Allocator, toks: []const Token, i: usize) !?Deno
 }
 
 /// Stat dedup for a crossing: the same keyword with the same `<dim>`
-/// denominator (or none) is one statistic — `x*sum all*x*sum` names SUM twice.
+/// denominator (or none) is one statistic - `x*sum all*x*sum` names SUM twice.
 /// Same keyword, DIFFERENT denominators are two columns (`pctsum<a> pctsum<b>`).
 fn hasStat(stats: []const []const u8, denoms: []const ?[]const u8, nm: []const u8, dn: ?[]const u8) bool {
     for (stats, 0..) |x, k| {
@@ -9815,16 +9815,16 @@ fn hasStat(stats: []const []const u8, denoms: []const ?[]const u8, nm: []const u
 }
 
 /// TABULATE accepts the MEANS stat keywords plus its own pctn/pctsum (each cell's
-/// share of the grand total — BUG-tabpctsum).
+/// share of the grand total - BUG-tabpctsum).
 fn isTabStat(nm: []const u8) bool {
     return statFromKw(nm) != null or eqi(nm, "pctn") or eqi(nm, "pctsum");
 }
 
 /// One TABULATE cell value: pctn/pctsum are 100 × cell/basis (report %; the
-/// grand total is the default basis — BUG-tabpctsum, a `<dim>` clause swaps in
-/// the named dimension's subtotal — GAP-tabdenom); anything else defers to
+/// grand total is the default basis - BUG-tabpctsum, a `<dim>` clause swaps in
+/// the named dimension's subtotal - GAP-tabdenom); anything else defers to
 /// statValue. `obs` is the cell's row count: NMISS = obs − nonmissing n, which
-/// statValue can't know (it returned NaN → "." — BUG-tabnmiss), so every render
+/// statValue can't know (it returned NaN → "." - BUG-tabnmiss), so every render
 /// site passes its row-slice length, exactly as emitMeansBlock does for MEANS.
 /// null = unknown keyword; parseTable rejects those first, so the render sites
 /// treat null as fail-loud, never as a silent SUM fallback.
@@ -9857,9 +9857,9 @@ fn isInList(list: []const []const u8, name: []const u8) bool {
 }
 
 /// GAP-varcolonprefix-procs: one variable-list entry for a proc's name list.
-/// A name directly followed by `:` is kept as one "pfx:" entry — main.zig
+/// A name directly followed by `:` is kept as one "pfx:" entry - main.zig
 /// collectNames' wire form (GAP-varcolonprefix), the DROP/KEEP parseNameList
-/// model (GAP-dropcolon) — for expandVarPrefixes once the dataset is known;
+/// model (GAP-dropcolon) - for expandVarPrefixes once the dataset is known;
 /// a bare colon never survives token-skipping into a name. Callers' loops
 /// advance past the name themselves, so on a colon this consumes one extra.
 fn appendVarListName(arena: std.mem.Allocator, toks: []const Token, i: *usize, list: *std.ArrayList([]const u8)) !void {
@@ -9869,18 +9869,18 @@ fn appendVarListName(arena: std.mem.Allocator, toks: []const Token, i: *usize, l
     } else try list.append(arena, toks[i.*].text);
 }
 
-/// GAP-varcolonprefix-procs: THE one expander — any "pfx:" entries
+/// GAP-varcolonprefix-procs: THE one expander - any "pfx:" entries
 /// (appendVarListName's wire form; the name-prefix variable list, Language Reference: Concepts
 /// printed p.69 / p.70 Table 4.5) expand against the dataset's columns,
-/// case-insensitively, in PDV order — Language Reference: Concepts printed p.62: a variable list
+/// case-insensitively, in PDV order - Language Reference: Concepts printed p.62: a variable list
 /// refers to its variables "in the same order that SAS uses to keep track of
 /// the variables". MEANS/UNIVARIATE/FREQ/TABULATE call this ONCE per list
-/// where the dataset is known — never a prefix test at each `ds.indexOf`.
+/// where the dataset is known - never a prefix test at each `ds.indexOf`.
 /// The proc.zig twin of main.zig's expandVarList (PROC PRINT). A prefix
 /// matching NO column is a typo'd prefix → a loud rc-1 ERROR naming it: the
 /// two existing expansion sites already agree on loud rc 1 (eval.zig's OF
 /// arm "the name prefix '{s}' matched no variables"; main.zig's PRINT arm
-/// "Variable X not found.") — a third disagreeing behaviour would replace
+/// "Variable X not found.") - a third disagreeing behaviour would replace
 /// one inconsistency with another. Same message vocabulary as the OF arm.
 fn expandVarPrefixes(arena: std.mem.Allocator, ds: *Dataset, names: []const []const u8, diags: *diag.Diagnostics, line_no: usize, proc_name: []const u8) diag.Error![][]const u8 {
     var out: std.ArrayList([]const u8) = .empty;
@@ -9990,7 +9990,7 @@ fn tabNum(arena: std.mem.Allocator, x: f64) ![]const u8 {
     if (!std.math.isFinite(x)) return "."; // ±inf → missing
     if (x == @trunc(x) and @abs(x) < 1e15)
         return std.fmt.allocPrint(arena, "{d}", .{@as(i64, @intFromFloat(x))});
-    // SAS's default cell format is BEST12. — route through the shared path PROC
+    // SAS's default cell format is BEST12. - route through the shared path PROC
     // PRINT/MEANS use; raw Zig `{d}` printed 17-digit binary-float noise
     // (BUG-tabrawfloat, qa-findings-tick144).
     return format.bestNum(arena, x);
@@ -10026,7 +10026,7 @@ fn sortKeys(keys: [][]const u8, sums: []f64) void {
 
 // ── token helpers ────────────────────────────────────────────────────────────
 
-/// Index just past the balanced `(…)` group starting at toks[i] (a .lparen) —
+/// Index just past the balanced `(…)` group starting at toks[i] (a .lparen) -
 /// for header scans that skip dataset-option groups like `data=d(keep=x)`.
 fn skipParen(toks: []const Token, start: usize) usize {
     var i = start;
@@ -10051,7 +10051,7 @@ fn optAt(toks: []const Token, i: usize, name: []const u8) ?[]const u8 {
 }
 
 /// Like `optAt` but the value may also be a quoted string (`outfile="a.csv"`),
-/// whose token carries the unquoted text — for EXPORT/IMPORT path options.
+/// whose token carries the unquoted text - for EXPORT/IMPORT path options.
 fn optAny(toks: []const Token, i: usize, name: []const u8) ?[]const u8 {
     if (i + 2 >= toks.len) return null;
     if (toks[i].tag != .name or !eqi(toks[i].text, name)) return null;
@@ -10062,10 +10062,10 @@ fn optAny(toks: []const Token, i: usize, name: []const u8) ?[]const u8 {
     };
 }
 
-/// `PROC EXPORT data=DS outfile="path" [dbms=csv] [replace];` — serialize DS to a
+/// `PROC EXPORT data=DS outfile="path" [dbms=csv] [replace];` - serialize DS to a
 /// CSV file through the shared CSV engine. ponytail: only DBMS=CSV is wired; any
 /// other DBMS is a NOTE + no-op, never a silent success.
-/// Documented SAS 9.4 PROC EXPORT options opensas does NOT implement — the
+/// Documented SAS 9.4 PROC EXPORT options opensas does NOT implement - the
 /// gap arms of the two catch-alls (rc 2); anything else is the user's typo
 /// (rc 1). Closed sets from the EXPORT syntax block (Base SAS 9.4 Procedures
 /// Guide, 7th ed., printed pp. 851-852, === pdf 900/901 ===): the statement
@@ -10082,7 +10082,7 @@ fn isExportStmtGapOption(kw: []const u8) bool {
     return false;
 }
 
-/// Documented SAS 9.4 PROC IMPORT options opensas does NOT implement — same
+/// Documented SAS 9.4 PROC IMPORT options opensas does NOT implement - same
 /// shape (printed pp. 1327-1328, === pdf 1376/1377 ===): statement options
 /// DATAFILE=|TABLE=/OUT=/DBMS=/REPLACE; delimited sub-statements DATAROW=/
 /// DELIMITER=/GETNAMES=/GUESSINGROWS=/VARNAMEROW=; JMP DBENCODING=/FMTLIB=/
@@ -10123,12 +10123,12 @@ pub fn runExport(cx: ProcCtx, toks: []const Token) diag.Error!void {
         } else if (tkKw(toks[i], "replace")) {
             // REPLACE: SAS's overwrite consent. The CSV writer overwrites
             // unconditionally (long-standing behavior), so REPLACE is already
-            // exactly what happens — enumerate it (every export fixture passes
+            // exactly what happens - enumerate it (every export fixture passes
             // it) instead of silently skipping the token (GAP-procopts).
             i += 1;
         } else if (toks[i].tag == .lparen) {
             // data=x(keep=…): the option list is EXTRACTED and APPLIED below via
-            // procInput (BUG-exportimportdsopts) — this arm only steps the header
+            // procInput (BUG-exportimportdsopts) - this arm only steps the header
             // scanner past the balanced parens so `keep`/`where` inside them never
             // false-fire the unknown-option arm.
             i = skipParen(toks, i);
@@ -10141,7 +10141,7 @@ pub fn runExport(cx: ProcCtx, toks: []const Token) diag.Error!void {
             return diags.fail(error.ParseError, toks[i].line, "PROC EXPORT: option {s} is not supported", .{toks[i].text});
         } else i += 1;
     }
-    // sub-statements after the header `;` — SAS's `putnames=no;` lives there
+    // sub-statements after the header `;` - SAS's `putnames=no;` lives there
     // (BUG-exportputnames). It was dropped on the floor → a NO file wrongly
     // carried the header line.
     if (atTag(toks, i, .semicolon)) i += 1;
@@ -10153,7 +10153,7 @@ pub fn runExport(cx: ProcCtx, toks: []const Token) diag.Error!void {
             continue;
         }
         // GAP-procopts: any other sub-statement used to be skipped token by
-        // token — a typo'd `putname=no` silently re-armed the header row.
+        // token - a typo'd `putname=no` silently re-armed the header row.
         // SPLIT: DELIMITER=/DBENCODING=/FMTLIB=/META= are the documented
         // delimited/JMP sub-statements (rc 2); a typo stays rc 1.
         if (toks[i].tag == .name) {
@@ -10165,13 +10165,13 @@ pub fn runExport(cx: ProcCtx, toks: []const Token) diag.Error!void {
     }
     const raw = (if (data_name) |n| lib.find(n) else lastDataset(lib)) orelse {
         // BUG-procmissingrc2: missing table = user error (D-009 rc 1), not a
-        // gap — the runSort (GH#8) absent-input arm: "File {s} does not
+        // gap - the runSort (GH#8) absent-input arm: "File {s} does not
         // exist" + the runExpanded step-halt NOTE, rc 1. NOT unsupported().
         diags.report(.err, if (toks.len > 1) toks[1].line else 0, "File {s} does not exist", .{data_name orelse "_last_"}) catch {};
         return;
     };
     // GH#20 BUG-exportimportdsopts: `data=x(keep=/drop=/where=/rename=/firstobs=/
-    // obs=)` options were PARSED PAST and dropped on the floor — the full table
+    // obs=)` options were PARSED PAST and dropped on the floor - the full table
     // was serialized with the wrong columns, wrong rows and wrong names at rc 0.
     // A CSV that silently disagrees with the program that wrote it is the worst
     // failure class for clinical use (D-002, CLAUDE.md fail-loud). The options are
@@ -10196,30 +10196,30 @@ pub fn runExport(cx: ProcCtx, toks: []const Token) diag.Error!void {
         return;
     };
     var csv = try io.writeCsvExport(arena, ds); // empty field for numeric missing, not "." (GH#68)
-    // PUTNAMES=NO: drop the header row — the writer's first line is always the
+    // PUTNAMES=NO: drop the header row - the writer's first line is always the
     // column names, so slicing past it is byte-identical to not writing it.
     if (!putnames) if (std.mem.indexOfScalar(u8, csv, '\n')) |nl| {
         csv = csv[nl + 1 ..];
     };
     if (!io.writeFileRaw(path, csv)) {
         // BUG-procmissingfilerc (GH#21): an unwritable EXTERNAL file is a USER
-        // error (D-009 rc 1), not an opensas gap — EXPORT itself worked, the
+        // error (D-009 rc 1), not an opensas gap - EXPORT itself worked, the
         // caller's OUTFILE= path is wrong (missing directory, read-only target,
         // full disk). rc 2 told a downstream agent "file an opensas issue" for a
         // path typo. Same shape as the five BUG-procmissingrc2 absent-input arms
         // (MEANS/FREQ/TRANSPOSE/REPORT/UNIVARIATE) and as exec.zig's INFILE open
         // failure, which has always been rc 1 ("Physical file does not exist,
-        // {s}") — D-009b corollary: one condition must not carry two rcs. The
+        // {s}") - D-009b corollary: one condition must not carry two rcs. The
         // plain .err report (NOT unsupported(), NOT a fail() propagation) is what
         // lets runExpanded emit THIS step's halt NOTE and arm BUG-errhalt's
         // later-step skip. writeFileRaw collapses every open/write error into
         // false, so the message names the path and does not guess WHICH one.
-        diags.report(.err, toks[0].line, "PROC EXPORT: cannot write the output file \"{s}\" — check the directory exists and is writable", .{path}) catch {};
+        diags.report(.err, toks[0].line, "PROC EXPORT: cannot write the output file \"{s}\" - check the directory exists and is writable", .{path}) catch {};
         return;
     }
 }
 
-/// `PROC IMPORT datafile="path" out=DS [dbms=csv|xlsx] [replace]; [sheet="S";]` —
+/// `PROC IMPORT datafile="path" out=DS [dbms=csv|xlsx] [replace]; [sheet="S";]` -
 /// read a CSV (shared CSV engine) or XLSX (minimal in-memory reader below) file
 /// into a new dataset. The `sheet=` sub-statement rides after the first `;`.
 pub fn runImport(cx: ProcCtx, toks: []const Token) diag.Error!void {
@@ -10246,12 +10246,12 @@ pub fn runImport(cx: ProcCtx, toks: []const Token) diag.Error!void {
             i += 1;
         } else if (toks[i].tag == .lparen) {
             // out=x(keep=…): the option list is EXTRACTED and APPLIED to the
-            // imported dataset below (BUG-exportimportdsopts) — this arm only
+            // imported dataset below (BUG-exportimportdsopts) - this arm only
             // steps the header scanner past the balanced parens.
             i = skipParen(toks, i);
         } else if (toks[i].tag == .name) {
             // GAP-procopts: an unknown header option used to be silently
-            // skipped by the bare `else i += 1` — a typo'd `dbm=xlsx` then
+            // skipped by the bare `else i += 1` - a typo'd `dbm=xlsx` then
             // read the file as CSV and landed garbage columns.
             // SPLIT: TABLE= is documented (rc 2); a typo stays rc 1.
             if (isImportGapOption(toks[i].text))
@@ -10259,7 +10259,7 @@ pub fn runImport(cx: ProcCtx, toks: []const Token) diag.Error!void {
             return diags.fail(error.ParseError, toks[i].line, "PROC IMPORT: option {s} is not supported", .{toks[i].text});
         } else i += 1;
     }
-    // sub-statements after the header `;` — `sheet="Name";` (XLSX tab), the
+    // sub-statements after the header `;` - `sheet="Name";` (XLSX tab), the
     // Excel-engine `range="Name$";` (BUG-procimport) and the DLM controls
     // `delimiter="x"; getnames=yes|no; datarow=N;` (BUG-importdlm).
     var sheet: ?[]const u8 = null;
@@ -10301,18 +10301,18 @@ pub fn runImport(cx: ProcCtx, toks: []const Token) diag.Error!void {
         {
             // INERT (SAS 9.4 PROC IMPORT doc): GUESSINGROWS= bounds the rows
             // scanned to guess column types. opensas's reader infers from the
-            // WHOLE column (io.zig readDelimited) — GUESSINGROWS=MAX behavior
+            // WHOLE column (io.zig readDelimited) - GUESSINGROWS=MAX behavior
             // already, a superset of any requested window.
             // ponytail: a smaller window is never simulated; add row-bounded
             // inference if a study's types ever depend on it.
             i += 3;
             continue;
         }
-        // GAP-procopts: any other sub-statement was skipped token by token —
+        // GAP-procopts: any other sub-statement was skipped token by token -
         // a typo'd `getname=yes` silently re-armed the header-row default.
         // SPLIT: VARNAMEROW=/DBENCODING=/FMTLIB=/META= are the documented
         // delimited/JMP sub-statements (rc 2); a typo stays rc 1 (MIXED=
-        // included — it is from the PC Files book, not this one).
+        // included - it is from the PC Files book, not this one).
         if (toks[i].tag == .name) {
             if (isImportStmtGapOption(toks[i].text))
                 return failGap(diags, toks[i].line, "PROC IMPORT: statement option {s} is not supported", .{toks[i].text});
@@ -10329,13 +10329,13 @@ pub fn runImport(cx: ProcCtx, toks: []const Token) diag.Error!void {
         return;
     };
     // SAS 9.4: OUT= already existing without REPLACE is an ERROR, never an
-    // overwrite — clobbering a kept dataset is the silent-wrong worst case
+    // overwrite - clobbering a kept dataset is the silent-wrong worst case
     // (BUG-importnoreplace). Checked before the file read so a bogus DATAFILE
     // can't mask the clobber.
     if (!replace and lib.find(out) != null) {
-        return diags.fail(error.ExecError, toks[0].line, "PROC IMPORT: {s} already exists — specify the REPLACE option to overwrite it", .{out});
+        return diags.fail(error.ExecError, toks[0].line, "PROC IMPORT: {s} already exists - specify the REPLACE option to overwrite it", .{out});
     }
-    // The Excel engine's RANGE="Name$" names a whole sheet (the trailing $) —
+    // The Excel engine's RANGE="Name$" names a whole sheet (the trailing $) -
     // map it onto SHEET=. Ignoring RANGE read the FIRST sheet instead: silent
     // wrong data (BUG-procimport). A cell area ("Name$A1:C9") or named range
     // (no $) would import the wrong slice → fail loud.
@@ -10343,13 +10343,13 @@ pub fn runImport(cx: ProcCtx, toks: []const Token) diag.Error!void {
         if (r.len > 0 and r[r.len - 1] == '$' and std.mem.indexOfScalar(u8, r[0 .. r.len - 1], '$') == null) {
             sheet = r[0 .. r.len - 1];
         } else {
-            unsupported(try std.fmt.allocPrint(arena, "PROC IMPORT: RANGE \"{s}\" (cell area / named range) is not supported — only a whole sheet \"Name$\"", .{r}));
+            unsupported(try std.fmt.allocPrint(arena, "PROC IMPORT: RANGE \"{s}\" (cell area / named range) is not supported - only a whole sheet \"Name$\"", .{r}));
             return;
         }
     };
     const is_csv = eqi(dbms, "csv");
     const is_dlm = eqi(dbms, "dlm") or eqi(dbms, "tab");
-    // DBMS=EXCEL/XLS is the legacy Excel engine over the same workbook files —
+    // DBMS=EXCEL/XLS is the legacy Excel engine over the same workbook files -
     // route it to the xlsx reader (a binary .xls fails loud below). EXCEL2000/
     // 2002/2003/2007 are version-tagged aliases for the same engine (GH#55).
     const is_xlsx = eqi(dbms, "xlsx") or eqi(dbms, "excel") or eqi(dbms, "xls") or
@@ -10362,32 +10362,32 @@ pub fn runImport(cx: ProcCtx, toks: []const Token) diag.Error!void {
     }
     const bytes = io.readFileRaw(arena, path) orelse {
         // BUG-procmissingfilerc (GH#21): an unreadable EXTERNAL file is a USER
-        // error (D-009 rc 1), not an opensas gap — IMPORT is implemented, the
+        // error (D-009 rc 1), not an opensas gap - IMPORT is implemented, the
         // caller's DATAFILE= path is wrong or undelivered. Naming the path was
         // always the point (a bogus/undelivered input must read as source skew,
         // not an interpreter bug); rc 2 undid that by telling a downstream agent
         // to file an opensas issue. Same shape as the five BUG-procmissingrc2
         // absent-input arms and as exec.zig's INFILE open failure, rc 1 since
-        // ISS-infilemissing ("Physical file does not exist, {s}") — D-009b
+        // ISS-infilemissing ("Physical file does not exist, {s}") - D-009b
         // corollary: one condition must not carry two rcs. ONE read site covers
         // every DBMS we support (CSV, DLM/TAB, XLSX/EXCEL/XLS), and the DBMS gap
-        // guard above already ran, so an UNSUPPORTED dbms still exits 2 — as does
+        // guard above already ran, so an UNSUPPORTED dbms still exits 2 - as does
         // a successfully-read but unparseable XLSX below (a real opensas gap).
         // The plain .err report (NOT unsupported(), NOT a fail() propagation) is
         // what lets runExpanded emit THIS step's halt NOTE and arm BUG-errhalt's
         // later-step skip. readFileRaw collapses open AND read errors into null,
         // so the message does not claim "does not exist".
-        diags.report(.err, toks[0].line, "PROC IMPORT: cannot read DATAFILE \"{s}\" — check the path exists and is readable", .{path}) catch {};
+        diags.report(.err, toks[0].line, "PROC IMPORT: cannot read DATAFILE \"{s}\" - check the path exists and is readable", .{path}) catch {};
         return;
     };
     // GAP-importtypes: an empty (or all-whitespace) delimited input has NO
-    // variables and NO observations — importing it as a 0-variable dataset is
+    // variables and NO observations - importing it as a 0-variable dataset is
     // a silent no-op whose only symptom is a confusing downstream "variable
     // not found". The Procedures Guide IMPORT chapter is silent on the exact
     // SAS message (wording here is ours); we make it an ERROR and create NO
-    // dataset — fail loud at the cause, per house rules.
+    // dataset - fail loud at the cause, per house rules.
     if ((is_csv or is_dlm) and std.mem.trim(u8, bytes, " \t\r\n").len == 0) {
-        return diags.fail(error.ExecError, toks[0].line, "PROC IMPORT: DATAFILE \"{s}\" is empty — no variables or observations to import", .{path});
+        return diags.fail(error.ExecError, toks[0].line, "PROC IMPORT: DATAFILE \"{s}\" is empty - no variables or observations to import", .{path});
     }
     const ds: *Dataset = if (is_csv)
         try io.readDelimited(arena, bytes, out, delim orelse ',', getnames, datarow, true)
@@ -10413,7 +10413,7 @@ pub fn runImport(cx: ProcCtx, toks: []const Token) diag.Error!void {
     // EXPORT's data=, these sit on an OUTPUT dataset, so they are applied to the
     // freshly-read table through the SHARED out= helper (input=false → DKROCOND
     // WARN severity for an unreferenced keep/drop/rename name, and firstobs=/obs=
-    // ignored exactly as SAS ignores them on an output data set — settled,
+    // ignored exactly as SAS ignores them on an output data set - settled,
     // BUG-outdsobsslice). Applied BEFORE lib.put so the library never holds the
     // unfiltered table, not even transiently.
     try applyOutOptions(arena, ds, toks, diags, "out");
@@ -10426,7 +10426,7 @@ pub fn runImport(cx: ProcCtx, toks: []const Token) diag.Error!void {
 // `xl/_rels/workbook.xml.rels` maps r:id→sheet file, `xl/sharedStrings.xml` is
 // the string pool, and each `xl/worksheets/sheetN.xml` holds the cells (a cell
 // with t="s" stores a pool index, otherwise a literal number). We unzip the few
-// members we need in-memory and scan the XML by hand — no styles/formulas/dates.
+// members we need in-memory and scan the XML by hand - no styles/formulas/dates.
 // ponytail: happy-path only (store/deflate members, shared/number/inline cells,
 // getnames=yes, per-column numeric-or-char inference). Anything outside → fail
 // loud, never a silently-wrong table. Upgrade path: honor number formats (dates)
@@ -10725,7 +10725,7 @@ fn xmlUnescape(arena: std.mem.Allocator, s: []const u8) ![]const u8 {
 /// tests across the tree instead of a per-file re-implementation.
 const tkKw = @import("parser.zig").tkKw;
 
-/// True if token `i` exists and is keyword `kw` — the bound stated positively,
+/// True if token `i` exists and is keyword `kw` - the bound stated positively,
 /// once, so call sites don't each re-derive `i < toks.len and …` (QL-B, taste
 /// #13: one forgotten bound among ~100 hand-copies is an OOB token read).
 fn atKw(toks: []const Token, i: usize, kw: []const u8) bool {
@@ -10739,16 +10739,16 @@ fn atTag(toks: []const Token, i: usize, tag: lex.Tag) bool {
 
 /// Shared PROC-statement `by [descending] var … [notsorted];` scanner
 /// (MEANS/TRANSPOSE/UNIVARIATE/RANK/STANDARD/TABULATE, and PROC PRINT in
-/// main.zig — PROCBY-printfreq). Routes through parser.scanByList — the SAME
+/// main.zig - PROCBY-printfreq). Routes through parser.scanByList - the SAME
 /// scanner the DATA step uses (GAP-procbydescending): no third BY parser, so
 /// DESCENDING (per-variable, Statements ref p.39-43) and NOTSORTED
 /// (statement-wide, contiguous-run grouping) mean exactly one thing across
 /// DATA step, PROC SORT and every PROC on this path. GROUPFORMAT still fails
-/// loud there (GAP-bygroupformat — "You cannot use the GROUPFORMAT option,
+/// loud there (GAP-bygroupformat - "You cannot use the GROUPFORMAT option,
 /// which is available in the BY statement in a DATA step, in a BY statement in
 /// any PROC step", Base SAS Procedures Guide p.75). PROC SORT's own BY (which
 /// implements DESCENDING as sort keys) does not route through here. Output is
-/// scanByList's wire encoding — decode with decodeProcBy before any indexOf.
+/// scanByList's wire encoding - decode with decodeProcBy before any indexOf.
 pub fn parseProcBy(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const Token, i: *usize, bys: *std.ArrayList([]const u8)) diag.Error!void {
     i.* += 1; // by
     try bys.appendSlice(arena, try @import("parser.zig").Parser.scanByList(arena, diags, toks, i));
@@ -10789,17 +10789,17 @@ fn eqi(a: []const u8, b: []const u8) bool {
 }
 
 // TEST-quietnoise2: negative tests (reportacross/reportcomputed/…) exercise the
-// fail-loud UNSUPPORTED path but must not spam stderr — that noise + zig's ensuing
+// fail-loud UNSUPPORTED path but must not spam stderr - that noise + zig's ensuing
 // "failed command" line read as a suite failure on a GREEN build. In a test build
 // the message is CAPTURED for a test to assert on; the CLI still prints it.
 var g_test_unsup_buf: [512]u8 = undefined;
 pub var g_test_last_unsup: []const u8 = "";
 
 /// GAP guard (D-009): the construct is valid SAS 9.4 opensas doesn't implement
-/// — an opensas gap, exit 2 ("file an opensas issue"), not rc 1 ("fix your
+/// - an opensas gap, exit 2 ("file an opensas issue"), not rc 1 ("fix your
 /// SAS"). Flag the gap, then fail with the usual loud ERROR. parser.zig's
 /// failGap, same shape; `unsupported` is the no-diags sibling. ONLY for guards
-/// matching a SPECIFIC valid construct (a named keyword/option) — a catch-all
+/// matching a SPECIFIC valid construct (a named keyword/option) - a catch-all
 /// that also swallows typos stays a plain user-error `fail`
 /// (audit-exitcodecontract.md §5b).
 fn failGap(diags: *diag.Diagnostics, line_no: usize, comptime fmt: []const u8, args: anytype) diag.Error {
@@ -10809,7 +10809,7 @@ fn failGap(diags: *diag.Diagnostics, line_no: usize, comptime fmt: []const u8, a
 
 /// The SAS 9.4 member types a PROC DATASETS MEMTYPE= value can validly be,
 /// beyond the DATA opensas accepts. Deliberately the universally documented
-/// set only — an exotic-but-valid type degrades to the user's rc 1, never a
+/// set only - an exotic-but-valid type degrades to the user's rc 1, never a
 /// false rc 2 (audit-exitcodecontract.md §5b).
 fn isDatasetMemberType(kw: []const u8) bool {
     inline for (.{ "all", "catalog", "view" }) |mtyp|
@@ -10817,15 +10817,15 @@ fn isDatasetMemberType(kw: []const u8) bool {
     return false;
 }
 
-// BUG-proctypoexits2 — the `unsupported("PROC X: unknown option")` catch-alls
+// BUG-proctypoexits2 - the `unsupported("PROC X: unknown option")` catch-alls
 // below conflated a TYPO (user error, rc 1) with a documented SAS 9.4 option we
-// simply don't implement (gap, rc 2), so a misspelling exited 2 — "file an
+// simply don't implement (gap, rc 2), so a misspelling exited 2 - "file an
 // opensas issue" for the user's own mistake (the inverse of D-009, the same
 // disease 2a57cc33 fixed in main.zig). The fix is the 342b8305 split: each
 // PROC's option set is CLOSED by the doc (Base SAS 9.4 Procedures Guide,
 // Seventh Edition), so a catch-all name in the doc set keeps the byte-identical
 // UNSUPPORTED message at rc 2, and any other name becomes the user's rc 1.
-// Deliberately the doc's set only — an exotic-but-valid alias the guide omits
+// Deliberately the doc's set only - an exotic-but-valid alias the guide omits
 // degrades to rc 1, never a false rc 2 (audit-exitcodecontract.md §5b).
 
 /// PROC SORT (printed pp. 2406-2408): the options opensas does NOT implement.
@@ -10839,7 +10839,7 @@ fn isSortGapOption(kw: []const u8) bool {
 }
 
 /// PROC TRANSPOSE (printed pp. 2697-2699): DATA=/DELIMITER=/LABEL=/LET/NAME=/
-/// OUT=/PREFIX=/SUFFIX= are all implemented — INDB= is the one valid option
+/// OUT=/PREFIX=/SUFFIX= are all implemented - INDB= is the one valid option
 /// left, so every other name reaching the catch-all is the user's typo.
 fn isTransposeGapOption(kw: []const u8) bool {
     return eqi(kw, "indb");
@@ -10859,7 +10859,7 @@ fn isContentsGapOption(kw: []const u8) bool {
 /// OUTNOEQUAL/NOVALUES/NOSUMMARY/BRIEF/MAXPRINT= are handled upstream; LISTALL/
 /// PRINTALL/TRANSPOSE/CLIST already fail loud as gaps on their own arm).
 /// OUTPERCENT is the documented name opensas only accepts under its OUTPCT
-/// alias — valid SAS, so a gap here; C= is the documented COMPARE= alias.
+/// alias - valid SAS, so a gap here; C= is the documented COMPARE= alias.
 fn isCompareGapOption(kw: []const u8) bool {
     inline for (.{ "allobs", "allstats", "allvars", "briefsummary", "c", "error", "fuzz", "list", "listbase", "listbaseobs", "listbasevar", "listcomp", "listcompobs", "listcompvar", "listequalvar", "listobs", "listvar", "nodate", "nomissbase", "nomisscomp", "nomissing", "nomiss", "noprint", "note", "outall", "outpercent", "outstats", "stats", "warning" }) |opt|
         if (eqi(kw, opt)) return true;
@@ -10903,14 +10903,14 @@ fn buildHave(arena: std.mem.Allocator) !*Dataset {
 // format engine (put / a column format in PROC PRINT) decodes coded values to
 // labels (BUG-userformat). Numeric formats take single values or `lo-hi` ranges
 // (with `low`/`high` for open ends) plus an `OTHER=`; `$NAME` formats key on the
-// character value. A range's label may instead be `[fmtname w.d]` — a nested-format
+// character value. A range's label may instead be `[fmtname w.d]` - a nested-format
 // label (SAS directed formatting, BUG-fmtnestlabel) resolved by format.apply.
 // `$NAME` formats also take character RANGES ('A'-'C'=, lexical match, `<`
-// exclusion like numeric — GAP-fmtcharrange).
+// exclusion like numeric - GAP-fmtcharrange).
 // Catalogs from multiple PROC FORMAT steps accumulate.
 //
 // FAIL LOUD (BUG-fmtprocbatch): every statement/option/entry this parser doesn't
-// implement is a visible error, never a skipped token — INVALUE, SELECT/EXCLUDE/
+// implement is a visible error, never a skipped token - INVALUE, SELECT/EXCLUDE/
 // FMTLIB, `(multilabel)`/other VALUE options, `.` missing keys, unquoted labels.
 // Overlapping VALUE ranges error like SAS without MULTILABEL (BUG-fmtoverlap).
 //
@@ -10919,7 +10919,7 @@ fn buildHave(arena: std.mem.Allocator) !*Dataset {
 // accepted: the catalog is process-wide, so a format built early (e.g.
 // a codelist-format macro's VISNUM) persists to a later step's apply (GAP-permformat).
 /// Documented SAS 9.4 PROC FORMAT statement options opensas does NOT
-/// implement — the gap arm of BOTH header catch-alls (rc 2); anything else
+/// implement - the gap arm of BOTH header catch-alls (rc 2); anything else
 /// is the user's typo (rc 1). Closed set from the "Summary of Optional
 /// Arguments" (Base SAS 9.4 Procedures Guide, 7th ed., printed p. 1085,
 /// === pdf 1134/1135 ===): CASFMTLIB=/CNTLIN=/CNTLOUT=/FMTLIB/LIBRARY=/
@@ -10934,7 +10934,7 @@ fn isFormatGapOption(kw: []const u8) bool {
 }
 
 /// Documented SAS 9.4 PICTURE per-entry `(picture-N-options)` opensas does
-/// NOT implement — "The DATATYPE, DECSEP, DIG3SEP, FILL, LANGUAGE, MULT,
+/// NOT implement - "The DATATYPE, DECSEP, DIG3SEP, FILL, LANGUAGE, MULT,
 /// NOEDIT, and PREFIX options are valid in parentheses after the
 /// user-supplied value label" (printed pp. 1098-1099, === pdf 1147/1148 ===);
 /// PREFIX=/MULT=/ROUND are handled. Gap arm (rc 2); a typo stays rc 1.
@@ -10944,7 +10944,7 @@ fn isPictureGapOption(kw: []const u8) bool {
     return false;
 }
 
-/// The PICTURE statement's POSITION-1 `(format-options)` — "The DEFAULT,
+/// The PICTURE statement's POSITION-1 `(format-options)` - "The DEFAULT,
 /// FUZZ, MAX, MIN, MULTILABEL, NOTSORTED, and ROUND options are valid before
 /// the value range specification" (printed p. 1098, === pdf 1147 ===). None
 /// are honoured → the gap arm (rc 2); any other name in that paren group is
@@ -10966,7 +10966,7 @@ pub fn runFormat(cx: ProcCtx, toks: []const Token) diag.Error!void {
     // The `proc format <options>;` header statement. CNTLIN=<dataset> builds
     // formats from the control dataset; CNTLOUT=<dataset> dumps the catalog to
     // one after the VALUE/PICTURE statements install (inverse, BUG-fmtcntlout);
-    // LIBRARY=/LIB= are accepted as-is. Anything else errors — no silent skip.
+    // LIBRARY=/LIB= are accepted as-is. Anything else errors - no silent skip.
     var cntlout: ?[]const u8 = null;
     while (i < toks.len and toks[i].tag != .semicolon and toks[i].tag != .eof) {
         if (toks[i].tag == .name and i + 2 < toks.len and toks[i + 1].tag == .eq and toks[i + 2].tag == .name) {
@@ -10975,10 +10975,10 @@ pub fn runFormat(cx: ProcCtx, toks: []const Token) diag.Error!void {
             } else if (tkKw(toks[i], "cntlout")) {
                 cntlout = toks[i + 2].text;
             } else if (tkKw(toks[i], "library") or tkKw(toks[i], "lib")) {
-                // accepted — single process-wide catalog (GAP-permformat)
+                // accepted - single process-wide catalog (GAP-permformat)
             } else {
                 // SPLIT: a documented but unimplemented option (rc 2) vs the
-                // user's typo (rc 1) — same message body, one closed set.
+                // user's typo (rc 1) - same message body, one closed set.
                 if (isFormatGapOption(toks[i].text))
                     return failGap(diags, toks[i].line, "PROC FORMAT: option {s}= is not supported (only CNTLIN=, CNTLOUT=, LIBRARY=)", .{toks[i].text});
                 return diags.fail(error.ParseError, toks[i].line, "PROC FORMAT: option {s}= is not supported (only CNTLIN=, CNTLOUT=, LIBRARY=)", .{toks[i].text});
@@ -10987,7 +10987,7 @@ pub fn runFormat(cx: ProcCtx, toks: []const Token) diag.Error!void {
         } else if (toks[i].tag == .name and isFormatGapOption(toks[i].text))
             // the bare flags / number- or string-valued members of the same
             // closed set (FMTLIB, LOCALE, NOREPLACE, PAGE, MAXLABLEN=8,
-            // CASFMTLIB='name') — gap (rc 2)
+            // CASFMTLIB='name') - gap (rc 2)
             return failGap(diags, toks[i].line, "PROC FORMAT: '{s}' is not a supported PROC FORMAT statement option", .{toks[i].text})
         else return diags.fail(error.ParseError, toks[i].line, "PROC FORMAT: '{s}' is not a supported PROC FORMAT statement option", .{toks[i].text});
     }
@@ -11004,7 +11004,7 @@ pub fn runFormat(cx: ProcCtx, toks: []const Token) diag.Error!void {
         }
         if (!tkKw(toks[i], "value")) {
             // INVALUE (informats) and EXCLUDE/SELECT (catalog maintenance) are
-            // valid SAS 9.4 PROC FORMAT statements — a gap (rc 2); a typo'd
+            // valid SAS 9.4 PROC FORMAT statements - a gap (rc 2); a typo'd
             // keyword stays the user's error below.
             if (tkKw(toks[i], "invalue") or tkKw(toks[i], "exclude") or tkKw(toks[i], "select"))
                 return failGap(diags, toks[i].line, "PROC FORMAT: statement {s} is not supported (only VALUE and PICTURE)", .{toks[i].text});
@@ -11021,13 +11021,13 @@ pub fn runFormat(cx: ProcCtx, toks: []const Token) diag.Error!void {
         const fname = toks[i].text;
         const def_line = toks[i].line;
         i += 1;
-        // VALUE statement options live in parens — `(multilabel)`, `(notsorted)`.
+        // VALUE statement options live in parens - `(multilabel)`, `(notsorted)`.
         // MULTILABEL changes overlap semantics, NOTSORTED lookup order: installing
         // an ordinary single-label format would silently mis-resolve, so error
         // (BUG-fmtmultilabel).
         if (atTag(toks, i, .lparen)) {
             const opt = if (i + 1 < toks.len) toks[i + 1].text else "";
-            // MULTILABEL/NOTSORTED are the two valid SAS 9.4 VALUE options — a
+            // MULTILABEL/NOTSORTED are the two valid SAS 9.4 VALUE options - a
             // gap (rc 2); any other paren option is the user's typo (rc 1).
             if (eqi(opt, "multilabel") or eqi(opt, "notsorted"))
                 return failGap(diags, toks[i].line, "PROC FORMAT: VALUE option ({s}) is not supported", .{opt});
@@ -11068,7 +11068,7 @@ pub fn runFormat(cx: ProcCtx, toks: []const Token) diag.Error!void {
             {
                 parseNumRange(toks, &i, &e);
             } else if (atTag(toks, i, .dot)) {
-                // `.` (numeric missing) as a VALUE key is valid SAS — the gap the
+                // `.` (numeric missing) as a VALUE key is valid SAS - the gap the
                 // else message used to name; split out so a garbage entry below
                 // stays the user's rc 1.
                 return failGap(diags, toks[i].line, "PROC FORMAT: a '.' missing VALUE key is not supported", .{});
@@ -11079,7 +11079,7 @@ pub fn runFormat(cx: ProcCtx, toks: []const Token) diag.Error!void {
             if (atTag(toks, i, .string)) {
                 e.label = toks[i].text;
                 i += 1;
-            } else if (atTag(toks, i, .lbrace)) { // `[fmtname w.d]` — nested-format label
+            } else if (atTag(toks, i, .lbrace)) { // `[fmtname w.d]` - nested-format label
                 e.nested = true;
                 e.label = try parseNestedSpec(arena, diags, toks, &i);
             } else {
@@ -11100,12 +11100,12 @@ pub fn runFormat(cx: ProcCtx, toks: []const Token) diag.Error!void {
         try merged.appendSlice(arena, cats.items);
         format.setUserFormats(try merged.toOwnedSlice(arena));
     }
-    // CNTLOUT= — dump the (whole, merged) catalog to a control dataset.
+    // CNTLOUT= - dump the (whole, merged) catalog to a control dataset.
     if (cntlout) |name| try dumpCntlout(arena, lib, name, format.userFormats());
 }
 
 /// Parse a nested-format label `[fmtname<w><.d>]` (SAS directed formatting:
-/// the range's label is another format applied to the value at render time —
+/// the range's label is another format applied to the value at render time -
 /// BUG-fmtnestlabel). The brackets lex as lbrace/rbrace and the spec inside is
 /// reassembled as text (`[dollar8.2]` → name 'dollar8' + number '.2' → "dollar8.2");
 /// format.apply parses it again at apply time.
@@ -11131,7 +11131,7 @@ fn parseNestedSpec(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []c
         i += 1;
     }
     if (!atTag(toks, i, .rbrace))
-        return diags.fail(error.ParseError, def_line, "PROC FORMAT: malformed nested-format label — expected [fmtname<w.d>]", .{});
+        return diags.fail(error.ParseError, def_line, "PROC FORMAT: malformed nested-format label - expected [fmtname<w.d>]", .{});
     i += 1; // past `]`
     ip.* = i;
     return buf.items;
@@ -11144,7 +11144,7 @@ fn parseNestedSpec(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []c
 /// endpoints overlap unless an exclusion flag separates them. OTHER= entries are
 /// exempt (they match only after every range misses).
 /// ponytail: char-key duplicates/char-range overlaps and CNTLIN-built formats are
-/// unchecked — SAS errors on the former too; add when a study hits either.
+/// unchecked - SAS errors on the former too; add when a study hits either.
 fn checkValueOverlap(diags: *diag.Diagnostics, fname: []const u8, entries: []const format.UserFmtEntry, def_line: usize) diag.Error!void {
     const s = try diags.arena.alloc(format.UserFmtEntry, entries.len);
     var n: usize = 0;
@@ -11167,13 +11167,13 @@ fn checkValueOverlap(diags: *diag.Diagnostics, fname: []const u8, entries: []con
     }
 }
 
-/// CNTLOUT= — dump the catalog to a control dataset, the inverse of appendCntlin
+/// CNTLOUT= - dump the catalog to a control dataset, the inverse of appendCntlin
 /// (BUG-fmtcntlout): columns FMTNAME, START, END, LABEL (all char, bound values
 /// as their text) plus TYPE ('C' char / 'P' picture / '' numeric) and HLO
-/// ('L'/'H' open ends — both for `low-high` — 'O' OTHER). A nested-format label
+/// ('L'/'H' open ends - both for `low-high` - 'O' OTHER). A nested-format label
 /// dumps in its source bracket form `[spec]`.
 /// ponytail: no SEXCL/EEXCL columns, so exclusive-endpoint flags don't round-trip
-/// through CNTLIN= — add when a study needs it.
+/// through CNTLIN= - add when a study needs it.
 fn dumpCntlout(arena: std.mem.Allocator, lib: *Library, name: []const u8, cats: []const format.UserFmt) diag.Error!void {
     const ds = try arena.create(Dataset);
     ds.* = Dataset.init(arena, name);
@@ -11210,15 +11210,15 @@ fn dumpCntlout(arena: std.mem.Allocator, lib: *Library, name: []const u8, cats: 
 
 /// Build user formats from a CNTLIN= control dataset and append them to `cats`.
 /// Standard CDISC/SAS layout: one row per range with columns FMTNAME, START, END,
-/// LABEL, and optional TYPE ('C'→char keys, 'P'→PICTURE — the label is a digit
+/// LABEL, and optional TYPE ('C'→char keys, 'P'→PICTURE - the label is a digit
 /// template, not a literal: BUG-cntlinpicture) and HLO ('L'/'H'→low/high open ends,
 /// 'O'→OTHER). SEXCL/EEXCL='Y' mark an exclusive start/end endpoint (`0-<5`).
 /// Rows sharing a FMTNAME group into one format (GAP-permformat).
 fn appendCntlin(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, line_no: usize, name: []const u8, cats: *std.ArrayList(format.UserFmt)) diag.Error!void {
     const ds = lib.find(name) orelse {
         // BUG-procmissingrc2: CNTLIN= naming an absent member is the user's
-        // error (D-009 rc 1) — real SAS errors "ERROR: File WORK.X.DATA does
-        // not exist." — so it takes the runSort (GH#8) .err arm (step-halt
+        // error (D-009 rc 1) - real SAS errors "ERROR: File WORK.X.DATA does
+        // not exist." - so it takes the runSort (GH#8) .err arm (step-halt
         // NOTE, BUG-errhalt later-step skip, rc 1), never unsupported()/rc 2:
         // the CNTLIN feature itself is supported, the table just isn't there.
         diags.report(.err, line_no, "File {s} does not exist", .{name}) catch {};
@@ -11243,7 +11243,7 @@ fn appendCntlin(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostic
         if (fname.len == 0) continue;
         const ty = cellStr(row, i_type);
         const is_char = ty.len > 0 and (ty[0] == 'C' or ty[0] == 'c');
-        // TYPE='P' — rebuild the same representation parsePicture installs
+        // TYPE='P' - rebuild the same representation parsePicture installs
         // (is_picture UserFmt + numeric-range entries whose label is the digit
         // template). PREFIX=/MULT= don't round-trip (CNTLOUT doesn't dump them);
         // the template's implicit decimal-point mult does (renderPicture).
@@ -11257,7 +11257,7 @@ fn appendCntlin(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostic
             try groups.append(arena, .{ .name = try arena.dupe(u8, fname), .is_char = is_char, .is_picture = is_picture, .entries = .empty });
 
         var e: format.UserFmtEntry = .{ .label = if (i_label) |il| try arena.dupe(u8, std.mem.trimEnd(u8, cellStr(row, il), " ")) else "" };
-        // SEXCL/EEXCL='Y' — exclusive range endpoints, read-side twin of the
+        // SEXCL/EEXCL='Y' - exclusive range endpoints, read-side twin of the
         // dumpCntlout ponytail (BUG-cntlinpicture). Without these an exclusive
         // range (`0-<5`) rebuilds INCLUSIVE and a shared boundary maps to the
         // wrong side. Same flags parseNumRange sets for a direct definition.
@@ -11296,7 +11296,7 @@ fn hasCharCI(s: []const u8, c: u8) bool {
 }
 
 /// A range endpoint (`low`/`high` → ±inf, or a number with an optional leading
-/// `-` — `-5--1` is a legal range), advancing `i` past it.
+/// `-` - `-5--1` is a legal range), advancing `i` past it.
 fn rangeVal(toks: []const Token, i: *usize) f64 {
     var sign: f64 = 1;
     if (atTag(toks, i.*, .minus)) {
@@ -11304,7 +11304,7 @@ fn rangeVal(toks: []const Token, i: *usize) f64 {
         i.* += 1;
     }
     // Truncated range (`value v 65 -` at EOF, BUG-formatnumrangecrash): never
-    // index past end / consume the eof or `;` terminator — leave `i` ON it so
+    // index past end / consume the eof or `;` terminator - leave `i` ON it so
     // the caller's error branch fails loud on a token that's in bounds.
     if (i.* >= toks.len or toks[i.*].tag == .eof or toks[i.*].tag == .semicolon) return 0;
     const v = if (tkKw(toks[i.*], "low")) -std.math.inf(f64) else if (tkKw(toks[i.*], "high")) std.math.inf(f64) else std.fmt.parseFloat(f64, toks[i.*].text) catch 0;
@@ -11314,16 +11314,16 @@ fn rangeVal(toks: []const Token, i: *usize) f64 {
 
 /// Parse a `n` / `lo-hi` numeric range (with `<` exclusion and `low`/`high` opens)
 /// into `e`, advancing `i` past it. Shared by VALUE and PICTURE (both range the
-/// same way; only the RHS differs — a label vs a digit template).
+/// same way; only the RHS differs - a label vs a digit template).
 fn parseNumRange(toks: []const Token, i: *usize, e: *format.UserFmtEntry) void {
     e.lo = rangeVal(toks, i);
-    if (atTag(toks, i.*, .lt)) { // `n<-m` — low endpoint EXCLUDED
+    if (atTag(toks, i.*, .lt)) { // `n<-m` - low endpoint EXCLUDED
         e.lo_excl = true;
         i.* += 1;
     }
     if (atTag(toks, i.*, .minus)) { // `lo-hi`
         i.* += 1;
-        if (atTag(toks, i.*, .lt)) { // `n-<m` — high endpoint EXCLUDED
+        if (atTag(toks, i.*, .lt)) { // `n-<m` - high endpoint EXCLUDED
             e.hi_excl = true;
             i.* += 1;
         }
@@ -11331,16 +11331,16 @@ fn parseNumRange(toks: []const Token, i: *usize, e: *format.UserFmtEntry) void {
     } else e.hi = e.lo;
 }
 
-// `picture NAME range='template' [(prefix='..' mult=n)] … ;` — a numeric digit-selector
+// `picture NAME range='template' [(prefix='..' mult=n)] … ;` - a numeric digit-selector
 // format (PICTURE-format). Ranges parse exactly like VALUE; the RHS is a template
 // applied to the value at render time (format.renderPicture). FAIL LOUD on the parts
 // v1 doesn't do: `$char` pictures, date-directive templates (`%Y` etc.), and any
-// option beyond PREFIX=/MULT= — never a silent wrong render.
+// option beyond PREFIX=/MULT= - never a silent wrong render.
 fn parsePicture(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const Token, ip: *usize, cats: *std.ArrayList(format.UserFmt)) diag.Error!void {
     var i = ip.*;
     i += 1; // past `picture`
     if (atTag(toks, i, .dollar))
-        // `picture $NAME` — character picture formats are valid SAS 9.4 → gap.
+        // `picture $NAME` - character picture formats are valid SAS 9.4 → gap.
         return failGap(diags, toks[i].line, "PROC FORMAT: character ($) PICTURE formats are not supported", .{});
     if (i >= toks.len or toks[i].tag != .name) {
         ip.* = i;
@@ -11348,13 +11348,13 @@ fn parsePicture(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []cons
     }
     const fname = toks[i].text;
     i += 1;
-    // `picture NAME (format-options) range='template' …` — the POSITION-1
+    // `picture NAME (format-options) range='template' …` - the POSITION-1
     // option group (the doc's syntax: `PICTURE name <(format-options)>`).
     // It used to fall to the ENTRY catch-all: rc 1 with the degenerate
     // `unsupported PICTURE entry ''` (the lparen token's empty text) on
     // options the doc explicitly allows there. Split per the closed set: a
-    // documented name failGaps (rc 2), anything else errors (rc 1) — both
-    // NAMED. A name right after `=` is a VALUE, not an option — skip it.
+    // documented name failGaps (rc 2), anything else errors (rc 1) - both
+    // NAMED. A name right after `=` is a VALUE, not an option - skip it.
     if (atTag(toks, i, .lparen)) {
         i += 1;
         while (i < toks.len and toks[i].tag != .rparen and toks[i].tag != .semicolon and toks[i].tag != .eof) {
@@ -11434,7 +11434,7 @@ test "PROC FORMAT CNTLIN builds a value format resolved at apply time (GAP-permf
     defer format.clearUserFormats();
 
     // Control dataset (as a codelist-format macro builds from a codelist CSV): a VISNUM
-    // value format — 1="Screening", 2-3="Treatment", other="Other".
+    // value format - 1="Screening", 2-3="Treatment", other="Other".
     var lib = Library.init(a);
     const ctl = try a.create(Dataset);
     ctl.* = Dataset.init(a, "ctl");
@@ -11516,7 +11516,7 @@ test "PROC FORMAT fail-loud: INVALUE / unknown statement / (multilabel) / overla
     format.clearUserFormats();
     defer format.clearUserFormats();
 
-    // INVALUE — custom informats are a loud GAP at the definition site, not a
+    // INVALUE - custom informats are a loud GAP at the definition site, not a
     // silent drop that fails only at the later INPUT (BUG-fmtinvalue).
     {
         var diags = diag.Diagnostics.init(a);
@@ -11526,7 +11526,7 @@ test "PROC FORMAT fail-loud: INVALUE / unknown statement / (multilabel) / overla
         try t.expect(diags.hasErrors());
         try t.expect(std.mem.indexOf(u8, try diags.render(), "invalue") != null);
     }
-    // Any other unrecognized statement (SELECT/EXCLUDE/FMTLIB/…) — same loud else.
+    // Any other unrecognized statement (SELECT/EXCLUDE/FMTLIB/…) - same loud else.
     {
         var diags = diag.Diagnostics.init(a);
         var lib = Library.init(a);
@@ -11535,7 +11535,7 @@ test "PROC FORMAT fail-loud: INVALUE / unknown statement / (multilabel) / overla
         try t.expect(diags.hasErrors());
         try t.expect(std.mem.indexOf(u8, try diags.render(), "select") != null);
     }
-    // (multilabel) VALUE option — not silently dropped (BUG-fmtmultilabel).
+    // (multilabel) VALUE option - not silently dropped (BUG-fmtmultilabel).
     {
         var diags = diag.Diagnostics.init(a);
         var lib = Library.init(a);
@@ -11584,7 +11584,7 @@ test "PROC FORMAT: truncated numeric range fails loud, never crashes (BUG-format
     format.clearUserFormats();
     defer format.clearUserFormats();
 
-    // `65 -` at EOF — rangeVal must not index/consume past the last token
+    // `65 -` at EOF - rangeVal must not index/consume past the last token
     // (qa tick174 F-3: this SIGABRTed on an OOB token read).
     {
         var diags = diag.Diagnostics.init(a);
@@ -11600,14 +11600,14 @@ test "PROC FORMAT: truncated numeric range fails loud, never crashes (BUG-format
         const toks = try lex.tokenize(a, "proc format; value v 65 - ; run;", &diags);
         try t.expectError(error.ParseError, runFormat(.{ .arena = a, .lib = &lib, .diags = &diags }, toks));
     }
-    // `65 - -` at EOF — rangeVal's own sign branch at end-of-tokens.
+    // `65 - -` at EOF - rangeVal's own sign branch at end-of-tokens.
     {
         var diags = diag.Diagnostics.init(a);
         var lib = Library.init(a);
         const toks = try lex.tokenize(a, "proc format; value v 65 - -", &diags);
         try t.expectError(error.ParseError, runFormat(.{ .arena = a, .lib = &lib, .diags = &diags }, toks));
     }
-    // Valid ranges — including negative endpoints (`-5--1`, both minus paths) —
+    // Valid ranges - including negative endpoints (`-5--1`, both minus paths) -
     // are byte-identical.
     {
         var diags = diag.Diagnostics.init(a);
@@ -11772,7 +11772,7 @@ test "PROC APPEND length mismatch: no-FORCE ERROR, FORCE reconciles at the store
     var diags = diag.Diagnostics.init(a);
 
     var lib = Library.init(a);
-    // BASE=: s Char 3, n Num 5 — declared widths on both types.
+    // BASE=: s Char 3, n Num 5 - declared widths on both types.
     const base = try a.create(Dataset);
     base.* = Dataset.init(a, "base");
     _ = try base.addColumn("s", .char);
@@ -11799,7 +11799,7 @@ test "PROC APPEND length mismatch: no-FORCE ERROR, FORCE reconciles at the store
 
     // FORCE → warning, and the STORE reconciles to the BASE= length (doc
     // p.595: "The length of the variables in the BASE= data set takes
-    // precedence"): s holds 'abc' — never 8 bytes under a Char 3 descriptor —
+    // precedence"): s holds 'abc' - never 8 bytes under a Char 3 descriptor -
     // and n holds the len-5 truncation of 36.6; the descriptors don't move.
     var diags2 = diag.Diagnostics.init(a);
     const toks2 = try lex.tokenize(a, "proc append base=base data=wide force; run;", &diags2);
@@ -11816,7 +11816,7 @@ test "PROC APPEND length mismatch: no-FORCE ERROR, FORCE reconciles at the store
     };
     try t.expect(warned);
 
-    // shorter DATA= (Char 3 into Char 8) needs no FORCE and stores as-is —
+    // shorter DATA= (Char 3 into Char 8) needs no FORCE and stores as-is -
     // char storage is dynamic, so the doc's "pad" is a no-op.
     const tall = try a.create(Dataset);
     tall.* = Dataset.init(a, "tall");
@@ -11839,7 +11839,7 @@ test "PROC APPEND length mismatch: no-FORCE ERROR, FORCE reconciles at the store
     try t.expectEqualStrings("pq", b3.rows.items[1][0].str);
 
     // an untracked-width DATA= column (len null) holding a wider cell: no
-    // declared mismatch to gate, but the store still clips to the descriptor —
+    // declared mismatch to gate, but the store still clips to the descriptor -
     // the cell must not disagree with it (2a4a2b6a).
     const raw = try a.create(Dataset);
     raw.* = Dataset.init(a, "raw");
@@ -12083,7 +12083,7 @@ test "PROC DATASETS MODIFY: ATTRIB _all_ INFORMAT= strips informats; LENGTH= is 
     }.f;
 
     // (1) THE DEFECT: `attrib _all_ informat=;` used to be a hard-coded no-op at
-    // rc 0 — the format went, the informat stayed (Procedures Guide 7th ed.
+    // rc 0 - the format went, the informat stayed (Procedures Guide 7th ed.
     // pp.598/641: _ALL_ + an empty INFORMAT= is the documented removal idiom).
     {
         diag.resetGap(); // process-global: an earlier test's gap would leak in
@@ -12123,7 +12123,7 @@ test "PROC DATASETS MODIFY: ATTRIB _all_ INFORMAT= strips informats; LENGTH= is 
         try t.expectEqualStrings("Bee", ds.columns.items[ds.indexOf("b").?].label.?);
     }
     // (4) LENGTH= is not one of the three options ATTRIB takes inside DATASETS
-    // (p.598) — captured ERROR, rc 1 (the user's SAS is wrong, not an opensas
+    // (p.598) - captured ERROR, rc 1 (the user's SAS is wrong, not an opensas
     // gap), never the old silent drop. D-003: captured reporter, no child.
     {
         diag.resetGap();
@@ -12154,12 +12154,12 @@ test "PROC DATASETS MODIFY: the LENGTH statement fails loud rc 1 (BUG-datasetsle
     }.f;
 
     // THE DEFECT: `length c $20;` inside MODIFY used to parse and silently
-    // drop at rc 0 — the user believes a width change happened. Real SAS
+    // drop at rc 0 - the user believes a width change happened. Real SAS
     // REJECTS it: Base SAS 9.4 Procedures Guide 7th ed. printed p.563
     // (DATASETS restrictions): "You cannot change the length of a variable
     // using the LENGTH statement or the LENGTH= option in an ATTRIB
     // statement", and LENGTH is absent from MODIFY's p.576
-    // subordinate-statement syntax diagram. Captured ERROR at rc 1 — the
+    // subordinate-statement syntax diagram. Captured ERROR at rc 1 - the
     // user's SAS is wrong, the same verdict the ATTRIB LENGTH= arm reached
     // (D-009 / D-009b corollary). D-003: captured reporter, no child process.
     {
@@ -12172,7 +12172,7 @@ test "PROC DATASETS MODIFY: the LENGTH statement fails loud rc 1 (BUG-datasetsle
         try t.expect(std.mem.indexOf(u8, try diags.render(), "LENGTH statement is not valid in the DATASETS procedure") != null);
         try t.expectEqual(@as(u8, 1), diag.exitCode(diag.gapHit(), diags.hasErrors()));
     }
-    // …and outside MODIFY it is no more valid — not a DATASETS statement at
+    // …and outside MODIFY it is no more valid - not a DATASETS statement at
     // all, so the same rc 1 (not the old "attribute statement outside MODIFY"
     // rc-2 gap arm).
     {
@@ -12244,7 +12244,7 @@ test "PROC DATASETS MODIFY: the INFORMAT statement sets/strips informats (GAP-da
         const ds = lib.find("m").?;
         for (ds.columns.items) |c| try t.expect(c.informat == null);
     }
-    // (4) Unknown variable: the FORMAT/RENAME/LABEL arms' shared verdict —
+    // (4) Unknown variable: the FORMAT/RENAME/LABEL arms' shared verdict -
     // captured ERROR "variable z not found", rc 1 (the user's SAS is wrong,
     // D-009 / D-009b corollary). D-003: captured reporter, no child process.
     {
@@ -12258,7 +12258,7 @@ test "PROC DATASETS MODIFY: the INFORMAT statement sets/strips informats (GAP-da
         try t.expectEqual(@as(u8, 1), diag.exitCode(diag.gapHit(), diags.hasErrors()));
     }
     // (5) Outside a MODIFY RUN group the statement is not valid (p.640
-    // restriction) — the shared gap arm, rc 2 (GAP-dsmgmt family).
+    // restriction) - the shared gap arm, rc 2 (GAP-dsmgmt family).
     {
         diag.resetGap();
         g_test_last_unsup = "";
@@ -12279,7 +12279,7 @@ test "GAP-varcolonprefix-procs: `pfx:` expands in MEANS/FREQ/TABULATE (PDV order
     defer arena.deinit();
     const a = arena.allocator();
     diag.resetGap(); // process-global: an earlier test's gap would leak into the rc-0 arms
-    // Columns CREATED x2, x1, x10 — PDV order (x2 x1 x10) differs from
+    // Columns CREATED x2, x1, x10 - PDV order (x2 x1 x10) differs from
     // alphabetical (x1 x10 x2), and every happy path below must keep PDV
     // order (Language Reference: Concepts printed p.62).
     const mk = struct {
@@ -12298,7 +12298,7 @@ test "GAP-varcolonprefix-procs: `pfx:` expands in MEANS/FREQ/TABULATE (PDV order
         }
     }.f;
 
-    // (1) MEANS `var y x:` — the prefix expands in PDV order after the plain
+    // (1) MEANS `var y x:` - the prefix expands in PDV order after the plain
     // name (the listing's Variable rows ARE the expansion order).
     {
         var lib = Library.init(a);
@@ -12315,7 +12315,7 @@ test "GAP-varcolonprefix-procs: `pfx:` expands in MEANS/FREQ/TABULATE (PDV order
         try t.expect(p_y < p_2 and p_2 < p_1 and p_1 < p_10);
         try t.expectEqual(@as(u8, 0), diag.exitCode(diag.gapHit(), diags.hasErrors()));
     }
-    // (2) FREQ `tables x:` — one one-way table per match, PDV order.
+    // (2) FREQ `tables x:` - one one-way table per match, PDV order.
     {
         var lib = Library.init(a);
         try mk(a, &lib);
@@ -12329,7 +12329,7 @@ test "GAP-varcolonprefix-procs: `pfx:` expands in MEANS/FREQ/TABULATE (PDV order
         const p_10 = std.mem.indexOf(u8, r, "x10    Frequency").?;
         try t.expect(p_2 < p_1 and p_1 < p_10);
     }
-    // (3) TABULATE `class c:` — the TABLE expression names an EXPANDED var,
+    // (3) TABULATE `class c:` - the TABLE expression names an EXPANDED var,
     // matched against the pre-expansion wire form at parse time.
     {
         var lib = Library.init(a);
@@ -12341,7 +12341,7 @@ test "GAP-varcolonprefix-procs: `pfx:` expands in MEANS/FREQ/TABULATE (PDV order
         try t.expect(std.mem.indexOf(u8, out.items, "|c2  |") != null); // c2 rendered as the row CLASS, not an analysis var
         try t.expectEqual(@as(u8, 0), diag.exitCode(diag.gapHit(), diags.hasErrors()));
     }
-    // (4) Empty match — the SAME loud rc 1 as the OF (eval.zig) and PRINT
+    // (4) Empty match - the SAME loud rc 1 as the OF (eval.zig) and PRINT
     // (main.zig) empty-match arms; same message vocabulary as the OF arm.
     // D-003: captured reporter, no child process.
     {
@@ -12355,7 +12355,7 @@ test "GAP-varcolonprefix-procs: `pfx:` expands in MEANS/FREQ/TABULATE (PDV order
         try t.expect(std.mem.indexOf(u8, try diags.render(), "PROC MEANS: the name prefix 'zz:' matched no variables") != null);
         try t.expectEqual(@as(u8, 1), diag.exitCode(diag.gapHit(), diags.hasErrors()));
     }
-    // (5) FREQ's hard case: a prefix INSIDE a `*` crossing — the doc is
+    // (5) FREQ's hard case: a prefix INSIDE a `*` crossing - the doc is
     // silent (Statistical Procedures 6th ed. p.103 Table 3.8 covers parens
     // and name ranges only), so it stays LOUD as a gap (rc 2), never guessed.
     {
@@ -12369,7 +12369,7 @@ test "GAP-varcolonprefix-procs: `pfx:` expands in MEANS/FREQ/TABULATE (PDV order
         try t.expect(std.mem.indexOf(u8, try diags.render(), "inside a TABLES '*' crossing is not supported") != null);
         try t.expectEqual(@as(u8, 2), diag.exitCode(diag.gapHit(), diags.hasErrors()));
     }
-    // (6) A prefix in a TABULATE TABLE expression — same doc silence, same
+    // (6) A prefix in a TABULATE TABLE expression - same doc silence, same
     // loud gap (never the old phantom row var `x`).
     {
         diag.resetGap();
@@ -12393,7 +12393,7 @@ test "PROC DATASETS MODIFY/DELETE resolve members in a directory libname (GAP-da
 
     var lib = Library.init(a);
     // A directory libname keys its members `<lib>.<member>` (as `data T.dm` / SET /
-    // PRINT store them) — MODIFY must find `dm` there, not only in WORK.
+    // PRINT store them) - MODIFY must find `dm` there, not only in WORK.
     inline for (.{ "T.dm", "T.ae" }) |nm| {
         const d = try a.create(Dataset);
         d.* = Dataset.init(a, nm);
@@ -12476,7 +12476,7 @@ test "BUG-procimport: DBMS=EXCEL RANGE reads the named sheet; every gap fails lo
         try t.expectEqualStrings("Bob & Lee", d.row(1)[1].str);
     }
     // GH#55: EXCEL2000/2002/2003/2007 are version-tagged aliases for the same
-    // Excel-workbook engine — they read the .xlsx exactly like DBMS=EXCEL.
+    // Excel-workbook engine - they read the .xlsx exactly like DBMS=EXCEL.
     for ([_][]const u8{ "excel2000", "excel2002", "excel2003", "excel2007" }) |eng| {
         g_test_last_unsup = "";
         const src = try std.fmt.allocPrint(a, "proc import out=x datafile=\"{s}\" dbms={s} replace; range=\"Data$\"; getnames=yes; run;", .{ wb, eng });
@@ -12500,11 +12500,11 @@ test "BUG-procimport: DBMS=EXCEL RANGE reads the named sheet; every gap fails lo
         try runImport(.{ .arena = a, .lib = &lib, .diags = &diags }, try lex.tokenize(a, "proc import out=e datafile=\"no/such.accdb\" dbms=accdb; run;", &diags));
         try t.expect(std.mem.indexOf(u8, g_test_last_unsup, "DBMS=accdb") != null);
     }
-    // a missing DATAFILE names the path — an undelivered external file (a
+    // a missing DATAFILE names the path - an undelivered external file (a
     // Windows-drive path in a program run elsewhere) must read as source skew,
     // not a mystery. BUG-procmissingfilerc (GH#21) moved it off unsupported()
     // onto the rc-1 user-error arm, so the path now shows up in a captured
-    // ERROR, not in an UNSUPPORTED line — same loudness, correct D-009 class.
+    // ERROR, not in an UNSUPPORTED line - same loudness, correct D-009 class.
     {
         g_test_last_unsup = "";
         try runImport(.{ .arena = a, .lib = &lib, .diags = &diags }, try lex.tokenize(a, "proc import out=e datafile=\"E:\\nope\\gone.xlsx\" dbms=excel; run;", &diags));
@@ -12588,8 +12588,8 @@ test "BUG-procmissingfilerc (GH#21): an unreadable/unwritable EXTERNAL file is a
     // THE DEFECT: both external-file failures went through unsupported() → rc 2,
     // which tells a downstream agent "opensas cannot do this / file an issue"
     // when the truth is "your path is wrong" (D-009: 1 = fix your SAS). The fix
-    // is the five BUG-procmissingrc2 arms' shape — a plain .err report at rc 1,
-    // NEVER diag.markGap() — and it matches exec.zig's INFILE open failure,
+    // is the five BUG-procmissingrc2 arms' shape - a plain .err report at rc 1,
+    // NEVER diag.markGap() - and it matches exec.zig's INFILE open failure,
     // which has been rc 1 since ISS-infilemissing (D-009b corollary: the same
     // condition must not carry two rcs). D-003: captured reporter, no child.
     //
@@ -12601,7 +12601,7 @@ test "BUG-procmissingfilerc (GH#21): an unreadable/unwritable EXTERNAL file is a
     // IMPORT: every DBMS opensas supports funnels through the ONE
     // io.readFileRaw site, so all four spellings must now land on rc 1. The
     // DBMS gap guard runs BEFORE the read, so an unsupported DBMS still exits 2
-    // (that arm is unchanged) — this loop proves the supported ones do not.
+    // (that arm is unchanged) - this loop proves the supported ones do not.
     for ([_][]const u8{ "csv", "dlm", "tab", "xlsx", "excel" }) |dbms| {
         var lib = Library.init(a);
         var diags = diag.Diagnostics.init(a);
@@ -12637,7 +12637,7 @@ test "BUG-procmissingfilerc (GH#21): an unreadable/unwritable EXTERNAL file is a
     }
 
     // THE BOUNDARY this ticket deliberately does NOT move: a file that WAS read
-    // and then fails to PARSE as a workbook is a genuine opensas gap — rc 2
+    // and then fails to PARSE as a workbook is a genuine opensas gap - rc 2
     // stays. "PK" is the ZIP magic, so the not-an-XLSX guard passes it through
     // to readXlsx, which finds no central directory.
     {
@@ -12655,7 +12655,7 @@ test "BUG-procmissingfilerc (GH#21): an unreadable/unwritable EXTERNAL file is a
     diag.resetGap();
 }
 
-test "PROC DATASETS DELETE/KILL unlink on-disk members — no undead datasets (BUG-datasetsdeletedisk)" {
+test "PROC DATASETS DELETE/KILL unlink on-disk members - no undead datasets (BUG-datasetsdeletedisk)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -12677,7 +12677,7 @@ test "PROC DATASETS DELETE/KILL unlink on-disk members — no undead datasets (B
     var diags = diag.Diagnostics.init(a);
 
     // literal DELETE of a disk-only member (nothing in memory): file + sidecar
-    // gone, no "member not found" — it DID exist, on disk.
+    // gone, no "member not found" - it DID exist, on disk.
     g_test_last_unsup = "";
     var out: std.ArrayList(u8) = .empty;
     var toks = try lex.tokenize(a, "proc datasets lib=t nolist; delete x; quit;", &diags);
@@ -12758,7 +12758,7 @@ test "proc sort by a numeric key, in place" {
     try t.expectEqualStrings("Carol", have.row(2)[0].str);
 }
 
-test "PROC SORT is STABLE at scale — ties keep input order (qa tick-37, gen2 AE row order)" {
+test "PROC SORT is STABLE at scale - ties keep input order (qa tick-37, gen2 AE row order)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -12835,7 +12835,7 @@ test "SORTSEQ=LINGUISTIC sorts case-folded; unknown SORT option fails loud (BUG-
     try t.expectEqualStrings("Banana", ds.row(1)[0].str);
     try t.expectEqualStrings("cherry", ds.row(2)[0].str);
 
-    // a bogus header option must not vanish silently — a typo is the user's
+    // a bogus header option must not vanish silently - a typo is the user's
     // rc 1 via diags (BUG-proctypoexits2 split; the gap arm keeps g_test_last_unsup)
     const bad = try lex.tokenize(a, "proc sort data=d bogusopt; by name; run;", &diags);
     try t.expectError(error.ParseError, runSort(.{ .arena = a, .lib = &lib, .diags = &diags }, bad));
@@ -12868,7 +12868,7 @@ test "GAP-sortlow-tick282: THREADS & co benign, out=_null_ discards, LINGUISTIC(
     try t.expectEqual(numV(1), ds.row(0)[0]);
     try t.expectEqual(numV(3), ds.row(2)[0]);
 
-    // F5: out=_null_ discards the sorted result — but DUPOUT= still materializes.
+    // F5: out=_null_ discards the sorted result - but DUPOUT= still materializes.
     const t5 = try lex.tokenize(a, "proc sort data=d out=_null_ nodupkey dupout=g; by x; run;", &diags);
     try runSort(.{ .arena = a, .lib = &lib, .diags = &diags }, t5);
     try t.expect(lib.find("_null_") == null);
@@ -12888,7 +12888,7 @@ test "GAP-freqlow-tick276: unknown FREQ option fails loud; zero-weight stratum p
     defer arena.deinit();
     const a = arena.allocator();
 
-    // F6: a typo'd PROC FREQ statement option must not vanish — the old final
+    // F6: a typo'd PROC FREQ statement option must not vanish - the old final
     // else `i += 1`'d ANY token (compress/odrer=freq ran silently, rc=0).
     {
         var diags = diag.Diagnostics.init(a);
@@ -12951,10 +12951,10 @@ test "GAP-procsubstmtswallow: SORT/MEANS/FREQ/CONTENTS statement loops fail loud
     const a = arena.allocator();
 
     // An unknown SUB-STATEMENT was silently swallowed by SORT (whose own OPTION
-    // loop was already loud — one PROC, two policies), MEANS, FREQ and CONTENTS
+    // loop was already loud - one PROC, two policies), MEANS, FREQ and CONTENTS
     // while PRINT/TRANSPOSE/SQL errored (D-002). Each loop now ends in a real
     // else naming the statement, behind a parser.isMidStepSkippable arm (D-014a
-    // — the CONVERGED predicate: after BUG-filenamemidstep, FILENAME/ODS are
+    // - the CONVERGED predicate: after BUG-filenamemidstep, FILENAME/ODS are
     // hoisted too, so NO isGlobalKw member fails loud here anymore).
     {
         var diags = diag.Diagnostics.init(a);
@@ -12978,7 +12978,7 @@ test "GAP-procsubstmtswallow: SORT/MEANS/FREQ/CONTENTS statement loops fail loud
         _ = try ds.addColumn("x", .num);
         try ds.appendRow(&.{numV(1)});
         try lib.put("d", ds);
-        // SORT, unknown statement AFTER the BY — same policy both sides.
+        // SORT, unknown statement AFTER the BY - same policy both sides.
         const t2 = try lex.tokenize(a, "proc sort data=d; by x; zzzqnosuchstatement; run;", &diags);
         try t.expectError(error.ParseError, runSort(.{ .arena = a, .lib = &lib, .diags = &diags }, t2));
         try t.expect(std.mem.indexOf(u8, try diags.render(), "PROC SORT statement zzzqnosuchstatement is not supported") != null);
@@ -13023,7 +13023,7 @@ test "GAP-procsubstmtswallow: SORT/MEANS/FREQ/CONTENTS statement loops fail loud
         try t.expect(std.mem.indexOf(u8, try diags.render(), "PROC CONTENTS statement zzzqnosuchstatement is not supported") != null);
     }
     // CONTENTS takes NO WHERE statement and runs no procInput, so WHERE hits
-    // the loud else there (as SAS errors) — never an honest skip.
+    // the loud else there (as SAS errors) - never an honest skip.
     {
         var diags = diag.Diagnostics.init(a);
         var lib = Library.init(a);
@@ -13038,7 +13038,7 @@ test "GAP-procsubstmtswallow: SORT/MEANS/FREQ/CONTENTS statement loops fail loud
         try t.expect(std.mem.indexOf(u8, try diags.render(), "PROC CONTENTS statement where is not supported") != null);
     }
     // D-014: a hoisted mid-step global (TITLE) must NOT trip the loud else in
-    // any of the four — main.zig hoists and executes it, the loop skips it.
+    // any of the four - main.zig hoists and executes it, the loop skips it.
     {
         var diags = diag.Diagnostics.init(a);
         var lib = Library.init(a);
@@ -13062,7 +13062,7 @@ test "GAP-procsubstmtswallow: SORT/MEANS/FREQ/CONTENTS statement loops fail loud
         try t.expect(!diags.hasErrors());
     }
     // D-014a CONVERGED (BUG-filenamemidstep): FILENAME/ODS joined the hoist, so
-    // mid-step they skip HONESTLY now — the prior attempt's 'FILENAME fails
+    // mid-step they skip HONESTLY now - the prior attempt's 'FILENAME fails
     // loud' arm went stale on exactly this and is deliberately NOT re-added.
     {
         var diags = diag.Diagnostics.init(a);
@@ -13086,7 +13086,7 @@ test "BUG-sortstraysemi: SORT pre-BY loop consumes exactly one token per path; u
 
     // QA tick357 F2 (regression in d1d38c27): the pre-BY loop's new
     // stray-punctuation arm consumed the stray `;` and the PRE-EXISTING
-    // UNCONDITIONAL trailer then consumed the NEXT token too — the `by` — so
+    // UNCONDITIONAL trailer then consumed the NEXT token too - the `by` - so
     // the loop landed on the BY variable and failed loud naming it. The
     // trailer is now GUARDED (`if (atTag(...))`), the same form the four
     // sibling loops already used. These arms pin that a stray token costs
@@ -13110,7 +13110,7 @@ test "BUG-sortstraysemi: SORT pre-BY loop consumes exactly one token per path; u
             try t.expectEqual(@as(f64, 2), s.rows.items[1][0].num);
         }
     };
-    // A null statement is legal SAS — silently ignored. A semicolon-terminated
+    // A null statement is legal SAS - silently ignored. A semicolon-terminated
     // macro call `%mymacro;` leaves EXACTLY this token stream after expansion
     // (macro expansion is upstream of runSort), so this arm is that case too;
     // the corpus fixture pins the real `%mymacro;` source end-to-end.
@@ -13120,7 +13120,7 @@ test "BUG-sortstraysemi: SORT pre-BY loop consumes exactly one token per path; u
     try sortRuns.check(a, "proc sort data=d out=s; title 't'; ; by x; run;");
     try sortRuns.check(a, "proc sort data=d out=s; where x > 0; ; by x; run;");
     // The OTHER unnamed token class: a stray `,` had the same double-advance
-    // hole (probed, not reasoned) — now exactly one token, BY still parses.
+    // hole (probed, not reasoned) - now exactly one token, BY still parses.
     try sortRuns.check(a, "proc sort data=d out=s; , by x; run;");
     // The fix is position tracking, NOT a retreat from d1d38c27's policy: a
     // genuinely unknown sub-statement still fails loud NAMING ITSELF.
@@ -13143,7 +13143,7 @@ test "GAP-dsmgmt-tick262-264: DATASETS verbs named-loud; SORT BY GROUPFORMAT nam
     defer arena.deinit();
     const a = arena.allocator();
 
-    // F5: COPY/SAVE/EXCHANGE/AGE (and other unsupported verbs) NAME themselves —
+    // F5: COPY/SAVE/EXCHANGE/AGE (and other unsupported verbs) NAME themselves -
     // a silent-looking generic message hid WHICH data-management the user
     // believes happened.
     for ([_][]const u8{ "copy out=tgt", "save keepme", "exchange a=b", "age cur bk1 bk2", "select a" }) |verb| {
@@ -13158,7 +13158,7 @@ test "GAP-dsmgmt-tick262-264: DATASETS verbs named-loud; SORT BY GROUPFORMAT nam
         try t.expect(std.mem.indexOf(u8, g_test_last_unsup, first_word) != null);
     }
     // D-014/D-014a: a mid-step TITLE/FOOTNOTE/OPTIONS is hoisted by main.zig
-    // and its tokens left in the step — the loud else must skip them, never
+    // and its tokens left in the step - the loud else must skip them, never
     // UNSUPPORTED (was: `proc datasets; title "t"; …` died at exit 2).
     {
         var diags = diag.Diagnostics.init(a);
@@ -13288,7 +13288,7 @@ test "PROC SORT validates BY even on a 0-obs input; schemaless empty stays toler
     _ = try ds.addColumn("x", .num);
     try lib.put("e0", ds); // 0 observations, but a real schema
 
-    // missing BY on a 0-obs input used to be silently accepted — now fails loud.
+    // missing BY on a 0-obs input used to be silently accepted - now fails loud.
     g_test_last_unsup = "";
     const nb = try lex.tokenize(a, "proc sort data=e0 out=o1; run;", &diags);
     try runSort(.{ .arena = a, .lib = &lib, .diags = &diags }, nb);
@@ -13301,7 +13301,7 @@ test "PROC SORT validates BY even on a 0-obs input; schemaless empty stays toler
     try t.expect(std.mem.indexOf(u8, g_test_last_unsup, "empty BY list") != null);
 
     // a truly SCHEMALESS empty dataset (0 cols, 0 rows) still can't check a BY
-    // var, so it stays tolerant — no error (SORT-emptytol, must not regress).
+    // var, so it stays tolerant - no error (SORT-emptytol, must not regress).
     const es = try a.create(Dataset);
     es.* = Dataset.init(a, "e1");
     try lib.put("e1", es);
@@ -13319,10 +13319,10 @@ test "GH#8 ISS-sortmissingerr: SORT on a missing member is a hard STEP error, rc
     var lib = Library.init(a);
 
     // The repro: data= names a member that was never created. SAS 9.4 errors
-    // ("ERROR: File WORK.NOPE.DATA does not exist.") — same condition, same
+    // ("ERROR: File WORK.NOPE.DATA does not exist.") - same condition, same
     // text as the DATA-step SET (BUG-setmissingquiet, exec.zig), so the
     // message must match it byte-for-byte. A plain .err report (captured
-    // here — never a real aborting process) that is NOT `recoverable`, so
+    // here - never a real aborting process) that is NOT `recoverable`, so
     // hasStepErrors() arms the BUG-errhalt syntax-check skip of later steps
     // and the GH#3 step-halt NOTE parity, and hasErrors() makes the run rc 1.
     var diags = diag.Diagnostics.init(a);
@@ -13338,11 +13338,11 @@ test "GH#8 ISS-sortmissingerr: SORT on a missing member is a hard STEP error, rc
     // The gap flag is a per-RUN global (main's interpret resets it); earlier
     // tests in this binary hit unsupported() paths, so reset before asserting.
     diag.resetGap();
-    try t.expect(!diag.gapHit()); // NOT unsupported()/rc 2 — nothing is missing in opensas
+    try t.expect(!diag.gapHit()); // NOT unsupported()/rc 2 - nothing is missing in opensas
     // No plausible-looking artifact survives the failed step: no OUT= member.
     try t.expect(lib.find("g1") == null);
 
-    // A bare `proc sort;` with NO prior dataset resolves DATA= to _LAST_ —
+    // A bare `proc sort;` with NO prior dataset resolves DATA= to _LAST_ -
     // same user error, named by the dataset SAS would have looked for.
     var diags2 = diag.Diagnostics.init(a);
     const c2 = try lex.tokenize(a, "proc sort; by g; run;", &diags2);
@@ -13350,7 +13350,7 @@ test "GH#8 ISS-sortmissingerr: SORT on a missing member is a hard STEP error, rc
     try t.expectEqualStrings("File _last_ does not exist", diags2.list.items[0].message);
 
     // Control: a 0-obs PRESENT input keeps sorting as a no-op (SORT-emptytol,
-    // must not regress — the error is for an ABSENT member only).
+    // must not regress - the error is for an ABSENT member only).
     const empt = try a.create(Dataset);
     empt.* = Dataset.init(a, "empt");
     try lib.put("empt", empt);
@@ -13367,8 +13367,8 @@ test "BUG-procmissingrc2: a missing PROC input is a rc-1 STEP error everywhere (
     diag.resetGap(); // process-global: an earlier test's gap would leak into the rc asserts
 
     // The task-named trio at full GH#8 depth: the ERROR text is byte-for-byte
-    // the SET path's (BUG-setmissingquiet) and SORT's (GH#8) — real SAS 9.4
-    // prints "ERROR: File WORK.NOPE.DATA does not exist." and ends the step —
+    // the SET path's (BUG-setmissingquiet) and SORT's (GH#8) - real SAS 9.4
+    // prints "ERROR: File WORK.NOPE.DATA does not exist." and ends the step -
     // severity .err, NOT recoverable (hasStepErrors arms BUG-errhalt's
     // later-step skip and the GH#3 step-halt NOTE), rc 1 via hasErrors, and
     // NEVER diag.markGap(): the PROC is supported, the user's table just is
@@ -13398,7 +13398,7 @@ test "BUG-procmissingrc2: a missing PROC input is a rc-1 STEP error everywhere (
 
     // The same arm across the sibling PROCs (one assert per PROC, fresh
     // library): every DATA=-named absent member is the same user error. These
-    // fire BEFORE each PROC's own "required option" guards — the table is
+    // fire BEFORE each PROC's own "required option" guards - the table is
     // looked up first, exactly as SAS resolves the name before validating the
     // rest of the step.
     const fam3 = [_]Case{
@@ -13433,7 +13433,7 @@ test "BUG-procmissingrc2: a missing PROC input is a rc-1 STEP error everywhere (
         try t.expectEqual(@as(u8, 1), diag.exitCode(diag.gapHit(), diags.hasErrors()));
     }
     // FORMAT's CNTLIN= resolves its input inside a helper, so the arm moved in
-    // there with it — same message, same rc class.
+    // there with it - same message, same rc class.
     {
         var lib = Library.init(a);
         var diags = diag.Diagnostics.init(a);
@@ -13446,7 +13446,7 @@ test "BUG-procmissingrc2: a missing PROC input is a rc-1 STEP error everywhere (
 
     // A bare `proc summary;` (no DATA=) resolves to _LAST_; with nothing
     // created the same user error fires, named by the dataset SAS would have
-    // looked for. SUMMARY dispatches to runMeans (main.zig) — one name, one arm.
+    // looked for. SUMMARY dispatches to runMeans (main.zig) - one name, one arm.
     {
         var lib = Library.init(a);
         var diags = diag.Diagnostics.init(a);
@@ -13457,7 +13457,7 @@ test "BUG-procmissingrc2: a missing PROC input is a rc-1 STEP error everywhere (
         try t.expectEqual(@as(u8, 1), diag.exitCode(diag.gapHit(), diags.hasErrors()));
     }
 
-    // Control: the error is for an ABSENT member only — a PRESENT input still
+    // Control: the error is for an ABSENT member only - a PRESENT input still
     // lists clean (must not regress).
     {
         var lib = Library.init(a);
@@ -13479,7 +13479,7 @@ test "cmpStrLing: case-folded dictionary order, blank-padded (BUG-sortseq)" {
 }
 
 test "cmpColl: the shared collation compare's contract (NOTE-collationduplicated)" {
-    // sql.zig's cmpValColl must become a pure delegate of cmpColl — pin the
+    // sql.zig's cmpValColl must become a pure delegate of cmpColl - pin the
     // exact semantics that delegation relies on, so a semantic drift here
     // reds before it silently moves row order on either side.
     const apple: Value = .{ .str = "apple" };
@@ -13498,7 +13498,7 @@ test "cmpColl: the shared collation compare's contract (NOTE-collationduplicated
     try t.expect(cmpColl(Value.specialMissing('_'), Value.missing, true) == .lt); // ._ < .
     try t.expect(cmpColl(Value.specialMissing('A'), one, false) == .lt); // all missings < real
     // A char that parses numerically still compares as a STRING when both sides
-    // are char ("10" < "9" byte-wise) — the column-type homogeneity rule.
+    // are char ("10" < "9" byte-wise) - the column-type homogeneity rule.
     const ten: Value = .{ .str = "10" };
     const nine: Value = .{ .str = "9" };
     try t.expect(cmpColl(ten, nine, false) == .lt);
@@ -13622,7 +13622,7 @@ test "BUG-meansoptnoop: DESCENDING/ORDER=/ALPHA= honored; COMPLETETYPES, ORDER=F
         try ds.appendRow(&.{ strV(nm), numV(r[1]) });
     try lib.put("have", ds);
 
-    // DESCENDING reverses the printed CLASS level order (c b a) — was a silent no-op.
+    // DESCENDING reverses the printed CLASS level order (c b a) - was a silent no-op.
     {
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -13657,7 +13657,7 @@ test "BUG-meansoptnoop: DESCENDING/ORDER=/ALPHA= honored; COMPLETETYPES, ORDER=F
         try t.expect(std.mem.indexOf(u8, out.items, "Lower 90% CL for Mean") != null);
         try t.expect(std.mem.indexOf(u8, out.items, "95% CL") == null);
     }
-    // The rest fail LOUD (captured) — never a silent no-op.
+    // The rest fail LOUD (captured) - never a silent no-op.
     const loud = [_][]const u8{
         "proc means data=have completetypes n; class g; var x; run;",
         "proc means data=have order=formatted n; class g; var x; run;",
@@ -13675,15 +13675,15 @@ test "BUG-meansoptnoop: DESCENDING/ORDER=/ALPHA= honored; COMPLETETYPES, ORDER=F
     }
 }
 
-test "BUG-sortseq-byverify: the BY verify honors the linguistic collation the sort used — ascending, fold-equal, DESCENDING" {
+test "BUG-sortseq-byverify: the BY verify honors the linguistic collation the sort used - ascending, fold-equal, DESCENDING" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
-    defer io.global_sortseq_linguistic = false; // run global — restore like the sql sortseq tests
+    defer io.global_sortseq_linguistic = false; // run global - restore like the sql sortseq tests
 
     // What `proc sort; by g;` yields under `options sortseq=linguistic;`:
     // apple < Banana < Zebra (case-folded dictionary order). A byte verifier
-    // reads the very same rows as Banana Zebra apple — i.e. "not sorted".
+    // reads the very same rows as Banana Zebra apple - i.e. "not sorted".
     var lib = Library.init(a);
     const ds = try a.create(Dataset);
     ds.* = Dataset.init(a, "ling");
@@ -13694,7 +13694,7 @@ test "BUG-sortseq-byverify: the BY verify honors the linguistic collation the so
     try ds.appendRow(&.{ strV("Zebra"), numV(3) });
     try lib.put("ling", ds);
 
-    { // control: flag OFF keeps the byte verify armed — linguistic-ordered data
+    { // control: flag OFF keeps the byte verify armed - linguistic-ordered data
         // still fails loud (captured), so the fix cannot be a silent verify drop
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -13704,7 +13704,7 @@ test "BUG-sortseq-byverify: the BY verify honors the linguistic collation the so
         try t.expectEqual(@as(usize, 0), out.items.len);
     }
 
-    { // the fix: same data, system option on — the verify uses the sort's
+    { // the fix: same data, system option on - the verify uses the sort's
         // collation (lrcon printed p.533 Note) and the step runs, in order
         io.global_sortseq_linguistic = true;
         var diags = diag.Diagnostics.init(a);
@@ -13742,7 +13742,7 @@ test "BUG-sortseq-byverify: the BY verify honors the linguistic collation the so
 
     // DESCENDING: Zebra Banana apple is `by descending g` order (the same
     // collation, inverted). The byte check dies at Banana→apple ('a' > 'B').
-    // A second emit site (TABULATE) — every site shares byOrderViolation.
+    // A second emit site (TABULATE) - every site shares byOrderViolation.
     var dlib = Library.init(a);
     const dds = try a.create(Dataset);
     dds.* = Dataset.init(a, "desc");
@@ -13776,7 +13776,7 @@ test "PROCBY-modifiers: PROC BY DESCENDING/NOTSORTED honored, GROUPFORMAT loud, 
     for ([_][2]f64{ .{ 1, 10 }, .{ 1, 20 }, .{ 2, 30 } }) |r| try ds.appendRow(&.{ numV(r[0]), numV(r[1]) });
     try lib.put("have", ds);
 
-    // plain BY still parses and renders (baseline — no regression).
+    // plain BY still parses and renders (baseline - no regression).
     {
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -13786,7 +13786,7 @@ test "PROCBY-modifiers: PROC BY DESCENDING/NOTSORTED honored, GROUPFORMAT loud, 
         try t.expect(std.mem.indexOf(u8, out.items, "Mean") != null);
     }
     // BY DESCENDING g on DESCENDING-sorted data → groups, largest first
-    // (GAP-procbydescending — was: loud "plain ascending BY only").
+    // (GAP-procbydescending - was: loud "plain ascending BY only").
     var dlib = Library.init(a);
     const dds = try a.create(Dataset);
     dds.* = Dataset.init(a, "dhave");
@@ -13813,7 +13813,7 @@ test "PROCBY-modifiers: PROC BY DESCENDING/NOTSORTED honored, GROUPFORMAT loud, 
         try t.expect(std.mem.indexOf(u8, try diags.render(), "not sorted in descending sequence") != null);
         try t.expectEqual(@as(usize, 0), out.items.len);
     }
-    // BY g NOTSORTED → contiguous-run groups, no sortedness check (RANK path —
+    // BY g NOTSORTED → contiguous-run groups, no sortedness check (RANK path -
     // the modifier trails the vars).
     {
         var diags = diag.Diagnostics.init(a);
@@ -13823,7 +13823,7 @@ test "PROCBY-modifiers: PROC BY DESCENDING/NOTSORTED honored, GROUPFORMAT loud, 
         try t.expect(!diags.hasErrors());
         try t.expect(lib.find("r") != null);
     }
-    // BY GROUPFORMAT → STILL a captured ParseError (GAP-bygroupformat —
+    // BY GROUPFORMAT → STILL a captured ParseError (GAP-bygroupformat -
     // grouping on raw values, so accepting it would silently mis-group).
     {
         var diags = diag.Diagnostics.init(a);
@@ -13921,7 +13921,7 @@ test "BUG-meansoutbydescending: OUT= rows follow the BY direction; SORT NOTSORTE
     }
     // PROC SORT `by g notsorted` → captured ParseError naming the RULE (Base SAS
     // Procedures Guide p.75), not a phantom "BY variable notsorted" message
-    // (NOTE-sortnotsortedmsg — erroring was always correct, the message was not).
+    // (NOTE-sortnotsortedmsg - erroring was always correct, the message was not).
     {
         var diags = diag.Diagnostics.init(a);
         const toks = try lex.tokenize(a, "proc sort data=d; by g notsorted; run;", &diags);
@@ -13991,7 +13991,7 @@ test "REOPEN-meansdefvar: char var in VAR list fails loud; CLASS/BY/WEIGHT/FREQ/
         try ds.appendRow(&.{ strV(nm), numV(r[0]), numV(r[1]) });
     try lib.put("d", ds);
 
-    // #8: `var c x;` (c char) — SAS type ERROR, no fabricated stats, no output.
+    // #8: `var c x;` (c char) - SAS type ERROR, no fabricated stats, no output.
     {
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -14000,7 +14000,7 @@ test "REOPEN-meansdefvar: char var in VAR list fails loud; CLASS/BY/WEIGHT/FREQ/
         try t.expect(std.mem.indexOf(u8, try diags.render(), "does not match type prescribed") != null);
         try t.expectEqual(@as(usize, 0), out.items.len);
     }
-    // #3: no VAR statement — the CLASS var g drops out of the analysis set.
+    // #3: no VAR statement - the CLASS var g drops out of the analysis set.
     {
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -14011,7 +14011,7 @@ test "REOPEN-meansdefvar: char var in VAR list fails loud; CLASS/BY/WEIGHT/FREQ/
     }
 }
 
-test "GAP-meanspctlkeywords: PRT is a MEANS-family alias only — UNIVARIATE OUTPUT still rejects it (captured)" {
+test "GAP-meanspctlkeywords: PRT is a MEANS-family alias only - UNIVARIATE OUTPUT still rejects it (captured)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -14025,7 +14025,7 @@ test "GAP-meanspctlkeywords: PRT is a MEANS-family alias only — UNIVARIATE OUT
 
     // UNIVARIATE's OUTPUT keyword table (Table 4.14, printed p.354) lists PROBT and
     // NO PRT alias, and it spells aliases out elsewhere in the same table
-    // ("KURTOSIS | KURT", "Q1 | P25") — so `prt=` must stay loud here even though
+    // ("KURTOSIS | KURT", "Q1 | P25") - so `prt=` must stay loud here even though
     // MEANS now accepts it. Accepting it would mean silently honouring syntax SAS
     // rejects, which is worse than the error it replaced.
     {
@@ -14045,7 +14045,7 @@ test "GAP-meanspctlkeywords: PRT is a MEANS-family alias only — UNIVARIATE OUT
         try t.expect(!diags.hasErrors());
         try t.expect(lib.find("ogood") != null);
     }
-    // And MEANS accepts BOTH spellings, giving the same value — that equality is the
+    // And MEANS accepts BOTH spellings, giving the same value - that equality is the
     // entire meaning of "alias" ("PROBT | PRT", printed p.1492).
     {
         var diags = diag.Diagnostics.init(a);
@@ -14060,7 +14060,7 @@ test "GAP-meanspctlkeywords: PRT is a MEANS-family alias only — UNIVARIATE OUT
     }
 }
 
-test "GAP-meanspctlkeywords: P20–P80 are MEANS-family only — UNIVARIATE OUTPUT rejects them; a VAR named p20 is still a column (captured)" {
+test "GAP-meanspctlkeywords: P20–P80 are MEANS-family only - UNIVARIATE OUTPUT rejects them; a VAR named p20 is still a column (captured)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -14074,7 +14074,7 @@ test "GAP-meanspctlkeywords: P20–P80 are MEANS-family only — UNIVARIATE OUTP
     try lib.put("d", ds);
 
     // (a) UNIVARIATE's OUTPUT table (Table 4.14, printed p.354) stops at
-    // P1/P5/P10/P25/P50/P75/P90/P95/P99 — the six MEANS-family percentiles must
+    // P1/P5/P10/P25/P50/P75/P90/P95/P99 - the six MEANS-family percentiles must
     // fail LOUD there, not silently decode via the shared statFromKw.
     {
         var diags = diag.Diagnostics.init(a);
@@ -14085,7 +14085,7 @@ test "GAP-meanspctlkeywords: P20–P80 are MEANS-family only — UNIVARIATE OUTP
         try t.expect(lib.find("obad") == null);
     }
     // (b) MEANS computes them: on {2,4,4,6,8} (n=5), np = p/100·n is an integer
-    // position for both — P20: np=1 → (x1+x2)/2 = 3; P80: np=4 → (x4+x5)/2 = 7
+    // position for both - P20: np=1 → (x1+x2)/2 = 3; P80: np=4 → (x4+x5)/2 = 7
     // (QNTLDEF=5, the same rule the BUG-meanspctlmore fixture pins).
     {
         var diags = diag.Diagnostics.init(a);
@@ -14110,10 +14110,10 @@ test "GAP-meanspctlkeywords: P20–P80 are MEANS-family only — UNIVARIATE OUTP
         try t.expect(std.mem.indexOf(u8, out.items, "24") != null);
     }
     // TABULATE: the statistic interpretation WINS over the var name in a TABLE
-    // crossing (exactly as P10 always has), leaving no analysis variable — and a
+    // crossing (exactly as P10 always has), leaving no analysis variable - and a
     // statistic without one is malformed SAS (p.2548: "Statistic keywords other
     // than N must be associated with an analysis variable"), so it fails LOUD as
-    // a user error (rc 1, D-009 — GAP-tabulateforms #7 moved it off the rc-2
+    // a user error (rc 1, D-009 - GAP-tabulateforms #7 moved it off the rc-2
     // unsupported channel), never a silently wrong table.
     {
         var diags = diag.Diagnostics.init(a);
@@ -14178,7 +14178,7 @@ test "GAP-meansoutguards: MEANS/UNIVARIATE OUTPUT OUT= silent drops fail loud (c
         try t.expect(lib.find("obb") != null);
     }
 
-    // (c) UNIVARIATE: WEIGHT with a percentile in OUTPUT — the shared MEANS builder
+    // (c) UNIVARIATE: WEIGHT with a percentile in OUTPUT - the shared MEANS builder
     // would emit an UNWEIGHTED percentile silently. Must fail loud (WEIGHT-uni-impl).
     {
         var diags = diag.Diagnostics.init(a);
@@ -14203,7 +14203,7 @@ test "BUG-meansoutdupname/meansoutnamecount: OUTPUT dup names + name-count misma
     try lib.put("d", ds);
 
     // (a) bare `mean= std=` reuse the analysis-var name → TWO columns both named
-    // `x` — a structurally broken dataset SAS refuses ("Variable x already exists").
+    // `x` - a structurally broken dataset SAS refuses ("Variable x already exists").
     {
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -14213,7 +14213,7 @@ test "BUG-meansoutdupname/meansoutnamecount: OUTPUT dup names + name-count misma
         try t.expect(lib.find("od") == null); // no broken dataset produced
     }
     // (b) name count ≠ var count: fewer names silently dropped vars, more names
-    // cloned a value into duplicate columns — both must fail loud.
+    // cloned a value into duplicate columns - both must fail loud.
     for ([_][]const u8{
         "proc means data=d noprint; var x y; output out=oc mean=m; run;", // 1 name, 2 vars
         "proc means data=d noprint; var x y; output out=oc mean=a b c; run;", // 3 names, 2 vars
@@ -14257,7 +14257,7 @@ test "BUG-meanstypes/meansways: TYPES/WAYS restrict the CLASS combos; misuse fai
     try lib.put("d", ds);
 
     // `types a;` → ONLY the a-alone table: the collapsed a=1 group (Mean 15)
-    // appears, the a*b cross cells (Mean 10) do NOT — previously silently the cross.
+    // appears, the a*b cross cells (Mean 10) do NOT - previously silently the cross.
     {
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -14298,7 +14298,7 @@ test "BUG-meanstypes/meansways: TYPES/WAYS restrict the CLASS combos; misuse fai
     try t.expect(lib.find("o") == null); // no misleading OUTPUT dataset produced
 }
 
-test "BUG-meanstypescross: TYPES paren-group crossing expands per the doc — no spurious _TYPE_=0" {
+test "BUG-meanstypescross: TYPES paren-group crossing expands per the doc - no spurious _TYPE_=0" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -14314,7 +14314,7 @@ test "BUG-meanstypescross: TYPES paren-group crossing expands per the doc — no
         try ds.appendRow(&.{ numV(r[0]), numV(r[1]), numV(r[2]), numV(r[3]) });
     try lib.put("d", ds);
 
-    // `types (a);` must equal `types a;` — ONE a-alone table. The loop this
+    // `types (a);` must equal `types a;` - ONE a-alone table. The loop this
     // replaced emitted a spurious overall (_TYPE_=0) table for ANY `(`
     // (probed by @pi-g2: two tables vs one). Pin: exactly one table, the
     // a=1 cell mean 10 present, the overall mean 20 absent.
@@ -14335,8 +14335,8 @@ test "BUG-meanstypescross: TYPES paren-group crossing expands per the doc — no
         try t.expect(std.mem.indexOf(u8, out.items, "20.0000000") == null); // the spurious overall mean
     }
     // The doc's grouping syntax (Procedures Guide 7th ed., printed p. 1512):
-    // `types (a b)*c;` = `types a*c b*c;` — exactly TWO tables, no overall,
-    // no singles. Old parse: {}, {a}, {b,c} — three tables, two of them wrong.
+    // `types (a b)*c;` = `types a*c b*c;` - exactly TWO tables, no overall,
+    // no singles. Old parse: {}, {a}, {b,c} - three tables, two of them wrong.
     {
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -14352,7 +14352,7 @@ test "BUG-meanstypescross: TYPES paren-group crossing expands per the doc — no
         try t.expectEqual(@as(usize, 2), ntables);
         try t.expect(std.mem.indexOf(u8, out.items, "20.0000000") == null); // overall mean: not requested
     }
-    // `types a*(b c);` = `types a*b a*c;` — the doc's other shape, two tables.
+    // `types a*(b c);` = `types a*b a*c;` - the doc's other shape, two tables.
     {
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -14419,7 +14419,7 @@ test "proc WHERE (statement + data= option) filters rows, leaves the source inta
         try runMeans(.{ .arena = a, .lib = &lib, .diags = &diags }, &out, toks);
         try t.expect(std.mem.indexOf(u8, out.items, "50.0000000") != null);
     }
-    // the library dataset is untouched (filter ran on a copy) — still 4 rows
+    // the library dataset is untouched (filter ran on a copy) - still 4 rows
     try t.expectEqual(@as(usize, 4), lib.find("have").?.rowCount());
 }
 
@@ -14504,7 +14504,7 @@ test "proc freq all-missing still prints Frequency Missing; WEIGHT makes the cou
     const toks = try lex.tokenize(a, "proc freq data=d; tables x; run;", &diags);
     try runFreq(.{ .arena = a, .lib = &lib, .diags = &diags }, &out, toks);
     // p.156: "The procedure displays the number of missing observations
-    // following each table" — even when EVERY observation is missing (the
+    // following each table" - even when EVERY observation is missing (the
     // table has no rows; the count line must still appear).
     try t.expect(std.mem.indexOf(u8, out.items, "Frequency Missing = 3") != null);
 
@@ -14576,7 +14576,7 @@ test "computeStats: WEIGHT → weighted mean/sum/std; ≤0 counted in N, missing
     };
     const s = computeStats(&rows, 0, 1); // col v, weight w
     try t.expectEqual(@as(usize, 4), s.n); // 3 positive + 1 zero-weight; missing-weight dropped
-    try t.expectApproxEqAbs(@as(f64, 140.0 / 6.0), s.mean, 1e-9); // Σwx/Σw — zero weight adds nothing
+    try t.expectApproxEqAbs(@as(f64, 140.0 / 6.0), s.mean, 1e-9); // Σwx/Σw - zero weight adds nothing
     try t.expectEqual(@as(f64, 140), s.sum); // Σwx
     try t.expectEqual(@as(f64, 10), s.min); // zero-weight value still bounds MIN/MAX…
     try t.expectEqual(@as(f64, 99), s.max); // …the 99 with weight 0 is now the maximum
@@ -14750,7 +14750,7 @@ test "proc tabulate: pctn/pctsum are shares of the grand total + ALL row; unknow
         try runTabulate(.{ .arena = a, .lib = &lib, .diags = &diags }, &out, toks);
         try t.expect(std.mem.indexOf(u8, out.items, "Pctsum") != null);
         try t.expect(std.mem.indexOf(u8, out.items, "|All") != null); // grand-total row (was dropped)
-        try t.expect(std.mem.indexOf(u8, out.items, "50") != null); // a pct share — sums are only 30/60
+        try t.expect(std.mem.indexOf(u8, out.items, "50") != null); // a pct share - sums are only 30/60
         try t.expect(std.mem.indexOf(u8, out.items, "100") != null); // the All row's pctsum
     }
     // an unknown stat keyword in `(...)` fails loud instead of rendering SUM
@@ -14777,7 +14777,7 @@ test "proc tabulate: ORDER=/LABEL/KEYLABEL//box= honored, incl. the 2-way cross 
     ds.* = Dataset.init(a, "d");
     _ = try ds.addColumn("g", .char);
     _ = try ds.addColumn("v", .num);
-    // g: first appearance c,a,b — counts b=3 a=2 c=1 — sums b=130 a=70 c=10.
+    // g: first appearance c,a,b - counts b=3 a=2 c=1 - sums b=130 a=70 c=10.
     try ds.appendRow(&.{ strV("c"), numV(10) });
     try ds.appendRow(&.{ strV("a"), numV(20) });
     try ds.appendRow(&.{ strV("b"), numV(30) });
@@ -14794,7 +14794,7 @@ test "proc tabulate: ORDER=/LABEL/KEYLABEL//box= honored, incl. the 2-way cross 
         try t.expect(std.mem.indexOf(u8, out.items, "\n|c").? < std.mem.indexOf(u8, out.items, "\n|a").?);
         try t.expect(std.mem.indexOf(u8, out.items, "\n|a").? < std.mem.indexOf(u8, out.items, "\n|b").?);
     }
-    // ORDER=FREQ: descending count b(3),a(2),c(1) — neither lexical nor appearance.
+    // ORDER=FREQ: descending count b(3),a(2),c(1) - neither lexical nor appearance.
     {
         var out: std.ArrayList(u8) = .empty;
         const toks = try lex.tokenize(a, "proc tabulate data=d order=freq; class g; var v; table g, v*sum; run;", &diags);
@@ -14848,7 +14848,7 @@ test "proc tabulate: rts=/unknown table options, COLPCTN-family stats, 1-dim tab
     try lib.put("d", ds);
     defer diag.resetGap();
 
-    // Each was a SILENT no-op or the bogus "analysis variable not found" — now
+    // Each was a SILENT no-op or the bogus "analysis variable not found" - now
     // every one fails loud naming the real culprit and renders nothing.
     const Case = struct { src: []const u8, msg: []const u8 };
     const cases = [_]Case{
@@ -14939,7 +14939,7 @@ test "proc tabulate: PCTN/PCTSUM <denominator> definitions (GAP-tabdenom)" {
         try t.expect(std.mem.indexOf(u8, out.items, "75") != null);
         try t.expect(std.mem.indexOf(u8, out.items, "33.333333333") != null); // BEST12. (BUG-tabrawfloat)
     }
-    // pctsum<reg> = share of the reg ROW subtotal: W×A 30/70≈42.86 — a share no
+    // pctsum<reg> = share of the reg ROW subtotal: W×A 30/70≈42.86 - a share no
     // other basis produces. Two <dim> variants of one keyword are two columns.
     {
         var out: std.ArrayList(u8) = .empty;
@@ -14964,7 +14964,7 @@ test "proc tabulate: PCTN/PCTSUM <denominator> definitions (GAP-tabdenom)" {
         try t.expect(std.mem.indexOf(u8, out.items, "100") != null);
     }
     // a denominator outside the TABLE crossing fails loud, NAMING the
-    // PCTN/PCTSUM denominator — never the old bogus "unknown statistic 'grp'".
+    // PCTN/PCTSUM denominator - never the old bogus "unknown statistic 'grp'".
     {
         g_test_last_unsup = "";
         defer diag.resetGap();
@@ -15010,7 +15010,7 @@ test "BUG-tabulatemed: 1-way ALL column row-restricted (#4), separate TABLE stmt
     try ds.appendRow(&.{ strV("y"), numV(30) });
     try lib.put("d", ds);
 
-    // #4: the All column is each row's OWN subtotal (30/30) — never the grand
+    // #4: the All column is each row's OWN subtotal (30/30) - never the grand
     // 60 on every row; the All Pctsum is the row share 50/50, never 100/100.
     {
         var out: std.ArrayList(u8) = .empty;
@@ -15023,7 +15023,7 @@ test "BUG-tabulatemed: 1-way ALL column row-restricted (#4), separate TABLE stmt
         while (std.mem.indexOfPos(u8, out.items, pos, "30")) |hit| : (pos = hit + 2) n30 += 1;
         try t.expectEqual(@as(usize, 4), n30); // x/y rows × (Sum, All-Sum)
     }
-    // #5: two TABLE statements render TWO tables — 4 box rules, not one merged
+    // #5: two TABLE statements render TWO tables - 4 box rules, not one merged
     // table with a Sum and a Mean column side by side (2 rules).
     {
         var out: std.ArrayList(u8) = .empty;
@@ -15046,7 +15046,7 @@ test "BUG-tabulatemed: 1-way ALL column row-restricted (#4), separate TABLE stmt
         }
         try t.expectEqual(@as(usize, 4), rules); // two separate boxed tables
     }
-    // #6: `class g / missing` keeps the missing-class obs — the "." level
+    // #6: `class g / missing` keeps the missing-class obs - the "." level
     // appears (N=1, Sum=20); the default exclusion is pinned elsewhere.
     {
         const dm = try a.create(Dataset);
@@ -15083,7 +15083,7 @@ test "BUG-tabulatemed: 1-way ALL column row-restricted (#4), separate TABLE stmt
         try t.expect(std.mem.indexOf(u8, out.items, "\n|b").? < std.mem.indexOf(u8, out.items, "\n|c").?);
         try t.expect(std.mem.indexOf(u8, out.items, "\n|c").? < std.mem.indexOf(u8, out.items, "\n|a").?);
     }
-    // #6: unknown `/` options and `/mlf` fail loud NAMING the option — never
+    // #6: unknown `/` options and `/mlf` fail loud NAMING the option - never
     // the old silent swallow (they parsed as phantom class variables).
     {
         defer diag.resetGap();
@@ -15316,7 +15316,7 @@ test "proc rank: out=, ties, descending, groups, by (vs known ranks)" {
         const r = lib.find("rb").?;
         try t.expectEqual(@as(f64, 1), rk(r, 0, "xr")); // A: 5 → 1
         try t.expectEqual(@as(f64, 2), rk(r, 1, "xr")); // A: 15 → 2
-        try t.expectEqual(@as(f64, 3), rk(r, 2, "xr")); // B: 30 → 3 (of A? no—within B, 30 is largest → 3)
+        try t.expectEqual(@as(f64, 3), rk(r, 2, "xr")); // B: 30 → 3 (of A? no-within B, 30 is largest → 3)
         try t.expectEqual(@as(f64, 1), rk(r, 3, "xr")); // B: 10 → 1
         try t.expectEqual(@as(f64, 2), rk(r, 4, "xr")); // B: 20 → 2
     }
@@ -15465,7 +15465,7 @@ test "proc report: GROUP var + ANALYSIS SUM collapses to one row per level (BUG-
     ds.* = Dataset.init(a, "d");
     _ = try ds.addColumn("g", .char);
     _ = try ds.addColumn("v", .num);
-    // a{10,20} b{30,40} — GROUP g + SUM v must give a=30, b=70 (2 rows, not 4 detail)
+    // a{10,20} b{30,40} - GROUP g + SUM v must give a=30, b=70 (2 rows, not 4 detail)
     try ds.appendRow(&.{ strV("a"), numV(10) });
     try ds.appendRow(&.{ strV("b"), numV(30) });
     try ds.appendRow(&.{ strV("a"), numV(20) });
@@ -15532,7 +15532,7 @@ test "Student-t CDF + inverse for MEANS CLM/T/PROBT (MEANS-cistat)" {
     // Authoritative TINV(0.975,2)=4.302652729696142 (scipy stats.t.ppf) → the exact
     // closed form for df=2 is √(2p²/(1−p²)) with p=0.95, = 4.302652729749464. Both
     // agree to 1e-10; our inverse-t must land there, so lclm = −0.484137711720.
-    // (Note: 1e-11-accurate vs the authoritative value — already well past the 1e-9 goal.)
+    // (Note: 1e-11-accurate vs the authoritative value - already well past the 1e-9 goal.)
     try t.expectApproxEqAbs(@as(f64, 4.302652729696), tQuantile(0.975, 2), 1e-9);
     try t.expectApproxEqAbs(@as(f64, 2.570581835636), tQuantile(0.975, 5), 1e-9);
     const sw = computeStats(&.{
@@ -15568,7 +15568,7 @@ test "proc report: COMPUTED column fails loud, no silently-dropped column (BUG-r
     try t.expectEqualStrings("", out.items);
 }
 
-test "proc report: DEFINE options — GROUP DESC / ORDER=FREQ / NOPRINT + fail-loud (tick240)" {
+test "proc report: DEFINE options - GROUP DESC / ORDER=FREQ / NOPRINT + fail-loud (tick240)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -15794,7 +15794,7 @@ test "proc report: unsupported break forms fail loud, nothing emitted (FEAT-proc
     }
 }
 
-test "proc report: COMPUTE basic computed column — arithmetic over displayed cols (FEAT-procreport-2)" {
+test "proc report: COMPUTE basic computed column - arithmetic over displayed cols (FEAT-procreport-2)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -15985,7 +15985,7 @@ test "BUG-transposebyorder: unsorted BY fails loud (captured), ascending BY stil
     defer arena.deinit();
     const a = arena.allocator();
 
-    // Unsorted BY (1,2,1) — SAS ERRORs "not sorted in ascending sequence" and stops;
+    // Unsorted BY (1,2,1) - SAS ERRORs "not sorted in ascending sequence" and stops;
     // consecutive-equal grouping alone would emit a duplicate subj=1 group at exit 0.
     var lib = Library.init(a);
     const ds = try a.create(Dataset);
@@ -16002,7 +16002,7 @@ test "BUG-transposebyorder: unsorted BY fails loud (captured), ascending BY stil
     try t.expect(std.mem.indexOf(u8, try diags.render(), "not sorted in ascending sequence") != null);
     try t.expect(lib.find("w") == null); // no silently-wrong reshape produced
 
-    // Ascending BY (1,1,2) — normal transpose, unchanged.
+    // Ascending BY (1,1,2) - normal transpose, unchanged.
     var lib2 = Library.init(a);
     const ds2 = try a.create(Dataset);
     ds2.* = Dataset.init(a, "d");
@@ -16036,7 +16036,7 @@ test "PROC TRANSPOSE fail-loud: mixed char/num VAR list + unknown VAR/BY/ID name
     try ds.appendRow(&.{ numV(1), numV(10), numV(20), strV("x"), strV("y") });
     try lib.put("have", ds);
 
-    // Mixed char/num VAR list — SAS 9.4 ERRORs; was silently typed by the first
+    // Mixed char/num VAR list - SAS 9.4 ERRORs; was silently typed by the first
     // var, corrupting the char var to missing (doc-finder tick175).
     {
         var diags = diag.Diagnostics.init(a);
@@ -16179,7 +16179,7 @@ test "proc sort nodupkey keeps the first row of each BY key (BUG-sortdup)" {
     const u = lib.find("u").?;
     try t.expectEqual(@as(usize, 2), u.rowCount()); // one per name, not all 4
     try t.expectEqualStrings("Alice", u.row(0)[0].str);
-    try t.expectEqual(@as(f64, 30), u.row(0)[1].num); // first Alice (30), not 99 — stable
+    try t.expectEqual(@as(f64, 30), u.row(0)[1].num); // first Alice (30), not 99 - stable
     try t.expectEqualStrings("Bob", u.row(1)[0].str);
     // source untouched by OUT=
     try t.expectEqual(@as(usize, 4), ds.rowCount());
@@ -16330,7 +16330,7 @@ test "NOTE-freqdanglingcross: a dangling `*` in TABLES fails loud; well-formed o
         try ds.appendRow(&.{ strV(r[0]), strV(r[1]) });
     try lib.put("d", ds);
 
-    // Dangling `*`: at end of statement or before `/` — ParseError, no table.
+    // Dangling `*`: at end of statement or before `/` - ParseError, no table.
     for ([_][]const u8{ "tables g*;", "tables g* / norow;" }) |stmt| {
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -16430,7 +16430,7 @@ test "proc freq two-way WEIGHT sums the weight column (BUG-freqweight2way); 3-wa
         try t.expect(std.mem.indexOf(u8, out.items, "Controlling for g=A") != null);
         try t.expect(std.mem.indexOf(u8, out.items, "Table 2 of h by w") != null);
         try t.expect(std.mem.indexOf(u8, out.items, "Controlling for g=B") != null);
-        // stratum g=A: (X,w=2) and (Y,w=1) — w columns ascend 1,2 → X row is 0,1
+        // stratum g=A: (X,w=2) and (Y,w=1) - w columns ascend 1,2 → X row is 0,1
         try t.expect(std.mem.indexOf(u8, out.items, "X        |      0 |      1 |      1") != null);
     }
     // NOPRINT + OUT= → no listing; dataset has the TABLES vars then COUNT, PERCENT,
@@ -16506,7 +16506,7 @@ test "BUG-freqweightorder: zero-weight levels drop by default, /zeros re-include
     try ds.appendRow(&.{ strV("C"), numV(0) }); // C exists only at weight 0
     try lib.put("d", ds);
 
-    // F2a: default — the zero-weight-only level C forms NO row (was a spurious
+    // F2a: default - the zero-weight-only level C forms NO row (was a spurious
     // `Frequency 0` row); A/B counts and percents unchanged.
     {
         var diags = diag.Diagnostics.init(a);
@@ -16566,7 +16566,7 @@ test "GAP-freqignoreopt: unknown TABLES options fail loud (captured); OUTCUM add
     for ([_]f64{ 1, 2, 2, 3 }) |v| try ds.appendRow(&.{numV(v)});
     try lib.put("d", ds);
 
-    // A typo'd option must ParseError naming itself — never silently accepted.
+    // A typo'd option must ParseError naming itself - never silently accepted.
     for ([_][]const u8{ "bogusoption123", "outcumm" }) |opt| {
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -16606,7 +16606,7 @@ test "NOTE-freqlistfmt: n-way / list fails loud (no silent grid substitute); one
     for ([_]f64{ 1, 2, 2, 3 }, [_]f64{ 7, 7, 8, 8 }) |v, w| try ds.appendRow(&.{ numV(v), numV(w) });
     try lib.put("d", ds);
 
-    // Two-way and three-way `/ list`: the listing would be the wrong layout —
+    // Two-way and three-way `/ list`: the listing would be the wrong layout -
     // ParseError naming the option, never the grid at exit 0.
     for ([_][]const u8{ "tables g*h / list;", "tables g*h*g / list;" }) |stmt| {
         var diags = diag.Diagnostics.init(a);
@@ -16666,7 +16666,7 @@ test "GAP-ebnfrcwrongclass: n-way TABLES / LIST is a NAMED rc-2 gap (was rc 1); 
         try t.expect(std.mem.indexOf(u8, try diags.render(), "TABLES option list (n-way list layout) is not yet supported") != null);
         try t.expect(diag.gapHit());
     }
-    // one-way / list: documented no-op — runs clean, no gap.
+    // one-way / list: documented no-op - runs clean, no gap.
     {
         diag.resetGap();
         var diags = diag.Diagnostics.init(a);
@@ -16677,7 +16677,7 @@ test "GAP-ebnfrcwrongclass: n-way TABLES / LIST is a NAMED rc-2 gap (was rc 1); 
         try t.expect(!diag.gapHit());
     }
     // / freq is NOT in Table 3.9's closed TABLES option set (printed
-    // pp.104-106) — a typo in real-SAS terms, so the catch-all stays rc 1
+    // pp.104-106) - a typo in real-SAS terms, so the catch-all stays rc 1
     // (no gap mark; the tick431 row's premise was stale).
     {
         diag.resetGap();
@@ -16715,7 +16715,7 @@ test "GAP-tabformat: *f= honored; row-dimension and distinct per-element *f= fai
         try t.expect(std.mem.indexOf(u8, out.items, "1.50") != null);
         try t.expect(std.mem.indexOf(u8, out.items, "10.00") != null);
     }
-    // row-dimension *f= (would format row labels) — fail loud, not a bogus row var.
+    // row-dimension *f= (would format row labels) - fail loud, not a bogus row var.
     {
         var out: std.ArrayList(u8) = .empty;
         const toks = try lex.tokenize(a, "proc tabulate data=d; class g; var x; table g*f=8.1, x*mean; run;", &diags);
@@ -16723,7 +16723,7 @@ test "GAP-tabformat: *f= honored; row-dimension and distinct per-element *f= fai
         try t.expect(std.mem.indexOf(u8, g_test_last_unsup, "row-dimension") != null);
         try t.expectEqual(@as(usize, 0), out.items.len);
     }
-    // two DISTINCT *f= specs would be per-element formats we don't model — fail loud.
+    // two DISTINCT *f= specs would be per-element formats we don't model - fail loud.
     {
         var out: std.ArrayList(u8) = .empty;
         const toks = try lex.tokenize(a, "proc tabulate data=d; class g; var x; table g, x*sum*f=6.2 x*mean*f=8.1; run;", &diags);
@@ -16733,7 +16733,7 @@ test "GAP-tabformat: *f= honored; row-dimension and distinct per-element *f= fai
     }
 }
 
-test "NOTE-tabulatelistnoop: TABULATE `/ list` fails loud naming the option — never a silently wrong-shaped table (captured)" {
+test "NOTE-tabulatelistnoop: TABULATE `/ list` fails loud naming the option - never a silently wrong-shaped table (captured)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -16750,7 +16750,7 @@ test "NOTE-tabulatelistnoop: TABULATE `/ list` fails loud naming the option — 
     // Both placements of `list` name themselves and render NOTHING (exit-2 gap):
     // the TABLE-statement `/ list` and the PROC-level `list`. The ticket's silent
     // no-op predates the GAP-tabprocopt / GAP-tabulateopts blanket option
-    // fail-louds (probe: both already UNSUPPORTED) — this pins them. (FREQ's
+    // fail-louds (probe: both already UNSUPPORTED) - this pins them. (FREQ's
     // 1-way no-op carve-out has no TABULATE analog: 1-dimensional tables are
     // themselves unsupported here, so no `/ list` form is vacuously safe.)
     for ([_][]const u8{
@@ -16784,10 +16784,10 @@ test "BUG-tabnestcol: a 2nd class variable in the column crossing fails loud (ca
     try lib.put("d", ds);
 
     // `table a, b*c*v*sum`: the 2nd column class var (c) used to be silently
-    // DROPPED — cells merged over c, wrong sums, no diagnostic. Now: loud ERROR,
+    // DROPPED - cells merged over c, wrong sums, no diagnostic. Now: loud ERROR,
     // nothing rendered (mirrors the row-dimension guard, BUG-tabulaterowdim).
     {
-        diag.resetGap(); // global flag — don't credit an earlier test's gap
+        diag.resetGap(); // global flag - don't credit an earlier test's gap
         var out: std.ArrayList(u8) = .empty;
         const toks = try lex.tokenize(a, "proc tabulate data=d; class a b c; var v; table a, b*c*v*sum; run;", &diags);
         try runTabulate(.{ .arena = a, .lib = &lib, .diags = &diags }, &out, toks);
@@ -16795,7 +16795,7 @@ test "BUG-tabnestcol: a 2nd class variable in the column crossing fails loud (ca
         try t.expect(diag.gapHit()); // marks the run exit-2, like every UNSUPPORTED
         try t.expectEqual(@as(usize, 0), out.items.len);
     }
-    // a single column class var still renders — the guard only fires on the 2nd.
+    // a single column class var still renders - the guard only fires on the 2nd.
     {
         g_test_last_unsup = "";
         var out: std.ArrayList(u8) = .empty;
@@ -16825,7 +16825,7 @@ test "GAP-tabulateforms #7: per-element stat lists render per block; crossed mul
     try lib.put("d", ds);
 
     // the fixed rendering: `a*sum b*mean` = a-Sum then b-Mean (p.2548's
-    // concatenation), each element carrying ONLY its own statistic — the old
+    // concatenation), each element carrying ONLY its own statistic - the old
     // union rendered b×(Sum,Mean): an extra column and a*sum silently dropped.
     {
         var out: std.ArrayList(u8) = .empty;
@@ -16855,7 +16855,7 @@ test "GAP-tabulateforms #7: per-element stat lists render per block; crossed mul
         try t.expectEqual(@as(usize, 0), out.items.len);
     }
     // a var-less non-N/PCTN statistic is MALFORMED SAS (p.2548: "Statistic
-    // keywords other than N must be associated with an analysis variable") —
+    // keywords other than N must be associated with an analysis variable") -
     // a user error (rc 1 ParseError, D-009), not a gap.
     {
         var out: std.ArrayList(u8) = .empty;
@@ -16883,18 +16883,18 @@ test "GAP-tabulateforms #8: an ALL-only row dimension renders ONE grand-total ro
     try lib.put("d", ds);
 
     // `table all, v*sum`: one grand-total row (p.2547: two dimensions → rows,
-    // columns; ALL is a dimension element) — used to die "no TABLE row variable".
+    // columns; ALL is a dimension element) - used to die "no TABLE row variable".
     {
         var out: std.ArrayList(u8) = .empty;
         const toks = try lex.tokenize(a, "proc tabulate data=d; class g c; var v; table all, v*sum; run;", &diags);
         try runTabulate(.{ .arena = a, .lib = &lib, .diags = &diags }, &out, toks);
         try t.expect(std.mem.indexOf(u8, out.items, "|All  |   6 |") != null);
-        var alls: usize = 0; // exactly ONE All row — not a level row plus a total row
+        var alls: usize = 0; // exactly ONE All row - not a level row plus a total row
         var pos: usize = 0;
         while (std.mem.indexOfPos(u8, out.items, pos, "\n|All")) |hit| : (pos = hit + 4) alls += 1;
         try t.expectEqual(@as(usize, 1), alls);
     }
-    // the crossed form: the single level group IS the All row — appending the
+    // the crossed form: the single level group IS the All row - appending the
     // usual grand-total row on top would double it.
     {
         var out: std.ArrayList(u8) = .empty;
@@ -16924,7 +16924,7 @@ test "NOTE-tabulateorderempty: value-less order= fails loud (captured); order=fr
     try lib.put("d", ds);
 
     // `order=;` (no value) used to fall to the catch-all and be silently
-    // ignored — now a loud ERROR, nothing rendered.
+    // ignored - now a loud ERROR, nothing rendered.
     {
         diag.resetGap();
         var out: std.ArrayList(u8) = .empty;
@@ -16984,7 +16984,7 @@ test "proc means CLASS emits per-group stats over unsorted input (BUG-meansclass
     ds.* = Dataset.init(a, "have");
     _ = try ds.addColumn("g", .char);
     _ = try ds.addColumn("x", .num);
-    // UNSORTED by g — CLASS must still group A={10,20,30}, B={100,200}
+    // UNSORTED by g - CLASS must still group A={10,20,30}, B={100,200}
     try ds.appendRow(&.{ strV("A"), numV(10) });
     try ds.appendRow(&.{ strV("B"), numV(100) });
     try ds.appendRow(&.{ strV("A"), numV(20) });
@@ -16997,7 +16997,7 @@ test "proc means CLASS emits per-group stats over unsorted input (BUG-meansclass
     try runMeans(.{ .arena = a, .lib = &lib, .diags = &diags }, &out, toks);
 
     // one combined table (class var a column, a row per level), NOT per-group
-    // blocks — BUG-meansclass-layout
+    // blocks - BUG-meansclass-layout
     try t.expect(std.mem.indexOf(u8, out.items, "Analysis Variable : x") != null);
     try t.expect(std.mem.indexOf(u8, out.items, "g=A") == null);
     try t.expect(std.mem.indexOf(u8, out.items, "20.0000000") != null); // A mean (grouped across gaps)
@@ -17036,7 +17036,7 @@ test "proc means OUTPUT OUT= builds the summary dataset; NOPRINT suppresses the 
     const ai = o.indexOf("avg").?;
     const ti = o.indexOf("tot").?;
     const ci = o.indexOf("cnt").?;
-    // row 0: overall — CLASS var missing (blank char), _TYPE_=0, _FREQ_=4, over all 4 obs
+    // row 0: overall - CLASS var missing (blank char), _TYPE_=0, _FREQ_=4, over all 4 obs
     try t.expectEqualStrings("", o.row(0)[gi].str);
     try t.expectEqual(@as(f64, 0), o.row(0)[tp].num);
     try t.expectEqual(@as(f64, 4), o.row(0)[fr].num);
@@ -17119,7 +17119,7 @@ test "BUG-univmu0freq: MU0= + FREQ + fail-loud unrecognized option/statement (ca
     try ds.appendRow(&.{ numV(3), numV(1) }); // Σf = 6, Σf·x = 11
     try lib.put("d", ds);
 
-    // F1: MU0= is used as the reference — header prints Mu0=5 (not 0).
+    // F1: MU0= is used as the reference - header prints Mu0=5 (not 0).
     {
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -17136,7 +17136,7 @@ test "BUG-univmu0freq: MU0= + FREQ + fail-loud unrecognized option/statement (ca
         try runUnivariate(.{ .arena = a, .lib = &lib, .diags = &diags }, &out, toks);
         try t.expect(std.mem.indexOf(u8, out.items, "Mu0=0") != null);
     }
-    // F2: FREQ f — N = Σf = 6, Mean = Σf·x/Σf = 11/6, via OUTPUT (exact).
+    // F2: FREQ f - N = Σf = 6, Mean = Σf·x/Σf = 11/6, via OUTPUT (exact).
     {
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -17168,7 +17168,7 @@ test "BUG-univignoresby: BY splits the listing per group; unsorted BY fails loud
     const a = arena.allocator();
 
     // Sorted BY (1,1,2): TWO block sets, each headed by its BY value, with the
-    // per-group Mean (was: ONE pooled block, Mean 2, at exit 0 — silent-wrong).
+    // per-group Mean (was: ONE pooled block, Mean 2, at exit 0 - silent-wrong).
     var lib = Library.init(a);
     const ds = try a.create(Dataset);
     ds.* = Dataset.init(a, "d");
@@ -17190,7 +17190,7 @@ test "BUG-univignoresby: BY splits the listing per group; unsorted BY fails loud
         // per-group means 2 and 10, never the pooled 14/3
         try t.expect(std.mem.indexOf(u8, o, "4.6666667") == null);
     }
-    // Unsorted BY (1,2,1) — SAS ERRORs "not sorted in ascending sequence" (the
+    // Unsorted BY (1,2,1) - SAS ERRORs "not sorted in ascending sequence" (the
     // shared MEANS/TRANSPOSE guard's exact wording) instead of printing a
     // duplicate g=1 group at exit 0.
     {
@@ -17295,7 +17295,7 @@ test "NOTE-procsortguards: RANK/STANDARD unsorted BY fails loud (captured); sort
     defer arena.deinit();
     const a = arena.allocator();
 
-    // Sorted BY (1,1,1,2,2,2) — correct per-group output, guard stays silent.
+    // Sorted BY (1,1,1,2,2,2) - correct per-group output, guard stays silent.
     var lib = Library.init(a);
     const ds = try a.create(Dataset);
     ds.* = Dataset.init(a, "d");
@@ -17322,7 +17322,7 @@ test "NOTE-procsortguards: RANK/STANDARD unsorted BY fails loud (captured); sort
         for (0..6, [_]f64{ -1, 0, 1, -1, 0, 1 }) |row, want| try t.expectEqual(want, sz.row(row)[x].num);
     }
 
-    // Unsorted BY (2,1,2 — the ticket's probe): SAS ERRORs "not sorted in
+    // Unsorted BY (2,1,2 - the ticket's probe): SAS ERRORs "not sorted in
     // ascending sequence" (the shared MEANS/TRANSPOSE/UNIVARIATE guard's exact
     // wording) and stops; consecutive-run grouping alone ranked every row 1 at
     // exit 0. No OUT= dataset may be produced.
@@ -17348,7 +17348,7 @@ test "NOTE-procsortguards: RANK/STANDARD unsorted BY fails loud (captured); sort
     }
 
     // BY DESCENDING flips the guard per key: ascending data under `by descending g`
-    // ERRORs. (The descending MESSAGE wording is INFERRED — it appears in none of
+    // ERRORs. (The descending MESSAGE wording is INFERRED - it appears in none of
     // the acquired SAS volumes; it is whatever the one shared guard emits so all
     // procs stay identical. The check flip itself is Statements ref p.40.)
     {
@@ -17384,7 +17384,7 @@ test "NOTE-procsortguards: RANK/STANDARD unsorted BY fails loud (captured); sort
         for (0..3, [_]f64{ 1, 2, 1 }) |row, want| try t.expectEqual(want, rd.row(row)[rx].num);
     }
 
-    // NOTSORTED drops the guard: unsorted (2,1,2) ranks each contiguous run —
+    // NOTSORTED drops the guard: unsorted (2,1,2) ranks each contiguous run -
     // explicit opt-in, no error.
     {
         var dg = diag.Diagnostics.init(a);
@@ -17410,7 +17410,7 @@ test "GAP-procopts: unknown PROC statement options fail LOUD across the PROC sur
     try lib.put("d", ds);
 
     // ── the audit probe itself: PROC MEANS silently skipped `bogusopt=3`
-    //    while PROC PRINT failed loud on the same class — the inconsistency. ──
+    //    while PROC PRINT failed loud on the same class - the inconsistency. ──
     {
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -17428,7 +17428,7 @@ test "GAP-procopts: unknown PROC statement options fail LOUD across the PROC sur
     }
     // positive controls: honoured options + inert SUMSIZE=/THREADS + the
     // data=d(keep=…) paren group (previously a bogus "statistic-keyword keep"
-    // WARNING on legal input) — clean run, no warnings at all.
+    // WARNING on legal input) - clean run, no warnings at all.
     {
         var diags = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -17454,7 +17454,7 @@ test "GAP-procopts: unknown PROC statement options fail LOUD across the PROC sur
         try t.expect(!diags.hasErrors());
     }
     // DELETE: LIB=/MEMTYPE=/a stray option names itself (a second bare name
-    // after DATA= stays a dataset list — SAS's own parse, not an option)
+    // after DATA= stays a dataset list - SAS's own parse, not an option)
     {
         var diags = diag.Diagnostics.init(a);
         const toks = try lex.tokenize(a, "proc delete lib=work data=d; run;", &diags);
@@ -17525,7 +17525,7 @@ test "D-009: a recognized-but-unsupported PROC construct exits 2, a typo stays 1
     try lib.put("have", try buildHave(a));
 
     // Each of these is VALID SAS 9.4 opensas doesn't implement, matched by a
-    // guard naming THAT construct — an opensas gap (failGap/markGap) → exit 2,
+    // guard naming THAT construct - an opensas gap (failGap/markGap) → exit 2,
     // "file an opensas issue". The step still fails LOUD with the same ERROR
     // message; only the rc signal moves 1 → 2. Pinned against exitCode
     // directly (the two signals main.zig:89-90 read) because only rc-pinned
@@ -17586,7 +17586,7 @@ test "D-009: a recognized-but-unsupported PROC construct exits 2, a typo stays 1
     }
 
     // Controls keep rc 1 reachable: each is a condition real SAS 9.4 also
-    // rejects — a typo'd/invalid option value, overlapping VALUE ranges
+    // rejects - a typo'd/invalid option value, overlapping VALUE ranges
     // without MULTILABEL, a garbage PICTURE entry, a CONTENTS member that
     // isn't there.
     {
@@ -17666,7 +17666,7 @@ test "D-009: a recognized-but-unsupported PROC construct exits 2, a typo stays 1
         try t.expectError(error.ParseError, runFreq(.{ .arena = a, .lib = &lib, .diags = &d }, &out, toks));
         try t.expectEqual(@as(u8, 1), diag.exitCode(diag.gapHit(), d.hasErrors()));
     }
-    // §5b re-verdict splits (the statistical-volume PROCs) — each gap arm is a
+    // §5b re-verdict splits (the statistical-volume PROCs) - each gap arm is a
     // documented SAS 9.4 construct the guide enumerates in one place (rc 2),
     // each typo arm is the SAME catch-all fed a non-option (rc 1).
     { // MEANS header option: FW= is documented (rc 2); `maxddec=2` is a typo (rc 1)
@@ -17720,7 +17720,7 @@ test "D-009: a recognized-but-unsupported PROC construct exits 2, a typo stays 1
         try t.expectEqual(@as(u8, 1), diag.exitCode(diag.gapHit(), d.hasErrors()));
     }
     { // FREQ header ALREADY-CORRECT: Table 3.4's seven options are all handled,
-      // so only a typo reaches the catch-all — pinned at rc 1.
+      // so only a typo reaches the catch-all - pinned at rc 1.
         diag.resetGap();
         var d = diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
@@ -17762,7 +17762,7 @@ test "D-009: a recognized-but-unsupported PROC construct exits 2, a typo stays 1
         try t.expectError(error.ParseError, runUnivariate(.{ .arena = a, .lib = &lib, .diags = &d }, &out, toks));
         try t.expectEqual(@as(u8, 1), diag.exitCode(diag.gapHit(), d.hasErrors()));
     }
-    { // UNIVARIATE sub-statement: INSET is a valid statement (rc 2 — this pin
+    { // UNIVARIATE sub-statement: INSET is a valid statement (rc 2 - this pin
       // STOOD at rc 1 while INSET was parked conflated; the split moves it);
       // `zzzq` stays a typo (rc 1).
         diag.resetGap();
@@ -17841,7 +17841,7 @@ test "D-009: a recognized-but-unsupported PROC construct exits 2, a typo stays 1
     { // APPEND: NOWARN is documented (rc 2); `froce` is a typo (rc 1).
       // Pinned on exitCode, not expectError: the two arms deliberately
       // return different error types (gap arm ParseError via failGap, the
-      // family's long-standing ExecError typo arm) — the rc is the signal.
+      // family's long-standing ExecError typo arm) - the rc is the signal.
         diag.resetGap();
         var d = diag.Diagnostics.init(a);
         const toks = try lex.tokenize(a, "proc append base=have data=have nowarn; run;", &d);
@@ -18045,7 +18045,7 @@ test "D-009: a recognized-but-unsupported PROC construct exits 2, a typo stays 1
     }
     // BUG-proctypoexits2 follow-on: a bare documented NORMAL= score name
     // (BLOM/TUKEY/VW, Procedures Guide 7th ed. printed p. 2048) is the same
-    // recognized gap — it can only be a score request, never a typo.
+    // recognized gap - it can only be a score request, never a typo.
     {
         diag.resetGap();
         var d = diag.Diagnostics.init(a);
@@ -18055,8 +18055,8 @@ test "D-009: a recognized-but-unsupported PROC construct exits 2, a typo stays 1
         try t.expectEqual(@as(u8, 2), diag.exitCode(diag.gapHit(), d.hasErrors()));
     }
     // BUG-proctypoexits2: the SORT/TRANSPOSE/CONTENTS/COMPARE `unknown option`
-    // catch-alls, split. The gap arm — a documented SAS 9.4 option opensas
-    // doesn't implement — keeps the byte-identical UNSUPPORTED message at rc 2 …
+    // catch-alls, split. The gap arm - a documented SAS 9.4 option opensas
+    // doesn't implement - keeps the byte-identical UNSUPPORTED message at rc 2 …
     {
         diag.resetGap();
         var d = diag.Diagnostics.init(a);
@@ -18147,7 +18147,7 @@ test "PROC DELETE data=x(gennum=all) fails loud BEFORE the delete (BUG-deletegen
     // The doc's OWN spelling for deleting all generations goes in parens after
     // the file name (printed pp. 786-787, === pdf 835/836/837 ===). opensas has
     // no generation model, so the four documented in-parens options failGap
-    // (rc 2) — and the file must be UNTOUCHED: the old lparen-skip deleted x
+    // (rc 2) - and the file must be UNTOUCHED: the old lparen-skip deleted x
     // and said nothing, a silent drop on a destructive request (D-002).
     {
         diag.resetGap();
@@ -18160,7 +18160,7 @@ test "PROC DELETE data=x(gennum=all) fails loud BEFORE the delete (BUG-deletegen
         try t.expect(std.mem.indexOf(u8, try d.render(), "PROC DELETE: option gennum is not supported (only DATA=)") != null);
         try t.expect(lib.find("have") != null); // behaviour pin: the delete did NOT run
     }
-    { // MEMTYPE= is in the same closed paren set — same gap, same survival.
+    { // MEMTYPE= is in the same closed paren set - same gap, same survival.
         diag.resetGap();
         var lib = Library.init(a);
         try lib.put("have", try buildHave(a));
@@ -18190,7 +18190,7 @@ test "PROC UNIVARIATE accepts and APPLIES data=x(keep=/where=…) (BUG-univdatas
     const a = arena.allocator();
     // The paren group used to hit the header catch-all: rc 1 with a degenerate
     // empty-name message (the lparen token's text). Now skipped as a group so
-    // procInput applies it — the WHERE= run's N=2 (not 3) pins APPLICATION.
+    // procInput applies it - the WHERE= run's N=2 (not 3) pins APPLICATION.
     var lib = Library.init(a);
     try lib.put("have", try buildHave(a));
     {
@@ -18221,7 +18221,7 @@ test "PROC UNIVARIATE accepts and APPLIES the WHERE statement (BUG-univwherestmt
     // WHERE is documented with UNIVARIATE ("Procedures That Support the WHERE
     // Statement", printed p. 89, === pdf 138 ===) but the statement loop had
     // no arm: rc 1 on a universal statement. MEANS' arm now skips it and
-    // procInput applies it — N=2 (not 3) pins the application.
+    // procInput applies it - N=2 (not 3) pins the application.
     var lib = Library.init(a);
     try lib.put("have", try buildHave(a));
     diag.resetGap();
@@ -18241,7 +18241,7 @@ test "PROC MEANS bare documented flags warn the truth, unknown keywords keep not
     var lib = Library.init(a);
     try lib.put("have", try buildHave(a));
     // A documented bare flag (Summary of Optional Arguments, printed
-    // pp. 1482-1484) used to be called "not recognized" — a lie about the
+    // pp. 1482-1484) used to be called "not recognized" - a lie about the
     // doc. Still a warn, still rc 0: message-only.
     {
         diag.resetGap();
@@ -18275,7 +18275,7 @@ test "PROC FORMAT PICTURE position-1 (format-options) split (BUG-picturepos1opts
     var lib = Library.init(a);
     // "The DEFAULT, FUZZ, MAX, MIN, MULTILABEL, NOTSORTED, and ROUND options
     // are valid before the value range specification" (printed p. 1098,
-    // === pdf 1147 ===) — documented → rc 2, NAMED (was: rc 1 with the
+    // === pdf 1147 ===) - documented → rc 2, NAMED (was: rc 1 with the
     // degenerate `unsupported PICTURE entry ''`).
     {
         diag.resetGap();

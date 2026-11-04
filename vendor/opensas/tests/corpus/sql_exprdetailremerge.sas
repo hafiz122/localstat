@@ -1,5 +1,5 @@
 /* BUG-sqlexprdetailremerge: a non-summarized detail column referenced INSIDE an
-   expression (sal in sal/sum(sal)) under GROUP BY must trigger SAS remerge —
+   expression (sal in sal/sum(sal)) under GROUP BY must trigger SAS remerge -
    broadcast each group's aggregate across its detail rows → N rows (percent-of-
    group idiom), not 1 row/group. Sibling of BUG-sqlgroupremerge (bare detail col).
    Guards the two collapse cases too: a pure aggregate select, and an expression

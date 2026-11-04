@@ -4,10 +4,10 @@
    PROC SORT since GH#8: real SAS 9.4 errors "ERROR: File WORK.NOPE.DATA does
    not exist." and ends the failing step with "NOTE: The SAS System stopped
    processing this step because of errors." (both on STDERR, pinned by the
-   captured-diagnostics test in src/proc.zig — never a real aborting run).
+   captured-diagnostics test in src/proc.zig - never a real aborting run).
    stdout pins the batch consequence (BUG-errhalt syntax-check mode): "before"
-   runs, the MEANS step dies on the absent table, every later step — the
-   REPORT sibling included — is skipped, and the "pipeline survived" canary
+   runs, the MEANS step dies on the absent table, every later step - the
+   REPORT sibling included - is skipped, and the "pipeline survived" canary
    must NOT appear. Before this fix the missing table filed a rc-2
    "UNSUPPORTED: PROC MEANS: no input dataset" gap: the PROC is supported,
    the user's table just is not there.

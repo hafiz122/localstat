@@ -1,5 +1,5 @@
 /* ISS-charnumassign: assigning a character value to a NUMERIC variable must
-   convert the SAS way (implicit BEST input) and be LOUD — the conversion NOTEs
+   convert the SAS way (implicit BEST input) and be LOUD - the conversion NOTEs
    go to stderr (not this stdout diff); here we pin the resulting values so a
    silent-drop regression (or a wrong conversion) shows up.
 

@@ -1,11 +1,11 @@
 /* CNTLIN= rebuild of a PICTURE format (TYPE='P') and of SEXCL/EEXCL exclusive
    endpoints (BUG-cntlinpicture).
-   (a) A CNTLOUT row with TYPE='P' must rebuild a PICTURE format — the label is a
+   (a) A CNTLOUT row with TYPE='P' must rebuild a PICTURE format - the label is a
        digit template, not a literal: put(x, ppx.) renders `  31.4`, never the raw
        template `0009.9`. FMTNAME is renamed only to dodge first-match shadowing
        by the directly-defined original in the same run (catalog is append-only).
    (b) SEXCL/EEXCL='Y' rebuild an EXCLUSIVE endpoint (direct `0-<5` twin), so the
-       shared boundary 5 maps to the NEXT range — an inclusive rebuild maps it low. */
+       shared boundary 5 maps to the NEXT range - an inclusive rebuild maps it low. */
 proc format cntlout=ctl;
   picture ppict low-high='0009.9';
 run;

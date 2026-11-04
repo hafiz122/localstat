@@ -1,6 +1,6 @@
-//! Dataset I/O — the bytes-in/rows-out layer the executor (C1) drives.
+//! Dataset I/O - the bytes-in/rows-out layer the executor (C1) drives.
 //!
-//! Three jobs, all mechanism (the executor owns the *policy* — the DATA-step
+//! Three jobs, all mechanism (the executor owns the *policy* - the DATA-step
 //! loop, drop/keep, `_ERROR_`):
 //!
 //!   readList   raw `datalines` text + an `input` list → PDV cells (list input)
@@ -9,9 +9,9 @@
 //!
 //! plus `seedColumns`, which stamps a Dataset's schema from a PDV. Char bytes:
 //! `readList` *borrows* its tokens from the caller's line (valid while that line
-//! lives — `datalines` are arena-long-lived); `snapshot` is where they get duped
+//! lives - `datalines` are arena-long-lived); `snapshot` is where they get duped
 //! into the output dataset, via `Dataset.appendRow`. So the PDV never owns char
-//! bytes — it points at whatever fed it, and the copy happens at the write.
+//! bytes - it points at whatever fed it, and the copy happens at the write.
 
 const std = @import("std");
 const ast = @import("ast.zig");
@@ -32,7 +32,7 @@ const xport = @import("xport.zig");
 // ── global OBS=/FIRSTOBS= system options (BUG-globalobs) ─────────────────────
 // `options obs=N;` / `options firstobs=N;` set the DEFAULT last/first obs for
 // EVERY subsequent input read until reset (`options obs=max;` restores all-obs;
-// Language Reference: Concepts p.247 — they exist as system options, not just dataset options). A
+// Language Reference: Concepts p.247 - they exist as system options, not just dataset options). A
 // per-dataset (obs=)/(firstobs=) still overrides, field by field. Module state
 // like format.noFmtErr: one program run = one options state. main.zig's OPTIONS
 // handler writes these; applyDatasetOptions reads them on `input` reads.
@@ -45,20 +45,20 @@ pub fn globalObsActive() bool {
 }
 
 // ── global MISSING=/LINESIZE=/PAGESIZE= system options ───────────────────────
-/// `options missing='X';` — the display char for a PLAIN missing numeric
+/// `options missing='X';` - the display char for a PLAIN missing numeric
 /// (Language Reference: Concepts p.209/234; BUG-optmissing: parsed then DROPPED → every listing kept
 /// printing `.` = silent wrong display). `missing='.'` resets to the default
 /// `.`; `missing=' '` (and `''`, which the lexer maps to " " per GH#60) sets a
-/// blank. Special missings (.A–.Z/._) keep their own letter — the render sites
+/// blank. Special missings (.A–.Z/._) keep their own letter - the render sites
 /// (main.zig fmtValue for PROC PRINT, exec.zig appendValue for PUT) only
 /// substitute when Value.missingChar is '.'. Module state like global_obs
-/// above. ponytail: explicit-format renders (`format x 8.2;`) still print `.` —
+/// above. ponytail: explicit-format renders (`format x 8.2;`) still print `.` -
 /// that path is format.zig's renderNum, wire it there if a study sets MISSING=
 /// together with explicit formats.
 pub var global_missing: u8 = '.';
 
-/// `options linesize=N pagesize=N;` — captured + validated (GAP-listingwidth).
-/// INERT: no listing proc wraps/paginates to them yet (accepted, not an error —
+/// `options linesize=N pagesize=N;` - captured + validated (GAP-listingwidth).
+/// INERT: no listing proc wraps/paginates to them yet (accepted, not an error -
 /// output is data-correct, just unpaginated). 0 = unset. Read these when a
 /// PROC PRINT panel-split lands.
 pub var global_linesize: usize = 0;
@@ -81,8 +81,8 @@ pub var global_nobyline: bool = false;
 pub var global_sortseq_linguistic: bool = false;
 
 /// An OBS=/FIRSTOBS= value at toks[j]: an integer, optionally with a K/M/G
-/// suffix (×1024ⁿ — `obs=2k` is 2048, never 2), MAX (all observations), or MIN
-/// (1). null on anything else — the caller fails LOUD naming the option
+/// suffix (×1024ⁿ - `obs=2k` is 2048, never 2), MAX (all observations), or MIN
+/// (1). null on anything else - the caller fails LOUD naming the option
 /// (BUG-optionsstmtswallow / BUG-dsobsvaluenovalidate: `obs=abc` silently read
 /// EVERY row on both the system and the dataset-option path).
 pub const ObsValue = struct { val: usize, consumed: usize };
@@ -120,7 +120,7 @@ pub fn readXport(a: std.mem.Allocator, bytes: []const u8, name: []const u8) xpor
     return xport.read(a, bytes, name);
 }
 
-/// LIBNAME engine hook: serialize a Dataset to XPORT v5 (`.xpt`) bytes — the write
+/// LIBNAME engine hook: serialize a Dataset to XPORT v5 (`.xpt`) bytes - the write
 /// side of readXport, for `libname o xport "f.xpt"; data o.x; …` (CLIN-xptwrite).
 pub fn writeXport(a: std.mem.Allocator, ds: *const Dataset) xport.Error![]const u8 {
     return xport.write(a, ds);
@@ -132,7 +132,7 @@ pub fn readSas7bdat(a: std.mem.Allocator, bytes: []const u8, name: []const u8) s
     return sas7bdat.read(a, bytes, name);
 }
 
-/// LIBNAME engine hook: serialize a Dataset to native sas7bdat bytes — the write
+/// LIBNAME engine hook: serialize a Dataset to native sas7bdat bytes - the write
 /// side of readSas7bdat, now the DEFAULT directory-LIBNAME output format so
 /// variable type/length survive a TARGET reload (E-sas7write-hookup: CSV carried
 /// no metadata, so all-digit char like '007' was re-typed Num on reload).
@@ -163,11 +163,11 @@ pub fn endsWithIgnoreCase(s: []const u8, suffix: []const u8) bool {
 }
 
 /// The ONE member name a FILE-libref file actually holds. An XPORT v5 file
-/// stamps it in the first DSCRPTR record — fixed layout: LIBRARY hdr + 2 recs
+/// stamps it in the first DSCRPTR record - fixed layout: LIBRARY hdr + 2 recs
 /// (240), MEMBER hdr (80), DSCRPTR hdr (80), then a descriptor record whose
 /// bytes 8..16 are the ≤8-char blank-padded member name (xport.zig writes it).
 /// A `.sas7bdat` exposes no cheap stamped name to this reader (our writer
-/// doesn't stamp one), so fall back to the filename stem — SAS names the file
+/// doesn't stamp one), so fall back to the filename stem - SAS names the file
 /// `<member>.sas7bdat`, so the stem IS the member name in practice. Lets a
 /// FILE libref refuse a typo'd member name (BUG-filelibrefmember) instead of
 /// silently serving the one file under any alias.
@@ -194,13 +194,13 @@ pub fn stampedMemberName(path: []const u8, bytes: []const u8) []const u8 {
 
 /// SAS list input, reading one field per `input` item (in order) from the
 /// whitespace-delimited tokens of `lines[start]`. When a line runs dry before
-/// every item is filled, reading *spills onto the next line* — SAS's default
+/// every item is filled, reading *spills onto the next line* - SAS's default
 /// (not MISSOVER). A `$` item takes the token verbatim; a numeric item parses
 /// as `f64` (`.`/junk → missing); running out of lines too → missing.
 ///
 /// Returns the HIGH-WATER index of the lines read from (a backward `#n` leaves
 /// the cursor earlier). The caller advances past it so the next observation
-/// starts on a fresh record — leftover tokens on that line are dropped, as SAS
+/// starts on a fresh record - leftover tokens on that line are dropped, as SAS
 /// does without a trailing `@@`.
 ///
 /// `missover` rejects a PARTIAL formatted/column field: a `w.`/range read the
@@ -210,12 +210,12 @@ pub fn stampedMemberName(path: []const u8, bytes: []const u8) []const u8 {
 /// at all lives in the caller (exec.zig, BUG-infilemissover).
 ///
 /// ponytail: invalid numeric list-input data should raise a NOTE + set `_ERROR_`
-///   — silent until the log is under test. (Char length now honoured:
+///   - silent until the log is under test. (Char length now honoured:
 ///   see `listCharValue`, BUG-inputlistlen / BUG-coloninformatwidth.)
 /// Length + truncation for a list / DSD CHARACTER read, returning the value to
 /// store:
 /// - explicit informat width `w>0` (colon-modified `:$w.`): the var takes length
-///   `w` (if undeclared) and the token is truncated to `w` — the informat governs
+///   `w` (if undeclared) and the token is truncated to `w` - the informat governs
 ///   how many chars are read (BUG-coloninformatwidth). A declared LENGTH stays as
 ///   storage; `setAt` truncates the store to it, but the read still stops at w.
 /// - no informat width, undeclared: SAS's default char length of 8, so `setAt`
@@ -236,20 +236,20 @@ fn listCharValue(pdv: *Pdv, slot: usize, informat: ?[]const u8, tok: []const u8)
 }
 
 /// Language Reference: Concepts p.171: "NOTE: SAS went to a new line when INPUT statement reached past
-/// the end of a line." — written when FLOWOVER moves a read onto the next record
+/// the end of a line." - written when FLOWOVER moves a read onto the next record
 /// (any input style). pdv.diags is null in standalone/unit uses.
 /// PERF-flownoteperrecord: one NOTE per flow EVENT is one allocPrint into the
-/// never-freed run arena + one Diagnostic append per event — measured ~385 ns
+/// never-freed run arena + one Diagnostic append per event - measured ~385 ns
 /// and ~259 retained bytes per flow; a 2M-record flowing file paid 2.45x wall
 /// and 2.05x RSS for a million byte-identical NOTEs. Real SAS caps repeated
 /// log messages, so cap this one at FLOW_NOTE_MAX per input stream and say so
-/// once with a closing suppression NOTE — bounded but never silent (the NOTE
+/// once with a closing suppression NOTE - bounded but never silent (the NOTE
 /// exists because a flow means INPUT ran off a record, which a user must see).
 /// io.zig owns no step boundary, so the stream is identified by its line
 /// buffer and monotonic record index: a new DATA step / INFILE gets a fresh
 /// arena buffer or rewinds the index, and either re-arms the budget.
 /// ponytail: a step ALTERNATING two infiles re-arms per switch (each switch
-/// looks like a new stream); a run-wide ceiling would live in diag.zig — add
+/// looks like a new stream); a run-wide ceiling would live in diag.zig - add
 /// it there if a real program ever hits that shape.
 var flow_note_count: usize = 0;
 var flow_note_lines: ?[*]const []const u8 = null;
@@ -271,17 +271,17 @@ fn flowNote(pdv: *Pdv, lines: []const []const u8, li: usize) void {
         d.report(.note, 0, "Further 'SAS went to a new line' notes are suppressed for this input.", .{}) catch {};
 }
 
-/// FLOWOVER's record advance — the ONE place that decides what "go to the next
+/// FLOWOVER's record advance - the ONE place that decides what "go to the next
 /// input data record" means, shared by the whitespace reader (readList) and the
 /// delimited reader (readDelim). Steps `li` on when a record is available, keeping
 /// the high-water index and the flow-over NOTE in step; returns false at
 /// end-of-file, which the caller turns into `ListRead.eof`.
 ///
 /// GAP-inputdlmnoflow: readDelim had NO spill at all, so the two readers did not
-/// merely disagree about the EOF edge — one implemented FLOWOVER and the other
+/// merely disagree about the EOF edge - one implemented FLOWOVER and the other
 /// silently did not. Sharing the decision here (rather than writing a second copy
 /// beside the first) is what keeps them from drifting again; each caller only
-/// re-seats its OWN cursor, which is the part that genuinely differs — a
+/// re-seats its OWN cursor, which is the part that genuinely differs - a
 /// tokenizer for whitespace, a byte offset for delimited.
 ///
 /// MISSOVER/TRUNCOVER need no flag here: exec hands those modes a ONE-RECORD
@@ -296,8 +296,8 @@ fn flowToNextRecord(pdv: *Pdv, lines: []const []const u8, li: *usize, hi: *usize
 
 /// BUG-informatnotfoundcontinues (Language Reference: Concepts p.518, "How SAS Handles Invalid Data"):
 /// an INPUT item naming an informat that does not exist makes its field
-/// UNREADABLE — the value is invalid by definition ("requires an informat that
-/// is not specified") — yet the ERROR printed and the step RAN ANYWAY, a
+/// UNREADABLE - the value is invalid by definition ("requires an informat that
+/// is not specified") - yet the ERROR printed and the step RAN ANYWAY, a
 /// substituted standard read landing wrong DATA in a populated data set (a
 /// plausible typo like `mmdyy10.` is the dangerous shape). On the WRITE side
 /// the same fallback only mis-renders, so it stays (BUG-unknownfmtsilent's
@@ -305,7 +305,7 @@ fn flowToNextRecord(pdv: *Pdv, lines: []const []const u8, li: *usize, hi: *usize
 /// Report through the captured reporter (D-003) and fail the step before any
 /// value is read. `options nofmterr` keeps the historical substituted read
 /// (SAS substitutes the default informat; its NOTE wording is needs-oracle).
-/// Runs once per readList call — halts at the first record, so exactly one
+/// Runs once per readList call - halts at the first record, so exactly one
 /// ERROR where the old fallback printed one per record.
 fn checkInputInformats(pdv: *Pdv, items: []const ast.InputItem) diag.Error!void {
     if (format.nofmterr()) return;
@@ -314,13 +314,13 @@ fn checkInputInformats(pdv: *Pdv, items: []const ast.InputItem) diag.Error!void 
         const spec = item.informat orelse continue;
         if (spec.len > 0 and spec[0] == '@') continue; // `@s-e` column-range encoding
         // parseSpec's name split (not io's alphabetic informatName): digit-bearing
-        // names keep their digits — `b8601da8.` is name "b8601da" + w 8, not "b".
+        // names keep their digits - `b8601da8.` is name "b8601da" + w 8, not "b".
         const nm = format.parseSpec(spec).name;
         const known = if (item.type == .char) format.isKnownCharInformat(nm) else format.isKnownInformat(nm);
         if (!known) {
             // D-009 §5f: a documented-but-unimplemented informat is an opensas
             // gap (rc 2, "file an opensas issue"); a name the 9.4 dictionary
-            // does not name is the user's typo and stays rc 1 — same message.
+            // does not name is the user's typo and stays rc 1 - same message.
             if (format.isDocumentedInformat(nm, item.type == .char)) diag.markGap();
             if (pdv.diags) |d| try d.report(.err, 0, "The informat {s} was not found or could not be loaded.", .{nm});
             return error.ExecError;
@@ -329,10 +329,10 @@ fn checkInputInformats(pdv: *Pdv, items: []const ast.InputItem) diag.Error!void 
 }
 
 /// NOTE-inputinvalidnote (Language Reference: Concepts p.518 "How SAS Handles Invalid Data"): a
-/// non-blank, non-`.`-coded NUMERIC field that read back missing is INVALID —
+/// non-blank, non-`.`-coded NUMERIC field that read back missing is INVALID -
 /// it does not conform to the informat or to the input style. This lands two
 /// of p.518's four mandated actions on the INPUT-statement path: the
-/// invalid-data NOTE (with the REAL record line + column — the house text's
+/// invalid-data NOTE (with the REAL record line + column - the house text's
 /// hardcoded 0/0 belongs to the no-span expression path, not this one) and
 /// _ERROR_=1 for the current observation (the `if _error_ then …` validation
 /// idiom works on INPUT again). The value is already missing (action 1, long
@@ -344,7 +344,7 @@ fn noteInvalidNum(pdv: *Pdv, field: []const u8, suppress: u2, line: usize, colno
     if (t.len == 0) return; // a blank field is a legitimate, silent missing
     if (std.mem.eql(u8, t, ".") or Value.parseSpecialMissing(t) != null) return; // coded missing
     // one NOTE per invalid value: readNumeric may already have emitted its own
-    // for this exact field (the plain-w.d embedded-blank path, read_noted) —
+    // for this exact field (the plain-w.d embedded-blank path, read_noted) -
     // still set _ERROR_, which that path never did.
     if (!format.read_noted and suppress < 1) if (pdv.diags) |d|
         try d.note(0, "Invalid numeric data, '{s}', at line {d} column {d}.", .{ t, line, colno });
@@ -355,7 +355,7 @@ fn noteInvalidNum(pdv: *Pdv, field: []const u8, suppress: u2, line: usize, colno
 /// read WANTED a record past the end of `lines` and could not have it.
 ///
 /// GAP-inputeofdegrade: that second fact had nowhere to go, so three sites in
-/// this file all wrote `if (li + 1 < lines.len) li += 1;` — silently declining to
+/// this file all wrote `if (li + 1 < lines.len) li += 1;` - silently declining to
 /// advance and then reading on. The caller could not tell a satisfied read from
 /// one that ran out, and the shortfall came back as FABRICATED data.
 /// `eof` is "I needed another record"; only the CALLER knows whether that means
@@ -370,7 +370,7 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
     var li = start;
     // High-water record index: a BACKWARD `#n` leaves li < hi, and the caller
     // releases hi + 1 records. Returning the final li collapsed a backward-#n
-    // record group to ONE record — a sliding window of 2-3x too many
+    // record group to ONE record - a sliding window of 2-3x too many
     // observations plus a fabricated EOF row (BUG-inputlinehighwater).
     var hi = start;
     var col: usize = 1; // 1-based column cursor (formatted / column input)
@@ -381,14 +381,14 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
     while (idx < items.len) : (idx += 1) {
         var item = items[idx];
         // ── array-element target `input v{i}` (GAP-inputarrayelem): resolve the
-        // flat subscript to its element var per read — a DO-loop index changes
-        // every iteration — then read the element as a plain item. An
+        // flat subscript to its element var per read - a DO-loop index changes
+        // every iteration - then read the element as a plain item. An
         // out-of-range index is a loud execution ERROR (resolver, mirroring
         // eval.zig's subscriptOor), never a silent record desync.
         if (item.arr_index) |ixe| item.name = try resolveArrElem(pdv, item, ixe);
         // ── pointer / position controls (no variable) ────────────────────────
         if (item.name.len == 0) {
-            // GAP-atexpression: `@(expr)` — value per read, the SAME clampCol
+            // GAP-atexpression: `@(expr)` - value per read, the SAME clampCol
             // as `@n`/`@var`; col >= 1 by construction, no underflow possible.
             if (item.col_expr) |e| {
                 col = try evalColExpr(pdv, e);
@@ -398,13 +398,13 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
                 continue;
             }
             const inf = item.informat orelse "";
-            if (std.mem.eql(u8, inf, "@@")) continue; // @@ hold sentinel — executor-level, no read
-            if (std.mem.eql(u8, inf, "@")) continue; // single-@ hold sentinel — executor-level, no read
+            if (std.mem.eql(u8, inf, "@@")) continue; // @@ hold sentinel - executor-level, no read
+            if (std.mem.eql(u8, inf, "@")) continue; // single-@ hold sentinel - executor-level, no read
             if (inf.len >= 1 and inf[0] == '/') { // next input record
                 // GAP-inputeofdegrade: no next record → record it and STOP
                 // re-reading the current one. Falling through re-tokenized the
                 // SAME record, so `input x $ / y $;` over an odd record count
-                // handed y the value already in x — a fabricated value at exit 0.
+                // handed y the value already in x - a fabricated value at exit 0.
                 if (li + 1 >= lines.len) {
                     eof = true;
                     break;
@@ -413,12 +413,12 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
                 hi = @max(hi, li);
                 col = 1;
                 fields = std.mem.tokenizeAny(u8, lines[li], " \t");
-            } else if (inf.len >= 1 and inf[0] == '@') { // @col — move to a column
+            } else if (inf.len >= 1 and inf[0] == '@') { // @col - move to a column
                 if (inf.len > 2 and inf[1] == '\'') {
-                    // GAP-inputatstring: `@'string'` — search the current record from
+                    // GAP-inputatstring: `@'string'` - search the current record from
                     // the cursor for the literal; found → cursor lands just after the
                     // match, NOT found → end of line (a following read gets missing,
-                    // MISSOVER-style — never an error).
+                    // MISSOVER-style - never an error).
                     const line = if (li < lines.len) lines[li] else "";
                     const needle = inf[2 .. inf.len - 1];
                     const hit = std.mem.indexOfPos(u8, line, @min(fields.index, line.len), needle);
@@ -437,18 +437,18 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
                     const line = if (li < lines.len) lines[li] else "";
                     fields.index = @min(col - 1, line.len);
                 }
-            } else if (inf.len >= 1 and inf[0] == '+') { // +n — skip n columns
+            } else if (inf.len >= 1 and inf[0] == '+') { // +n - skip n columns
                 // BUG-inputrelcol: `col` must reflect the CURRENT position, which a
                 // prior token/fixed read advanced via the byte cursor (not `col`).
                 // Re-sync from `fields.index` before the relative skip, then move both.
                 col = fields.index + 1 + (std.fmt.parseInt(usize, inf[1..], 10) catch 0);
                 colmode = true;
                 // BUG-inputplusncol: clamp to line.len so a `+n` skip PAST end-of-line
-                // (followed by a list/colon read → fields.next()) doesn't index OOB —
+                // (followed by a list/colon read → fields.next()) doesn't index OOB -
                 // SAS yields missing, not a crash. Mirror of the @n/@s-e clamps.
                 const line = if (li < lines.len) lines[li] else "";
                 fields.index = @min(col - 1, line.len);
-            } else if (inf.len >= 1 and inf[0] == '#') { // #n — go to line n of the record
+            } else if (inf.len >= 1 and inf[0] == '#') { // #n - go to line n of the record
                 const n = std.fmt.parseInt(usize, inf[1..], 10) catch 1;
                 const target = start + (if (n > 0) n - 1 else 0);
                 // GAP-inputeofdegrade: `#n` is a record advance too, and asking
@@ -475,14 +475,14 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
             const rend = if (dash) |d| std.fmt.parseInt(usize, inf[1..][d + 1 ..], 10) catch 0 else 0;
             const rstart = std.fmt.parseInt(usize, if (dash) |d| inf[1..][0..d] else inf[1..], 10) catch 0;
             // FLOWOVER (Language Reference: Concepts p.171, BUG-flowovercolumn): the range STARTS past
-            // this record's end — there is nothing to read, so flow to the next
+            // this record's end - there is nothing to read, so flow to the next
             // record and read the SAME absolute columns there. (A range that
-            // starts inside the record but ends past it reads SHORT, no flow —
+            // starts inside the record but ends past it reads SHORT, no flow -
             // datalines_char_informat pins SAS's short-field rule.) The caller's
             // record window spans >1 record ONLY under FLOWOVER (the short-record
             // modes clip it), so those modes never reach this and their
             // partial-field rules below are untouched.
-            // ponytail: resume column = the absolute range — needs-oracle
+            // ponytail: resume column = the absolute range - needs-oracle
             //   (doc-finder-tick287 F5), UNVERIFIED against a real SAS.
             while (rstart > line.len and li + 1 < lines.len) {
                 li += 1;
@@ -518,7 +518,7 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
             }
             continue;
         };
-        // ── $VARYINGw. — the NEXT input item is not a variable, it is the
+        // ── $VARYINGw. - the NEXT input item is not a variable, it is the
         // length-variable OPERAND: read its (already-assigned) numeric value and
         // read that many columns (0..w) for THIS var from the cursor, then skip it.
         // BUG-varyinginformat. SAS: len<0 / missing → read no data; w is the max.
@@ -548,7 +548,7 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
         }
         // ── column-mode formatted read: `w` columns from the cursor ───────────
         // BUG-coloninformatat: a colon-modified informat (`:$w.`) stays list-style
-        // even after an `@n`/`+n` pointer — the pointer sets the START column
+        // even after an `@n`/`+n` pointer - the pointer sets the START column
         // (`fields.index`), then the read scans to the next delimiter (list mode
         // below), truncating to `w`. Only NON-colon items take the fixed-width grab.
         if (colmode and !item.list_mod) {
@@ -557,11 +557,11 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
                 var line = if (li < lines.len) lines[li] else "";
                 var s = col - 1;
                 // FLOWOVER (Language Reference: Concepts p.171, BUG-flowovercolumn): the field STARTS
-                // at/past this record's end — nothing to read, so flow and
+                // at/past this record's end - nothing to read, so flow and
                 // resume at column 1 (a field that merely extends past the end
                 // reads short, no flow). Window-gated to FLOWOVER like the
                 // column-range branch above.
-                // ponytail: resume column 1 — needs-oracle (F5), UNVERIFIED.
+                // ponytail: resume column 1 - needs-oracle (F5), UNVERIFIED.
                 while (s >= line.len and li + 1 < lines.len) {
                     li += 1;
                     hi = @max(hi, li);
@@ -575,7 +575,7 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
                 col += w;
                 fields.index = @min(col - 1, line.len); // BUG-inputrelcol: keep cursor == col
                 // BUG-missovertruncover-partial: the record ends MID-FIELD (seg
-                // starts inside the line but is shorter than w) — MISSOVER reads
+                // starts inside the line but is shorter than w) - MISSOVER reads
                 // missing; TRUNCOVER keeps the truncated partial.
                 const partial = missover and seg.len > 0 and seg.len < w;
                 if (item.type == .char) {
@@ -583,7 +583,7 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
                     // BUG-charinformatloud: an unknown $-informat fails loud on
                     // the column read too (this path skips charInformat).
                     format.checkCharInformat(informatName(item.informat orelse ""));
-                    // BUG-charwleadblank: leading blanks follow the informat —
+                    // BUG-charwleadblank: leading blanks follow the informat -
                     // $CHARw. KEEPS them, plain $w. strips (left-aligns).
                     try pdv.set(item.name, .{ .str = if (partial) "" else charField(item.informat, seg, " ") });
                 } else {
@@ -600,7 +600,7 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
             }
         }
         // ── formatted char read: `$w.` (non-colon) takes the full w columns from
-        // the cursor, embedded blanks included — NOT a whitespace token
+        // the cursor, embedded blanks included - NOT a whitespace token
         // (DATALINES-informat). The colon form (`:$w.`, list_mod) still tokenizes.
         // Shares the tokenizer's byte cursor so it composes with prior list reads:
         // after `input a $ b $12.`, `b` reads 12 cols from just past `a`'s token.
@@ -609,7 +609,7 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
             if (w > 0) {
                 var line = if (li < lines.len) lines[li] else "";
                 var s = @min(fields.index, line.len);
-                // FLOWOVER (Language Reference: Concepts p.171) — field starts past the record end,
+                // FLOWOVER (Language Reference: Concepts p.171) - field starts past the record end,
                 // as the colmode branch above.
                 while (s >= line.len and li + 1 < lines.len) {
                     li += 1;
@@ -623,7 +623,7 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
                 fields.index = @min(s + w, line.len);
                 col = fields.index + 1; // BUG-inputrelcol: col follows the byte cursor
                 _ = try pdv.define(item.name, .char);
-                // BUG-missovertruncover-partial: record ends mid-field — MISSOVER
+                // BUG-missovertruncover-partial: record ends mid-field - MISSOVER
                 // reads missing, TRUNCOVER keeps the truncated partial.
                 if (missover and seg.len > 0 and seg.len < w) {
                     try pdv.set(item.name, .{ .str = "" });
@@ -643,7 +643,7 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
             }
         }
         // ── formatted numeric read: any `w.d` informat (non-colon) takes the
-        // full w columns from the cursor — the numeric mirror of the char branch
+        // full w columns from the cursor - the numeric mirror of the char branch
         // above (Language Reference: Concepts p.515: formatted input "combines the flexibility of using
         // informats with many of the features of column input").
         // BUG-inputfmtseq: sequential `x 2. y 2.` must advance the byte cursor by
@@ -651,16 +651,16 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
         // colmode is off, so the colmode grab above never fires for these.
         // BUG-dateblanksep: `input d date11.;` (informat INLINE, no colon) is a
         // formatted read of w columns in SAS, and the DATE/MMDDYY/DDMMYY/YYMMDD
-        // informats accept blank separators (`16 mar 2012`) — so those four skip
+        // informats accept blank separators (`16 mar 2012`) - so those four skip
         // leading blanks below. The `:`/INFORMAT-statement forms carry
         // list_mod=true and still tokenize (BUG-informatlistinput).
         // BUG-inputfmtnamedtoken: EVERY other named numeric informat (comma5.,
-        // time8., bz4., percent5., hex4.) is a formatted w-column read too —
+        // time8., bz4., percent5., hex4.) is a formatted w-column read too -
         // gating columns on the informat NAME tokenized them instead, so
         // adjacent fields MERGED (`1,1321,187` → score1=11321187, score2 lost)
         // and the byte cursor desynced every following variable (hex4. even
         // read the right VALUE off the wrong columns). The w-column slice goes
-        // to readNum raw for BZ (its blanks are ZEROS — Table 21.2 rows 1-2:
+        // to readNum raw for BZ (its blanks are ZEROS - Table 21.2 rows 1-2:
         // `23  ` bz4. → 2300; the colmode branch's BUG-bzstmtcolumn twin),
         // trimmed otherwise; embedded-blank rules are per-informat in
         // format.readNumeric (plain w.d: invalid; COMMA family: strip).
@@ -672,7 +672,7 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
             if (w > 0) {
                 var line = if (li < lines.len) lines[li] else "";
                 var s = @min(fields.index, line.len);
-                // FLOWOVER (Language Reference: Concepts p.171) — field starts past the record end,
+                // FLOWOVER (Language Reference: Concepts p.171) - field starts past the record end,
                 // as the colmode branch above.
                 while (s >= line.len and li + 1 < lines.len) {
                     li += 1;
@@ -682,7 +682,7 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
                     fields = std.mem.tokenizeAny(u8, line, " \t");
                     s = 0;
                 }
-                // After a list token the cursor rests ON the delimiter — skip
+                // After a list token the cursor rests ON the delimiter - skip
                 // blanks so `input id $ d date9.` lands on the date columns
                 // (cf_import_raw). ponytail: skips ALL blanks; a blanks-only
                 // missing date eats the next field's lead-in, same failure
@@ -694,7 +694,7 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
                 fields.index = @min(s + w, line.len);
                 col = fields.index + 1; // BUG-inputrelcol: col follows the byte cursor
                 _ = try pdv.define(item.name, .num);
-                // BUG-missovertruncover-partial: record ends mid-field — MISSOVER
+                // BUG-missovertruncover-partial: record ends mid-field - MISSOVER
                 // reads missing, TRUNCOVER keeps the truncated partial.
                 const partial = missover and seg.len > 0 and seg.len < w;
                 // BZ gets the raw field (blanks→zeros, see branch comment);
@@ -702,7 +702,7 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
                 const numf = if (eqi(numnm, "bz")) seg else std.mem.trim(u8, seg, " ");
                 const nval = if (partial) Value.missing else readNum(item.informat, numf);
                 // NOTE-inputinvalidnote: the informat-nonconformance case too
-                // (`notadate!!` under mmddyy10.) — p.518's second definition.
+                // (`notadate!!` under mmddyy10.) - p.518's second definition.
                 if (!partial and nval.isMissing()) try noteInvalidNum(pdv, numf, item.suppress, li + 1, s + 1);
                 try pdv.set(item.name, nval);
                 continue;
@@ -718,7 +718,7 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
         // onto. Under FLOWOVER that is end-of-FILE and the caller must end the
         // step; assigning missing here is MISSOVER's documented job, not
         // FLOWOVER's, and doing it anyway wrote a PARTIAL observation. The
-        // caller distinguishes the two — MISSOVER/TRUNCOVER are handed a
+        // caller distinguishes the two - MISSOVER/TRUNCOVER are handed a
         // one-record window, so they reach this line normally and must keep
         // their missing-value behaviour.
         if (tok == null) eof = true;
@@ -741,15 +741,15 @@ pub fn readList(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const 
 }
 
 /// GAP-inputarrayelem: evaluate an INPUT array-element subscript to the element
-/// var it names — per read, since a DO-loop index changes every iteration — or
+/// var it names - per read, since a DO-loop index changes every iteration - or
 /// null for an out-of-range/missing/character index (PUT's array_elem parity:
 /// no read). The Evaluator wants pdv.diags; a standalone readList caller
 /// without one cannot eval → null (only hand-built unit-test items hit that).
 /// GAP-inputarrayelem: evaluate an INPUT array-element subscript to the element
-/// var it names — per read, since a DO-loop index changes every iteration. An
+/// var it names - per read, since a DO-loop index changes every iteration. An
 /// out-of-range/missing/character subscript is a SAS execution ERROR that sets
 /// _ERROR_=1 and halts the step, mirroring the array-READ and assignment paths
-/// (eval.zig subscriptOor / BUG-arrayoorerror / BUG-arrwriteoor) — a silent
+/// (eval.zig subscriptOor / BUG-arrayoorerror / BUG-arrwriteoor) - a silent
 /// skip would desync the record stream, the worst failure class here. The
 /// Evaluator wants pdv.diags; a standalone readList caller without one cannot
 /// eval a subscript at all (only hand-built unit-test items hit that).
@@ -769,7 +769,7 @@ fn resolveArrElem(pdv: *Pdv, item: ast.InputItem, ixe: *const ast.Expr) diag.Err
 }
 
 /// Read type for LIST input: an explicit `$` / char informat wins, but a BARE
-/// `input nm;` takes the var's ALREADY-DECLARED PDV type — a LENGTH/ATTRIB char
+/// `input nm;` takes the var's ALREADY-DECLARED PDV type - a LENGTH/ATTRIB char
 /// var reads a char token without needing `$` (BUG-inputcharnodollar); only an
 /// undeclared var falls through to the numeric read.
 fn listReadsChar(pdv: *const Pdv, item: ast.InputItem) bool {
@@ -784,36 +784,36 @@ fn listReadsChar(pdv: *const Pdv, item: ast.InputItem) bool {
 /// delimiter options combine freely): `/`/`#n` move the record, `@n`/`+n`/`@'str'`
 /// move the byte cursor the next field scans from, `@`/`@@` are executor-level
 /// holds reported through `pos`. BUG-inputdlmpointer: with no pointer-item guard
-/// every control fell into a variable read — eating a field and defining a
-/// NAMELESS PDV slot (a phantom column in the output dataset) — and the dropped
+/// every control fell into a variable read - eating a field and defining a
+/// NAMELESS PDV slot (a phantom column in the output dataset) - and the dropped
 /// `pos` left an `@@` hold on the same record forever (an infinite loop).
 /// Returns the high-water record index read from (BUG-inputlinehighwater).
 /// ponytail: `@n`/`+n` land the cursor mid-record and the field scanner resumes
-///   there — landing exactly ON a delimiter reads an empty field under DSD; SAS's
+///   there - landing exactly ON a delimiter reads an empty field under DSD; SAS's
 ///   exact landing semantics for that edge are unpinned (no oracle).
 fn readDelim(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const u8, start: usize, d: []const u8, dsd: bool, pos: ?*usize) !ListRead {
     var eof = false;
     var li = start;
-    var hi = start; // high-water mark — a backward #n leaves li < hi (BUG-inputlinehighwater)
+    var hi = start; // high-water mark - a backward #n leaves li < hi (BUG-inputlinehighwater)
     var line = if (li < lines.len) lines[li] else "";
     var fpos: usize = if (pos) |p| p.* else 0; // `@`/`@@` hold: resume mid-record
     for (items) |item_| {
         var item = item_;
-        // array-element target (GAP-inputarrayelem) — same resolution as readList
+        // array-element target (GAP-inputarrayelem) - same resolution as readList
         if (item.arr_index) |ixe| item.name = try resolveArrElem(pdv, item, ixe);
         // ── pointer / position controls (no variable) ────────────────────────
         if (item.name.len == 0) {
-            if (item.col_expr) |e| { // GAP-atexpression — same arm as readList
+            if (item.col_expr) |e| { // GAP-atexpression - same arm as readList
                 const c = try evalColExpr(pdv, e);
                 fpos = @min(c - 1, line.len);
                 continue;
             }
             const inf = item.informat orelse "";
-            if (std.mem.eql(u8, inf, "@@")) continue; // @@ hold sentinel — executor-level, no read
-            if (std.mem.eql(u8, inf, "@")) continue; // single-@ hold sentinel — executor-level, no read
+            if (std.mem.eql(u8, inf, "@@")) continue; // @@ hold sentinel - executor-level, no read
+            if (std.mem.eql(u8, inf, "@")) continue; // single-@ hold sentinel - executor-level, no read
             if (inf.len >= 1 and inf[0] == '/') { // next input record
                 // GAP-inputeofdegrade: the THIRD copy of this pattern, and the
-                // one the ticket did not name — a DLM=/DSD read advancing past
+                // one the ticket did not name - a DLM=/DSD read advancing past
                 // EOF re-read the current record exactly as readList did.
                 if (li + 1 >= lines.len) {
                     eof = true;
@@ -823,7 +823,7 @@ fn readDelim(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const u8,
                 hi = @max(hi, li);
                 line = if (li < lines.len) lines[li] else "";
                 fpos = 0;
-            } else if (inf.len >= 1 and inf[0] == '#') { // #n — line n of the record group
+            } else if (inf.len >= 1 and inf[0] == '#') { // #n - line n of the record group
                 const n = std.fmt.parseInt(usize, inf[1..], 10) catch 1;
                 const target = start + (if (n > 0) n - 1 else 0);
                 if (target >= lines.len) { // same p.178 stop as `/` above
@@ -834,9 +834,9 @@ fn readDelim(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const u8,
                 hi = @max(hi, li);
                 line = lines[li];
                 fpos = 0;
-            } else if (inf.len >= 1 and inf[0] == '@') { // @col — move the byte cursor
+            } else if (inf.len >= 1 and inf[0] == '@') { // @col - move the byte cursor
                 if (inf.len > 2 and inf[1] == '\'') {
-                    // @'string' — search from the cursor; miss → end of record.
+                    // @'string' - search from the cursor; miss → end of record.
                     const needle = inf[2 .. inf.len - 1];
                     fpos = if (std.mem.indexOfPos(u8, line, @min(fpos, line.len), needle)) |h| h + needle.len else line.len;
                 } else {
@@ -844,12 +844,12 @@ fn readDelim(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const u8,
                     // column from the PDV value (BUG-inputatvarptr), bad → column 1.
                     fpos = @min((std.fmt.parseInt(usize, inf[1..], 10) catch ptrCol(pdv, inf[1..])) -| 1, line.len);
                 }
-            } else if (inf.len >= 1 and inf[0] == '+') { // +n — skip n columns
+            } else if (inf.len >= 1 and inf[0] == '+') { // +n - skip n columns
                 fpos = @min(fpos + (std.fmt.parseInt(usize, inf[1..], 10) catch 0), line.len);
             }
             continue;
         }
-        // GAP-inputdlmnoflow: FLOWOVER for the DELIMITED reader, which had none —
+        // GAP-inputdlmnoflow: FLOWOVER for the DELIMITED reader, which had none -
         // it read missing off the end of the record instead of taking the next
         // one, so Statements ref printed p.145's OWN example came back with THREE
         // observations where the volume prints TWO and its second observation lost
@@ -864,7 +864,7 @@ fn readDelim(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const u8,
             line = lines[li];
             fpos = 0;
         }
-        if (fpos > line.len) eof = true; // no record left — caller ends the step (p.178)
+        if (fpos > line.len) eof = true; // no record left - caller ends the step (p.178)
         const fstart = fpos;
         const field = try nextDelimField(pdv.arena, line, &fpos, d, dsd);
         if (listReadsChar(pdv, item)) {
@@ -884,17 +884,17 @@ fn readDelim(pdv: *Pdv, items: []const ast.InputItem, lines: []const []const u8,
 
 /// Extract the next delimited field from `line`, advancing `pos` past it (and
 /// its trailing delimiter). Past the last field → "". With DSD, a leading `"`
-/// starts a quoted field that ends at the next `"` — and a DOUBLED `""` inside
+/// starts a quoted field that ends at the next `"` - and a DOUBLED `""` inside
 /// it is one escaped quote (BUG-dsddoublequote, Language Reference: Concepts Table 21.4 p.509: the DSD
-/// writer and the PROC IMPORT reader both already use this rule — the file
-/// opensas writes, opensas must read back). `d` is a delimiter SET —
+/// writer and the PROC IMPORT reader both already use this rule - the file
+/// opensas writes, opensas must read back). `d` is a delimiter SET -
 /// a byte splits iff it is a MEMBER of `d` (BUG-dlmmultichar).
 fn nextDelimField(a: std.mem.Allocator, line: []const u8, pos: *usize, d: []const u8, dsd: bool) ![]const u8 {
     if (pos.* > line.len) return ""; // no fields left
     var start = pos.*;
     if (dsd and start < line.len and line[start] == '"') {
         var i = start + 1;
-        var esc = false; // saw a "" escape — the value needs unescaping below
+        var esc = false; // saw a "" escape - the value needs unescaping below
         while (i < line.len) {
             if (line[i] != '"') {
                 i += 1;
@@ -908,7 +908,7 @@ fn nextDelimField(a: std.mem.Allocator, line: []const u8, pos: *usize, d: []cons
             break; // the real closing quote
         }
         var field = line[start + 1 .. @min(i, line.len)];
-        if (esc) { // collapse each "" pair to a single " (rare path — else borrow)
+        if (esc) { // collapse each "" pair to a single " (rare path - else borrow)
             const buf = try a.alloc(u8, field.len);
             var n: usize = 0;
             var j: usize = 0;
@@ -950,14 +950,14 @@ fn readNum(informat: ?[]const u8, field: []const u8) Value {
     if (eqi(name, "ddmmyy")) return parseDateParts(field, .dmy);
     if (eqi(name, "yymmdd")) return parseDateParts(field, .ymd);
     // TIMEw./HHMMSSw.: the shared format.zig parsers (AM/PM, `.` separator,
-    // fraction, packed digits) — the local copy below was that code gone stale
+    // fraction, packed digits) - the local copy below was that code gone stale
     // (BUG-timeinformat / BUG-hhmmssinformat).
     if (eqi(name, "time")) return if (format.parseTimeSecs(field)) |sc| .{ .num = sc } else Value.missing;
     if (eqi(name, "hhmmss")) return if (format.parseHhmmss(field)) |sc| .{ .num = sc } else Value.missing;
     // Plain `w.d` (implied decimal), PERCENTw. and the COMMA/DOLLAR family live
     // in format.readNumeric, so the numeric informat rules stay in one place
     // (BUG-informatdec, BUG-percentinformat). COMMA/DOLLAR's local copy was that
-    // code gone stale — no interior-hyphen removal, no implied decimals
+    // code gone stale - no interior-hyphen removal, no implied decimals
     // (NOTE-informatlow-tick245 #13); parens-negative and the strip rules are
     // readNumeric's commalike branch.
     // readNumericStmt, NOT readNumeric: the statement list/colon path hands over
@@ -987,7 +987,7 @@ fn parseDateParts(field: []const u8, order: DateOrder) Value {
         }
         if (n != 3) return Value.missing;
     } else {
-        // packed digits: yyyymmdd (ymd) or mmddyyyy/ddmmyyyy — 8 digits, or a
+        // packed digits: yyyymmdd (ymd) or mmddyyyy/ddmmyyyy - 8 digits, or a
         // 6-digit form with a 2-digit year.
         for (s) |c| if (!std.ascii.isDigit(c)) return Value.missing;
         const yw: usize = if (s.len >= 8) 4 else 2; // year field width
@@ -1037,17 +1037,17 @@ fn parseNum(s: []const u8) Value {
     return if (std.fmt.parseFloat(f64, tr)) |x| .{ .num = x } else |_| Value.missing;
 }
 
-/// The ONE SAS column-pointer clamp (Statements printed p.168 — the same Tip
+/// The ONE SAS column-pointer clamp (Statements printed p.168 - the same Tip
 /// is printed under `@n`, `@numeric-variable` AND `@(expression)`: 'If it is
 /// zero or negative, the pointer moves to column 1', non-integers truncated to
-/// the integer value). ptrCol and the `@(expr)` arm BOTH route through this —
+/// the integer value). ptrCol and the `@(expr)` arm BOTH route through this -
 /// one rule, one place; do not grow a second clamp.
 ///
 /// GAP-atexpression-put: `pub` because PUT's `@(expression)` (exec.zig runPut,
 /// Statements printed p.269) is the FOURTH caller of this same rule. p.269's
 /// `@(expression)` Tip drops the word "negative" that its own `@numeric-variable`
 /// sibling one entry above carries ('If n is zero or negative, the pointer moves
-/// to column 1') and that INPUT's p.168 entry carries — an omission, not a
+/// to column 1') and that INPUT's p.168 entry carries - an omission, not a
 /// different rule: both PUT entries declare 'Range a positive integer', and every
 /// pointer control on p.269-270 floors at column 1 (even `+numeric-variable`,
 /// which moves BACKWARD, says 'If the current column position becomes less than
@@ -1068,11 +1068,11 @@ fn ptrCol(pdv: *Pdv, name: []const u8) usize {
 }
 
 /// `@(expression)` column pointer (GAP-atexpression, Statements printed p.168):
-/// evaluate the expression PER READ against the PDV — a variable computed
+/// evaluate the expression PER READ against the PDV - a variable computed
 /// earlier in the same step moves the pointer (`b=5; input @(b*3) name $10.;`
-/// is the doc's own example) — then the SAME clampCol as `@n`/`@var`.
+/// is the doc's own example) - then the SAME clampCol as `@n`/`@var`.
 /// A CHARACTER result is SAS's OTHER parenthesised form, the
-/// `@(character-expression)` string search, which is not implemented — fail
+/// `@(character-expression)` string search, which is not implemented - fail
 /// loud (D-002); landing on column 1 would silently read the wrong column.
 fn evalColExpr(pdv: *Pdv, e: *const ast.Expr) diag.Error!usize {
     const d = pdv.diags orelse return error.ExecError;
@@ -1142,7 +1142,7 @@ fn daysFromCivil(y_in: i64, m: i64, d: i64) i64 {
 /// Read-side char-field blank rule (BUG-charwleadblank), mirroring the INPUT()
 /// function path: $CHARw. KEEPS leading blanks (trailing trimmed only); plain
 /// $w. and the other $ informats strip them (left-align). `ws` is the trailing
-/// cutset — the column-pointer path trims spaces only, the cursor path " \t".
+/// cutset - the column-pointer path trims spaces only, the cursor path " \t".
 fn charField(informat: ?[]const u8, seg: []const u8, ws: []const u8) []const u8 {
     if (eqi(informatName(informat orelse ""), "char")) return std.mem.trimEnd(u8, seg, ws);
     return std.mem.trim(u8, seg, ws);
@@ -1162,7 +1162,7 @@ fn eqi(a: []const u8, b: []const u8) bool {
 
 /// Stamp `ds`'s schema from `pdv`, one column per variable in PDV order. Call
 /// once before snapshotting rows. drop/keep is the executor's: it seeds only
-/// the columns it wants, or adds them by hand — this is the all-variables case.
+/// the columns it wants, or adds them by hand - this is the all-variables case.
 pub fn seedColumns(ds: *Dataset, pdv: *const Pdv) std.mem.Allocator.Error!void {
     for (pdv.vars.items) |v| _ = try ds.addColumn(v.name, v.type);
 }
@@ -1181,7 +1181,7 @@ pub fn snapshot(ds: *Dataset, pdv: *const Pdv) std.mem.Allocator.Error!void {
 /// Resolve each column of `ds` to its PDV slot, ONCE per source
 /// (PERF-loadrowdual, docs/findings/perf-findings-tick121.md). `define` is
 /// idempotent, so for columns already seeded (exec.seedColumnsOf) this is a
-/// pure lookup; the slots stay valid — `Pdv.vars` is append-only.
+/// pure lookup; the slots stay valid - `Pdv.vars` is append-only.
 pub fn columnSlots(pdv: *Pdv, ds: *const Dataset) std.mem.Allocator.Error![]usize {
     const slots = try pdv.arena.alloc(usize, ds.columns.items.len);
     for (ds.columns.items, 0..) |col, j| slots[j] = try pdv.define(col.name, col.type);
@@ -1189,9 +1189,9 @@ pub fn columnSlots(pdv: *Pdv, ds: *const Dataset) std.mem.Allocator.Error![]usiz
 }
 
 /// `set`: load observation `i` of `ds` into the PDV, writing each column's
-/// cell straight to its pre-resolved slot (`columnSlots`) — zero name lookups
+/// cell straight to its pre-resolved slot (`columnSlots`) - zero name lookups
 /// on the per-row path (PERF-loadrowdual). The PDV borrows the dataset's char
-/// bytes — both live in the run arena and the dataset is immutable, so the
+/// bytes - both live in the run arena and the dataset is immutable, so the
 /// alias is safe until the next reset/write overwrites it.
 /// `_setobs_` (the nobs= backing var) is no longer stamped here per row: the
 /// executor sets it once per distinct source, and only when nobs= was
@@ -1205,12 +1205,12 @@ pub fn loadRow(pdv: *Pdv, ds: *const Dataset, i: usize, slots: []const usize) st
 // ── raw file I/O for PROC EXPORT/IMPORT ──────────────────────────────────────
 // The PROC layer carries no `Io`, so these use the hardcoded single-threaded
 // blocking `Io` (std.Io.Threaded.global_single_threaded) via the portable
-// std.Io.Dir API — CWD-relative, cross-platform (posix.openat's AT.FDCWD doesn't
+// std.Io.Dir API - CWD-relative, cross-platform (posix.openat's AT.FDCWD doesn't
 // exist on Windows: BUILD-windows). Return values degrade to a bool/optional so
 // callers surface a NOTE.
 
 /// A process-wide blocking Io for the no-`Io` leaf paths (PROC EXPORT/IMPORT here,
-/// `%include` in macro.zig). Sync file ops only — no async/concurrency.
+/// `%include` in macro.zig). Sync file ops only - no async/concurrency.
 fn rawIo() std.Io {
     return std.Io.Threaded.global_single_threaded.io();
 }
@@ -1236,7 +1236,7 @@ pub fn fileExistsRaw(path: []const u8) bool {
 /// Unlink a member's on-disk files under a directory libname: any
 /// `stem.{sas7bdat,xpt,csv}` plus the `.labels` sidecar, stem matched
 /// case-insensitively (with `prefix` set, every member whose name starts with
-/// `stem` — the DELETE `pfx:` wildcard / KILL sweep; empty stem = all members).
+/// `stem` - the DELETE `pfx:` wildcard / KILL sweep; empty stem = all members).
 /// PROC DATASETS DELETE must remove the files too, else the EXIST disk probe
 /// finds the member and a later SET resurrects the deleted data
 /// (BUG-datasetsdeletedisk). Returns the number of files removed; a
@@ -1245,7 +1245,7 @@ pub fn deleteMemberFiles(a: std.mem.Allocator, dir_path: []const u8, stem: []con
     const io = rawIo();
     var dir = std.Io.Dir.cwd().openDir(io, dir_path, .{ .iterate = true }) catch return 0;
     defer dir.close(io);
-    // collect first, delete after — unlinking mid-iteration may skip entries
+    // collect first, delete after - unlinking mid-iteration may skip entries
     var victims: std.ArrayList([]const u8) = .empty;
     var it = dir.iterate();
     while (it.next(io) catch null) |e| {
@@ -1274,7 +1274,7 @@ pub fn deleteMemberFiles(a: std.mem.Allocator, dir_path: []const u8, stem: []con
 /// observation. Char missing → empty field; numeric missing → `.`. A field is
 /// quoted when it has a comma, quote, newline, or leading/trailing space (so the
 /// deliberate padding in the corpus survives the round trip).
-/// The INTERNAL libname/target CSV: a missing numeric writes "." — round-trips
+/// The INTERNAL libname/target CSV: a missing numeric writes "." - round-trips
 /// through readCsv and matches every real-SAS golden (BUG-csvregress). The data CSV
 /// stays CLEAN (header + rows); labels persist in a `.labels` sidecar.
 pub fn writeCsv(a: std.mem.Allocator, ds: *const Dataset) diag.Error![]const u8 {
@@ -1282,12 +1282,12 @@ pub fn writeCsv(a: std.mem.Allocator, ds: *const Dataset) diag.Error![]const u8 
 }
 
 /// PROC EXPORT (dbms=csv) differs from the internal writer in two policies, never
-/// in mechanism (D-001): a missing numeric writes an EMPTY field (`,,`) — a "."
-/// there would be read back as data by a strict reader (BUG-exportmissing) — and
+/// in mechanism (D-001): a missing numeric writes an EMPTY field (`,,`) - a "."
+/// there would be read back as data by a strict reader (BUG-exportmissing) - and
 /// an ATTACHED format is PRESERVED (GH#25): live SAS 9.4 EFI exports
 /// `format d yymmdd10.;` as `2024-02-15`, never the day count; BEST12. is only
 /// the DEFAULT for numerics with NO format. This variant is ONLY for the EXPORT
-/// code path — the libname TARGET engine keeps the internal rendering (D-001:
+/// code path - the libname TARGET engine keeps the internal rendering (D-001:
 /// scope to the caller, never the shared writer).
 pub fn writeCsvExport(a: std.mem.Allocator, ds: *const Dataset) diag.Error![]const u8 {
     return writeCsvImpl(a, ds, .exporting);
@@ -1295,7 +1295,7 @@ pub fn writeCsvExport(a: std.mem.Allocator, ds: *const Dataset) diag.Error![]con
 
 /// Which caller is serializing. The impl below forks on this for exactly the two
 /// documented policy differences (missing rendering, BUG-exportmissing; attached
-/// formats, GH#25) — everything else is byte-identical for both callers, per
+/// formats, GH#25) - everything else is byte-identical for both callers, per
 /// D-001's "scope any behavior change to the caller".
 const CsvVariant = enum { internal, exporting };
 
@@ -1323,13 +1323,13 @@ fn writeCsvImpl(a: std.mem.Allocator, ds: *const Dataset, variant: CsvVariant) d
     // independent grounds, so writing one produces a file that is a lie:
     //
     //  (1) THE HEADER. A record of k fields is k-1 delimiters, and the fewest
-    //      fields any line can yield is ONE (possibly empty) — there is no line
+    //      fields any line can yield is ONE (possibly empty) - there is no line
     //      that yields zero. So a 0-column header row is inexpressible: the
     //      empty line we used to emit says "one column whose name is empty",
     //      which every CSV reader must then invent a name for (ours made VAR1;
     //      Excel/R make "" or "X1"). A variable is FABRICATED.
     //  (2) THE OBSERVATIONS. Even granting a convention that an empty header
-    //      means 0 columns, each observation is then a ZERO-LENGTH record — so
+    //      means 0 columns, each observation is then a ZERO-LENGTH record - so
     //      N obs and N+1 obs differ by exactly one trailing '\n', which is also
     //      exactly what "the file ends with a newline" looks like. The obs count
     //      would ride entirely on trailing whitespace that editors, git and
@@ -1339,12 +1339,12 @@ fn writeCsvImpl(a: std.mem.Allocator, ds: *const Dataset, variant: CsvVariant) d
     // (an unsupported case errors visibly, never no-ops) the write REFUSES.
     // Same conclusion and same rc as the sibling native writer, which returns
     // error.Unsupported for ncol==0 (sas7bdat.zig; GAP-xport0colskip,
-    // SEV-zerocolrefusal) — a gap is 2 under D-009.
+    // SEV-zerocolrefusal) - a gap is 2 under D-009.
     //
     // The guard is in the SHARED impl deliberately, and that does NOT violate
     // D-001: D-001 forbids changing the writer's behaviour FOR ONE CALLER
     // (BUG-csvregress). The format's inability to hold 0 columns is identical
-    // for both callers, and BOTH were probed writing the same 2-byte lie —
+    // for both callers, and BOTH were probed writing the same 2-byte lie -
     // the libname TARGET path (main.writeMember) and PROC EXPORT (proc.runExport,
     // which was SILENT at rc=0). Guarding only the ticket's path would leave the
     // sibling caller broken.
@@ -1353,7 +1353,7 @@ fn writeCsvImpl(a: std.mem.Allocator, ds: *const Dataset, variant: CsvVariant) d
     // one bad member does not abort writeLibOutputs' remaining (good) members;
     // main.writeMember skips a zero-length body exactly as it already does for
     // the .sas7bdat one. ponytail: PROC EXPORT still creates a 0-BYTE outfile
-    // (proc.zig writes the body unconditionally) — loud and rc=2, and 0 bytes
+    // (proc.zig writes the body unconditionally) - loud and rc=2, and 0 bytes
     // reads back as nothing rather than a phantom column, so it is honest but
     // untidy. Upgrade path: the same `len > 0` guard at proc.zig's writeFileRaw.
     if (ds.columns.items.len == 0) {
@@ -1361,7 +1361,7 @@ fn writeCsvImpl(a: std.mem.Allocator, ds: *const Dataset, variant: CsvVariant) d
         // libname path writes no file at all; PROC EXPORT still creates an empty
         // one (see the ponytail note above). Over-claiming here is the exact
         // defect SEV-zerocolrefusal had to correct in the sibling message.
-        loudUnsup("CSV: {s} has 0 variables and CANNOT be written as CSV — an empty header row reads back as one phantom column, and a 0-column observation is a zero-length record indistinguishable from a trailing newline; no CSV body is produced and this data set does NOT survive the run", .{ds.name});
+        loudUnsup("CSV: {s} has 0 variables and CANNOT be written as CSV - an empty header row reads back as one phantom column, and a 0-column observation is a zero-length record indistinguishable from a trailing newline; no CSV body is produced and this data set does NOT survive the run", .{ds.name});
         return "";
     }
     var buf: std.ArrayList(u8) = .empty;
@@ -1373,15 +1373,15 @@ fn writeCsvImpl(a: std.mem.Allocator, ds: *const Dataset, variant: CsvVariant) d
     for (ds.rows.items) |row| {
         for (row, 0..) |v, i| {
             if (i > 0) try buf.append(a, ',');
-            // GH#25 (EXPORT ONLY — D-001): live SAS 9.4 EFI PRESERVES an attached
+            // GH#25 (EXPORT ONLY - D-001): live SAS 9.4 EFI PRESERVES an attached
             // format; the in-tree NOTE-exportformatraw ruling over-generalized the
             // doc's SASHELP.CLASS example (whose numerics carry NO formats, so its
             // generated `format <var> best12.;` lines were re-stating the source
-            // data, not stripping formats) — a real EFI log for SASHELP.CARS keeps
+            // data, not stripping formats) - a real EFI log for SASHELP.CARS keeps
             // `format MSRP dollar8.;`, and comma separators show up in exported
             // CSVs exactly for COMMA/DOLLAR-formatted columns. Overturned, not
             // worked around: see docs/decisions.md D-027. Char columns stay
-            // verbatim as before — ponytail: whether EFI applies an attached CHAR
+            // verbatim as before - ponytail: whether EFI applies an attached CHAR
             // format (`$upcase.`) is unruled; no fixture pins it.
             const fmt: ?[]const u8 = if (variant == .exporting) ds.columns.items[i].format else null;
             switch (v) {
@@ -1394,7 +1394,7 @@ fn writeCsvImpl(a: std.mem.Allocator, ds: *const Dataset, variant: CsvVariant) d
                     if (fmt) |f| {
                         // Render exactly as `put v f;` does (the same format.apply
                         // the PUT statement dispatches), then strip the LEADING
-                        // width padding — EFI writes the value, not the field:
+                        // width padding - EFI writes the value, not the field:
                         // dollar10.2 exports `$8,765.40`, not `  $8,765.40`.
                         // Trailing blanks are NOT stripped: numeric formats
                         // right-justify so they never emit any, and a user VALUE
@@ -1408,13 +1408,13 @@ fn writeCsvImpl(a: std.mem.Allocator, ds: *const Dataset, variant: CsvVariant) d
                     try buf.append(a, '.') // internal libname: missing → "."
                 else if (Value.missingChar(x) != '.') {
                     // NOTE-exportspecialmiss: EXPORT keeps the special-missing
-                    // letter (.A–.Z, ._) — an empty field erased the "missing
+                    // letter (.A–.Z, ._) - an empty field erased the "missing
                     // because A" vs "just missing" distinction. Plain missing
                     // stays empty (BUG-exportmissing). The internal path above
                     // keeps ".": readDelimited can't round-trip a letter back.
                     // A format does NOT redirect this: a missing under yymmdd10.
                     // renders "         ." via put, but EFI's missing handling
-                    // wins — the field stays empty / lettered (BUG-exportmissing
+                    // wins - the field stays empty / lettered (BUG-exportmissing
                     // + NOTE-exportspecialmiss keep their verdicts under GH#25).
                     try buf.appendSlice(a, &[2]u8{ '.', Value.missingChar(x) });
                 },
@@ -1431,10 +1431,10 @@ pub const label_ext = ".labels";
 /// The `.labels` sidecar body for `ds`: one CSV-encoded `name,label,format,informat`
 /// record per column that carries ANY of those attrs (empty field = attr absent),
 /// or null when the dataset has none. These attributes are NOT in the data CSV /
-/// sas7bdat, so they'd be lost on reload — the sidecar carries them (F-varlabels;
+/// sas7bdat, so they'd be lost on reload - the sidecar carries them (F-varlabels;
 /// extends BUG-labelspersist from labels to format/informat). The DATASET label
 /// (PROC DATASETS MODIFY (LABEL=), SDTM domain descriptions) rides as a record
-/// whose name field is the reserved marker `*` — never a legal SAS column name,
+/// whose name field is the reserved marker `*` - never a legal SAS column name,
 /// so old readers can't misapply it to a column (F8: without it the dataset
 /// label had NO persistence path and a fresh session could never recover it).
 /// Backward-compatible: an old 2-field `name,label` sidecar still applies its label.
@@ -1462,7 +1462,7 @@ pub fn labelSidecar(a: std.mem.Allocator, ds: *const Dataset) diag.Error!?[]cons
 
 /// Apply a `.labels` sidecar's bytes to a just-read dataset's columns (no-op for a
 /// missing/empty sidecar or a name the dataset doesn't have). Fields after the
-/// name — label, format, informat — are each applied only when non-empty, so an
+/// name - label, format, informat - are each applied only when non-empty, so an
 /// old 2-field `name,label` sidecar still works (F-varlabels).
 pub fn applyLabelSidecar(a: std.mem.Allocator, ds: *Dataset, bytes: []const u8) diag.Error!void {
     var lines = std.mem.splitScalar(u8, bytes, '\n');
@@ -1484,7 +1484,7 @@ pub fn applyLabelSidecar(a: std.mem.Allocator, ds: *Dataset, bytes: []const u8) 
 /// Parse CSV text into a dataset (the `.csv` libname engine). Row 1 names the
 /// columns; numeric columns are inferred from the whole column
 /// (BUG-csvnumtype). Date/time detection is PROC IMPORT-only
-/// (`detect_dates=false` here) — the `.csv` member engine is an opensas
+/// (`detect_dates=false` here) - the `.csv` member engine is an opensas
 /// convenience with no SAS counterpart, so its date-shaped columns stay char
 /// (GAP-importtypes).
 pub fn readCsv(a: std.mem.Allocator, text: []const u8, name: []const u8) diag.Error!*Dataset {
@@ -1492,10 +1492,10 @@ pub fn readCsv(a: std.mem.Allocator, text: []const u8, name: []const u8) diag.Er
 }
 
 /// Build the `sashelp.vtable` dictionary view: one row per in-memory library
-/// member — LIBNAME (the libref, WORK when the name is one-level), MEMNAME (the
+/// member - LIBNAME (the libref, WORK when the name is one-level), MEMNAME (the
 /// member), MEMTYPE ("DATA"), NOBS, NVAR. Char values are upper-cased per SAS's
 /// dictionary convention so `where libname="TARGET"` matches. Called fresh at each
-/// reference (exec.resolveDataset) so it reflects the current library state —
+/// reference (exec.resolveDataset) so it reflects the current library state -
 /// %XPT_CREAT enumerates TARGET members from it to drive its XPORT copy loop, and
 /// any dataset-listing program can read it (BUG-xptcreat-novtable).
 pub fn buildVtable(a: std.mem.Allocator, names: []const []const u8, datasets: []const *Dataset) std.mem.Allocator.Error!*Dataset {
@@ -1523,10 +1523,10 @@ pub fn buildVtable(a: std.mem.Allocator, names: []const []const u8, datasets: []
     }
 
     // GAP-vtabledisk: a libref's DISK-ONLY (never-loaded) members belong in the
-    // dictionary view too — a real XPT-export macro discovers its export list
+    // dictionary view too - a real XPT-export macro discovers its export list
     // from VTABLE, and lazy loading means most members were never SET. Dedupe
     // against loaded members and across engine extensions (dm.sas7bdat + dm.csv
-    // = one member DM). ponytail: disk-only rows carry MISSING nobs/nvar —
+    // = one member DM). ponytail: disk-only rows carry MISSING nobs/nvar -
     // counting means parsing every member file; add when a program reads them.
     var seen: std.StringHashMapUnmanaged(void) = .empty;
     for (ds.rows.items) |r| { // in-memory rows, already upper-cased
@@ -1563,12 +1563,12 @@ pub fn buildVtable(a: std.mem.Allocator, names: []const []const u8, datasets: []
 }
 
 /// Build the `dictionary.columns` / `sashelp.vcolumn` dictionary view: one row per
-/// column of every in-memory library member — LIBNAME (libref, WORK when one-level),
+/// column of every in-memory library member - LIBNAME (libref, WORK when one-level),
 /// MEMNAME (member), NAME (the variable, case preserved as SAS does), TYPE ("char"/
 /// "num"), LENGTH, LABEL, VARNUM (1-based). LIBNAME/MEMNAME upper-cased per the
 /// dictionary convention so `where libname="WORK"` matches. Built fresh at each
 /// reference so it reflects the current library state (ISS-dictviews). ponytail:
-/// only in-memory members (no disk-only sweep — that needs parsing each member's
+/// only in-memory members (no disk-only sweep - that needs parsing each member's
 /// schema; add when a program reads columns of an unloaded member).
 pub fn buildVcolumn(a: std.mem.Allocator, names: []const []const u8, datasets: []const *Dataset) std.mem.Allocator.Error!*Dataset {
     const ds = try a.create(Dataset);
@@ -1623,8 +1623,8 @@ pub fn readDelimited(a: std.mem.Allocator, text: []const u8, name: []const u8, d
 
     // Collect records (CR-trimmed) so DATAROW can index them. The split is
     // QUOTE-AWARE (BUG-importdelimread): under DSD a '\n' (or '\r\n') inside an
-    // open double-quoted field is field data — clinical AE verbatim/comment
-    // text spans lines — not a record boundary; only an unquoted line break
+    // open double-quoted field is field data - clinical AE verbatim/comment
+    // text spans lines - not a record boundary; only an unquoted line break
     // ends the record. Quote state opens only at a field start (record start /
     // just past the delimiter), matching parseCsvLine, and "" is one escaped
     // quote. An embedded break keeps its raw bytes inside the field value.
@@ -1659,7 +1659,7 @@ pub fn readDelimited(a: std.mem.Allocator, text: []const u8, name: []const u8, d
     var ncol: usize = 0;
     if (getnames) {
         // BUG-csvzerocolphantom: an EMPTY header record declares no columns, so
-        // there is nothing to name — inventing `VAR1` here fabricated a variable
+        // there is nothing to name - inventing `VAR1` here fabricated a variable
         // nobody declared, and it was SILENT (rc=0). Probed on the 2-byte
         // `"\n\n"` a 0-variable member used to write: reload reported
         // `Observations 0, Variables 1`, i.e. the observation lost AND a column
@@ -1667,15 +1667,15 @@ pub fn readDelimited(a: std.mem.Allocator, text: []const u8, name: []const u8, d
         // such a file, but files already on disk (and foreign CSVs that open
         // with a blank line) still reach here, so the reader refuses too: no
         // columns, no rows, and LOUD (rc=2) rather than a quietly wrong dataset.
-        // Narrow on purpose — only a ZERO-LENGTH record. A header like `a,,c`
+        // Narrow on purpose - only a ZERO-LENGTH record. A header like `a,,c`
         // (or `,,`) declares real, merely unnamed columns and keeps the normal
         // VAR-n naming, which is what PROC IMPORT does.
         if (all.items[0].len == 0) {
-            loudUnsup("CSV: {s} — the header row declares NO columns (empty first record); a 0-variable data set has no CSV encoding, so nothing is loaded", .{name});
+            loudUnsup("CSV: {s} - the header row declares NO columns (empty first record); a 0-variable data set has no CSV encoding, so nothing is loaded", .{name});
             return ds;
         }
         const hfields = try parseCsvLine(a, all.items[0], delim);
-        // Header text → valid V7 names, deduped — the same mangling the XLSX
+        // Header text → valid V7 names, deduped - the same mangling the XLSX
         // path uses (GH#62), so `First Name`/`Age (yrs)`/`2nd` →
         // `First_Name`/`Age__yrs_`/`_2nd` and duplicate `age,age` →
         // `age`,`age0`. Raw headers were unreferenceable downstream
@@ -1706,11 +1706,11 @@ pub fn readDelimited(a: std.mem.Allocator, text: []const u8, name: []const u8, d
     }
 
     // Infer type: a column becomes numeric when it has at least one non-missing
-    // value and every non-missing value parses as a number — so a numeric column
+    // value and every non-missing value parses as a number - so a numeric column
     // sorts/compares numerically, not lexically (BUG-csvnumtype). A significant
     // leading zero does NOT keep the column character: live SAS 9.4 EFI types an
     // all-digit zero-padded column (`0001`) NUMERIC (informat BEST32.) and reads
-    // `1` (GH#29, BUG-importleadingzero — the old keep-char choice was an
+    // `1` (GH#29, BUG-importleadingzero - the old keep-char choice was an
     // unrecorded deviation, overturned and recorded as D-026).
     for (0..ncol) |ci| {
         var any = false;
@@ -1729,11 +1729,11 @@ pub fn readDelimited(a: std.mem.Allocator, text: []const u8, name: []const u8, d
 
     // EFI date/time guessing (GAP-importtypes), PROC IMPORT only: a
     // still-character column whose EVERY non-missing value fits the SAME
-    // recognised date/time pattern becomes NUMERIC with that format attached —
+    // recognised date/time pattern becomes NUMERIC with that format attached -
     // Procedures Guide p. 1330 (see format.importDateGuess for the recognised
     // set + citations). A MIXED column stays character: one informat must fit
     // every value, else "the type remains character". ponytail: field quoting
-    // is lost by parseCsvLine, so a QUOTED date is detected too — SAS's EFI
+    // is lost by parseCsvLine, so a QUOTED date is detected too - SAS's EFI
     // default keeps quoted values character (p. 1325 EFI_QUOTED_NUMERICS);
     // the numeric inference above has always had that ceiling. Upgrade path:
     // thread per-field quoted flags through parseCsvLine.
@@ -1819,7 +1819,7 @@ pub fn validName(arena: std.mem.Allocator, raw: []const u8, col: usize) []const 
 /// Ensure `name` is unique (case-insensitively) among `used`, appending it.
 /// SAS PROC IMPORT dedups collided names by appending an increasing integer
 /// (Foo, Foo0, Foo1, …), truncating the base so the result stays ≤32 bytes.
-/// ponytail: append-0,1,2 with 32-byte cap — Language Reference: Concepts documents V7 but not the
+/// ponytail: append-0,1,2 with 32-byte cap - Language Reference: Concepts documents V7 but not the
 /// import dedup scheme; this matches observed SAS behavior. Revisit if a corpus
 /// case shows a different suffix start.
 pub fn uniqueName(arena: std.mem.Allocator, used: *std.ArrayList([]const u8), name: []const u8) ![]const u8 {
@@ -1848,8 +1848,8 @@ fn nameTaken(used: []const []const u8, name: []const u8) bool {
 /// O(C) accepted-name set for GETNAMES header dedup (PERF-importhdrquad):
 /// uniqueName's naming policy byte-identically (first wins unchanged; else
 /// base+0,1,2,… truncated to ≤32 bytes; case-insensitive membership), but the
-/// membership test is a lowercase-keyed hash set — the same pattern as
-/// exec.zig's freezeNameList — instead of nameTaken's O(C) rescan per column,
+/// membership test is a lowercase-keyed hash set - the same pattern as
+/// exec.zig's freezeNameList - instead of nameTaken's O(C) rescan per column,
 /// which made a C-column import O(C²). ponytail: the XLSX path still uses
 /// uniqueName (quadratic) because its call site is proc.zig, another dev's
 /// file; switch it to NameSet when that lock clears.
@@ -1937,11 +1937,11 @@ fn fmtCsvNum(a: std.mem.Allocator, x: f64) ![]const u8 {
 /// `rename = ( x = z )`. keep/drop restrict the columns; rename relabels them.
 /// The parse is deliberately here (io owns the dataset shape); the CLI just
 /// hands over the token slice. ponytail: no WHERE=/FIRSTOBS=/OBS= yet, and
-/// keep/drop use original names (applied before rename) — SAS's exact
+/// keep/drop use original names (applied before rename) - SAS's exact
 /// keep-vs-rename ordering can wait for a corpus fixture that pins it.
 /// `input` selects DKRICOND (input datasets: SET/MERGE/UPDATE source, PROC SQL
 /// FROM) vs DKROCOND (output datasets + DROP/KEEP/RENAME statement). SAS 9.4
-/// defaults DKRICOND=ERROR (fatal, step aborts) and DKROCOND=WARN — so a
+/// defaults DKRICOND=ERROR (fatal, step aborts) and DKROCOND=WARN - so a
 /// keep/drop/rename of a nonexistent variable is fatal on INPUT, a warning on
 /// OUTPUT (GH#71 corrects GH#22's "both WARN" premise).
 pub fn applyDatasetOptions(a: std.mem.Allocator, ds: *Dataset, opt_toks: []const lex.Token, diags: *diag.Diagnostics, input: bool) diag.Error!void {
@@ -1952,7 +1952,7 @@ pub fn applyDatasetOptions(a: std.mem.Allocator, ds: *Dataset, opt_toks: []const
 /// (BUG-dropoptfalsewarn). The OUTPUT-option "never been referenced" check
 /// runs against the FINALIZED dataset, whose schema the executor already
 /// stripped of temporary PDV vars (SET end=/in= temps, statement-dropped
-/// vars) — `data b(drop=e); set a end=e;` false-warned though `e` was plainly
+/// vars) - `data b(drop=e); set a end=e;` false-warned though `e` was plainly
 /// referenced. The STATEMENT path validates against the PDV
 /// (exec.assertReferenced); handing the same set in makes both spellings of
 /// DROP/KEEP/RENAME reach the SAME answer (D-009b's corollary).
@@ -1964,7 +1964,7 @@ pub fn applyDatasetOptionsRefs(a: std.mem.Allocator, ds: *Dataset, opt_toks: []c
 /// THEY CURRENTLY STAND (i.e. after any WHERE filter already applied). INPUT
 /// only; on OUTPUT SAS ignores the range. Global `options firstobs=/obs=`
 /// supply the defaults. Split out of applyDatasetOptionsObs (BUG-wherestmtobsorder)
-/// so the DATA-step WHERE STATEMENT can filter BEFORE this counts positions —
+/// so the DATA-step WHERE STATEMENT can filter BEFORE this counts positions -
 /// mirroring the where= OPTION, which already filters first within one call.
 pub fn applyObsSlice(a: std.mem.Allocator, ds: *Dataset, opt_toks: []const lex.Token, input: bool, obs_out: ?*?[]const usize) diag.Error!void {
     if (!input) return;
@@ -1976,7 +1976,7 @@ pub fn applyObsSlice(a: std.mem.Allocator, ds: *Dataset, opt_toks: []const lex.T
             // parseObsValue honours integers, the K/M/G suffix (`obs=2k` is
             // 2048), MAX and MIN. A value it REJECTS (`obs=abc`, `firstobs=-1`)
             // is not applied here and is diagnosed LOUD by the option walk in
-            // applyDatasetOptionsObs (BUG-dsobsvaluenovalidate) — this fn has
+            // applyDatasetOptionsObs (BUG-dsobsvaluenovalidate) - this fn has
             // no diags of its own (exec.zig calls it directly).
             if (eqiTok(opt_toks[i].text, "firstobs")) {
                 if (parseObsValue(opt_toks, i + 2)) |pv| firstobs = pv.val;
@@ -1988,7 +1988,7 @@ pub fn applyObsSlice(a: std.mem.Allocator, ds: *Dataset, opt_toks: []const lex.T
     if (firstobs > 1 or last != std.math.maxInt(usize)) {
         const n = ds.rows.items.len;
         // FIRSTOBS=MAX starts at the LAST observation (BUG-dsobsvaluenovalidate
-        // — it used to fall off the parse and silently return ALL rows).
+        // - it used to fall off the parse and silently return ALL rows).
         const lo = @min(if (firstobs == std.math.maxInt(usize)) n -| 1 else if (firstobs > 0) firstobs - 1 else 0, n);
         const hi = @min(last, n); // rows[lo..hi] = obs firstobs..obs (1-based)
         if (obs_out) |t| { // surviving range = source obs lo+1..hi (or a re-slice of the prior list)
@@ -2017,11 +2017,11 @@ pub fn applyObsSlice(a: std.mem.Allocator, ds: *Dataset, opt_toks: []const lex.T
 /// the list for its Obs column; every other caller passes null.
 pub fn applyDatasetOptionsObs(a: std.mem.Allocator, ds: *Dataset, opt_toks: []const lex.Token, diags: *diag.Diagnostics, input: bool, skip_obs_slice: bool, obs_out: ?*?[]const usize, pdv_refs: []const []const u8) diag.Error!void {
     // `where=(expr)` filters rows FIRST (BUG-whereobsorder): SAS applies WHERE
-    // before firstobs=/obs= count POSITIONS within the WHERE-selected subset —
+    // before firstobs=/obs= count POSITIONS within the WHERE-selected subset -
     // slicing first kept the wrong rows. The WHERE also runs while the original
     // columns are still present (a `keep=`/`rename=` might otherwise remove a
     // column it references), and SAS applies `rename=` BEFORE evaluating the
-    // WHERE, so a WHERE that references the RENAMED (new) name must resolve —
+    // WHERE, so a WHERE that references the RENAMED (new) name must resolve -
     // pass the rename map so applyWhere also exposes each new name
     // (BUG-setwhererename).
     var wr_old: std.ArrayList([]const u8) = .empty;
@@ -2031,13 +2031,13 @@ pub fn applyDatasetOptionsObs(a: std.mem.Allocator, ds: *Dataset, opt_toks: []co
 
     // `firstobs=`/`obs=`: the observation range to read, counted as 1-based
     // POSITIONS WITHIN the WHERE-selected rows above (`obs=k` is the LAST
-    // position — an upper bound, not a count). With no where= this is the raw
+    // position - an upper bound, not a count). With no where= this is the raw
     // physical range, unchanged (G-dsopt: these were parsed but silently
     // ignored → wrong data). On an INPUT read the global `options
     // obs=/firstobs=` supply the DEFAULT range; a per-dataset option below
     // overrides it field by field (BUG-globalobs). obs=/firstobs= are
     // INPUT-ONLY options: on an OUTPUT dataset SAS ignores them and writes ALL
-    // rows — applying the slice there silently drops output rows
+    // rows - applying the slice there silently drops output rows
     // (BUG-outdsobsslice). where= stays honored on output (applied above).
     // skip_obs_slice: the DATA-step WHERE STATEMENT path defers this slice to
     // after applyWhereStmt so firstobs=/obs= count positions within the
@@ -2076,7 +2076,7 @@ pub fn applyDatasetOptionsObs(a: std.mem.Allocator, ds: *Dataset, opt_toks: []co
                 if (i < opt_toks.len) i += 1; // past `)`
             }
         } else if (eqiTok(key, "where")) {
-            // Consumed by applyWhere above — skip the balanced (…) so a
+            // Consumed by applyWhere above - skip the balanced (…) so a
             // `name =` INSIDE the predicate never reaches the unknown-option
             // error below (over-strictness guard, D-014's lesson).
             if (i < opt_toks.len and opt_toks[i].tag == .lparen) {
@@ -2092,11 +2092,11 @@ pub fn applyDatasetOptionsObs(a: std.mem.Allocator, ds: *Dataset, opt_toks: []co
                 }
             }
         } else if (eqiTok(key, "firstobs") or eqiTok(key, "obs")) {
-            // BUG-dsobsvaluenovalidate (F5): the VALUE is validated on INPUT —
+            // BUG-dsobsvaluenovalidate (F5): the VALUE is validated on INPUT -
             // the system-option and INFILE-option paths both fail loud on
             // `obs=abc` / `firstobs=0` / `firstobs=-1` while this path silently
             // read EVERY row (and `obs=2k` silently sliced 2). Same wording as
-            // the OPTIONS handler; on INPUT mirror the unknown-option arm —
+            // the OPTIONS handler; on INPUT mirror the unknown-option arm -
             // 0 rows, never the unbounded superset. On OUTPUT the range is
             // ignored entirely (settled, BUG-outdsobsslice) → nothing to
             // validate, consume loosely.
@@ -2123,18 +2123,18 @@ pub fn applyDatasetOptionsObs(a: std.mem.Allocator, ds: *Dataset, opt_toks: []co
             if (i < opt_toks.len) i += 1;
         } else {
             // BUG-wheredsoptswallow: a misspelled or unimplemented option used
-            // to fall through this chain and vanish — `set d(wehre=(x>2))`
+            // to fall through this chain and vanish - `set d(wehre=(x>2))`
             // then ran UNFILTERED at exit 0, a silent superset of the intended
             // rows (a typo in a filter silently DISABLES it). Fail loud
             // (D-002), naming the option so the typo is obvious; on INPUT
-            // mirror whereoptunknownvar — 0 rows, never the superset.
+            // mirror whereoptunknownvar - 0 rows, never the superset.
             // NOTE-typoarmgapwording: the WORDING splits on who is wrong
             // (macro.zig's STORE/STROE split). A DOCUMENTED option opensas has
-            // not implemented (pw=/whereup=/… — every word in
+            // not implemented (pw=/whereup=/… - every word in
             // documentedDsoptGap) is valid SAS 9.4, an opensas gap, so it says
-            // "is not supported" (its rc stays 1 here — exec.zig's hash pw=
+            // "is not supported" (its rc stays 1 here - exec.zig's hash pw=
             // test pins it; making every gap path exit 2 is DEC-abortrcvsD009).
-            // Anything else is a TYPO — the user's own SAS, rc 1 (D-009) — so
+            // Anything else is a TYPO - the user's own SAS, rc 1 (D-009) - so
             // it says "Unrecognized", never the gap vocabulary a downstream
             // agent routes on.
             if (documentedDsoptGap(key)) {
@@ -2150,9 +2150,9 @@ pub fn applyDatasetOptionsObs(a: std.mem.Allocator, ds: *Dataset, opt_toks: []co
         }
     }
 
-    // GH#22 ISS-dkrocondwarn / GH#71: a keep/drop name — or a rename OLD name —
+    // GH#22 ISS-dkrocondwarn / GH#71: a keep/drop name - or a rename OLD name -
     // that matches NO column is a typo. Severity follows the DKRICOND=/DKROCOND=
-    // system options (SAS 9.4 defaults: ERROR on INPUT, WARN on OUTPUT — a warn
+    // system options (SAS 9.4 defaults: ERROR on INPUT, WARN on OUTPUT - a warn
     // still runs the step, RC=4). Nonexistent names are simply ignored, never a
     // halt of their own. GH#19 wrongly ERRORed+aborted unconditionally here.
     // `ds` is the right set at each call site: input opts run against the
@@ -2167,7 +2167,7 @@ pub fn applyDatasetOptionsObs(a: std.mem.Allocator, ds: *Dataset, opt_toks: []co
         const mask = try a.alloc(bool, ds.columns.items.len);
         for (ds.columns.items, 0..) |c, ci| {
             // keep-then-drop (BUG-whereobsorder): a var survives iff it is in
-            // keep= (when keep= is given) AND not in drop= — a var explicitly
+            // keep= (when keep= is given) AND not in drop= - a var explicitly
             // kept then dropped is dropped; keep= no longer disables drop=.
             mask[ci] = (keep.items.len == 0 or nameIn(keep.items, c.name)) and !nameIn(drop.items, c.name);
         }
@@ -2176,7 +2176,7 @@ pub fn applyDatasetOptionsObs(a: std.mem.Allocator, ds: *Dataset, opt_toks: []co
 
     // rename: relabel columns (original names still valid here). If the target
     // name is already taken by a *different* column, renaming would create two
-    // identically-named columns — data loss when a later `set` collapses them.
+    // identically-named columns - data loss when a later `set` collapses them.
     // SAS WARNS ("Variable … already exists") and leaves the column unrenamed;
     // we do the same (BUG-renamedup). Severity matters since BUG-errhalt: an
     // .err here would wrongly poison every downstream step into syntax-check
@@ -2185,7 +2185,7 @@ pub fn applyDatasetOptionsObs(a: std.mem.Allocator, ds: *Dataset, opt_toks: []co
         const ci = ds.indexOf(o) orelse continue;
         if (ds.indexOf(n)) |taken| if (taken != ci) {
             // Route through Diagnostics (rendered by the CLI after the run), NOT a
-            // raw std.debug.print — printing to stderr *during* a unit test corrupts
+            // raw std.debug.print - printing to stderr *during* a unit test corrupts
             // `zig build test`'s --listen= IPC and fails the run intermittently
             // (BUG-transposedup). The rename is still refused, as SAS does.
             diags.report(.warning, 0, "Variable {s} already exists on dataset {s}", .{ n, ds.name }) catch {};
@@ -2195,7 +2195,7 @@ pub fn applyDatasetOptionsObs(a: std.mem.Allocator, ds: *Dataset, opt_toks: []co
     }
 }
 
-/// Report every `names` entry that resolves to no column of `ds` — the "never
+/// Report every `names` entry that resolves to no column of `ds` - the "never
 /// been referenced" case shared by keep=/drop= and the rename OLD names. SAS
 /// uppercases the name here. Severity follows the DKRICOND=/DKROCOND= system
 /// options (Language Reference: Concepts pp.184-185; io.global_dkricond/global_dkrocond, SAS 9.4
@@ -2205,11 +2205,11 @@ fn reportUnreferenced(a: std.mem.Allocator, ds: *const Dataset, names: []const [
     const lvl = if (input) global_dkricond else global_dkrocond;
     if (lvl == .nowarn) return;
     for (names) |name| {
-        // `pfx:` name-prefix wildcard is a pattern, not a literal name — skip it.
+        // `pfx:` name-prefix wildcard is a pattern, not a literal name - skip it.
         if (name.len > 0 and name[name.len - 1] == ':') continue;
         if (ds.indexOf(name) != null) continue;
         // A var the producing step held in its PDV but excluded from the
-        // output schema (end=/in= temp, statement-dropped) WAS referenced —
+        // output schema (end=/in= temp, statement-dropped) WAS referenced -
         // the statement path's PDV check (exec.assertReferenced) says so.
         const in_pdv = for (pdv_refs) |r| {
             if (eqi(r, name)) break true;
@@ -2223,15 +2223,15 @@ fn reportUnreferenced(a: std.mem.Allocator, ds: *const Dataset, names: []const [
 /// Apply a `where=(expr)` input dataset option: keep only rows for which the
 /// predicate is true. The predicate is parsed and evaluated per row against a
 /// throwaway PDV, so no executor state is involved. BUG-wherefunc: the PDV is
-/// throwaway, the diags and call_fn must be REAL — a local sink with no
+/// throwaway, the diags and call_fn must be REAL - a local sink with no
 /// dispatch made `where=(upcase(x)="Y")` silently misfilter (function →
 /// unsupported → missing, error invisible; fail-loud violated).
 fn applyWhere(a: std.mem.Allocator, ds: *Dataset, opt_toks: []const lex.Token, rn_old: []const []const u8, rn_new: []const []const u8, diags: *diag.Diagnostics, obs_out: ?*?[]const usize) !void {
     const wtoks = try extractWhere(a, opt_toks) orelse return;
 
     // Desugar SQL-style infix predicates (IS [NOT] NULL/MISSING, BETWEEN, LIKE,
-    // CONTAINS) to ordinary expressions BEFORE parsing — the exact path PROC SQL
-    // takes — so where=(nd is null) agrees with missing()/PROC SQL instead of
+    // CONTAINS) to ordinary expressions BEFORE parsing - the exact path PROC SQL
+    // takes - so where=(nd is null) agrees with missing()/PROC SQL instead of
     // silently dropping the `is null` tokens and inverting (GH#35 ISS-wherenull).
     // desugarPredicates reports its own specifics (BUG-wherebetweenexpr); the
     // old generic "unable to parse" catch would double-report.
@@ -2247,7 +2247,7 @@ fn applyWhere(a: std.mem.Allocator, ds: *Dataset, opt_toks: []const lex.Token, r
         return diags.report(.err, pp.peek().line, "unexpected token '{s}' in WHERE= dataset-option predicate", .{pp.peek().text}) catch {};
 
     // Every variable the predicate names must be a column of the source (or a
-    // rename= NEW name it's evaluated against) — an unknown name evals to missing
+    // rename= NEW name it's evaluated against) - an unknown name evals to missing
     // and silently filtered EVERY row (BUG-whereoptunknownvar). Fail loud like
     // the WHERE STATEMENT path (exec.checkWhereVars): report, drop all rows, stop.
     if (!whereVarOnDataset(cond, ds, rn_new, diags)) {
@@ -2267,14 +2267,14 @@ fn applyWhere(a: std.mem.Allocator, ds: *Dataset, opt_toks: []const lex.Token, r
             try pdv.set(col.name, row[j]);
             // SAS renames before the WHERE, so a where= on the NEW name resolves;
             // also keep the OLD name defined so a where= on it still works (the
-            // existing control) — BUG-setwhererename.
+            // existing control) - BUG-setwhererename.
             for (rn_old, rn_new) |o, n| if (eqiTok(o, col.name)) {
                 _ = try pdv.define(n, col.type);
                 try pdv.set(n, row[j]);
             };
         }
         // WHERE-context truthiness (Language Reference: Concepts p.216): a bare char var means
-        // non-blank — whereTruthy, NOT the IF rule (BUG-wherebarechar).
+        // non-blank - whereTruthy, NOT the IF rule (BUG-wherebarechar).
         if ((try ev.eval(cond)).whereTruthy()) {
             try kept.append(a, row);
             if (obs_out) |t| try kept_obs.append(a, if (t.*) |l| l[ri] else ri + 1);
@@ -2392,12 +2392,12 @@ fn nameIn(list: []const []const u8, name: []const u8) bool {
     return false;
 }
 
-/// SAS 9.4 dataset options that are DOCUMENTED but unimplemented here — the
+/// SAS 9.4 dataset options that are DOCUMENTED but unimplemented here - the
 /// "SAS Data Set Options" chapter of Language Reference: Concepts (the whereup= cite at printed
 /// p.215 is one entry) minus the seven this file honours
 /// (where/keep/drop/rename/firstobs/obs/in). The unknown-option arm uses it to
 /// tell a real opensas gap ("is not supported") from a user typo
-/// ("Unrecognized") — NOTE-typoarmgapwording, macro.zig's STORE/STROE split.
+/// ("Unrecognized") - NOTE-typoarmgapwording, macro.zig's STORE/STROE split.
 fn documentedDsoptGap(name: []const u8) bool {
     const words = [_][]const u8{
         "alter",   "bufno",      "bufsize",          "cntllev",   "compress", "dldmgaction",
@@ -2445,20 +2445,20 @@ test "CSV round-trip: header, quoting, char/num missing" {
     try std.testing.expect(back.row(1)[1].isMissing()); // numeric missing (.)
 }
 
-test "BUG-csvzerocolphantom: a 0-variable set has NO CSV encoding — write refuses, read never fabricates VAR1" {
+test "BUG-csvzerocolphantom: a 0-variable set has NO CSV encoding - write refuses, read never fabricates VAR1" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
 
     // The documented shape (Macro Language Ref, SYSDATASTEPPHASE ex. 2, printed
-    // p.246: "has 1 observations and 0 variables") — `data x; y=1; drop y; run;`.
+    // p.246: "has 1 observations and 0 variables") - `data x; y=1; drop y; run;`.
     var ds = Dataset.init(a, "work.zed");
     try ds.appendRow(&.{});
     try std.testing.expectEqual(@as(usize, 1), ds.rowCount());
     try std.testing.expectEqual(@as(usize, 0), ds.columns.items.len);
 
-    // WRITE half. Both surfaces refuse — the internal libname writer and PROC
-    // EXPORT's — since the inability is the format's, not the caller's (D-001
+    // WRITE half. Both surfaces refuse - the internal libname writer and PROC
+    // EXPORT's - since the inability is the format's, not the caller's (D-001
     // scopes CALLER behaviour; this is neither caller's choice). Empty body, so
     // main.writeMember's `len > 0` guard writes no file at all; LOUD + D-009 gap.
     diag.resetGap();
@@ -2474,7 +2474,7 @@ test "BUG-csvzerocolphantom: a 0-variable set has NO CSV encoding — write refu
 
     // READ half, pinned SEPARATELY because a file written before this fix is
     // still on disk: the exact 2 bytes the old writer produced must not come
-    // back as a phantom column. Old behaviour was 1 column `VAR1` + 0 rows —
+    // back as a phantom column. Old behaviour was 1 column `VAR1` + 0 rows -
     // observation LOST, variable FABRICATED, both silent.
     diag.resetGap();
     g_test_last_unsup = "";
@@ -2489,7 +2489,7 @@ test "BUG-csvzerocolphantom: a 0-variable set has NO CSV encoding — write refu
     // survive, and BOTH directions now say so loudly instead of disagreeing.
     // (1 obs/0 vars → nothing on disk → nothing back, rather than 0 obs/1 var.)
 
-    // CONTROLS — the guard is narrow. A normal set is untouched...
+    // CONTROLS - the guard is narrow. A normal set is untouched...
     var ok = Dataset.init(a, "work.ok");
     _ = try ok.addColumn("x", .num);
     try ok.appendRow(&.{.{ .num = 1 }});
@@ -2553,7 +2553,7 @@ test "readCsv infers numeric columns; text stays char, zero-padded digits go NUM
 
     // id: all numeric → numeric (loads as f64, so it sorts/compares numerically);
     // code: zero-padded all-digit → numeric too (live SAS 9.4 EFI, informat
-    // BEST32.: `007` reads 7 — GH#29/D-026, the old keep-char choice is
+    // BEST32.: `007` reads 7 - GH#29/D-026, the old keep-char choice is
     // overturned); name: text → char; a `.`/empty is missing.
     const ds = try readCsv(a, "id,code,name\n10,007,ann\n2,001,bob\n1,.,\n", "d");
     try std.testing.expectEqual(@as(usize, 3), ds.rowCount());
@@ -2581,7 +2581,7 @@ test "readDelimited: DBMS=DLM semicolon, GETNAMES, DATAROW, GETNAMES=NO (BUG-imp
     const a = arena.allocator();
 
     // `;`-delimited with names on row 1: numeric age; zero-padded all-digit code
-    // is NUMERIC too (live SAS EFI best32. — GH#29/D-026).
+    // is NUMERIC too (live SAS EFI best32. - GH#29/D-026).
     const ds = try readDelimited(a, "name;age;code\nAnn;30;007\nBob;25;010\n", "d", ';', true, 2, true);
     try std.testing.expectEqual(@as(usize, 3), ds.columns.items.len);
     try std.testing.expectEqualStrings("name", ds.columns.items[0].name);
@@ -2608,7 +2608,7 @@ test "readDelimited: quoted embedded newline stays ONE record; headers V7-normal
     defer arena.deinit();
     const a = arena.allocator();
 
-    // A DSD quoted free-text field spanning a physical line is ONE record —
+    // A DSD quoted free-text field spanning a physical line is ONE record -
     // columns to its right stay aligned (a torn record would split note's
     // second line into a bogus row and mistype/misalign everything right).
     const ds = try readDelimited(a, "subjid,aetext,age\n001,\"Rash on arm\nspreading to back\",34\n002,\"Nausea\",28\n", "d", ',', true, 2, true);
@@ -2628,7 +2628,7 @@ test "readDelimited: quoted embedded newline stays ONE record; headers V7-normal
     try std.testing.expectEqualStrings("x\r\ny", ds_crlf.row(0)[0].str);
     try std.testing.expectEqual(@as(f64, 1), ds_crlf.row(0)[1].num);
 
-    // Headers mangled per VALIDVARNAME=V7 and deduped — same as the XLSX path.
+    // Headers mangled per VALIDVARNAME=V7 and deduped - same as the XLSX path.
     const ds2 = try readDelimited(a, "First Name,Age (yrs),2nd,age,age\nAnn,30,x,1,2\n", "d2", ',', true, 2, true);
     try std.testing.expectEqualStrings("First_Name", ds2.columns.items[0].name);
     try std.testing.expectEqualStrings("Age__yrs_", ds2.columns.items[1].name);
@@ -2637,7 +2637,7 @@ test "readDelimited: quoted embedded newline stays ONE record; headers V7-normal
     try std.testing.expectEqualStrings("age0", ds2.columns.items[4].name);
 }
 
-test "readDelimited: EFI date/time detection (GAP-importtypes) — uniform column typed NUMERIC + format; mixed and DOC-SILENT stay char" {
+test "readDelimited: EFI date/time detection (GAP-importtypes) - uniform column typed NUMERIC + format; mixed and DOC-SILENT stay char" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -2651,7 +2651,7 @@ test "readDelimited: EFI date/time detection (GAP-importtypes) — uniform colum
     try std.testing.expectEqual(@as(f64, 23440), ds.row(0)[1].num);
     try std.testing.expectEqual(@as(f64, 23741), ds.row(1)[1].num);
 
-    // The other recognised families — DATE/MONYY/DATETIME/TIME (Procedures
+    // The other recognised families - DATE/MONYY/DATETIME/TIME (Procedures
     // Guide p. 1324/1326/1341 + the p. 1330 category rule). Width = widest value.
     const ds2 = try readDelimited(a, "d,m,dtm,tm\n05MAR2024,MAR2024,06JAN2016:10:04:26,10:30:00\n10MAY14,JAN2001,07FEB2017:23:59:59,9:05\n", "f", ',', true, 2, true);
     try std.testing.expectEqualStrings("DATE9.", ds2.columns.items[0].format.?);
@@ -2670,7 +2670,7 @@ test "readDelimited: EFI date/time detection (GAP-importtypes) — uniform colum
     try std.testing.expect(mx.columns.items[0].type == .char);
     try std.testing.expect(mx.columns.items[0].format == null);
     try std.testing.expectEqualStrings("2024-03-05", mx.row(0)[0].str);
-    // mixed date FAMILIES (ISO + DATE) — one informat must fit every value.
+    // mixed date FAMILIES (ISO + DATE) - one informat must fit every value.
     const mx2 = try readDelimited(a, "v\n2024-03-05\n05MAR2024\n", "mx2", ',', true, 2, true);
     try std.testing.expect(mx2.columns.items[0].type == .char);
     // DOC-SILENT patterns stay character: ambiguous slash dates, ISO-T
@@ -2767,7 +2767,7 @@ test "applyDatasetOptions: firstobs=/obs= slice the read range (G-dsopt)" {
     try std.testing.expectEqual(@as(f64, 30), ds.row(1)[0].num);
 
     // Same options on an OUTPUT dataset are ignored: all rows written
-    // (BUG-outdsobsslice — SAS treats obs=/firstobs= as input-only).
+    // (BUG-outdsobsslice - SAS treats obs=/firstobs= as input-only).
     var out_ds = Dataset.init(a, "out");
     _ = try out_ds.addColumn("v", .num);
     for ([_]f64{ 10, 20, 30, 40 }) |x| try out_ds.appendRow(&.{.{ .num = x }});
@@ -2824,7 +2824,7 @@ test "GH#22 ISS-dkrocondwarn: keep=/drop=/rename= of a never-referenced var WARN
 
     // keep = subjid ectrt  → ECTRT is on no column. On an OUTPUT dataset (input=
     // false) DKROCOND=WARN: WARN and keep only the vars that DO exist (SUBJID);
-    // the step still runs. (Input datasets are fatal — DKRICOND=ERROR, GH#71.)
+    // the step still runs. (Input datasets are fatal - DKRICOND=ERROR, GH#71.)
     const toks = [_]lex.Token{
         .{ .tag = .name, .text = "keep" },   .{ .tag = .eq },
         .{ .tag = .name, .text = "subjid" }, .{ .tag = .name, .text = "ectrt" },
@@ -2854,7 +2854,7 @@ test "applyDatasetOptions: rename onto an existing name is refused, not duplicat
     _ = try ds.addColumn("b", .num);
     try ds.appendRow(&.{ .{ .num = 1 }, .{ .num = 2 } });
 
-    // rename = ( a = b )  — b already exists, so the rename is skipped (no dup)
+    // rename = ( a = b )  - b already exists, so the rename is skipped (no dup)
     const rn_toks = [_]lex.Token{
         .{ .tag = .name, .text = "rename" }, .{ .tag = .eq }, .{ .tag = .lparen },
         .{ .tag = .name, .text = "a" },      .{ .tag = .eq }, .{ .tag = .name, .text = "b" },
@@ -2870,7 +2870,7 @@ test "applyDatasetOptions: rename onto an existing name is refused, not duplicat
 }
 
 /// BUG-wheredsoptswallow helper: one .err diagnostic naming `opt`, in the
-/// wording class `kind` — "is not supported" for a documented gap,
+/// wording class `kind` - "is not supported" for a documented gap,
 /// "Unrecognized" for a typo (NOTE-typoarmgapwording).
 fn expectOptErr(diags: *const diag.Diagnostics, opt: []const u8, kind: []const u8) !void {
     var hit = false;
@@ -2900,7 +2900,7 @@ test "BUG-wheredsoptswallow: unknown dataset option fails LOUD naming it; suppor
     try expectOptErr(&diags, "wehre", "Unrecognized"); // a typo is the user's own SAS (rc 1), never gap vocabulary
     try std.testing.expectEqual(@as(usize, 0), ds.rowCount()); // INPUT: 0 rows, never the unfiltered superset
 
-    // ── negative: whereup= is REAL SAS (Language Reference: Concepts p.215) but unimplemented — loud, not inert
+    // ── negative: whereup= is REAL SAS (Language Reference: Concepts p.215) but unimplemented - loud, not inert
     var ds2 = Dataset.init(a, "src");
     _ = try ds2.addColumn("x", .num);
     try ds2.appendRow(&.{.{ .num = 1 }});
@@ -3000,7 +3000,7 @@ test "BUG-dsobsvaluenovalidate: garbage obs=/firstobs= VALUES fail LOUD naming o
     try applyDatasetOptions(a, &d3, &obs_min, &g3, true);
     try std.testing.expectEqual(@as(usize, 1), d3.rowCount()); // OBS=MIN = 1
 
-    // ── OUTPUT: the range is ignored wholesale (settled, BUG-outdsobsslice) —
+    // ── OUTPUT: the range is ignored wholesale (settled, BUG-outdsobsslice) -
     //    even a garbage value is consumed without a diagnostic there
     var d4 = try mk(a);
     var g4 = diag.Diagnostics.init(a);
@@ -3014,7 +3014,7 @@ test "list input with :informat modifiers (comma, date)" {
     defer arena.deinit();
     var pdv = Pdv.init(arena.allocator());
 
-    // `input n :comma8. d :date9.;` — the COLON (list_mod) form: tokenize, then
+    // `input n :comma8. d :date9.;` - the COLON (list_mod) form: tokenize, then
     // apply (BUG-inputfmtnamedtoken made the non-colon form a true w-column read,
     // so list_mod is what makes this test's name true).
     const items = [_]ast.InputItem{
@@ -3142,7 +3142,7 @@ test "INPUT statement date/time informats read to SAS day/seconds (BUG-inputdate
     defer arena.deinit();
     var pdv = Pdv.init(arena.allocator());
 
-    // `input a mmddyy10. b yymmdd10. c ddmmyy10. t time8.;` — all previously
+    // `input a mmddyy10. b yymmdd10. c ddmmyy10. t time8.;` - all previously
     // dropped to missing; 2024-12-25 is SAS day 23735, 13:30:00 is 48600s.
     const items = [_]ast.InputItem{
         .{ .name = "a", .type = .num, .informat = "mmddyy10." },
@@ -3200,20 +3200,20 @@ test "delimited (DLM/DSD) infile input (G-infile)" {
         .{ .name = "b", .type = .char },
         .{ .name = "c", .type = .num },
     };
-    // DLM="," — one line, three comma fields
+    // DLM="," - one line, three comma fields
     _ = try readList(&pdv, &items, &[_][]const u8{"Ann,Smith,30"}, 0, ",", false, false, null);
     try std.testing.expectEqualStrings("Ann", pdv.get("a").?.str);
     try std.testing.expectEqualStrings("Smith", pdv.get("b").?.str);
     try std.testing.expectEqual(@as(f64, 30), pdv.get("c").?.num);
 
-    // BUG-dlmmultichar: DLM="|;" is a SET — EACH byte is a delimiter. The record
+    // BUG-dlmmultichar: DLM="|;" is a SET - EACH byte is a delimiter. The record
     // splits on '|' AND ';', not just the first char.
     _ = try readList(&pdv, &items, &[_][]const u8{"Ann|Smith;30"}, 0, "|;", false, false, null);
     try std.testing.expectEqualStrings("Ann", pdv.get("a").?.str);
     try std.testing.expectEqualStrings("Smith", pdv.get("b").?.str);
     try std.testing.expectEqual(@as(f64, 30), pdv.get("c").?.num);
 
-    // DSD — a quoted field keeps its comma; consecutive delimiters → missing.
+    // DSD - a quoted field keeps its comma; consecutive delimiters → missing.
     // `a` is an undeclared list-input char var → SAS default length 8, so the
     // 9-char "hi, there" truncates to "hi, ther" (BUG-inputlistlen; was asserting
     // the un-truncated bug value).
@@ -3259,7 +3259,7 @@ test "GAP-atexpression: @(expr) clamps zero/negative to column 1 (p.168); a char
     _ = try readList(&pdv, &items, &[_][]const u8{"wxyz"}, 0, null, false, false, null);
     try std.testing.expectEqualStrings("wx", pdv.get("a").?.str); // @(0) → column 1
     try std.testing.expectEqualStrings("wx", pdv.get("b").?.str); // @(-4) → column 1
-    // A CHARACTER result is SAS's other parenthesised form (the string search) —
+    // A CHARACTER result is SAS's other parenthesised form (the string search) -
     // unimplemented → loud ERROR via the captured reporter (D-002/D-003).
     const s: ast.Expr = .{ .str = "wx" };
     const citems = [_]ast.InputItem{
@@ -3277,7 +3277,7 @@ test "BUG-missovertruncover-partial: MISSOVER blanks a mid-field-truncated read;
     const items = [_]ast.InputItem{
         .{ .name = "", .type = .num, .informat = "@1" },
         .{ .name = "id", .type = .num, .informat = "2." },
-        .{ .name = "name", .type = .char, .informat = "$8." }, // record ends at col 7 — mid-field
+        .{ .name = "name", .type = .char, .informat = "$8." }, // record ends at col 7 - mid-field
     };
     const lines = [_][]const u8{"42ALICE"}; // 7 cols; $8. wants 8 → partial
 
@@ -3350,7 +3350,7 @@ test "flow-over NOTE is capped per input stream (PERF-flownoteperrecord)" {
         .{ .name = "a", .type = .num },
         .{ .name = "b", .type = .num },
     };
-    // One token per record: reading b flows to the next record EVERY obs —
+    // One token per record: reading b flows to the next record EVERY obs -
     // 60 records = 30 obs = 30 flow events on one stream, 10 past the cap.
     const lines = [_][]const u8{"1"} ** 60;
     var start: usize = 0;
@@ -3360,7 +3360,7 @@ test "flow-over NOTE is capped per input stream (PERF-flownoteperrecord)" {
         obs += 1;
     }
     try std.testing.expectEqual(@as(usize, 30), obs); // the flows still FLOW
-    // 20 verbatim NOTEs + exactly one suppression notice — bounded, never silent.
+    // 20 verbatim NOTEs + exactly one suppression notice - bounded, never silent.
     try std.testing.expectEqual(@as(usize, FLOW_NOTE_MAX + 1), diags.list.items.len);
     for (diags.list.items[0..FLOW_NOTE_MAX]) |d| {
         try std.testing.expectEqual(diag.Severity.note, d.severity);
@@ -3388,7 +3388,7 @@ test "round trip: PDV → snapshot → Dataset → loadRow → fresh PDV" {
     try seedColumns(&ds, &src); // schema from the PDV, in order
     try snapshot(&ds, &src); // row 0
 
-    src.reset(); // clobber the source — the dataset must be independent
+    src.reset(); // clobber the source - the dataset must be independent
     try snapshot(&ds, &src); // row 1: all missing
 
     try std.testing.expectEqual(@as(usize, 2), ds.rowCount());
@@ -3434,7 +3434,7 @@ test "NOTE-informatlow-tick245: statement readNum routes COMMA/DOLLAR to format.
     try t.expectEqual(@as(f64, -1234), readNum("comma8.", "(1,234)").num);
     try t.expectEqual(@as(f64, 1500.5), readNum("dollar12.", "$1,500.50").num);
     try t.expectEqual(@as(f64, 23), readNum("comma3.", "2 3").num);
-    // #14: NEGPAREN informat fails loud on this path too (D-002, captured) — the
+    // #14: NEGPAREN informat fails loud on this path too (D-002, captured) - the
     // statement-prep whitelist check (above) hard-ERRORs first in a real run.
     format.g_fmt_error = false;
     format.setNoFmtErr(false);
@@ -3449,7 +3449,7 @@ test "REVIEW-tick344: statement readNum does NOT slice a numeric token to w (Lan
     const t = std.testing;
     // The colon/list path hands readNum the WHOLE token; p.513 "Modified List
     // Input" limits length "(character only)", so a numeric `:comma5.` reads to
-    // the blank/EOL — `5,678,999` → 5678999, NOT 5678 (qa_tick336 fixture S3).
+    // the blank/EOL - `5,678,999` → 5678999, NOT 5678 (qa_tick336 fixture S3).
     try t.expectEqual(@as(f64, 5678999), readNum("comma5.", "5,678,999").num);
     try t.expectEqual(@as(f64, 12345), readNum("3.", "12345").num); // :3. tokenizes too
     // …but the informat's d still implies a decimal on the token (`:5.2`).
@@ -3503,7 +3503,7 @@ test "label sidecar is SEPARATE from a clean data CSV (BUG-labelspersist)" {
     _ = try plain.addColumn("z", .num);
     try std.testing.expect((try labelSidecar(a, &plain)) == null);
 
-    // F8: the DATASET label round-trips as a reserved `*`-named record — set
+    // F8: the DATASET label round-trips as a reserved `*`-named record - set
     // alone it still produces a sidecar, and it never lands on a column.
     var dl = Dataset.init(a, "dl");
     _ = try dl.addColumn("x", .num);
@@ -3635,16 +3635,16 @@ test "GH#25: EXPORT preserves attached formats; BEST12. stays the unformatted de
     // 23421 = '15feb2024'd: the day count a format-IGNORING writer would export.
     try ds.appendRow(&.{ .{ .str = "Ann" }, .{ .num = 23421 }, .{ .num = 8765.4 }, .{ .num = 2.0 / 3.0 }, Value.missing });
 
-    // EXPORT (live-SAS EFI): an attached format WINS — yymmdd10. exports the DATE,
+    // EXPORT (live-SAS EFI): an attached format WINS - yymmdd10. exports the DATE,
     // not 23421; dollar10.2 exports `$8,765.40` DSD-QUOTED (the rendered value
     // contains the delimiter, exactly like a char field with a comma); `raw`
-    // (NO format) keeps BEST12.; a FORMATTED missing stays EMPTY — BUG-exportmissing
+    // (NO format) keeps BEST12.; a FORMATTED missing stays EMPTY - BUG-exportmissing
     // keeps its verdict under a format.
     const exp = try writeCsvExport(a, &ds);
     try std.testing.expectEqualStrings("who,d,cost,raw,hole\nAnn,2024-02-15,\"$8,765.40\",0.6666666667,\n", exp);
 
-    // D-001: the INTERNAL libname writer is NOT format-aware — same cells, raw
-    // numbers, missing still "." — so the real-SAS internal-path goldens keep
+    // D-001: the INTERNAL libname writer is NOT format-aware - same cells, raw
+    // numbers, missing still "." - so the real-SAS internal-path goldens keep
     // their bytes.
     const internal = try writeCsv(a, &ds);
     try std.testing.expectEqualStrings("who,d,cost,raw,hole\nAnn,23421,8765.4,0.6666666667,.\n", internal);

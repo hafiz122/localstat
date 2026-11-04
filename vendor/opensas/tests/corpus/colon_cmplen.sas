@@ -1,5 +1,5 @@
 /* BUG-coloncmplen: `=:` truncates the LONGER operand to the SHORTER one's
-   STORAGE length (min of both, Language Reference: Concepts Ch.6 p.129) — not LHS-to-trimmed-length(RHS). */
+   STORAGE length (min of both, Language Reference: Concepts Ch.6 p.129) - not LHS-to-trimmed-length(RHS). */
 data _null_;
   a = ("cat" =: "ca");   /* longer LHS cut to 2: "ca"="ca" -> 1 */
   b = ("ca" =: "cat");   /* longer RHS cut to 2: "ca"="ca" -> 1 */

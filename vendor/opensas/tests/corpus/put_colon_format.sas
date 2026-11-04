@@ -1,4 +1,4 @@
-/* GAP-putcolonformat — the PUT `:` MODIFIED LIST OUTPUT modifier.
+/* GAP-putcolonformat - the PUT `:` MODIFIED LIST OUTPUT modifier.
 
    SAS 9.4 DATA Step Statements ref, "PUT Statement: List". Printed p.297 gives
    the syntax slot:
@@ -10,8 +10,8 @@
           each value is followed by a single blank.
 
    NOT the INPUT statement's colon. INPUT's (printed p.193) governs WHERE
-   READING STOPS — "reads the value from the next non-blank column until the
-   pointer reaches the next blank column" — while PUT's governs blank-stripping
+   READING STOPS - "reads the value from the next non-blank column until the
+   pointer reaches the next blank column" - while PUT's governs blank-stripping
    on OUTPUT. The volumes never cross-reference the two: each `:` entry "See"s
    only its own side's details section. Structurally parallel, semantically
    unrelated, and conflating them would have produced a different renderer.
@@ -48,7 +48,7 @@ data _null_;
 ;
 run;
 
-/* ---- 3: printed p.44 (BY Statement Example 4) — the NO-SPACE spelling
+/* ---- 3: printed p.44 (BY Statement Example 4) - the NO-SPACE spelling
    `height:best12.`, on a variable that already carries an attached format the
    modifier overrides for that one term. 72 prints bare, 51.3 is not padded
    to width 12.
@@ -72,7 +72,7 @@ data _null_;
   put '[' c : $char8. ']'; /* modified list: trailing gone    */
 run;
 
-/* ---- 5: "each value is followed by a single blank" — the separator rule.
+/* ---- 5: "each value is followed by a single blank" - the separator rule.
    A modified-list item spaces like a LIST item, not like a formatted one, so
    consecutive items get exactly one blank between them and a following
    literal gets one too (that trailing blank is what p.283's `+(-1)` exists to
@@ -83,7 +83,7 @@ data _null_;
 run;
 
 /* ---- 6: a character value whose stored width exceeds the format, plus a
-   missing numeric — the modifier must not invent or swallow content. */
+   missing numeric - the modifier must not invent or swallow content. */
 data _null_;
   length s $10;
   s = 'hi';

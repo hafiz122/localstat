@@ -1,7 +1,7 @@
-/* BUG-opencodestmtswallow (doc-finder tick305 F4 — the open-code sibling of
+/* BUG-opencodestmtswallow (doc-finder tick305 F4 - the open-code sibling of
    BUG-optionsstmtswallow): the top-level statement splitter recognized only
    DATA/PROC and the global keywords and silently DISCARDED every other
-   open-code statement — a typo'd `titl 'x';` / `libnam raw 'p';` vanished at
+   open-code statement - a typo'd `titl 'x';` / `libnam raw 'p';` vanished at
    exit 0 with the program built on the setting that never took effect, and
    `endsas;` (Language Reference: Concepts p.487 step boundary) was a silent no-op, so a program
    gated off by ENDSAS ran to completion. Now the chain has a real final else:
@@ -10,7 +10,7 @@
    This green fixture is the POSITIVE CONTROL (the D-014 anti-regression
    half): every top-level statement class in real use must keep parsing. */
 
-/* inert open-code statements — real SAS with no observable effect in a batch
+/* inert open-code statements - real SAS with no observable effect in a batch
    interpreter: the windowing environment (DM), graphics devices (GOPTIONS),
    dataset caching (SASFILE), windowing catalogs (CATNAME). The `;` INSIDE the
    DM string must not end the skip early (the skip is token-level). */

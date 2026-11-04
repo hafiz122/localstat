@@ -1,5 +1,5 @@
 /* BUG-calloutuninit: the pure-OUTPUT arg of CALL CATS/CATT/CATX/VNAME/RAN* is
-   written BY the routine — SAS emits NO `Variable X is uninitialized` NOTE for
+   written BY the routine - SAS emits NO `Variable X is uninitialized` NOTE for
    it (the NOTE goes to stderr, not this stdout diff; the exec.zig test block
    pins its absence). Pin the resulting values so a silent-drop regression
    shows up. */

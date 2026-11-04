@@ -1,7 +1,7 @@
 /* The exact SV VISNUM chain (QA-svpostfix): a permanent format built from a
    CNTLIN= control dataset whose FMTNAME has underscores (VISNUM_ALL_PERIOD),
    then resolved by name at apply time. Guards GAP-permformat (CNTLIN build) x
-   QA-svvisnum f93d388 (name parse not truncating at '_') together — the SV
+   QA-svvisnum f93d388 (name parse not truncating at '_') together - the SV
    codelist path, verified end-to-end. */
 data ctl;
   length fmtname $32 label $20;

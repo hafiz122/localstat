@@ -1,4 +1,4 @@
-/* doc-finder tick312 — Language Reference: Concepts Ch.21 "Reading Raw Data" (pp.505-524): the parts
+/* doc-finder tick312 - Language Reference: Concepts Ch.21 "Reading Raw Data" (pp.505-524): the parts
    that are CONFORMANT, banked so they cannot regress.  GREEN by construction:
    every block below was probed against the doc before being written here, and
    nothing that currently diverges is included (see
@@ -6,17 +6,17 @@
 
    Covered:
      Table 21.1 (p.508) all eight standard-numeric rows, "None needed"
-     Table 21.2 (p.508) rows 3/4/5 — comma, parentheses, hexadecimal
+     Table 21.2 (p.508) rows 3/4/5 - comma, parentheses, hexadecimal
      p.509      the explicit-decimal-point-overrides-the-informat rule
-     Table 21.4 (p.509) row 1 — $CHARw. keeps leading blanks, $w. trims them
-     Table 21.4 (p.509) row 2 — DATALINES4 + ;;;; for data containing semicolons
-     Table 21.5 (p.516) row 2 — trailing @@, and trailing @ with two INPUT/OUTPUT
-     Table 21.5 (p.517) row 5 — varying record layouts via IF-THEN + trailing @
-     Table 21.5 (p.517) row 7 — END= on INFILE, and END= is NOT an output column
-     Table 21.5 (p.517) row 9 — FIRSTOBS=/OBS= as INFILE options (incl. DATALINES)
-     Table 21.5 (p.517) row 11 — @n column pointer with formatted input
-     Table 21.5 (p.518) row 15 — DSD + TRUNCOVER missing values
-     Table 21.5 (p.517) row 10 — a second `infile datalines` does NOT rewind
+     Table 21.4 (p.509) row 1 - $CHARw. keeps leading blanks, $w. trims them
+     Table 21.4 (p.509) row 2 - DATALINES4 + ;;;; for data containing semicolons
+     Table 21.5 (p.516) row 2 - trailing @@, and trailing @ with two INPUT/OUTPUT
+     Table 21.5 (p.517) row 5 - varying record layouts via IF-THEN + trailing @
+     Table 21.5 (p.517) row 7 - END= on INFILE, and END= is NOT an output column
+     Table 21.5 (p.517) row 9 - FIRSTOBS=/OBS= as INFILE options (incl. DATALINES)
+     Table 21.5 (p.517) row 11 - @n column pointer with formatted input
+     Table 21.5 (p.518) row 15 - DSD + TRUNCOVER missing values
+     Table 21.5 (p.517) row 10 - a second `infile datalines` does NOT rewind
      p.510 / p.512 / p.514 / p.515 worked programs                              */
 
 /* ── Table 21.1 (p.508): eight standard numeric forms, all read with no help ── */
@@ -155,13 +155,13 @@ proc print data=mixed; run;
 
 /* ── Table 21.5 (p.517) row 7: END= flags the last record, and the END=
       variable is NOT added to the output data set.
-      REVERT-infileendmultirec — A CROSS-VOLUME INTERACTION, not a failure of
+      REVERT-infileendmultirec - A CROSS-VOLUME INTERACTION, not a failure of
       row 7: Language Reference: Concepts' table LISTS END= among the INFILE options, but the DATA
       Step Statements ref is the specific rule and it restricts the option for
       instream data (printed p.130's Restriction; printed p.138 "When you read
       instream data with a DATALINES statement, UNBUFFERED is in effect" +
       "When you use UNBUFFERED, SAS never sets the END= variable to 1"). The
-      specific governs the general, so `done` stays 0 here — this block reads
+      specific governs the general, so `done` stays 0 here - this block reads
       DATALINES. Row 7's OTHER half still holds and is still shown: `done` is
       absent from the printed data set. Row 7's FLAGGING half is demonstrated
       on an external file in infile_end.sas block 2. ── */
@@ -210,7 +210,7 @@ z
 proc print data=dsdmiss; run;
 
 /* ── Table 21.5 (p.517) row 10: a second `infile datalines` in the same step
-      re-selects the SAME stream — it does not rewind it ── */
+      re-selects the SAME stream - it does not rewind it ── */
 data _null_;
   infile datalines;
   input a;

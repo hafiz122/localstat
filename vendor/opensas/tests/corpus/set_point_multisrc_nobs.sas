@@ -1,8 +1,8 @@
-/* BUG-pointredefinesnobs — `point=` must not shrink the source list or NOBS=.
+/* BUG-pointredefinesnobs - `point=` must not shrink the source list or NOBS=.
 
    `set a b point=p nobs=n;` bound only `a`: n came back 3 where the IDENTICAL
    list without `point=` gives 5 (GAP-nobsmultisrc, fixture set_nobs_multisrc),
-   and obs 4-5 were unreachable. The two halves compound into the real damage —
+   and obs 4-5 were unreachable. The two halves compound into the real damage -
    see block 4.
 
    DOC-SETTLED, no oracle needed. SAS 9.4 DATA Step Statements ref printed p.334
@@ -16,8 +16,8 @@
    with no POINT= exception, and the same entry says it outright:
        Interaction  The NOBS= and POINT= options are independent of each other.
 
-   That the ADDRESSING spans all the sources — rather than POINT= being
-   single-source with NOBS= merely reporting a larger number — is settled on the
+   That the ADDRESSING spans all the sources - rather than POINT= being
+   single-source with NOBS= merely reporting a larger number - is settled on the
    same page by the OPEN=DEFER restriction:
        When you specify the DEFER option, you cannot use the KEY= statement
        option, the POINT= statement option, or the BY statement. These
@@ -25,7 +25,7 @@
        observations from the data sets, which is not possible unless all data
        sets are open.
    and POINT='s own Restrictions list (printed p.335) bars BY, WHERE, WHERE=,
-   KEY=, transport/sequential/view sources and CAS — a multi-dataset list is NOT
+   KEY=, transport/sequential/view sources and CAS - a multi-dataset list is NOT
    among them, so `set a b point=p;` is legal SAS and must work.
 
    OBSERVATION-PATH NOTE: every value below is reported with PUT to the log.
@@ -46,7 +46,7 @@ data b; input x; datalines;
 ;
 run;
 
-/* 1 — the internal-consistency pair, side by side on the IDENTICAL list.
+/* 1 - the internal-consistency pair, side by side on the IDENTICAL list.
    These two numbers were 5 and 3; they must now agree. */
 data _null_;
   set a b nobs=n;
@@ -59,7 +59,7 @@ data _null_;
   stop;
 run;
 
-/* 2 — the READ SET: obs 4 and 5 live in `b` and must be reachable. Under the
+/* 2 - the READ SET: obs 4 and 5 live in `b` and must be reachable. Under the
    bug, p=4 raised "invalid observation number 4: a has 3 observations". */
 data _null_;
   do p = 1 to 5;
@@ -69,8 +69,8 @@ data _null_;
   stop;
 run;
 
-/* 3 — the boundary itself: a has 3 rows, so obs 3 is a's last and obs 4 is b's
-   first. One address space, no seam. (One SET statement in a loop — two SET
+/* 3 - the boundary itself: a has 3 rows, so obs 3 is a's last and obs 4 is b's
+   first. One address space, no seam. (One SET statement in a loop - two SET
    statements would trip the unrelated "second or nested SET source" gap.) */
 data _null_;
   do p = 3 to 4;
@@ -80,7 +80,7 @@ data _null_;
   stop;
 run;
 
-/* 4 — THE COMPOUND FAILURE, which is why this was silent. The canonical POINT=
+/* 4 - THE COMPOUND FAILURE, which is why this was silent. The canonical POINT=
    idiom takes its bound FROM nobs=, so an under-reported n made the loop stop
    at 3 and never reach the out-of-range guard that would have exposed it:
    2 of 5 observations vanished at exit 0 with no diagnostic. */
@@ -92,7 +92,7 @@ data _null_;
   stop;
 run;
 
-/* 5 — CONTROLS: the single-source spelling is untouched. */
+/* 5 - CONTROLS: the single-source spelling is untouched. */
 data _null_;
   p = 2;
   set a point=p nobs=n;
@@ -100,8 +100,8 @@ data _null_;
   stop;
 run;
 
-/* 6 — out of range is still LOUD past the CONCATENATED end (6 > 3+2), not at
-   the old single-source boundary. NOTE-pointoorhard: it no longer halts —
+/* 6 - out of range is still LOUD past the CONCATENATED end (6 > 3+2), not at
+   the old single-source boundary. NOTE-pointoorhard: it no longer halts -
    _ERROR_=1 + a NOTE, and the step CONTINUES, so the PUT below DOES run and
    shows the never-loaded (missing) x of the failed iteration. */
 data _null_;

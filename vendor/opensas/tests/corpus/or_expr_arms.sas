@@ -1,4 +1,4 @@
-/* EBNF-gate tick356 marker evidence — or_expr arms "|" | "!" | "¦" | "OR"
+/* EBNF-gate tick356 marker evidence - or_expr arms "|" | "!" | "¦" | "OR"
    (Language Reference: Concepts Table 6.6 Group VII): `!` and `¦` lex to the pipe token (fixture
    expr_alt_ops landed that), the word OR shares the arm; chained spellings mix
    and OR binds looser than AND (Group VI). */

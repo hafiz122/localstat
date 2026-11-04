@@ -5,7 +5,7 @@
    hard-coded no-op at rc 0: the Format column emptied and the Informat column
    kept every old spec, so a "stripped" dataset still advertised them to
    CONTENTS and to the .xpt descriptor. Base SAS 9.4 Procedures Guide, 7th ed.
-   p.598 — inside DATASETS, ATTRIB takes only FORMAT/INFORMAT/LABEL; p.641 —
+   p.598 - inside DATASETS, ATTRIB takes only FORMAT/INFORMAT/LABEL; p.641 -
    "To remove all informats from a data set, use the ATTRIB statement ... and
    the _ALL_ keyword". vs2 is the negative control: a named-variable strip must
    leave the other variable's informat alone. */

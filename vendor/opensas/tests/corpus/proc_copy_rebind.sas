@@ -1,5 +1,5 @@
 /* GAP-proccopy(b): an EXECUTED libname statement re-binds the libref for the
-   steps AFTER it — a real XPT-export %do loop points xptfile at a NEW
+   steps AFTER it - a real XPT-export %do loop points xptfile at a NEW
    .xpt per iteration. First-declaration-wins wrote every member through one
    path; two members must land in TWO distinct files. */
 data one; x = 1; run;

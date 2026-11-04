@@ -1,5 +1,5 @@
 /* BUG-doindexreassign: an iterative DO must honor a body reassignment of the
-   index — the altered value is what the bottom-of-loop step increments and what
+   index - the altered value is what the bottom-of-loop step increments and what
    the TO bound is tested against. Normal loops that never touch the index are
    the control (final index = stop + by). */
 data _null_;

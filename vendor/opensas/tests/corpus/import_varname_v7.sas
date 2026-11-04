@@ -1,5 +1,5 @@
 /* GH#62 ISS-varnamev7: PROC IMPORT xlsx generates variable names per
-   VALIDVARNAME=V7 — each invalid char → one `_` (runs kept, trailing kept),
+   VALIDVARNAME=V7 - each invalid char → one `_` (runs kept, trailing kept),
    leading digit → `_` prefix, and duplicate headers deduped. */
 proc import out=d datafile="tests/corpus/includes/import_varname_v7.xlsx" dbms=xlsx replace;
   sheet="S1";

@@ -1,7 +1,7 @@
 /* BUG-mergebyvarlen: MERGE takes a char BY var's length from the FIRST source
    (Language Reference: Concepts p.559) and truncates every source's value to it BEFORE grouping. Here
    k is $2 in `a` (first), so b's "ABC"/"ABD" truncate to "AB" and BOTH collide
-   into a's "AB" group — a 1-to-2 match, 2 output rows (a held), NOT 3 rows. */
+   into a's "AB" group - a 1-to-2 match, 2 output rows (a held), NOT 3 rows. */
 data a; length k $2; input k $ x; datalines;
 AB 1
 ;

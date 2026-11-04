@@ -1,4 +1,4 @@
-//! Built-in SAS functions — the `call_fn` hook the evaluator (B1) dispatches
+//! Built-in SAS functions - the `call_fn` hook the evaluator (B1) dispatches
 //! through. C1 installs it with `ev.call_fn = &functions.dispatch`. Args arrive
 //! already evaluated (SAS built-ins are eager); we read the evaluator's arena
 //! for results and its diagnostics for usage NOTEs.
@@ -7,7 +7,7 @@
 //! type is coerced the SAS way: a char in a numeric slot parses as a number
 //! (blank/garbage → missing); a numeric in a char slot prints compactly.
 //!
-//! Coverage is the DATA-step core the corpus reaches now — numeric aggregates
+//! Coverage is the DATA-step core the corpus reaches now - numeric aggregates
 //! and scalars, the common string ops, and a stub `put`/`input`. An unknown or
 //! not-yet-built function is a diagnostic returning missing, so the corpus
 //! runner names it as the next backlog item rather than silently guessing.
@@ -24,7 +24,7 @@ const dsfns = @import("dsfns.zig");
 const Value = @import("value.zig").Value;
 
 /// Pure one-f64-in/one-f64-out numeric functions: arity 1, missing propagates,
-/// no side effects. Data-over-code — add a row, not an `if`. Irregular numeric
+/// no side effects. Data-over-code - add a row, not an `if`. Irregular numeric
 /// fns (sqrt/round/mod: arity ranges, NOTEs, extra args) stay explicit below.
 const UnaryFn = enum {
     abs, trunc, ceil, floor, sign,
@@ -120,7 +120,7 @@ pub fn toU32(v: Value) ?u32 {
 
 /// THE guard for every `@intFromFloat` on a user-supplied value (BUG-intfromfloat):
 /// a non-finite (NaN/±inf) or out-of-safe-range float would trap `@intFromFloat`,
-/// but SAS never traps — it yields missing. Returns the truncated i64, or null
+/// but SAS never traps - it yields missing. Returns the truncated i64, or null
 /// when the value can't be one; callers map null to their SAS out-of-range result
 /// (`Value.missing`, "", 0, or a clamp). 9e15 is past f64's exact-integer reach
 /// and clear of i64's edges, so downstream index/date math can't overflow either.
@@ -227,7 +227,7 @@ pub fn pctlDef5(sorted: []const f64, p: f64) f64 {
 }
 
 /// Error function via Abramowitz & Stegun 7.1.26 (|error| ≤ 1.5e-7).
-/// erfc for z ≥ 0 via a Chebyshev approximation, accurate to ~1e-15 (full f64) —
+/// erfc for z ≥ 0 via a Chebyshev approximation, accurate to ~1e-15 (full f64) -
 /// Numerical Recipes 3rd ed. Replaces the old ~1.5e-7 A&S 7.1.26 fit (BUG-erfaccuracy).
 fn erfccheb(z: f64) f64 {
     const cof = [_]f64{
@@ -314,7 +314,7 @@ pub fn charScan(ev: *eval.Evaluator, name: []const u8, args: []const Value, cls:
 }
 
 /// Bind the live Library so the SCL dataset functions (OPEN/FETCH/GETVAR/…) can
-/// resolve member names — the fix for BUG-sclbind. The executor must call this
+/// resolve member names - the fix for BUG-sclbind. The executor must call this
 /// once per run (e.g. in main's runData/runStep, where `lib` is in scope):
 /// `sas.functions.bindLibrary(lib);`. Exposed here so a caller that already
 /// imports `functions` needn't import `dsfns` directly.
@@ -335,7 +335,7 @@ pub fn bindLibrefs(refs: []const DiskLibref) void {
 
 /// Does `libref.member` already have a file on disk under a bound libref?
 /// Same probe EXIST uses, re-exported for main's "was not replaced" rule
-/// (GAP-errgatereplaces) — a `data <libref.x>` output target is deliberately
+/// (GAP-errgatereplaces) - a `data <libref.x>` output target is deliberately
 /// never preloaded, so the Library alone cannot answer it.
 pub fn memberOnDisk(name: []const u8) bool {
     return dsfns.onDisk(name);
@@ -343,7 +343,7 @@ pub fn memberOnDisk(name: []const u8) bool {
 
 /// Owned macro-var value (PERF-macroaccum): a malloc'd buffer REUSED and grown
 /// (doubling) across overwrites. The old design arena-duped every generation and
-/// orphaned the previous one — the macro arena never frees — so accumulating
+/// orphaned the previous one - the macro arena never frees - so accumulating
 /// `%let s=&s tok;` in a %do loop cost O(M²) time+RAM (1.5 GB at M=8000 while
 /// the live value is ~48 KB). Now memory tracks the live set. Shared by
 /// macro.zig's symbol table and the SYMGET mirror below.
@@ -352,7 +352,7 @@ pub const VarVal = struct {
     len: usize = 0,
     /// smp_allocator: freed blocks are RECYCLED (c_allocator isn't linked in the
     /// `zig build test` step; page_allocator's 4KB floor hurts the &&vart_&i
-    /// macro-array idiom — thousands of small live vars). SmpAllocator comptime-
+    /// macro-array idiom - thousands of small live vars). SmpAllocator comptime-
     /// asserts a threaded target, so the single-threaded wasm build uses
     /// wasm_allocator (also recycling).
     const alloc = if (@import("builtin").target.cpu.arch.isWasm())
@@ -376,13 +376,13 @@ pub const VarVal = struct {
 };
 
 /// The %let macro-variable table. macro.zig mirrors every `%let` into here (it
-/// already imports this module, so this avoids an import cycle) — BUG-symgetlet.
+/// already imports this module, so this avoids an import cycle) - BUG-symgetlet.
 /// SYMGET/SYMEXIST/RESOLVE read it alongside the runtime CALL SYMPUT table (g_lib).
 var g_letvars: std.StringHashMapUnmanaged(VarVal) = .empty;
 
 pub fn clearLetVars() void {
     // The map is global and must survive per-run arena death, so its storage,
-    // keys AND values are all smp-owned (VarVal.alloc) — safe to iterate here.
+    // keys AND values are all smp-owned (VarVal.alloc) - safe to iterate here.
     var it = g_letvars.iterator();
     while (it.next()) |e| {
         VarVal.alloc.free(e.key_ptr.*);
@@ -392,26 +392,26 @@ pub fn clearLetVars() void {
     g_letvars = .empty; // fresh per run; macro.expand calls this at the start
 }
 
-/// Drop the bound Library (test isolation — a bound Library from a short-lived
+/// Drop the bound Library (test isolation - a bound Library from a short-lived
 /// arena must not be read after that arena is freed).
 pub fn unbindLibrary() void {
     g_lib = null;
 }
 
 /// The session SYSPARM value (GAP-sysparm-opt): ONE value behind all three
-/// documented surfaces — `options sysparm="text";` writes it (main.zig
+/// documented surfaces - `options sysparm="text";` writes it (main.zig
 /// handleGlobal), the SYSPARM() function (below) and the &SYSPARM automatic
 /// (macro.zig getVar, live) read it. Macro Reference printed pp.486-487: valid
-/// in the OPTIONS statement and on the command line — no CLI flag exists here,
+/// in the OPTIONS statement and on the command line - no CLI flag exists here,
 /// so the default is "". The slice is owned by the caller's run arena and the
 /// value resets per run with the other OPTIONS-derived state (the
-/// year_cutoff rule: run-scoped, not session-scoped — wasm runs many programs
+/// year_cutoff rule: run-scoped, not session-scoped - wasm runs many programs
 /// per load and must not leak one program's option into the next).
 pub var sysparm_text: []const u8 = "";
 
 /// Uniform per-run reset of module globals (taste #12): the PRX registry, SCL
 /// open-handle table and HASHING_* digest table all hold pointers into a prior
-/// run's freed arenas — a stale 1-based handle must die, not dangle. Mirrors
+/// run's freed arenas - a stale 1-based handle must die, not dangle. Mirrors
 /// format.clearUserFormats; interpret() calls this at every run start.
 pub fn resetPerRun() void {
     prx.resetPerRun();
@@ -452,11 +452,11 @@ fn macroVarValue(name: []const u8) ?[]const u8 {
 
 pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval.Error!Value {
     conv_ev = ev; // stash for the ev-less leaf `toNum` (see conv_ev docs)
-    // Internal assignment desugar — the parser's `truncate` rewrites `c = rhs`
+    // Internal assignment desugar - the parser's `truncate` rewrites `c = rhs`
     // (c a known-length-n char var) to `__assignc(rhs, n)`. A char rhs truncates
     // to n, identical to the old substr(rhs,1,n) desugar; a NUMERIC rhs renders
     // BESTn. RIGHT-JUSTIFIED (Language Reference: Concepts p.124: assignment conversion uses the LHS
-    // variable's length), which substr's BEST12 field got wrong — n<12 sliced
+    // variable's length), which substr's BEST12 field got wrong - n<12 sliced
     // the field's blank LEFT edge (BUG-numcharwidth). Not a SAS function.
     if (eqi(name, "__assignc")) {
         if (args.len != 2) return badArity(ev, name, "2", args.len);
@@ -514,7 +514,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     // ── SCL dataset access: OPEN → dsid, then FETCH/GETVAR read the current row
     if (eqi(name, "open")) {
         if (args.len < 1) return badArity(ev, name, "1 or 2", args.len);
-        return .{ .num = dsfns.open(try toStr(ev, args[0])) }; // mode arg (args[1]) ignored — read-only
+        return .{ .num = dsfns.open(try toStr(ev, args[0])) }; // mode arg (args[1]) ignored - read-only
     }
     if (eqi(name, "exist")) {
         if (args.len < 1 or args.len > 2) return badArity(ev, name, "1 or 2", args.len);
@@ -528,11 +528,11 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         return .{ .num = dsfns.exist(try toStr(ev, args[0])) };
     }
     if (eqi(name, "pathname")) {
-        // PATHNAME(ref[, type]): the OS path bound to a libref — our LIBNAME map,
+        // PATHNAME(ref[, type]): the OS path bound to a libref - our LIBNAME map,
         // via the dsfns libref binding (GAP-pathname). Blank for an unknown ref.
         // SAS searches filerefs first then librefs; type 'F' restricts to filerefs.
         // ponytail: no FILENAME store yet, so 'F' is always blank and the default
-        // search is librefs-only — extend when a program defines filerefs.
+        // search is librefs-only - extend when a program defines filerefs.
         if (args.len < 1 or args.len > 2) return badArity(ev, name, "1 or 2", args.len);
         if (args.len == 2) {
             const ty = std.mem.trim(u8, try toStr(ev, args[1]), " ");
@@ -541,7 +541,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const ref = std.mem.trim(u8, try toStr(ev, args[0]), " ");
         // WORK always has a physical temp path in real SAS, and study macros use
         // PATHNAME(WORK) non-blankness as a health check (SPLIT: "LIBRARY WORK
-        // DOES NOT EXIST" killed gen-2 AE/CM — QA-pathnamework). Our WORK is
+        // DOES NOT EXIST" killed gen-2 AE/CM - QA-pathnamework). Our WORK is
         // in-memory; answer the OS temp root. ponytail: a real per-run WORK dir
         // if a program ever writes through this path.
         if (eqi(ref, "work")) return .{ .str = "/tmp" };
@@ -640,7 +640,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     // ── streaming (running) digest: HASHING_INIT → integer handle; HASHING_PART
     // feeds bytes; HASHING_TERM → final UPPERCASE hex digest (doc p.986 example).
     // Handle indexes process-global state (see hashing_table). Invalid method or
-    // handle → missing, matching the doc — but the doc SPLITS the two failure
+    // handle → missing, matching the doc - but the doc SPLITS the two failure
     // modes for HASHING_TERM and we now match both (BUG-charfnsmissingtype,
     // p.986): "If the handle is invalid, HASHING_TERM returns a NUMERIC MISSING
     // value" vs "If the final digest cannot be computed, the result is BLANK".
@@ -680,7 +680,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         var buf: [64]u8 = undefined;
         // p.986: digest cannot be computed → the result is BLANK (character).
         // Defensive: the method was validated at INIT, so these arms are unreachable
-        // today — they are written to the doc anyway so a future method table that
+        // today - they are written to the doc anyway so a future method table that
         // accepts more at INIT than at TERM cannot leak a numeric out of a
         // character function.
         const n = if (ctx.key) |k|
@@ -745,7 +745,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         if (args.len != 1) return badArity(ev, name, "1", args.len);
         // A bare value carries no format here (that lives in exec's format list, not
         // reachable from a by-value arg), so an unformatted variable renders as its
-        // compact default — same as vvaluex's no-format path. VVALUEX(name) picks up
+        // compact default - same as vvaluex's no-format path. VVALUEX(name) picks up
         // an explicit format from the PDV. A numeric arg still logs the
         // num→char NOTE here (only the CAT family is note-free, BUG-catnote).
         if (args[0] == .num) ev.diags.note(0, "Numeric values have been converted to character values at the places given by: (Line):(Column).", .{}) catch {};
@@ -804,7 +804,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         };
         return numVal(@floatFromInt(vf.d));
     }
-    // VINFORMAT*X — the read-informat twins of VFORMAT*X. The parser rewrites the
+    // VINFORMAT*X - the read-informat twins of VFORMAT*X. The parser rewrites the
     // bare-variable forms (VINFORMAT(x) → VINFORMATX("x")); EXEC-varattr stores the
     // INFORMAT statement's spec on the PDV var so varInfmtOf can read it.
     if (eqi(name, "vinformatx")) { // complete informat (uppercased, with period), e.g. COMMA8.
@@ -846,7 +846,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         return numVal(@floatFromInt(vf.d));
     }
 
-    // ── macro-symbol access: BOTH stores — the runtime CALL SYMPUT table (g_lib)
+    // ── macro-symbol access: BOTH stores - the runtime CALL SYMPUT table (g_lib)
     // and the %let table macro.zig mirrors here (BUG-symgetlet).
     if (eqi(name, "symget")) { // the value of a macro variable, blank if undefined
         if (args.len != 1) return badArity(ev, name, "1", args.len);
@@ -858,7 +858,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const mv = std.mem.trim(u8, try toStr(ev, args[0]), " ");
         return numVal(if (macroVarValue(mv) != null) 1 else 0);
     }
-    if (eqi(name, "symglobl")) { // 1 if a GLOBAL macro var exists — all of ours are global
+    if (eqi(name, "symglobl")) { // 1 if a GLOBAL macro var exists - all of ours are global
         if (args.len != 1) return badArity(ev, name, "1", args.len);
         return numVal(if (macroVarValue(std.mem.trim(u8, try toStr(ev, args[0]), " ")) != null) 1 else 0);
     }
@@ -879,7 +879,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     // ── stateful queue: LAGn / DIFn (state lives on the Evaluator)
     if (queueDepth(name, "lag")) |n| {
         if (args.len != 1) return badArity(ev, name, "1", args.len);
-        // LAG passes the Value through unchanged — a char lag returns the prior
+        // LAG passes the Value through unchanged - a char lag returns the prior
         // row's string, a numeric lag the prior number (BUG-lagchar).
         return lagFifo(ev, name, n, args[0]);
     }
@@ -888,7 +888,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         // DIF is numeric-only: coerce (a char arg → missing), keep a numeric FIFO.
         const x = toNum(args[0]);
         // NOTE-difcharnoterr: a non-convertible char arg already draws toNum's
-        // converted+invalid-data NOTE pair but left _ERROR_=0 — SAS flags
+        // converted+invalid-data NOTE pair but left _ERROR_=0 - SAS flags
         // _ERROR_=1 too (eval.zig's toNum pairs them). Blank char → missing
         // stays benign (silent there too).
         if (args[0] == .str and isMiss(x) and std.mem.trim(u8, args[0].str, " ").len != 0)
@@ -897,9 +897,9 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         return if (isMiss(x) or isMiss(prev)) Value.missing else numVal(x - prev);
     }
 
-    // ── conversion (stubs: format/informat spec ignored — see header ponytail)
+    // ── conversion (stubs: format/informat spec ignored - see header ponytail)
     // INPUTN/INPUTC are the runtime-informat variants of INPUT (the informat is a
-    // char expression) — our INPUT already takes the informat as a value, so they
+    // char expression) - our INPUT already takes the informat as a value, so they
     // share the path. ponytail: no forced numeric/char return-type distinction.
     // A `?`/`??`-modified call arrives desugared (parser_expr parseCall) and is
     // resolved to base+level by inputNameAndLevel.
@@ -907,12 +907,12 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         if (args.len != 2) return badArity(ev, in.base, "2", args.len);
         const s = try toStr(ev, args[0]); // the DATA: an implicit num→char here DOES note
         // a bare-numeric spec (`input(x, 4.)`) auto-converts 12-wide right-justified
-        // (BUG-numcharwidth) — trim back to the spec text, and coerce it SILENTLY:
+        // (BUG-numcharwidth) - trim back to the spec text, and coerce it SILENTLY:
         // `input("123", 8.)` used to log a num→char NOTE for the `8.` (QA tick356 F4).
         const spec = try specText(ev, args[1]); // the informat (a char spec)
         format.read_noted = false; // fresh per read, the way io.zig's readNum clears it
         const v = readInformat(spec, s);
-        // GH#5 + GH#4a ISS-inputfninvalid — ONE invalid-data rule for the whole
+        // GH#5 + GH#4a ISS-inputfninvalid - ONE invalid-data rule for the whole
         // family, covering BOTH classes: the informat did not LOAD (readInformat
         // has just printed the loud "was not found or could not be loaded"
         // ERROR), or a KNOWN informat could not read the non-blank source into
@@ -923,21 +923,21 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         // <?|??> informat.), Functions and CALL Routines Reference printed
         // pp.1038-39) scale the report: `?` keeps _ERROR_=1 but suppresses the
         // NOTE (doc Example 3 prints _ERROR_=1 under `?`); `??` silences both.
-        // Blank / `.` / special-missing source stays SILENT at every level — a
+        // Blank / `.` / special-missing source stays SILENT at every level - a
         // legitimate missing, not invalid data (io.zig noteInvalidNum's guard;
         // that function is the INPUT STATEMENT twin of this block). The
         // invalid-data NOTE is readNumeric's own when it emitted one (the
-        // embedded-blank plain-w.d class — format.read_noted, one NOTE per
+        // embedded-blank plain-w.d class - format.read_noted, one NOTE per
         // invalid value, io.zig's dedupe); else it is this block's
         // "Invalid argument to function INPUT." ponytail: ast.Call carries no
         // source span, so the NOTE omits SAS's "at line N column M" tail rather
         // than freeze a 0/0 (GH#78 precedent); readNumeric's own NOTE prints
-        // from format.zig regardless of the modifiers — io.zig's noteInvalidNum
+        // from format.zig regardless of the modifiers - io.zig's noteInvalidNum
         // gates only ITS note too, so both paths leak it alike under `?`/`??`.
         // The invalid-data judgment applies to the field the informat actually
         // READ: the fn entry (format.readNumeric) slices to the spec width w
         // first, so `input(123, 8.)` renders the number 12-wide right-justified
-        // and the 8-wide informat reads its blank LEFT edge — a legitimate
+        // and the 8-wide informat reads its blank LEFT edge - a legitimate
         // blank-field missing, never invalid data (QA tick356 F4 caught the
         // false NOTE here). Mirror that slice; io.zig's formatted statement
         // reads judge the same w columns.
@@ -950,8 +950,8 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
             if (in.lvl < 2) {
                 if (in.lvl == 0 and !format.read_noted) {
                     // Real SAS names the function UPPERCASE whatever the call's
-                    // case (and the in-file NOTE family — MORT/SAVING/COMPOUND
-                    // — spells it that way too), so derive it from the base
+                    // case (and the in-file NOTE family - MORT/SAVING/COMPOUND
+                    // - spells it that way too), so derive it from the base
                     // instead of echoing the (possibly desugared) name.
                     const fname = if (eqi(in.base, "inputn")) "INPUTN" else if (eqi(in.base, "inputc")) "INPUTC" else "INPUT";
                     note(ev, "Invalid argument to function {s}.", .{fname});
@@ -971,14 +971,14 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     if (eqi(name, "put") or eqi(name, "putn") or eqi(name, "putc")) {
         if (args.len != 2) return badArity(ev, name, "2", args.len);
         // BUG-putbarenumnote: a bare-numeric spec (`put(x, 8.2)`) is a format, not
-        // data — coerce it SILENTLY (specText), never toStr's num→char NOTE.
+        // data - coerce it SILENTLY (specText), never toStr's num→char NOTE.
         const spec = try specText(ev, args[1]);
         // ±inf → render as missing, never leak "inf". But NaN carries the
-        // special-missing payload (.A-.Z/._) — keep it so bestFmt/format emits
+        // special-missing payload (.A-.Z/._) - keep it so bestFmt/format emits
         // its letter (ISS-specialmiss-tochar), don't flatten it to plain `.`.
         const v: Value = if (args[0] == .num and std.math.isInf(args[0].num)) Value.missing else args[0];
         // BESTw. shows the value's natural/compact form (decimals kept, trailing
-        // zeros dropped) — not a fixed `w.d`. The generic engine treats it as
+        // zeros dropped) - not a fixed `w.d`. The generic engine treats it as
         // `w.` (d=0) and would round 36.2 → "36"; handle it here, right-justified.
         if (bestWidth(spec)) |w| return .{ .str = try bestFmt(ev.arena, toNum(v), w) };
         return .{ .str = try format.apply(ev.arena, v, spec) };
@@ -987,7 +987,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     // ── system / environment: correct in a base session with no options set
     if (eqi(name, "sysparm")) { // the shared session value (GAP-sysparm-opt)
         // `options sysparm="text";` writes sysparm_text; macro.zig's &SYSPARM
-        // reads the same value live. Was hardcoded "" — the option errored
+        // reads the same value live. Was hardcoded "" - the option errored
         // "not recognized" and the function always returned empty.
         if (args.len != 0) return badArity(ev, name, "0", args.len);
         return .{ .str = sysparm_text };
@@ -1001,12 +1001,12 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         return .{ .str = "" };
     }
     if (eqi(name, "wto")) { // write to the operator console (z/OS); log it and return 0
-        // ponytail: no operator console here — surface the text as a NOTE.
+        // ponytail: no operator console here - surface the text as a NOTE.
         if (args.len >= 1) note(ev, "WTO: {s}", .{try toStr(ev, args[0])});
         return numVal(0);
     }
     if (eqi(name, "sleep")) { // SAS SLEEP returns its first argument
-        // ponytail: a batch interpreter does NOT actually suspend — returning n
+        // ponytail: a batch interpreter does NOT actually suspend - returning n
         // honors the documented return value without stalling the run.
         if (args.len < 1 or args.len > 2) return badArity(ev, name, "1 or 2", args.len);
         const n = toNum(args[0]);
@@ -1043,7 +1043,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     }
 
     // An unknown/unimplemented function logs ONCE as an ERROR (SAS-like), not a
-    // NOTE + ERROR — `_ERROR_`/the corpus surface the err level.
+    // NOTE + ERROR - `_ERROR_`/the corpus surface the err level.
     ev.diags.report(.err, 0, "function {s}() is not supported yet", .{name}) catch {};
     return Value.missing;
 }
@@ -1145,7 +1145,7 @@ pub fn unary(ev: *eval.Evaluator, name: []const u8, args: []const Value, op: Una
 /// Out-of-domain argument → SAS missing plus a NOTE.
 pub fn domErr(ev: *eval.Evaluator, name: []const u8) Value {
     note(ev, "{s}: argument out of domain (result set to missing)", .{name});
-    // MISC-fnseterror: SAS also sets _ERROR_=1 on an invalid argument — route
+    // MISC-fnseterror: SAS also sets _ERROR_=1 on an invalid argument - route
     // through eval's PDV setter so every fn file using domErr gets it. catch{}:
     // keeps the plain-Value signature (~40 cross-file callers); only OOM can
     // fail, and the NOTE (the fail-loud signal) is already out, same as note().
@@ -1154,18 +1154,18 @@ pub fn domErr(ev: *eval.Evaluator, name: []const u8) Value {
 }
 
 /// `domErr` for a CHARACTER function: same NOTE and the same `_ERROR_=1`, but the
-/// result is the CHARACTER missing — a blank — not a numeric `.`
+/// result is the CHARACTER missing - a blank - not a numeric `.`
 /// (BUG-charfnsmissingtype). `domErr` itself cannot simply be made type-aware:
 /// its ~40 callers are overwhelmingly numeric (PROBIT, LOG1PX, the financial
 /// family …) and a numeric `.` is right for every one of them, so the FLAVOUR
 /// belongs at the call site, not in a shared branch. Only the handful of
 /// character functions that route through the domain path use this one: SUBPAD,
-/// and (BUG-charfnsnodomerr) BYTE, COLLATE, HASHING and HASHING_HMAC — each
+/// and (BUG-charfnsnodomerr) BYTE, COLLATE, HASHING and HASHING_HMAC - each
 /// because its OWN doc entry says the failure is diagnosed, not because the
 /// family should look uniform. Two arms deliberately do NOT come here and must
 /// stay out: COLLATE with an omitted start-position (`collate(,,56)` is a
 /// documented working example, p.524) and COLLATE's `length` (no prescribed
-/// range in the doc). Same discipline as HASHING_TERM's split at p.986 —
+/// range in the doc). Same discipline as HASHING_TERM's split at p.986 -
 /// invalid handle → numeric missing, uncomputable digest → blank.
 pub fn domErrChar(ev: *eval.Evaluator, name: []const u8) Value {
     _ = domErr(ev, name); // NOTE + _ERROR_=1, one implementation
@@ -1185,7 +1185,7 @@ pub fn substr(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval.E
     const s = try toStr(ev, args[0]);
     const posf = toNum(args[1]);
     if (isMiss(posf)) return .{ .str = "" };
-    // SAS 9.4: a NONPOSITIVE position is INVALID for SUBSTR (read) — it logs a NOTE
+    // SAS 9.4: a NONPOSITIVE position is INVALID for SUBSTR (read) - it logs a NOTE
     // that the 2nd argument is invalid and returns the WHOLE remainder from the
     // (clamped) start to the end, IGNORING length. This is deliberately UNLIKE
     // SUBSTRN, which begins at char 1 with the length reduced (SAS 9.4 functions
@@ -1197,9 +1197,9 @@ pub fn substr(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval.E
         try ev.setError();
         return .{ .str = s };
     }
-    // Compare against string bounds as floats first — pos may be huge and not fit
+    // Compare against string bounds as floats first - pos may be huge and not fit
     // i64, so guard before @intFromFloat (which panics on overflow).
-    // NOTE-substrpastend: a position PAST the end is invalid in SAS 9.4 too — same
+    // NOTE-substrpastend: a position PAST the end is invalid in SAS 9.4 too - same
     // NOTE + _ERROR_=1 as the nonpositive-position branch above, value still blank.
     if (posf > @as(f64, @floatFromInt(s.len))) {
         note(ev, "Invalid second argument to function SUBSTR.", .{});
@@ -1215,7 +1215,7 @@ pub fn substr(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval.E
         if (!isMiss(lenf)) {
             if (lenf <= 0) {
                 // SAS 9.4: a NONPOSITIVE length (zero or negative) is INVALID for
-                // SUBSTR (read) — it logs a NOTE (3rd arg invalid) and returns the
+                // SUBSTR (read) - it logs a NOTE (3rd arg invalid) and returns the
                 // remainder from position to the end (SUBSTRN comparison table,
                 // p.1535). Was: return "" (BUG-substrneglen, silent-wrong). `take`
                 // is already `avail` (the remainder), so just emit the NOTE.
@@ -1224,7 +1224,7 @@ pub fn substr(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval.E
                 try ev.setError();
             } else if (lenf > @as(f64, @floatFromInt(avail))) {
                 // NOTE-substrlenpastend: a positive length that runs PAST the end
-                // is invalid in SAS 9.4 too — same NOTE (3rd arg) + _ERROR_=1 as
+                // is invalid in SAS 9.4 too - same NOTE (3rd arg) + _ERROR_=1 as
                 // the nonpositive-length branch above, value still the clamped
                 // remainder. Strict `>`: an exact fit (lenf == avail) is valid.
                 // Mirrors NOTE-substrpastend (2410a3b) for the position arg.
@@ -1259,7 +1259,7 @@ pub fn classMod(m: u8) ?CharClass {
 pub const WordSpec = struct {
     set: [256]bool, // final delimiter set (class-add, i-fold, k-invert applied)
     keep_empty: bool = false, // m: consecutive/edge delimiters bound EMPTY words
-    word_number: bool = false, // e (FINDW only — SCAN/COUNTW reject it)
+    word_number: bool = false, // e (FINDW only - SCAN/COUNTW reject it)
     trim: bool = false, // t: caller trims trailing blanks of the string arg
     ci: bool = false, // i: set is already case-folded; FINDW also folds the word compare
 };
@@ -1339,15 +1339,15 @@ pub fn wordTokens(arena: std.mem.Allocator, s: []const u8, set: *const [256]bool
     return toks;
 }
 
-/// `scan(str, n [, delims [, mods]])` — the n-th word. Consecutive delimiters
+/// `scan(str, n [, delims [, mods]])` - the n-th word. Consecutive delimiters
 /// collapse (no empty words) unless `m` keeps them (BUG-scanmmod); `n < 0`
 /// counts from the right; out of range → "". Class adders + k/i/t honored
 /// (BUG-scanmodifiers); q/r/b etc. error loudly (D-002).
 ///
 /// BUG-scanmissingtype: SCAN is a CHARACTER function (SAS 9.4 Functions and CALL
-/// Routines: Reference, 5th ed., p.1462 — "Returns the nth word from a character
-/// string"), so EVERY exit — including the invalid/missing-count and the
-/// fail-loud modifier arms — must yield a BLANK CHARACTER value, never a numeric
+/// Routines: Reference, 5th ed., p.1462 - "Returns the nth word from a character
+/// string"), so EVERY exit - including the invalid/missing-count and the
+/// fail-loud modifier arms - must yield a BLANK CHARACTER value, never a numeric
 /// missing. A numeric missing here flips the receiving variable's TYPE, so
 /// `put (x) ($char10.);` errored out (rc 1) where SAS prints ten blanks (rc 0).
 /// SUBSTR (:1087) and CHOOSEC already had this right; scan was the odd one out.
@@ -1355,7 +1355,7 @@ pub fn scan(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval.Err
     if (args.len < 2 or args.len > 4) return badArity(ev, name, "2 to 4", args.len);
     var s = try toStr(ev, args[0]);
     const nf = toNum(args[1]);
-    if (isMiss(nf)) return .{ .str = "" }; // invalid/missing count — still CHARACTER
+    if (isMiss(nf)) return .{ .str = "" }; // invalid/missing count - still CHARACTER
     const n: i64 = toInt(nf) orelse return .{ .str = "" }; // huge index → out of range
     if (n == 0) return .{ .str = "" };
     const list = if (args.len >= 3) try toStr(ev, args[2]) else word_delims;
@@ -1382,7 +1382,7 @@ pub fn scan(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval.Err
     return .{ .str = try ev.arena.dupe(u8, toks.items[idx]) };
 }
 
-/// `find(str, sub [, mods] [, start])` — 1-based position of `sub` in `str`, 0 if
+/// `find(str, sub [, mods] [, start])` - 1-based position of `sub` in `str`, 0 if
 /// absent. Arg 3 is `start` when numeric, else modifiers (`i` case-insensitive,
 /// `t` trim trailing blanks); a numeric arg 4 is always `start`.
 /// Negative `start` searches right-to-left from `|start|`.
@@ -1426,7 +1426,7 @@ pub fn find(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval.Err
     return numVal(@floatFromInt(if (rel) |p| from + p + 1 else 0));
 }
 
-/// `tranwrd(str, target, replacement)` — replace EVERY occurrence of `target`.
+/// `tranwrd(str, target, replacement)` - replace EVERY occurrence of `target`.
 /// ponytail: empty target → unchanged; no trailing-blank trimming of the args.
 pub fn tranwrd(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval.Error!Value {
     if (args.len != 3) return badArity(ev, name, "3", args.len);
@@ -1437,10 +1437,10 @@ pub fn tranwrd(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval.
     return .{ .str = try std.mem.replaceOwned(u8, ev.arena, s, from, to) };
 }
 
-/// `compress(source [, chars [, mods]])` — remove characters from `source`.
+/// `compress(source [, chars [, mods]])` - remove characters from `source`.
 /// No `chars` → remove blanks; with `chars` → remove exactly that set. Modifiers:
 /// `k` keep (instead of remove), `i` case-insensitive, and class adders that
-/// extend the set, routed through classMod (a/d/p/s/l/u/n/f/g/w/c/x — the same
+/// extend the set, routed through classMod (a/d/p/s/l/u/n/f/g/w/c/x - the same
 /// machinery COUNTC/SCAN use). Unknown letters ERROR loudly (D-002).
 pub fn compress(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval.Error!Value {
     if (args.len < 1 or args.len > 3) return badArity(ev, name, "1 to 3", args.len);
@@ -1549,10 +1549,10 @@ fn bestWidth(spec: []const u8) ?usize {
 /// others with trailing zeros dropped), right-justified in `w`. Missing → `.`.
 /// ponytail: no scientific-notation fallback when the value overflows `w`.
 fn bestFmt(a: std.mem.Allocator, x: f64, w: usize) ![]const u8 {
-    // BESTw. bounds the value to w columns (fixed-or-E, most significant digits) —
+    // BESTw. bounds the value to w columns (fixed-or-E, most significant digits) -
     // NOT the raw f64 that overflowed the field (BESTFMT-explicit). Reuse the same
     // width-bounded logic the default numeric-display path uses, then right-justify.
-    // bestNumW already renders missing (plain/special) via Value.missingChar —
+    // bestNumW already renders missing (plain/special) via Value.missingChar -
     // ISS-specialmiss-tochar: no `.` shortcut, or `.K` would print as `.`.
     const body = try format.bestNumW(a, x, w);
     if (body.len >= w) return body;
@@ -1565,14 +1565,14 @@ fn bestFmt(a: std.mem.Allocator, x: f64, w: usize) ![]const u8 {
 /// The format attached to the variable `vn` names, decomposed for the VFORMAT*X
 /// family. Null when the variable is unknown. An unformatted variable reports the
 /// SAS default (BEST12. for numeric, $w. for character).
-/// ponytail: the char default width is the current value's length — our data model
+/// ponytail: the char default width is the current value's length - our data model
 /// tracks no declared char length, so a genuinely unformatted char reports its
 /// value width rather than SAS's fixed declared length.
 const VarFmt = struct { char: bool, name: []const u8, w: usize, d: usize };
 /// A FORMAT/INFORMAT attached to a column of some loaded dataset (not on the PDV
 /// var): after `data d; format x dollar10.2; …; set d;`, the format lives on d's
 /// column, not the fresh PDV var, so VFORMATX must fall back to it (BUG-vformatxlabel).
-/// ponytail: first dataset with a matching formatted column wins — unambiguous for
+/// ponytail: first dataset with a matching formatted column wins - unambiguous for
 /// the usual single-source SET; a same-named column with a different format in an
 /// earlier set would shadow, which the corpus never hits.
 fn libColFmt(vn: []const u8, want_informat: bool) ?[]const u8 {
@@ -1643,7 +1643,7 @@ pub fn pow10(n: usize) f64 {
 }
 
 pub fn numVal(x: f64) Value {
-    // BUG-mathoverflowinf: SAS has no infinity — overflow (exp(710), 1/0, …)
+    // BUG-mathoverflowinf: SAS has no infinity - overflow (exp(710), 1/0, …)
     // is a genuine missing, not a live ±inf that would defeat MISSING()/`x=.`
     // and misrank in sorts/comparisons. NaN passes through untouched: special
     // missings (.A–.Z, ._) ride in its payload.
@@ -1652,10 +1652,10 @@ pub fn numVal(x: f64) Value {
 }
 
 /// NOTE-overflownonote (tick183): numVal's overflow→missing collapse was the
-/// ONLY silent numeric-error path — div-by-zero and math-domain errors both
+/// ONLY silent numeric-error path - div-by-zero and math-domain errors both
 /// NOTE. Route overflow through the same NOTE-emitting mechanism (note())
 /// reusing domErr's exact math-domain wording; the value stays missing.
-/// Unlike domErr this does NOT set _ERROR_ — only the NOTE side-effect is
+/// Unlike domErr this does NOT set _ERROR_ - only the NOTE side-effect is
 /// added. numVal itself stays pure (no `ev`; ~40 cross-file callers, most of
 /// them int-valued). ponytail: ev-less callers that could theoretically
 /// overflow (agg sum/mean, splines) stay silent until they grow an `ev`.
@@ -1701,7 +1701,7 @@ pub fn factorial(n: f64) f64 {
 
 /// COMB(n,r), the binomial coefficient (assumes 0 ≤ r ≤ n integers). Interleaved
 /// product `∏_{i=1}^{r} (n-r+i)/i` so every partial product stays ≤ the final value
-/// — a representable answer (e.g. comb(1000,500)≈2.7e299) never overflows mid-way,
+/// - a representable answer (e.g. comb(1000,500)≈2.7e299) never overflows mid-way,
 /// unlike computing the full descending numerator first (BUG-comboverflow). Uses
 /// r=min(r,n-r) by symmetry C(n,r)=C(n,n-r): fewest iterations AND the tightest
 /// partial products (also keeps the ≤170-step overflow-bounded loop guarantee).
@@ -2025,13 +2025,13 @@ fn probitOf(p: f64) f64 {
     // One Halley step against the high-precision forward CDF lifts Acklam's
     // ~1e-9 error to full double precision (SAS: probit(0.975)=1.959963984540054).
     // NOTE-probitdeeptail: PARKED, not a conformance gap. The reference (p.1332)
-    // states NO accuracy guarantee — only Range 0<p<1 (domErr above) and a
+    // states NO accuracy guarantee - only Range 0<p<1 (domErr above) and a
     // CAUTION that the result could be truncated to [-8.222, 7.941]. Measured:
     // ≤7.8e-11 relative over p ∈ [0.001, 0.9999]; 1.54e-9 relative at p=1e-10,
     // where the Halley step is limited by the forward CDF's own tail precision.
     // Both doc example values (probit(.025), probit(1.e-7)) match to all 10
     // printed digits. Accuracy we do have is pinned in
-    // tests/corpus/note_probit_deeptail.sas — tighten only with a doc target.
+    // tests/corpus/note_probit_deeptail.sas - tighten only with a doc target.
     const u = (stdNormCdf(x) - p) / stdNormPdf(x);
     const x1 = x - u / (1 + x * u / 2);
     return if (std.math.isFinite(x1)) x1 else x; // |x| huge: keep Acklam
@@ -2353,7 +2353,7 @@ pub fn distPdf(d: Dist, x: f64, args: []const Value) ?f64 {
 /// continued fraction Q(z) = φ(z)·r(z), r(z) = 1/(z + 1/(z + 2/(z + 3/(z+⋯)))).
 /// BUG-logxdftail (doc LOGCDF p.1169: the log family exists for tail accuracy):
 /// the direct CDF underflows f64 at |z|≳38 (and our gammaP Φ collapses to 0/1
-/// near |z|≈8 — OBS-probnormtail), so callers reach here only with |z| large;
+/// near |z|≈8 - OBS-probnormtail), so callers reach here only with |z| large;
 /// the CF converges fast there. Modified Lentz (Numerical Recipes §5.2).
 pub fn logStdNormTail(z: f64) f64 {
     const tiny = 1e-300;
@@ -2374,7 +2374,7 @@ pub fn logStdNormTail(z: f64) f64 {
     return -0.5 * z * z - 0.5 * @log(2.0 * std.math.pi) - @log(f);
 }
 
-/// log of the PDF/PMF of `d` at `x`, computed in log-space — same formulas as
+/// log of the PDF/PMF of `d` at `x`, computed in log-space - same formulas as
 /// distPdf but returning the @exp argument. −inf outside the support (→ missing,
 /// exactly like log(pdf=0) today). BUG-logxdftail fallback: called only when the
 /// direct density underflowed to 0 (or overflowed/NaN'd at a pole), so mid-range
@@ -2472,7 +2472,7 @@ pub fn distLogPdf(d: Dist, x: f64, args: []const Value) f64 {
 /// underflowed to exactly 0, so the tail is always deep. null = no log-space
 /// form → missing, unchanged from today (ponytail: deep CDF tails for
 /// chisq/gamma/t/f/beta/cauchy and the discrete dists need a log-space
-/// incomplete-gamma/beta — add when a study actually hits them). −inf = outside
+/// incomplete-gamma/beta - add when a study actually hits them). −inf = outside
 /// the support (→ missing, same as log(0) today).
 pub fn distLogCdfSdf(d: Dist, x: f64, args: []const Value, right: bool) ?f64 {
     const ninf = -std.math.inf(f64);
@@ -2560,7 +2560,7 @@ pub fn distQuantile(d: Dist, p: f64, args: []const Value) ?f64 {
 
 /// US states + DC: postal code, FIPS number, mixed-case name. Uppercase names
 /// (STNAME/FIPNAME) are derived from `name`. FIPS numbering has documented gaps
-/// (3, 7, 14, 43, 52 …) — the table is the source of truth, not the index.
+/// (3, 7, 14, 43, 52 …) - the table is the source of truth, not the index.
 const StateRow = struct { po: []const u8, fips: u8, name: []const u8 };
 const states = [_]StateRow{
     .{ .po = "AL", .fips = 1, .name = "Alabama" },        .{ .po = "AK", .fips = 2, .name = "Alaska" },
@@ -2735,7 +2735,7 @@ fn annFv(r: f64, n: f64, pmt: f64, pv: f64, ty: f64) f64 {
 
 /// The annuity balance at maturity, pv·(1+r)^n + pmt·(1+r·type)·((1+r)^n−1)/r + fv,
 /// whose root (over r) is the RATE. For a large r, (1+r)^n overflows to +inf and the
-/// naive expression is inf−inf = NaN, which breaks bisection — so when the growth
+/// naive expression is inf−inf = NaN, which breaks bisection - so when the growth
 /// factor is non-finite we return a finite ±sentinel with the sign the balance takes
 /// as r→∞ (dominated by pv·(1+r)^n, or pmt's sign when pv is zero). Root always lies
 /// below that region, so the sentinel just tells bisection "go lower".
@@ -2768,7 +2768,7 @@ fn annIpmt(r: f64, per: f64, n: f64, pv: f64, fv: f64, ty: f64) f64 {
     return annFv(r, per - 1, pmt, pv, 0) * r;
 }
 
-/// Σ flow[i] / (1+r)^i, i from 0 — the polynomial FINANCE IRR drives to zero.
+/// Σ flow[i] / (1+r)^i, i from 0 - the polynomial FINANCE IRR drives to zero.
 fn irrPoly(flows: []const Value, r: f64) f64 {
     var sum: f64 = 0;
     var disc: f64 = 1;
@@ -2801,10 +2801,10 @@ fn irrSolve(flows: []const Value) ?f64 {
 }
 
 /// The FINANCE umbrella: `FINANCE(mode, params…)` dispatches to one financial
-/// calculation. Implements the closed-form (Excel-parity) modes — annuities,
+/// calculation. Implements the closed-form (Excel-parity) modes - annuities,
 /// depreciation, rate conversion, cash-flow NPV/IRR/MIRR, dollar fractions.
 /// ponytail: the security/bond/coupon modes (PRICE, YIELD, COUP*, ACCRINT, …)
-/// need day-count-basis + coupon-schedule machinery and are not built yet — they
+/// need day-count-basis + coupon-schedule machinery and are not built yet - they
 /// return missing with a NOTE, so FINANCE stays [ ] in the tracker until complete.
 pub fn finance(ev: *eval.Evaluator, args: []const Value) eval.Error!Value {
     if (args.len < 1) return badArity(ev, "finance", "1 or more", args.len);
@@ -3141,7 +3141,7 @@ pub fn solveIrr(freq: f64, cash: []const Value) ?f64 {
     return 0.5 * (lo + hi);
 }
 
-/// Accumulated depreciation through time `p` (clamped to [0,y]) — one closed form
+/// Accumulated depreciation through time `p` (clamped to [0,y]) - one closed form
 /// per method. The per-period depreciation is DACC(p)−DACC(p−1); SAS's fractional-
 /// period proration falls straight out of the difference. Verified against the PDF
 /// examples (DEPSL=75, DEPSYD 83.33/316.67, DACCSL=175, DACCDB=760.93).
@@ -3209,7 +3209,7 @@ pub fn enumPv(y: f64, f: f64, cfs: []const Value) f64 {
     return p;
 }
 
-/// Price of a periodic (bond) cash flow stream — PVP and the base for DURP/CONVXP.
+/// Price of a periodic (bond) cash flow stream - PVP and the base for DURP/CONVXP.
 /// t_k = n·k0+k−1; coupon c/n·A each period, plus par A at the last.
 pub fn bondPv(a: f64, c: f64, n: f64, bigK: usize, k0: f64, y: f64) f64 {
     const yr = y / n;
@@ -3231,7 +3231,7 @@ pub fn bondPv(a: f64, c: f64, n: f64, bigK: usize, k0: f64, y: f64) f64 {
 /// log(0)/÷0 → missing: BERNOULLI p→[ε,1−ε]; BINOMIAL μ→[nε, n(1−ε)];
 /// GAMMA/IGAUSS variable and μ→[ε,∞); POISSON μ→[ε,∞). `n` is BINOMIAL's trial
 /// count (ignored otherwise). Clamping applies only on the documented intervals
-/// — out-of-domain negatives stay on the NaN→missing path (doc formula tables).
+/// - out-of-domain negatives stay on the NaN→missing path (doc formula tables).
 pub fn devianceOf(dist: []const u8, y: f64, mu: f64, n: f64, eps_in: f64) ?f64 {
     const d = std.mem.trim(u8, dist, " ");
     const ylny = struct { // y·ln(y/m), with the 0·ln0 = 0 limit
@@ -3312,7 +3312,7 @@ pub fn hyperCdf(bigN: f64, bigK: f64, n: f64, x: f64) f64 {
     const lo = @max(0, n - (bigN - bigK));
     const hi = @min(x, @min(bigK, n));
     if (hi < lo) return 0;
-    // BUG-probhyprhang: iterate an INTEGER term count, not a float `i` — for a huge
+    // BUG-probhyprhang: iterate an INTEGER term count, not a float `i` - for a huge
     // population `i += 1` is a float no-op (i > 2^53) → infinite loop. Also cap the
     // term count (SAS switches to an approximation we don't model → missing).
     const terms = hi - lo + 1;
@@ -3328,7 +3328,7 @@ pub fn hyperCdf(bigN: f64, bigK: f64, n: f64, x: f64) f64 {
 }
 
 /// Bessel J_nu(x) by its ascending series (stable for |x| up to ~15; our use is
-/// small x). ponytail: no large-x asymptotic — returns the series value regardless.
+/// small x). ponytail: no large-x asymptotic - returns the series value regardless.
 pub fn besselJ(nu: f64, x: f64) f64 {
     const h = x / 2.0;
     var term = std.math.pow(f64, h, nu) / @exp(lgammaOf(nu + 1)); // k=0
@@ -3382,7 +3382,7 @@ fn airyAi(x: f64, derivative: bool) f64 {
     return if (derivative) airy_c1 * fp - airy_c2 * gp else airy_c1 * f - airy_c2 * g;
 }
 
-/// NVALID: is `s` a valid SAS variable name under the (default) V7 rules —
+/// NVALID: is `s` a valid SAS variable name under the (default) V7 rules -
 /// 1–32 chars, first a letter or underscore, rest letters/digits/underscore.
 pub fn isValidName(s: []const u8) bool {
     if (s.len == 0 or s.len > 32) return false;
@@ -3433,7 +3433,7 @@ pub fn mvalidExtend(s: []const u8) bool {
     return true;
 }
 
-/// Uppercase hex — HASHING_TERM renders its digest in uppercase (doc p.986).
+/// Uppercase hex - HASHING_TERM renders its digest in uppercase (doc p.986).
 pub fn hexEncodeUpper(ev: *eval.Evaluator, bytes: []const u8) ![]const u8 {
     const hex = "0123456789ABCDEF";
     const out = try ev.arena.alloc(u8, bytes.len * 2);
@@ -3445,11 +3445,11 @@ pub fn hexEncodeUpper(ev: *eval.Evaluator, bytes: []const u8) ![]const u8 {
 }
 
 /// Running-digest state for HASHING_INIT/PART/TERM. We accumulate the message and
-/// one-shot hashDigest() it at TERM — the final digest equals hashing the
+/// one-shot hashDigest() it at TERM - the final digest equals hashing the
 /// concatenation, which is the only observable value. The table is process-global
 /// because dispatch() is value-in/value-out and has nowhere per-session to stash a
 /// handle. ponytail: global, allocations leak per handle, and (unlike SAS) a handle
-/// survives across DATA steps — harmless for a single-program run. Upgrade path if
+/// survives across DATA steps - harmless for a single-program run. Upgrade path if
 /// isolation ever matters: move this beside `ev.lag` as a per-Evaluator field.
 const HashCtx = struct { method: []const u8, buf: std.ArrayList(u8), key: ?[]const u8 = null };
 var hashing_table: std.ArrayList(HashCtx) = .empty;
@@ -3578,7 +3578,7 @@ fn queueDepth(name: []const u8, prefix: []const u8) ?usize {
 /// x←16807·x mod 2³¹−1, value = x/(2³¹−1)). One stream per data step, held in
 /// `ev.lag` under a fixed key: the FIRST positive seed initializes it and every
 /// subsequent random draw (any generator) advances the same stream, so sequential
-/// draws differ and a fixed seed is reproducible — matching SAS's shared-stream model.
+/// draws differ and a fixed seed is reproducible - matching SAS's shared-stream model.
 /// ponytail: SAS's DOCUMENTED algorithm, but the seed-scramble details aren't
 /// published, so the stream is reproducible and uniform-distributed yet may not
 /// bit-match SAS's exact sequence. seed≤0 (SAS: clock) → a fixed seed (deterministic).
@@ -3602,7 +3602,7 @@ pub fn nextUniform(ev: *eval.Evaluator, seed: f64) f64 {
 // value SAS and reference MT19937 emit). RANUNI-family keeps the Lehmer
 // nextUniform above.
 // ponytail: the 624-word state is (de)serialised through the shared lag Value
-//   FIFO each draw — fine at validation scale; lift to an Evaluator field only
+//   FIFO each draw - fine at validation scale; lift to an Evaluator field only
 //   if a step draws enough randoms for the copy to dominate.
 const MT_N = 624;
 const MT_M = 397;
@@ -3725,7 +3725,7 @@ fn lagFifo(ev: *eval.Evaluator, name: []const u8, n: usize, v: Value) Value {
         .str => .{ .str = "" },
         .num => Value.missing,
     };
-    // Dupe a char value into the STATE arena — the PDV cell it came from is
+    // Dupe a char value into the STATE arena - the PDV cell it came from is
     // overwritten each iteration (and may point into the per-row scratch,
     // BUG-datastepoom), so the FIFO must own its bytes to hand them back later.
     const stored: Value = switch (v) {
@@ -3742,13 +3742,13 @@ fn lagFifo(ev: *eval.Evaluator, name: []const u8, n: usize, v: Value) Value {
 /// through its 200+ call sites across six function files (numfns/charfns/… all
 /// share `fns.toNum` and most lack an `ev` param). Set at every `dispatch`
 /// entry; single-threaded, so it's always the current call's evaluator.
-/// ponytail: module-global for a cross-file leaf — thread `ev` into toNum only
+/// ponytail: module-global for a cross-file leaf - thread `ev` into toNum only
 /// if these files ever run concurrently.
 var conv_ev: ?*eval.Evaluator = null;
 
 /// SAS char→num: trimmed empty or unparseable → missing (NaN). Every non-blank
 /// implicit conversion logs the SAS NOTE (GH#74b), matching eval.zig's `toNum`
-/// and pdv.zig's char→num assignment note — unparsable text adds the paired
+/// and pdv.zig's char→num assignment note - unparsable text adds the paired
 /// "Invalid numeric data" note. Blank (→ missing) is silent, as in eval.zig.
 pub fn toNum(v: Value) f64 {
     return switch (v) {
@@ -3759,11 +3759,11 @@ pub fn toNum(v: Value) f64 {
             if (conv_ev) |e|
                 e.diags.note(0, "Character values have been converted to numeric values at the places given by: (Line):(Column).", .{}) catch {};
             break :blk pdv_mod.sasParseFloat(tr) orelse {
-                // NOTE-invalidnumdataloc (GH#78): no "at line N column M" tail —
+                // NOTE-invalidnumdataloc (GH#78): no "at line N column M" tail -
                 // this leaf sees only the Value; the borrowed evaluator has no
                 // current line and AST expressions carry no source span, so the
                 // only printable position was a frozen 0/0 literal. Omitted, not
-                // frozen — same wording as eval.zig's and pdv.zig's notes.
+                // frozen - same wording as eval.zig's and pdv.zig's notes.
                 if (conv_ev) |e|
                     e.diags.note(0, "Invalid numeric data, '{s}'.", .{s}) catch {};
                 break :blk std.math.nan(f64);
@@ -3773,7 +3773,7 @@ pub fn toNum(v: Value) f64 {
 }
 
 /// SAS AUTOMATIC num→char conversion for a character-expecting argument:
-/// BEST12. RIGHT-JUSTIFIED in a 12-wide field (Language Reference: Concepts p.124, BUG-numcharwidth) —
+/// BEST12. RIGHT-JUSTIFIED in a 12-wide field (Language Reference: Concepts p.124, BUG-numcharwidth) -
 /// so `length(n)` is 12 and `substr(n,1,3)` is blanks, exactly as SAS does.
 /// Borrows a char slice as-is. Explicit conversions don't come here (PUT routes
 /// through format.apply/bestFmt; the CAT family uses catStr's compact BEST12).
@@ -3781,7 +3781,7 @@ pub fn toStr(ev: *eval.Evaluator, v: Value) eval.Error![]const u8 {
     return switch (v) {
         .str => |s| s,
         .num => |x| blk: {
-            // SAS logs a NOTE on every implicit num→char conversion (GH#74b) —
+            // SAS logs a NOTE on every implicit num→char conversion (GH#74b) -
             // this is the path a declared-length `c = n` takes (parser wraps it
             // as `substr(n,1,len)`, whose first arg coerces here).
             ev.diags.note(0, "Numeric values have been converted to character values at the places given by: (Line):(Column).", .{}) catch {};
@@ -3795,11 +3795,11 @@ pub fn toStr(ev: *eval.Evaluator, v: Value) eval.Error![]const u8 {
 /// The format/informat SPEC argument of PUT()/PUTN()/PUTC() and INPUT()/INPUTN()/
 /// INPUTC(). A bare-numeric spelling (`put(x, 8.2)`, `input(c, 8.)`) reaches us as a
 /// `.num` and must be coerced SILENTLY: the spec is a format, not data, so toStr's
-/// implicit num→char NOTE is a FALSE POSITIVE — and it fires on the very functions
+/// implicit num→char NOTE is a FALSE POSITIVE - and it fires on the very functions
 /// whose purpose is an explicit conversion. Same BEST12 coercion toStr does, minus
 /// the note, trimmed because both engines want the bare spec text.
 /// BUG-putbarenumnote fixed this inline for PUT only; INPUT/INPUTN/INPUTC were left
-/// on toStr and still logged the bogus NOTE (QA tick356 F4) — one helper, both
+/// on toStr and still logged the bogus NOTE (QA tick356 F4) - one helper, both
 /// callers, instead of a second copy. Only the SPEC coerces silently: the DATA
 /// argument keeps toStr, so a genuinely implicit `input(123, 8.)` still notes.
 fn specText(ev: *eval.Evaluator, v: Value) eval.Error![]const u8 {
@@ -3810,10 +3810,10 @@ fn specText(ev: *eval.Evaluator, v: Value) eval.Error![]const u8 {
 }
 
 /// Render a CAT-family argument: a numeric goes through SAS BEST12 (dev3's central
-/// `format.bestNum`, left-aligned/compact — so 1/3 → "0.3333333333", not the raw
+/// `format.bestNum`, left-aligned/compact - so 1/3 → "0.3333333333", not the raw
 /// f64), a char passes through verbatim. BUG-catbest: cat/cats/catt/catx must NOT
 /// use the raw `{d}` form `toStr` gives. BUG-catnote: and must NOT log the
-/// num→char NOTE — SAS 9.4 "CAT Function" (p.453-455): BESTw., leading blanks
+/// num→char NOTE - SAS 9.4 "CAT Function" (p.453-455): BESTw., leading blanks
 /// removed, "SAS does not write a note to the log". Non-CAT callers that DO note
 /// (vvalue/vvaluex/catq) emit it at their own call sites.
 pub fn catStr(ev: *eval.Evaluator, v: Value) eval.Error![]const u8 {
@@ -3889,15 +3889,15 @@ pub fn weekNumber(d: i64, desc: u8) i64 {
 
 // ── informats: char → value (the `input(x, informat.)` conversion) ───────────
 
-/// True when `spec` names an informat the READ side has no loader for — the
+/// True when `spec` names an informat the READ side has no loader for - the
 /// exact condition under which readInformat reports format.informatNotFound.
 /// Shared by readInformat (the loud ERROR) and the INPUT()/INPUTN()/INPUTC()
 /// dispatch (the p.518 invalid-data NOTE + _ERROR_), so the two halves of the
 /// unknown-informat handling cannot drift apart (D-021 rule 1: name the
 /// producers that reach each guard). `$`-specs are excluded: a char informat
 /// is validated by format.checkCharInformat instead (BUG-charinformatloud).
-/// The NAME comes from parseSpec's split — not this file's alphabetic
-/// informatName — because digit-bearing names must keep their digits:
+/// The NAME comes from parseSpec's split - not this file's alphabetic
+/// informatName - because digit-bearing names must keep their digits:
 /// `b8601da8.` is name "b8601da" + w 8, not "b" (and "b" is not a known
 /// numeric informat, so the alphabetic cut false-flags every B8601 read).
 /// Same reason io.zig's checkInputInformats twins this with parseSpec.
@@ -3909,7 +3909,7 @@ fn informatUnloaded(spec: []const u8) bool {
 /// GH#4a: resolve an INPUT-family call name to its base (`input`/`inputn`/
 /// `inputc`) and its `?`/`??` suppress level. The parser desugars a modified
 /// call to `__<base>q` / `__<base>qq` (parser_expr parseCall) because eval's
-/// call_fn boundary forwards name+args only (eval.zig evalCall) — the level,
+/// call_fn boundary forwards name+args only (eval.zig evalCall) - the level,
 /// which ast.Call.qq also records, has to ride the NAME (`__assignc` pattern).
 /// Returns null for every other name, so dispatch falls through.
 fn inputNameAndLevel(name: []const u8) ?struct { base: []const u8, lvl: u2 } {
@@ -3933,7 +3933,7 @@ fn inputNameAndLevel(name: []const u8) ?struct { base: []const u8, lvl: u2 } {
 /// Convert `s` under informat `spec` (e.g. "date9.", "yymmdd10.", "comma8.").
 /// Dates yield a SAS day number; COMMA/DOLLAR strip separators; everything else
 /// parses as a plain number. Unparseable input → missing; an informat that is
-/// not in the read-side dictionary fails LOUD and reads missing (GH#5 — it
+/// not in the read-side dictionary fails LOUD and reads missing (GH#5 - it
 /// used to fall through to the plain-number parse, so the ERROR was followed
 /// by a plausible-but-wrong value).
 pub fn readInformat(spec: []const u8, s: []const u8) Value {
@@ -3944,7 +3944,7 @@ pub fn readInformat(spec: []const u8, s: []const u8) Value {
         const w = informatWD(spec).w;
         const clipped = if (w > 0 and w < s.len) s[0..w] else s;
         // Plain `$w.` (no name): SAS strips leading blanks and reads a field
-        // that is a LONE '.' as the char missing value — gen2 VSSTRESC's
+        // that is a LONE '.' as the char missing value - gen2 VSSTRESC's
         // `input(<numeric missing>, $40.)` must yield "", not "." (the implicit
         // num→char conversion writes "           ." first; QA-dollarwdot).
         // Named forms ($CHARw. etc.) keep the field verbatim per SAS.
@@ -3963,33 +3963,33 @@ pub fn readInformat(spec: []const u8, s: []const u8) Value {
     // BUG-datetimeinputfn: datetime / ISO-8601 / time informats parse to SAS
     // datetime/time seconds. format.readNumeric already implements these (the same
     // path the INPUT statement uses), so the INPUT() function routes through it to
-    // match — the digit-bearing names (E8601DT.) need the raw spec, not `nm`.
+    // match - the digit-bearing names (E8601DT.) need the raw spec, not `nm`.
     const bare = if (spec.len > 0 and spec[0] == '$') spec[1..] else spec;
     const sw = std.ascii.startsWithIgnoreCase;
     // ISS-e8601dainf: ISO-8601 DATE informats (extended `e8601da`, basic `b8601da`)
     // read yyyy-mm-dd / yyyymmdd → a SAS day number. Digit-bearing names, so match
     // the raw spec (informatName stops at "e"); dateFromYMD handles both separators.
     if (sw(bare, "e8601da") or sw(bare, "b8601da")) return dateFromYMD(s);
-    // BUG-percentinputfn: PERCENTw. must strip `%` and divide by 100 — readNumeric
+    // BUG-percentinputfn: PERCENTw. must strip `%` and divide by 100 - readNumeric
     // does both; numFromSpec below only strips comma/dollar, so route percent here.
     if (sw(bare, "datetime") or sw(bare, "e8601dt") or sw(bare, "b8601dt") or
         sw(bare, "e8601tm") or sw(bare, "b8601tm") or eqi(nm, "time") or eqi(nm, "hhmmss") or eqi(nm, "percent") or
         eqi(nm, "monyy") or eqi(nm, "yyq") or eqi(nm, "yyqc") or // MONYY/YYQ: read-side date informats
         eqi(nm, "julian") or // JULIANw.: readNumeric has the parser (BUG-julianinputfn)
-        // TODw.: same one-line shape as JULIAN above — the STATEMENT read was fixed
+        // TODw.: same one-line shape as JULIAN above - the STATEMENT read was fixed
         // (BUG-todinformat) while this chain still fell through to numFromSpec, so
         // `input("10:30:00", tod8.)` returned missing where `input a tod8.;` read
         // 37800 (BUG-todinputfn). tod was the LAST name in format.isKnownInformat
         // with no route here; the two informat entry points now agree name-for-name.
         eqi(nm, "tod") or
         // HEXw./OCTALw. (GAP-hexinformat/octalinformat): the digit parse lives in
-        // readNumeric too — routing here replaces the old error-then-decimal
+        // readNumeric too - routing here replaces the old error-then-decimal
         // fallback (`octal8.` on '377' printed 377 after the ERROR).
         eqi(nm, "hex") or eqi(nm, "octal") or
         // GAP-anydtinformat: ANYDTDTE/DTM/TME auto-detect the date/datetime/time
-        // layout — that try-each-parser logic lives in readNumeric. Without this the
+        // layout - that try-each-parser logic lives in readNumeric. Without this the
         // fn path fell through to numFromSpec (silent missing) once format whitelisted
-        // the names — a fail-loud regression on the INPUT() function path.
+        // the names - a fail-loud regression on the INPUT() function path.
         eqi(nm, "anydtdte") or eqi(nm, "anydtdtm") or eqi(nm, "anydttme") or
         // BUG-commaxinformat: COMMAX/DOLLARX European `,`/`.` roles (and NLNUM's
         // comma grouping) live in readNumeric; numFromSpec only strips US commas,
@@ -3997,20 +3997,20 @@ pub fn readInformat(spec: []const u8, s: []const u8) Value {
         // (BUG-numxinformat).
         eqi(nm, "commax") or eqi(nm, "dollarx") or eqi(nm, "nlnum") or eqi(nm, "numx") or
         // plain w.d / F / BZ: blank handling is informat-specific and lives in
-        // readNumeric — BZw.d blanks→ZEROS, plain w.d embedded blank→missing+NOTE
+        // readNumeric - BZw.d blanks→ZEROS, plain w.d embedded blank→missing+NOTE
         // (BUG-bzinformat / BUG-numembeddedblank). numFromSpec drops all blanks.
         // Z/BEST/E/D are w.d aliases → the SAME embedded-blank rule (NOTE-
         // informatlow-tick245 #9); COMMA/DOLLAR gain readNumeric's interior-hyphen
-        // removal (#13) — numFromSpec below has neither rule.
+        // removal (#13) - numFromSpec below has neither rule.
         nm.len == 0 or eqi(nm, "f") or eqi(nm, "bz") or
         eqi(nm, "z") or eqi(nm, "best") or eqi(nm, "e") or eqi(nm, "d") or
         eqi(nm, "comma") or eqi(nm, "dollar"))
         return format.readNumeric(spec, s);
     // An unimplemented/unknown informat must FAIL LOUD, not silently read missing
-    // (BUG-informatreadloud) — twin of the write-side unknown-format error.
+    // (BUG-informatreadloud) - twin of the write-side unknown-format error.
     // GH#5 ISS-informatfallback: the loud ERROR used to be followed by a plain
     // numeric parse of the source, so `input('2025', zzznotreal.)` reported the
-    // informat and then STILL returned 2025 — plausible-but-wrong, the failure
+    // informat and then STILL returned 2025 - plausible-but-wrong, the failure
     // class D-002 exists to prevent. Language Reference: Concepts p.518 "How SAS
     // Handles Invalid Data": a value requiring an informat that is not
     // available is INVALID, and action 1 is set the value to MISSING. (The
@@ -4078,8 +4078,8 @@ fn dateFromDDMMMYYYY(s0: []const u8) Value {
         p = buf[0..n];
     }
     if (p.len < 6) return Value.missing;
-    // The packed ddMMMyyyy read (incl. the 1–2-digit day) lives in ONE place —
-    // format.parseDDMMMYYYY — so the INPUT() function and the informat paths
+    // The packed ddMMMyyyy read (incl. the 1–2-digit day) lives in ONE place -
+    // format.parseDDMMMYYYY - so the INPUT() function and the informat paths
     // can't disagree (BUG-datesingledigitday; the duplicated day slice fixed
     // in one copy only is how this class kept re-firing).
     return if (format.parseDDMMMYYYY(p)) |dn| numVal(@floatFromInt(dn)) else Value.missing;
@@ -4106,7 +4106,7 @@ fn dateFromParts(s: []const u8, order: DateOrder) Value {
         .mdy => dateFrom(applyCutoff(buf[2]), buf[0], buf[1]),
         .dmy => dateFrom(applyCutoff(buf[2]), buf[1], buf[0]),
     };
-    // packed digit-only form (`150312` under DDMMYY6. → 15MAR2012) — the same
+    // packed digit-only form (`150312` under DDMMYY6. → 15MAR2012) - the same
     // branch dateFromYMD has and the INPUT statement applies (BUG-ddmmyyfnpacked).
     if (n == 1) {
         const tr = std.mem.trim(u8, s, " ");
@@ -4241,7 +4241,7 @@ pub fn baseMonths(base: []const u8) ?i64 {
 }
 
 /// Calendar month-shift preserving day-of-month (clamped to the target month's
-/// length): BUG-intckcontyear — the continuous anniversary of `date` is the same
+/// length): BUG-intckcontyear - the continuous anniversary of `date` is the same
 /// month/day, not the same day-of-year (which INTNX SAME uses).
 pub fn addMonthsCal(date: i64, months: i64) i64 {
     const c = civilFromSas(date);
@@ -4384,7 +4384,7 @@ pub fn holidayDate(name: []const u8, yr: i64) ?i64 {
 }
 
 /// The base SAS time intervals INTTEST accepts (a leading name, optional DT prefix,
-/// before any multiplier/shift). ponytail: names only — the multiplier.shift suffix
+/// before any multiplier/shift). ponytail: names only - the multiplier.shift suffix
 /// is stripped but not range-checked.
 const interval_bases = [_][]const u8{
     "YEAR", "SEMIYEAR", "QTR", "MONTH", "SEMIMONTH", "TENDAY", "WEEK",
@@ -4422,7 +4422,7 @@ pub fn parseInterval(spec: []const u8, buf: []u8) struct { base: []const u8, mul
         mult = std.fmt.parseInt(i64, s[i..j], 10) catch std.math.maxInt(i64);
         if (mult <= 0) mult = 1;
     }
-    // WEEKDAYdW: a digit run closed by W is a weekend spec, not a multiplier —
+    // WEEKDAYdW: a digit run closed by W is a weekend spec, not a multiplier -
     // each digit '1'..'7' (Sun..Sat) marks a weekend day (BUG-intnxweekendskip).
     var wkend: u8 = 0b1000001; // default WEEKDAY: Sunday + Saturday
     if (std.mem.startsWith(u8, base, "WEEKDAY") and j < s.len and (s[j] == 'w' or s[j] == 'W')) {
@@ -4497,11 +4497,11 @@ fn isLeap(y: i64) bool {
 ///   30/360    30-day months, 360-day year (US NASD adjustment)
 ///   ACT/ACT   ISDA actual/actual: day fractions weighted by each year's length
 /// Blank basis defaults to ACT/ACT; any other unrecognized basis → NOTE +
-/// missing (BUG-datdifbasis — was a silent ACT/ACT fallback).
+/// missing (BUG-datdifbasis - was a silent ACT/ACT fallback).
 /// SQL LIKE glob match: `%` matches any sequence (incl. empty), `_` any single
 /// char, all other chars literal (case-sensitive, as SAS). Linear with one
-/// backtrack point — enough for the single-`%` patterns SQL fixtures use.
-/// Pure matcher: callers pre-trim/pad operands (BUG-likepadwidth — SAS
+/// backtrack point - enough for the single-`%` patterns SQL fixtures use.
+/// Pure matcher: callers pre-trim/pad operands (BUG-likepadwidth - SAS
 /// compares the pattern against the value at its DECLARED blank-padded width,
 /// unreachable here; charfns `like` currently trim-both, EPIC-charfixedwidth).
 pub fn sqlLike(s: []const u8, pat: []const u8) bool {
@@ -4529,7 +4529,7 @@ pub fn sqlLike(s: []const u8, pat: []const u8) bool {
 
 /// An unsupported day-count basis → NOTE + _ERROR_ + missing (the domErr
 /// idiom), never a silent ACT/ACT fallback (BUG-datdifbasis). These leaves
-/// carry no `ev` — route through the dispatch-stashed `conv_ev`, like toNum.
+/// carry no `ev` - route through the dispatch-stashed `conv_ev`, like toNum.
 fn badBasis(comptime fname: []const u8, b: []const u8) Value {
     if (conv_ev) |e| {
         note(e, "Invalid basis '{s}' in " ++ fname ++ " (result set to missing)", .{b});
@@ -4538,7 +4538,7 @@ fn badBasis(comptime fname: []const u8, b: []const u8) Value {
     return Value.missing;
 }
 
-/// datdif(d1, d2, basis) — day count between two SAS dates. ACT/ACT (and
+/// datdif(d1, d2, basis) - day count between two SAS dates. ACT/ACT (and
 /// ACTUAL) is the plain serial difference; 30/360 uses the 30-day-month
 /// convention (same day adjustment as yrdif). Blank basis → ACT/ACT; any
 /// other unrecognized basis → NOTE + missing.
@@ -4633,7 +4633,7 @@ pub fn floorI64(x: f64) i64 {
 
 /// Wall-clock seconds since the Unix epoch, cross-platform (the eval path carries no
 /// `Io`, so we read the OS clock directly). POSIX has `clock_gettime`; Windows has no
-/// such syscall, so use `RtlGetSystemTimePrecise` (100-ns ticks since 1601) — only the
+/// such syscall, so use `RtlGetSystemTimePrecise` (100-ns ticks since 1601) - only the
 /// target's switch prong is analyzed, so the cross-compile stays clean.
 fn epochSeconds() i64 {
     return switch (@import("builtin").os.tag) {
@@ -4655,7 +4655,7 @@ pub fn currentSecondOfDay() i64 {
     return @mod(epochSeconds(), 86400);
 }
 
-/// Expand a 2-digit year to a full year within the YEARCUTOFF window — the shared,
+/// Expand a 2-digit year to a full year within the YEARCUTOFF window - the shared,
 /// OPTIONS-aware helper (BUG-yearcutoff; was a separate hardcoded copy).
 pub fn expandYear(yy: i64) i64 {
     return format.expandYear(yy);
@@ -4703,7 +4703,7 @@ pub fn catq(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval.Err
     }
     var parts: std.ArrayList([]const u8) = .empty;
     for (args[idx..]) |arg| {
-        // BUG-catnote: CATQ is outside the note-free cat/cats/catt/catx set —
+        // BUG-catnote: CATQ is outside the note-free cat/cats/catt/catx set -
         // its numeric coercion still logs the NOTE (catStr no longer does).
         if (arg == .num) ev.diags.note(0, "Numeric values have been converted to character values at the places given by: (Line):(Column).", .{}) catch {};
         var it = try catStr(ev, arg); // BUG-catbest: numerics via BEST12, not raw f64
@@ -4723,7 +4723,7 @@ pub fn catq(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval.Err
 }
 
 /// Seconds in a time interval base (HOUR/MINUTE/SECOND), else null. A DT-prefixed
-/// time base is the same unit on a datetime (already seconds) — no special case.
+/// time base is the same unit on a datetime (already seconds) - no special case.
 fn timeSecsOf(base: []const u8) ?i64 {
     if (eqi(base, "HOUR")) return 3600;
     if (eqi(base, "MINUTE")) return 60;
@@ -4761,7 +4761,7 @@ fn weekdayBucket(d: i64, we: u8) i64 {
     return if (we & (@as(u8, 1) << o) != 0) w * wd + rank - 1 else w * wd + rank;
 }
 
-/// First day (SAS date) of weekday bucket `b` under weekend mask `we` — the
+/// First day (SAS date) of weekday bucket `b` under weekend mask `we` - the
 /// inverse of `weekdayBucket`. Buckets start on working days, so the r-th
 /// working day of week @divFloor(b, wd) is the answer.
 fn weekdayBucketFirst(b: i64, we: u8) i64 {
@@ -4823,7 +4823,7 @@ fn dateBucket(base: []const u8, mult: i64, shift: i64, wkend: u8, d: i64) ?i64 {
     return null;
 }
 
-/// First day of bucket `b` — the inverse of `dateBucket`.
+/// First day of bucket `b` - the inverse of `dateBucket`.
 fn bucketFirst(base: []const u8, mult: i64, shift: i64, wkend: u8, b: i64) ?i64 {
     if (eqi(base, "DAY")) return b * mult + (shift - 1);
     if (eqi(base, "WEEK") or eqi(base, "WEEKU")) return b * 7 * mult - 5 + (shift - 1);
@@ -4863,7 +4863,7 @@ fn bucketFirst(base: []const u8, mult: i64, shift: i64, wkend: u8, b: i64) ?i64 
     return null;
 }
 
-/// The serial index of the interval that contains `n` — differencing two
+/// The serial index of the interval that contains `n` - differencing two
 /// of these gives `intck`'s boundary count. null = unrecognised interval.
 /// Routed through `parseInterval`: DT prefix, multipliers, and shift-index all
 /// recognised (GAP-intnxintervals), so INTCK accepts what INTTEST accepts.
@@ -4912,7 +4912,7 @@ pub fn intnxAlign(iv: []const u8, start: i64, n: i64, al: Align) ?i64 {
 
 /// SAME alignment: `start`'s position within its interval, applied to the target
 /// period that begins at `b`. All month-shift-period intervals (MONTH, QTR,
-/// SEMIYEAR, YEAR — SAS gives them a shift period of MONTH) must preserve the
+/// SEMIYEAR, YEAR - SAS gives them a shift period of MONTH) must preserve the
 /// source MONTH-offset + DAY, clamping an overflowing day to the target month's
 /// last day (Feb 29→28; 31Jan +1mo→29Feb, NOT 02Mar). A plain day offset instead
 /// spills into the next month (BUG-intnxyearsame for YEAR; BUG-intnxmonthsame for
@@ -4926,7 +4926,7 @@ fn sameAlign(iv: []const u8, start: i64, b: i64) ?i64 {
         eqi(base, "SEMIYEAR") or eqi(base, "YEAR"))
     {
         // DT: clamp the calendar day like the date variant, then re-attach the
-        // time-of-day (BUG-intnxdtsameoverflow — plain seconds offset spills).
+        // time-of-day (BUG-intnxdtsameoverflow - plain seconds offset spills).
         const tod: i64 = if (is_dt) @mod(start, 86400) else 0;
         const sd = if (is_dt) @divFloor(start, 86400) else start;
         const psd = if (is_dt) @divFloor(ps, 86400) else ps;
@@ -5066,19 +5066,19 @@ fn strV(v: []const u8) Value {
     return .{ .str = v };
 }
 
-test "GAP-weekufn: WEEKU()/WEEKW() stay LOUD — SAS 9.4 has no such FUNCTIONS" {
+test "GAP-weekufn: WEEKU()/WEEKW() stay LOUD - SAS 9.4 has no such FUNCTIONS" {
     var h = harness();
     defer h.deinit();
     h.prime();
     var e = h.ev();
 
     // SAS 9.4 Functions and CALL Routines: Reference (Fifth Ed.) has NO WEEKU or
-    // WEEKW function entry — on the WEEK Function page (printed p.1681) the See
+    // WEEKW function entry - on the WEEK Function page (printed p.1681) the See
     // Also names WEEKUw./WEEKWw. only as FORMATS and INFORMATS, and the WEEK
     // entry is followed directly by WEEKDAY (full-dictionary scan: zero function
     // hits). The U/W week-numbering rules exist as WEEK(date,'U'/'W')
     // (numfns.zig) and as the INTCK/INTNX WEEKU/WEEKW intervals (GAP-weekuw).
-    // Implementing standalone functions would be a SILENT SUPERSET — a typo then
+    // Implementing standalone functions would be a SILENT SUPERSET - a typo then
     // computes a plausible number where real SAS errors "The function WEEKU is
     // unknown" (the NEGPAREN-informat class, NOTE-informatlow-tick245 #14). Pin
     // the loud gap (D-002); GAP-weekufn is resolved as documented-loud.
@@ -5131,7 +5131,7 @@ test "GH#5 ISS-informatfallback: INPUT() on an unloaded informat reads MISSING +
     var e = h.ev();
 
     // The repro: an unknown informat is LOUD (readInformat's captured
-    // format.informatNotFound) and the value is MISSING — never the plain
+    // format.informatNotFound) and the value is MISSING - never the plain
     // numeric parse of the source. `input('2025', zzznotreal.)` used to
     // report the informat and then STILL return 2025; Language Reference:
     // Concepts p.518 "How SAS Handles Invalid Data" makes it invalid data:
@@ -5155,8 +5155,8 @@ test "GH#5 ISS-informatfallback: INPUT() on an unloaded informat reads MISSING +
 
     // A blank / `.` / special-missing source is a LEGITIMATE missing: NO NOTE
     // and NO _ERROR_ (io.zig noteInvalidNum's guard, mirrored). The loud
-    // not-loaded ERROR still fires — the informat is absent from the
-    // dictionary whatever the source says — but that is readInformat's
+    // not-loaded ERROR still fires - the informat is absent from the
+    // dictionary whatever the source says - but that is readInformat's
     // diagnostic, not this guard's.
     for ([_][]const u8{ " ", ".", ".k" }) |src| {
         try h.pdv.set("_error_", .{ .num = 0 });
@@ -5195,7 +5195,7 @@ test "GH#4a ISS-inputfninvalid: ? keeps _ERROR_=1 without the NOTE, ?? silences 
     try t.expectEqual(@as(usize, 0), h.diags.count()); // the GH#5 NOTE suppressed
     try t.expect(std.mem.indexOf(u8, format.g_test_last_err, "was not found") != null); // loud ERROR stays
 
-    // `??` silences both — the observation is not flagged at all.
+    // `??` silences both - the observation is not flagged at all.
     try h.pdv.set("_error_", .{ .num = 0 });
     const qq = try dispatch(&e, "__inputqq", &.{ strV("2025"), strV("zzznotreal.") });
     try t.expect(qq.isMissing());
@@ -5203,7 +5203,7 @@ test "GH#4a ISS-inputfninvalid: ? keeps _ERROR_=1 without the NOTE, ?? silences 
     try t.expectEqual(@as(usize, 0), h.diags.count());
 
     // The rider: a KNOWN informat failing on non-blank data is invalid data
-    // too — NOTE + _ERROR_=1 at level 0 (`input('abc', 4.)` was a SILENT
+    // too - NOTE + _ERROR_=1 at level 0 (`input('abc', 4.)` was a SILENT
     // missing with _ERROR_=0 before GH#4a).
     try h.pdv.set("_error_", .{ .num = 0 });
     const r = try dispatch(&e, "input", &.{ strV("abc"), strV("4.") });
@@ -5213,8 +5213,8 @@ test "GH#4a ISS-inputfninvalid: ? keeps _ERROR_=1 without the NOTE, ?? silences 
     try t.expect(std.mem.indexOf(u8, h.diags.list.items[0].message, "Invalid argument to function INPUT") != null);
 
     // When readNumeric emits its OWN invalid-data NOTE (the embedded-blank
-    // class) that note IS the invalid-data NOTE — no second one (format
-    // .read_noted dedupe, io.zig's rule) — but _ERROR_ still sets.
+    // class) that note IS the invalid-data NOTE - no second one (format
+    // .read_noted dedupe, io.zig's rule) - but _ERROR_ still sets.
     try h.pdv.set("_error_", .{ .num = 0 });
     const r2 = try dispatch(&e, "input", &.{ strV("1 2"), strV("4.") });
     try t.expect(r2.isMissing());
@@ -5235,7 +5235,7 @@ test "GH#4a ISS-inputfninvalid: ? keeps _ERROR_=1 without the NOTE, ?? silences 
 
     // A width-slice BLANK read is not invalid data: `input(123, 8.)` renders
     // the number 12-wide right-justified and the 8-wide informat reads its
-    // blank LEFT edge — a legitimate silent missing (QA tick356 F4's exact
+    // blank LEFT edge - a legitimate silent missing (QA tick356 F4's exact
     // shape; the judgment is on the field the informat read, not the whole
     // rendered string).
     try h.pdv.set("_error_", .{ .num = 0 });
@@ -5247,7 +5247,7 @@ test "GH#4a ISS-inputfninvalid: ? keeps _ERROR_=1 without the NOTE, ?? silences 
     format.g_fmt_error = false; // reset module state for other tests
 }
 
-test "NOTE-subpadinvpos: a nonpositive SUBPAD position is INVALID — NOTE + _ERROR_=1, not a silent missing" {
+test "NOTE-subpadinvpos: a nonpositive SUBPAD position is INVALID - NOTE + _ERROR_=1, not a silent missing" {
     var h = harness();
     defer h.deinit();
     h.prime();
@@ -5255,14 +5255,14 @@ test "NOTE-subpadinvpos: a nonpositive SUBPAD position is INVALID — NOTE + _ER
 
     // SUBPAD's `position` "is a positive integer" (SAS 9.4 Functions and CALL
     // Routines: Reference p.1529). The volume's general rule (p.5): an invalid
-    // argument — "for example, missing or outside the prescribed range" — makes
+    // argument - "for example, missing or outside the prescribed range" - makes
     // SAS write a note, set _ERROR_ to 1, and return a missing value. We already
     // returned missing; the note and the flag are the half that was absent.
     //
     // BUG-charfnsmissingtype fixed this test's PREMISE, not its assertion: SUBPAD
     // is a CHARACTER function (p.1529), so its "missing value" is a BLANK, and
-    // `isMissing()` — which is false for every string, `Value.missing` being
-    // numeric-only — was asserting the wrong TYPE. The NOTE and the `_ERROR_=1`
+    // `isMissing()` - which is false for every string, `Value.missing` being
+    // numeric-only - was asserting the wrong TYPE. The NOTE and the `_ERROR_=1`
     // this ticket exists for are asserted exactly as before; only the shape of
     // the returned value changed, and it is now pinned by its union tag.
     for ([_]f64{ 0, -2 }) |bad| {
@@ -5272,12 +5272,12 @@ test "NOTE-subpadinvpos: a nonpositive SUBPAD position is INVALID — NOTE + _ER
         try t.expectEqualStrings("", r.str);
         try t.expectEqual(@as(f64, 1), h.pdv.get("_error_").?.num);
     }
-    // valid positions are untouched — value AND flag
+    // valid positions are untouched - value AND flag
     try h.pdv.set("_error_", .{ .num = 0 });
     try t.expectEqualStrings("bcd", (try dispatch(&e, "subpad", &.{ strV("abcdef"), numV(2), numV(3) })).str);
     try t.expectEqual(@as(f64, 0), h.pdv.get("_error_").?.num);
-    // A MISSING position is still its own rule — p.7 separates it from the range
-    // rule, so NO note and NO _ERROR_ — but the result is a blank CHARACTER, same
+    // A MISSING position is still its own rule - p.7 separates it from the range
+    // rule, so NO note and NO _ERROR_ - but the result is a blank CHARACTER, same
     // as every other SUBPAD exit. Ditto a position or length too big for an i64.
     try h.pdv.set("_error_", .{ .num = 0 });
     const miss_pos = try dispatch(&e, "subpad", &.{ strV("abcdef"), Value.missing, numV(3) });
@@ -5296,7 +5296,7 @@ test "GAP-bondrangenote (additive half): an out-of-range financial arg NOTEs, a 
     // Functions ref p.5: an argument "outside the prescribed range" is invalid →
     // note + _ERROR_=1 + missing. p.7 carves out financial functions ONLY for the
     // MISSING-value rule, not for the range rule, so the two must behave
-    // differently — that split is what this test pins.
+    // differently - that split is what this test pins.
     // Ranges: DEPDB p.604 "y > 0"; PVP p.1385 / YIELDP p.1688 "n > 0", "K > 0";
     // DUR p.658 / CONVX p.560 "f > 0".
     const OutOfRange = struct { name: []const u8, args: []const Value };
@@ -5332,7 +5332,7 @@ test "GAP-bondrangenote (additive half): an out-of-range financial arg NOTEs, a 
         try t.expectEqual(@as(f64, 0), h.pdv.get("_error_").?.num);
     }
 
-    // In-range calls keep BOTH their value and a clean flag — the doc's own
+    // In-range calls keep BOTH their value and a clean flag - the doc's own
     // worked examples: DEPDB p.605 → 36.779648624, DUR p.658 → 5.284024988.
     try h.pdv.set("_error_", .{ .num = 0 });
     try t.expectApproxEqAbs(@as(f64, 36.779648624), (try dispatch(&e, "depdb", &.{ numV(10), numV(1000), numV(15), numV(2) })).num, 1e-6);
@@ -5350,7 +5350,7 @@ test "NOTE-bitrangenote: an out-of-range bitwise arg NOTEs and sets _ERROR_ (val
     // (BNOT p.278–279 / BOR p.279 same bounds) + p.6's invalid-argument rule. The
     // two shapes tests/corpus/bitwise_exact.sas exercises are first.
     for ([_][]const Value{
-        &.{ numV(-1), numV(255) }, // band(-1,255)  — below the range
+        &.{ numV(-1), numV(255) }, // band(-1,255)  - below the range
         &.{ numV(4294967296), numV(3) }, // above (2^32)-1
     }) |a| {
         try h.pdv.set("_error_", .{ .num = 0 });
@@ -5366,7 +5366,7 @@ test "NOTE-bitrangenote: an out-of-range bitwise arg NOTEs and sets _ERROR_ (val
     try t.expect((try dispatch(&e, "band", &.{ Value.missing, numV(3) })).isMissing());
     try t.expectEqual(@as(f64, 1), h.pdv.get("_error_").?.num);
 
-    // in-range values and the flag are untouched — and NOTE-bitfracround stays
+    // in-range values and the flag are untouched - and NOTE-bitfracround stays
     // parked: an in-range FRACTION still rounds (band(1.9,3)=2), because the
     // entries never say round-or-truncate. Pinned so the park is visible.
     try h.pdv.set("_error_", .{ .num = 0 });
@@ -5381,7 +5381,7 @@ test "GAP-bondrangenote (value half): an unchecked out-of-range arg no longer co
     h.prime();
     var e = h.ev();
 
-    // These all COMPUTED a credible-looking figure before — the worst D-002
+    // These all COMPUTED a credible-looking figure before - the worst D-002
     // shape, because nothing in the output says the answer is meaningless.
     // Ranges: DEPDB p.604 "r >= 0"; PVP p.1385 / YIELDP p.1688 / DURP p.659 /
     // CONVXP p.561 "A > 0", "0 <= c < 1", "n > 0 and is an integer",
@@ -5430,7 +5430,7 @@ test "GAP-bondrangenote (value half): an unchecked out-of-range arg no longer co
     try t.expectEqual(@as(f64, 0), h.pdv.get("_error_").?.num);
 }
 
-test "NOTE-besselneg: nu<0 is OUTSIDE the documented range — NOTE + _ERROR_=1, not a silent missing" {
+test "NOTE-besselneg: nu<0 is OUTSIDE the documented range - NOTE + _ERROR_=1, not a silent missing" {
     var h = harness();
     defer h.deinit();
     h.prime();
@@ -5438,7 +5438,7 @@ test "NOTE-besselneg: nu<0 is OUTSIDE the documented range — NOTE + _ERROR_=1,
 
     // IBESSEL (Functions ref p.1022) and JBESSEL (p.1115) both give `nu` the
     // attribute "Range nu ≥ 0". p.5: an argument outside the prescribed range is
-    // INVALID — note + _ERROR_=1 + missing. The missing was already right.
+    // INVALID - note + _ERROR_=1 + missing. The missing was already right.
     try h.pdv.set("_error_", .{ .num = 0 });
     try t.expect((try dispatch(&e, "jbessel", &.{ numV(-1), numV(1) })).isMissing());
     try t.expectEqual(@as(f64, 1), h.pdv.get("_error_").?.num);
@@ -5452,7 +5452,7 @@ test "NOTE-besselneg: nu<0 is OUTSIDE the documented range — NOTE + _ERROR_=1,
     try t.expectApproxEqAbs(@as(f64, 0.7651976866), (try dispatch(&e, "jbessel", &.{ numV(0), numV(1) })).num, 1e-8);
     try t.expectApproxEqAbs(@as(f64, 1.2660658778), (try dispatch(&e, "ibessel", &.{ numV(0), numV(1), numV(0) })).num, 1e-8);
     try t.expectEqual(@as(f64, 0), h.pdv.get("_error_").?.num);
-    // a missing nu stays a plain missing — untouched, same scoping as SUBPAD
+    // a missing nu stays a plain missing - untouched, same scoping as SUBPAD
     try h.pdv.set("_error_", .{ .num = 0 });
     try t.expect((try dispatch(&e, "jbessel", &.{ Value.missing, numV(1) })).isMissing());
     try t.expectEqual(@as(f64, 0), h.pdv.get("_error_").?.num);
@@ -5489,7 +5489,7 @@ test "GH#74b: functions.zig toStr/toNum log the SAS implicit-conversion NOTEs" {
     h.prime();
     var e = h.ev();
 
-    // num→char via substr(n,1,8) — the declared-length `c = n` path (parser
+    // num→char via substr(n,1,8) - the declared-length `c = n` path (parser
     // rewrites the assignment to substr), where toStr coerces the numeric arg.
     _ = try dispatch(&e, "substr", &.{ numV(42), numV(1), numV(8) });
     try t.expectEqual(@as(usize, 1), h.diags.count());
@@ -5514,11 +5514,11 @@ test "NOTE-invalidnumdataloc: toNum's invalid-data NOTE omits the position, neve
 
     // The exact GH#78 path: scan's count argument coerces char→num through the
     // toNum leaf, which sees only the Value (the evaluator has no current line,
-    // AST expressions carry no span) — so the NOTE must OMIT the position, not
+    // AST expressions carry no span) - so the NOTE must OMIT the position, not
     // print the frozen "at line 0 column 0." an external user quoted.
     _ = try dispatch(&e, "scan", &.{ strV("a:b:c"), strV(":"), numV(2) });
     try t.expectEqualStrings("Invalid numeric data, ':'.", h.diags.list.items[1].message);
-    // The RENDERED log: plain "NOTE: …" — no "(L0)" tag, no position text.
+    // The RENDERED log: plain "NOTE: …" - no "(L0)" tag, no position text.
     const log = try h.diags.render();
     try t.expect(std.mem.indexOf(u8, log, "NOTE: Invalid numeric data, ':'.\n") != null);
     try t.expect(std.mem.indexOf(u8, log, "(L0") == null);
@@ -5532,7 +5532,7 @@ test "BUG-catnote: CAT-family num→char conversion logs NO note; other sites st
     var e = h.ev();
 
     // SAS 9.4 "CAT Function" (p.453-455): numeric items convert via BESTw. and
-    // "SAS does not write a note to the log" — cat/cats/catt/catx stay silent
+    // "SAS does not write a note to the log" - cat/cats/catt/catx stay silent
     // (GH#74c got this wrong). Values unchanged (BEST12, blank-stripped).
     try t.expectEqualStrings("1x", (try dispatch(&e, "cat", &.{ numV(1), strV("x") })).str);
     try t.expectEqualStrings("x42", (try dispatch(&e, "cats", &.{ strV("x"), numV(42) })).str);
@@ -5540,7 +5540,7 @@ test "BUG-catnote: CAT-family num→char conversion logs NO note; other sites st
     try t.expectEqualStrings("1|x", (try dispatch(&e, "catx", &.{ strV("|"), numV(1), strV("x") })).str);
     try t.expectEqual(@as(usize, 0), h.diags.count());
 
-    // the NOTE survives OUTSIDE the CAT family — vvalue's numeric coercion.
+    // the NOTE survives OUTSIDE the CAT family - vvalue's numeric coercion.
     _ = try dispatch(&e, "vvalue", &.{numV(42)});
     try t.expectEqual(@as(usize, 1), h.diags.count());
     try t.expect(std.mem.indexOf(u8, h.diags.list.items[0].message, "converted to character") != null);
@@ -5553,7 +5553,7 @@ test "BUG-putbarenumnote: PUT with a bare-numeric format spec logs NO num→char
     var e = h.ev();
 
     // bare spec `put(x, 8.2)`: the format engine result, no conversion note
-    // (a quoted spec was already silent — same output, still no note).
+    // (a quoted spec was already silent - same output, still no note).
     try t.expectEqualStrings("   42.00", (try dispatch(&e, "put", &.{ numV(42), numV(8.2) })).str);
     try t.expectEqualStrings("   42.00", (try dispatch(&e, "put", &.{ numV(42), strV("8.2") })).str);
     try t.expectEqual(@as(usize, 0), h.diags.count());
@@ -5571,7 +5571,7 @@ test "QA tick356 F4: INPUT/INPUTN/INPUTC with a bare-numeric informat spec log N
     var e = h.ev();
 
     // the reported shape: `input("123", 8.)` read the right value but logged a
-    // conversion NOTE for the SPEC — the twin of BUG-putbarenumnote above, left on
+    // conversion NOTE for the SPEC - the twin of BUG-putbarenumnote above, left on
     // toStr. The bare and named spellings must agree, and both must be silent.
     try t.expectEqual(@as(f64, 123), (try dispatch(&e, "input", &.{ strV("123"), numV(8.0) })).num);
     try t.expectEqual(@as(f64, 123), (try dispatch(&e, "input", &.{ strV("123"), strV("8.") })).num);
@@ -5643,7 +5643,7 @@ test "Phase F net-new: spedis/compged/vtypex/vnamex + system fns" {
     try t.expectEqualStrings("hello", (try dispatch(&e, "vvalue", &.{strV("hello")})).str);
     try t.expectEqualStrings("0", (try dispatch(&e, "vvalue", &.{numV(0)})).str);
 
-    // VLENGTH: storage length — 8 for numeric, value width for character.
+    // VLENGTH: storage length - 8 for numeric, value width for character.
     try t.expectEqual(@as(f64, 8), (try dispatch(&e, "vlength", &.{numV(42)})).num);
     try t.expectEqual(@as(f64, 5), (try dispatch(&e, "vlength", &.{strV("hello")})).num);
     try t.expectEqual(@as(f64, 8), (try dispatch(&e, "vlength", &.{numV(0)})).num);
@@ -5651,7 +5651,7 @@ test "Phase F net-new: spedis/compged/vtypex/vnamex + system fns" {
     // VFORMATX / VVALUEX / VLABELX are UN-TICKED: through the real pipeline the
     // FORMAT statement's spec lives in exec's `formats` list and is only lazily
     // copied to pdv.Var.format at output time (exec.zig:1120), and LABEL is parsed
-    // then discarded (no Var.label field) — neither is reachable from functions.zig,
+    // then discarded (no Var.label field) - neither is reachable from functions.zig,
     // so these return the default/name, not the assigned format/label. Making them
     // correct needs an exec.zig change (eager pdv.setFormat + a stored label), which
     // is out of this file's scope. The code stays as a correct-once-populated stub.
@@ -5674,14 +5674,14 @@ test "GAP-sysparm-opt: SYSPARM() reads the shared session value the OPTIONS stat
     // default: no option set → "" (the arm above pins it too)
     try t.expectEqualStrings("", (try dispatch(&e, "sysparm", &.{})).str);
     // `options sysparm="PROBE123";` (main.zig handleGlobal) writes the pub var;
-    // the function reads the SAME value — it used to be hardcoded "".
+    // the function reads the SAME value - it used to be hardcoded "".
     sysparm_text = "PROBE123";
     try t.expectEqualStrings("PROBE123", (try dispatch(&e, "sysparm", &.{})).str);
     // `options sysparm="";` resets to empty
     sysparm_text = "";
     try t.expectEqualStrings("", (try dispatch(&e, "sysparm", &.{})).str);
     // and resetPerRun (interpret's run start) clears it with the other
-    // OPTIONS-derived state — the year_cutoff run-scoped rule.
+    // OPTIONS-derived state - the year_cutoff run-scoped rule.
     sysparm_text = "LEAK";
     resetPerRun();
     try t.expectEqualStrings("", (try dispatch(&e, "sysparm", &.{})).str);
@@ -5746,13 +5746,13 @@ test "Phase F net-new: TIMEVALUE / SAVINGS (variable-rate time value)" {
     const d2005 = eval.dateConst("01JAN2005").?;
     const jul2000 = eval.dateConst("01JUL2000").?;
 
-    // TIMEVALUE — SAS doc example values (nominal rate, monthly compounding)
+    // TIMEVALUE - SAS doc example values (nominal rate, monthly compounding)
     try near((try dispatch(&e, "timevalue", &.{ numV(d2001), numV(d2000), numV(1000), strV("MONTH"), numV(d2000), numV(10) })).num, 1104.7130674, 1e-4);
     try near((try dispatch(&e, "timevalue", &.{ numV(d2001), numV(d2000), numV(1000), strV("MONTH"), numV(d2000), numV(10), numV(jul2000), numV(20) })).num, 1160.6365778, 1e-4);
     // date-rate pairs need not be sorted → same result
     try near((try dispatch(&e, "timevalue", &.{ numV(d2001), numV(d2000), numV(1000), strV("MONTH"), numV(jul2000), numV(20), numV(d2000), numV(10) })).num, 1160.6365778, 1e-4);
 
-    // SAVINGS — $300 monthly for 24 months, quarterly compounding at 4%. base3's
+    // SAVINGS - $300 monthly for 24 months, quarterly compounding at 4%. base3's
     // window ends before the last deposits, so deposits dated after base don't count.
     try near((try dispatch(&e, "savings", &.{ numV(d2005), numV(d2000), numV(300), numV(24), strV("MONTH"), strV("QUARTER"), numV(d2000), numV(4.00) })).num, 8458.794159, 1e-3);
     try near((try dispatch(&e, "savings", &.{ numV(d2001), numV(d2000), numV(300), numV(24), strV("MONTH"), strV("QUARTER"), numV(d2000), numV(4.00) })).num, 3978.6903712, 1e-3);
@@ -5818,7 +5818,7 @@ test "unary table (TASTE-unarytable): each folded fn maps to its own op" {
             try t.expect(@abs(got - want) < tol);
         }
     }.eq;
-    // one distinguishing value per folded fn — a swapped switch arm fails here
+    // one distinguishing value per folded fn - a swapped switch arm fails here
     try approx((try dispatch(&e, "trigamma", &.{numV(1)})).num, std.math.pi * std.math.pi / 6.0, 1e-4);
     try approx((try dispatch(&e, "lgamma", &.{numV(4)})).num, @log(6.0), 1e-9);
     try approx((try dispatch(&e, "gamma", &.{numV(5)})).num, 24, 1e-6);
@@ -5925,7 +5925,7 @@ test "string: upcase/lowcase/trim/strip/left/length/substr/index" {
     try t.expectEqualStrings("gamma", (try dispatch(&e, "scan", &.{ strV("alpha beta gamma"), numV(-1) })).str);
     try t.expectEqualStrings("", (try dispatch(&e, "scan", &.{ strV("alpha beta"), numV(9) })).str); // out of range
     try t.expectEqualStrings("b", (try dispatch(&e, "scan", &.{ strV("a,,b"), numV(2), strV(",") })).str); // collapse
-    // BUG-scandelim: one shared ASCII default set — '>' and TAB are NOT delimiters
+    // BUG-scandelim: one shared ASCII default set - '>' and TAB are NOT delimiters
     try t.expectEqualStrings("", (try dispatch(&e, "scan", &.{ strV("x>y"), numV(2) })).str);
     try t.expectEqualStrings("", (try dispatch(&e, "scan", &.{ strV("a\tb"), numV(2) })).str);
     // BUG-scanmodifiers: `d` adds the digit class, `k` keeps only the listed chars
@@ -5960,13 +5960,13 @@ test "BUG-scanmissingtype: EVERY SCAN exit is a CHARACTER value, never a numeric
     h.prime();
     var e = h.ev();
 
-    // SAS 9.4 Functions and CALL Routines: Reference, 5th ed., p.1462 — SCAN
+    // SAS 9.4 Functions and CALL Routines: Reference, 5th ed., p.1462 - SCAN
     // "Returns the nth word from a character string", so a no-match / invalid
     // count is a BLANK CHARACTER, not `.`. The union tag is the assertion here:
     // a numeric missing would flip the receiving variable's type and make
     // `put (x) ($char10.);` a hard ERROR (see tests/corpus/scan_missing_type.sas).
     const blanks = [_]Value{
-        try dispatch(&e, "scan", &.{ strV("a b c"), Value.missing }), // missing count — was `.`
+        try dispatch(&e, "scan", &.{ strV("a b c"), Value.missing }), // missing count - was `.`
         try dispatch(&e, "scan", &.{ strV("a:b:c"), strV(":"), numV(2) }), // #78: ':' in the count slot
         try dispatch(&e, "scan", &.{ strV("a b c"), numV(9) }), // count past the end
         try dispatch(&e, "scan", &.{ strV("a b c"), numV(0) }), // count 0
@@ -5980,7 +5980,7 @@ test "BUG-scanmissingtype: EVERY SCAN exit is a CHARACTER value, never a numeric
         try t.expectEqualStrings("", std.mem.trim(u8, v.str, " "));
     }
 
-    // The fail-loud arms still ERROR (D-002) — and still hand back a character.
+    // The fail-loud arms still ERROR (D-002) - and still hand back a character.
     const dbase = h.diags.count();
     const bad_mod = try dispatch(&e, "scan", &.{ strV("a b"), numV(1), strV(" "), strV("q") });
     try t.expect(bad_mod == .str);
@@ -5992,7 +5992,7 @@ test "BUG-scanmissingtype: EVERY SCAN exit is a CHARACTER value, never a numeric
     try t.expectEqual(dbase + 3, h.diags.count());
 
     // The correct 3- and 4-arg calls are untouched: `count` stays the SECOND
-    // argument and `character-list` the THIRD (GH#78 claimed otherwise — it was
+    // argument and `character-list` the THIRD (GH#78 claimed otherwise - it was
     // wrong, and closed as such).
     try t.expectEqualStrings("a", (try dispatch(&e, "scan", &.{ strV("a:b:c"), numV(1), strV(":") })).str);
     try t.expectEqualStrings("b", (try dispatch(&e, "scan", &.{ strV("a:b:c"), numV(2), strV(":") })).str);
@@ -6011,7 +6011,7 @@ test "coercion across the num/char boundary" {
     try t.expectEqual(@as(f64, 15), (try dispatch(&e, "sum", &.{ strV("10"), numV(5) })).num);
     // numeric in a char slot auto-converts BEST12. RIGHT-JUSTIFIED (Language Reference: Concepts p.124,
     // BUG-numcharwidth): trim drops only TRAILING blanks, so the 10 leading pad
-    // blanks survive — the classic SAS gotcha behind the trim(left(n)) idiom
+    // blanks survive - the classic SAS gotcha behind the trim(left(n)) idiom
     try t.expectEqualStrings("          14", (try dispatch(&e, "trim", &.{numV(14)})).str);
     // input applies the informat (INFEXPR): numeric, dates, comma
     try t.expectEqual(@as(f64, 42), (try dispatch(&e, "input", &.{ strV("42"), strV("best12.") })).num);
@@ -6020,7 +6020,7 @@ test "coercion across the num/char boundary" {
     try t.expectEqual(@as(f64, 14), (try dispatch(&e, "input", &.{ strV("1960-01-15"), strV("yymmdd10.") })).num);
     try t.expectEqual(@as(f64, 0), (try dispatch(&e, "input", &.{ strV("01JAN1960"), strV("date9.") })).num); // epoch
     try t.expectEqual(@as(f64, 1234), (try dispatch(&e, "input", &.{ strV("1,234"), strV("comma8.") })).num);
-    // BUG-commaxinformat: INPUT() honors the European roles (was missing) —
+    // BUG-commaxinformat: INPUT() honors the European roles (was missing) -
     // routed through format.readNumeric like the INPUT statement.
     try t.expectEqual(@as(f64, 1234.56), (try dispatch(&e, "input", &.{ strV("1.234,56"), strV("commax10.2") })).num);
     try t.expectEqual(@as(f64, 1234.56), (try dispatch(&e, "input", &.{ strV("$1.234,56"), strV("dollarx12.2") })).num);
@@ -6286,7 +6286,7 @@ test "intck counts boundaries; intnx advances to the interval start" {
         }
     }.f;
 
-    // intck — boundary counts, not elapsed units
+    // intck - boundary counts, not elapsed units
     try t.expectEqual(@as(f64, 10), (try dispatch(&e, "intck", &.{ strV("day"), numV(0), numV(10) })).num);
     try t.expectEqual(@as(f64, 20), (try dispatch(&e, "intck", &.{ strV("year"), numV(try mdy(&e, 1, 1, 2000)), numV(try mdy(&e, 1, 1, 2020)) })).num);
     try t.expectEqual(@as(f64, 2), (try dispatch(&e, "intck", &.{ strV("month"), numV(try mdy(&e, 1, 15, 2020)), numV(try mdy(&e, 3, 10, 2020)) })).num);
@@ -6307,7 +6307,7 @@ test "intck counts boundaries; intnx advances to the interval start" {
     // qtr continuous: 15JAN2020 → 15JUL2020 = 2 quarters (6 months); → 14JUL = 1
     try t.expectEqual(@as(f64, 2), (try dispatch(&e, "intck", &.{ strV("qtr"), numV(try mdy(&e, 1, 15, 2020)), numV(try mdy(&e, 7, 15, 2020)), strV("C") })).num);
 
-    // intnx — beginning of the target interval
+    // intnx - beginning of the target interval
     try t.expectEqual(try mdy(&e, 2, 1, 2020), (try dispatch(&e, "intnx", &.{ strV("month"), numV(try mdy(&e, 1, 15, 2020)), numV(1) })).num);
     try t.expectEqual(try mdy(&e, 1, 1, 2022), (try dispatch(&e, "intnx", &.{ strV("year"), numV(try mdy(&e, 6, 15, 2020)), numV(2) })).num);
     try t.expectEqual(@as(f64, 105), (try dispatch(&e, "intnx", &.{ strV("day"), numV(100), numV(5) })).num);
@@ -6330,7 +6330,7 @@ test "today() returns a plausible current SAS date" {
     h.prime();
     var e = h.ev();
     const d = (try dispatch(&e, "today", &.{})).num;
-    // 20000 ≈ 2014-10, 40000 ≈ 2069 — brackets any real run of this suite.
+    // 20000 ≈ 2014-10, 40000 ≈ 2069 - brackets any real run of this suite.
     try t.expect(d > 20000 and d < 40000);
     try t.expectEqual(d, (try dispatch(&e, "date", &.{})).num); // date() is a synonym
 }
@@ -6420,7 +6420,7 @@ test "count/countc/countw/indexc/indexw/constant/choose/which/ifn/soundex (Phase
     try t.expectEqual(@as(f64, 3), (try dispatch(&e, "indexc", &.{ strV("xy9z"), strV("0123456789") })).num);
     // FINDC character-class modifiers add a whole class to the search (BUG-findcmodifiers)
     try t.expectEqual(@as(f64, 4), (try dispatch(&e, "findc", &.{ strV("abc123"), strV(" "), strV("d") })).num); // first digit
-    // FINDC k = complement (first char NOT in the set) — BUG-findckmod
+    // FINDC k = complement (first char NOT in the set) - BUG-findckmod
     try t.expectEqual(@as(f64, 4), (try dispatch(&e, "findc", &.{ strV("abc123"), strV("abc"), strV("k") })).num);
     try t.expectEqual(@as(f64, 1), (try dispatch(&e, "findc", &.{ strV("abc123"), strV("123"), strV("k") })).num);
     try t.expectEqual(@as(f64, 0), (try dispatch(&e, "findc", &.{ strV("aaa"), strV("abc"), strV("k") })).num);
@@ -6541,7 +6541,7 @@ test "descriptive stats + erf/rounde/compfuzz/effrate + choosen guard (Phase F b
     try t.expect((try dispatch(&e, "ordinal", &.{ numV(1), Value.missing, numV(5), numV(3) })).isMissing());
     try t.expectEqual(@as(f64, 3), (try dispatch(&e, "ordinal", &.{ numV(2), Value.missing, numV(5), numV(3) })).num);
 
-    // scalar special / rounding / financial — ERF/ERFC to full f64 (BUG-erfaccuracy)
+    // scalar special / rounding / financial - ERF/ERFC to full f64 (BUG-erfaccuracy)
     try t.expectApproxEqAbs(@as(f64, 0.8427007929497149), (try dispatch(&e, "erf", &.{numV(1)})).num, 1e-14);
     try t.expectApproxEqAbs(@as(f64, 0.5204998778130465), (try dispatch(&e, "erf", &.{numV(0.5)})).num, 1e-14);
     try t.expectApproxEqAbs(@as(f64, 0.15729920705028513), (try dispatch(&e, "erfc", &.{numV(1)})).num, 1e-14);
@@ -6659,12 +6659,12 @@ test "BUG-intfromfloat: no @intFromFloat site traps on non-finite/huge args" {
         _ = try dispatch(&e, "depdbsl", &.{ numV(bad), numV(1000), numV(bad), numV(2) });
         _ = try dispatch(&e, "daccdbsl", &.{ numV(bad), numV(1000), numV(10), numV(2) });
     }
-    // subpad with a huge length arg → can't materialize, so it gives up — as a
+    // subpad with a huge length arg → can't materialize, so it gives up - as a
     // BLANK CHARACTER. This test's own comment three lines above already said
     // "string/position args → blank or 0, never a trap"; the assertion said
     // `isMissing()`, i.e. a numeric, and BUG-charfnsmissingtype made the code
     // match the stated intent. The trap-avoidance this test exists for is
-    // unchanged and still asserted — dispatch returning at all is the check.
+    // unchanged and still asserted - dispatch returning at all is the check.
     const huge_len = try dispatch(&e, "subpad", &.{ strV("abc"), numV(2), numV(inf) });
     try t.expect(huge_len == .str);
     try t.expectEqualStrings("", huge_len.str);
@@ -6718,7 +6718,7 @@ test "distribution family + FIPS/state + financial + html/url (Phase F batch 8)"
     try near(try num(&e, "quantile", &.{ strV("EXPONENTIAL"), numV(0.5) }), @log(2.0), 1e-9);
     try near(try num(&e, "squantile", &.{ strV("NORMAL"), numV(0.025) }), 1.959963985, 1e-6);
     // unknown distribution → loud ERROR + missing, never a wrong number
-    // (GAP-distsilentmiss; PARETO is implemented now — NORMALMIX stays a gap)
+    // (GAP-distsilentmiss; PARETO is implemented now - NORMALMIX stays a gap)
     try t.expect((try dispatch(&e, "cdf", &.{ strV("NORMALMIX"), numV(1), numV(1) })).isMissing());
 
     // FIPS / state lookups
@@ -6809,7 +6809,7 @@ test "depreciation + annuity + extra distributions + bessel/airy (Phase F batch 
     try near(try num(&e, "probhypr", &.{ numV(10), numV(5), numV(5), numV(2) }), 0.5, 1e-9); // symmetric
     try near(try num(&e, "probhypr", &.{ numV(10), numV(5), numV(5), numV(5) }), 1.0, 1e-12);
     // BUG-probhyprhang: a huge population must not infinite-loop (float i+=1 no-op past
-    // 2^53) or spin a billion terms — single-term huge returns fast, big range → missing
+    // 2^53) or spin a billion terms - single-term huge returns fast, big range → missing
     try near(try num(&e, "probhypr", &.{ numV(1e18), numV(5e17), numV(1e18), numV(5e17) }), 1, 1e-6);
     try t.expect((try dispatch(&e, "probhypr", &.{ numV(1e18), numV(1e9), numV(1e9), numV(1e9) })).isMissing());
 
@@ -6885,7 +6885,7 @@ test "option pricing + logistic + DBSL depreciation + bond analytics + deviance 
         1e-9,
     ); // first period is pure DB = v·r/y
 
-    // bond analytics — cross-checked against the enumerated forms and hand cases
+    // bond analytics - cross-checked against the enumerated forms and hand cases
     // DUR of a single 1-period zero = 1/(1+y); CONVX = 2/(1+y)²
     try near(try num(&e, "dur", &.{ numV(0.05), numV(1), numV(100) }), 1.0 / 1.05, 1e-9);
     try near(try num(&e, "convx", &.{ numV(0.05), numV(1), numV(100) }), 2.0 / (1.05 * 1.05), 1e-9);
@@ -6936,7 +6936,7 @@ test "put/input variants + table depreciation + holidays + interval/geodist (Pha
         }
     }.f;
 
-    // PUTN/PUTC/INPUTN/INPUTC — runtime-format variants of PUT/INPUT
+    // PUTN/PUTC/INPUTN/INPUTC - runtime-format variants of PUT/INPUT
     try t.expectEqualStrings(
         (try dispatch(&e, "put", &.{ numV(1234.5), strV("dollar10.2") })).str,
         (try dispatch(&e, "putn", &.{ numV(1234.5), strV("dollar10.2") })).str,
@@ -6967,7 +6967,7 @@ test "put/input variants + table depreciation + holidays + interval/geodist (Pha
     try t.expectEqual(@as(f64, 1), (try dispatch(&e, "inttest", &.{strV("DTDAY")})).num);
     try t.expectEqual(@as(f64, 0), (try dispatch(&e, "inttest", &.{strV("FORTNIGHT")})).num);
 
-    // GAP-intnxintervals: INTNX/INTCK route through parseInterval — WEEKDAY, INTCK
+    // GAP-intnxintervals: INTNX/INTCK route through parseInterval - WEEKDAY, INTCK
     // SEMIYEAR/SEMIMONTH/TENDAY parity, DT/time intervals, multipliers, shift-index.
     try t.expectEqual(day(2020, 1, 6), (try dispatch(&e, "intnx", &.{ strV("weekday"), numV(day(2020, 1, 1)), numV(3) })).num); // Wed +3 → Mon
     try t.expectEqual(day(2020, 3, 18), (try dispatch(&e, "intnx", &.{ strV("weekday"), numV(day(2020, 3, 15)), numV(3) })).num); // Sun +3 → Wed
@@ -7034,14 +7034,14 @@ test "holiday range/count + interval metadata + trunc + bivariate normal (Phase 
     try t.expectEqualStrings("YEAR", (try dispatch(&e, "intcycle", &.{strV("MONTH")})).str);
     try t.expectEqualStrings("YEAR", (try dispatch(&e, "intcycle", &.{strV("QTR")})).str);
 
-    // INTCINDEX: cycle index — week-of-year for day/week (doc: 01SEP2021 → 36),
+    // INTCINDEX: cycle index - week-of-year for day/week (doc: 01SEP2021 → 36),
     // month-of-year / qtr-of-year for month/qtr.
     try t.expectEqual(@as(f64, 36), (try dispatch(&e, "intcindex", &.{ strV("day"), numV(22524) })).num); // 01SEP2021
     try t.expectEqual(@as(f64, 36), (try dispatch(&e, "intcindex", &.{ strV("week"), numV(22524) })).num);
     try t.expectEqual(@as(f64, 3), (try dispatch(&e, "intcindex", &.{ strV("month"), numV(22354) })).num); // 15MAR2021
     try t.expectEqual(@as(f64, 3), (try dispatch(&e, "intcindex", &.{ strV("qtr"), numV(22507) })).num); // 15AUG2021
     try t.expect((try dispatch(&e, "intcindex", &.{ strV("hour"), numV(22524) })).isMissing()); // time not modeled
-    // INTINDEX — verified against the PDF examples (MONTH/DEC→12, QTR→1, DAY→weekday)
+    // INTINDEX - verified against the PDF examples (MONTH/DEC→12, QTR→1, DAY→weekday)
     try t.expectEqual(@as(f64, 12), (try dispatch(&e, "intindex", &.{ strV("MONTH"), numV(day(2012, 12, 1)) })).num);
     try t.expectEqual(@as(f64, 3), (try dispatch(&e, "intindex", &.{ strV("MONTH"), numV(day(2020, 3, 15)) })).num);
     try t.expectEqual(@as(f64, 1), (try dispatch(&e, "intindex", &.{ strV("QTR"), numV(day(2013, 1, 1)) })).num);
@@ -7052,13 +7052,13 @@ test "holiday range/count + interval metadata + trunc + bivariate normal (Phase 
     try t.expectEqual(@as(f64, 6), (try dispatch(&e, "intindex", &.{ strV("SEMIMONTH"), numV(day(2013, 3, 20)) })).num); // (3-1)*2+2
     try t.expectEqual(@as(f64, 5), (try dispatch(&e, "intindex", &.{ strV("TENDAY"), numV(day(2013, 2, 15)) })).num); // (2-1)*3+2
 
-    // TRUNC: byte truncation — 8 bytes = identity; 1/5→3 bytes = SAS's 0.1999816895
+    // TRUNC: byte truncation - 8 bytes = identity; 1/5→3 bytes = SAS's 0.1999816895
     try t.expectEqual(@as(f64, 3.14159), (try dispatch(&e, "trunc", &.{ numV(3.14159), numV(8) })).num);
     try t.expectEqual(@as(f64, 1.0), (try dispatch(&e, "trunc", &.{ numV(1.0), numV(3) })).num);
     try near((try dispatch(&e, "trunc", &.{ numV(1.0 / 5.0), numV(3) })).num, 0.1999816895, 1e-9); // exact SAS value
     try t.expect((try dispatch(&e, "trunc", &.{ numV(1.0 / 5.0), numV(3) })).num != 0.2); // and NOT the original
 
-    // bivariate normal — exact anchors
+    // bivariate normal - exact anchors
     try near(try num(&e, "probbnrm", &.{ numV(0), numV(0), numV(0) }), 0.25, 1e-9);
     try near(try num(&e, "probbnrm", &.{ numV(0), numV(0), numV(0.5) }), 0.25 + std.math.asin(@as(f64, 0.5)) / (2 * std.math.pi), 1e-7);
     try near(try num(&e, "probbnrm", &.{ numV(1), numV(1), numV(0) }), stdNormCdf(1) * stdNormCdf(1), 1e-9); // independent
@@ -7072,7 +7072,7 @@ test "holiday range/count + interval metadata + trunc + bivariate normal (Phase 
     try t.expectEqual(@as(f64, 1), (try dispatch(&e, "intnest", &.{ strV("QTR"), strV("YEAR") })).num);
     try t.expectEqual(@as(f64, 0), (try dispatch(&e, "intnest", &.{ strV("QTR"), strV("MONTH") })).num); // coarser in finer
 
-    // INTGET / INTFIT — the interval implied by dates (PDF examples: DAY2, MONTH4)
+    // INTGET / INTFIT - the interval implied by dates (PDF examples: DAY2, MONTH4)
     const dd = struct {
         fn f(ev: *eval.Evaluator, y: i64, m: i64, d: i64) eval.Error!f64 {
             return (try dispatch(ev, "mdy", &.{ numV(@floatFromInt(m)), numV(@floatFromInt(d)), numV(@floatFromInt(y)) })).num;
@@ -7084,7 +7084,7 @@ test "holiday range/count + interval metadata + trunc + bivariate normal (Phase 
     try t.expectEqualStrings("YEAR2", (try dispatch(&e, "intfit", &.{ numV(try dd(&e, 2018, 6, 1)), numV(try dd(&e, 2020, 6, 1)) })).str);
     try t.expectEqualStrings("DAY5", (try dispatch(&e, "intfit", &.{ numV(try dd(&e, 2020, 1, 1)), numV(try dd(&e, 2020, 1, 6)) })).str);
 
-    // INTFMT(interval, 'L'|'S') → recommended format — SAS's own doc examples (p.1070).
+    // INTFMT(interval, 'L'|'S') → recommended format - SAS's own doc examples (p.1070).
     // Multiplier/shift are ignored: month2 → MONTH, week3.2 → WEEK.
     try t.expectEqualStrings("YYQC4.", (try dispatch(&e, "intfmt", &.{ strV("qtr"), strV("s") })).str);
     try t.expectEqualStrings("YYQC6.", (try dispatch(&e, "intfmt", &.{ strV("qtr"), strV("l") })).str);
@@ -7144,7 +7144,7 @@ test "noncentral distributions + noncentrality solvers (Phase F batch 14)" {
     const t_p = try num(&e, "probt", &.{ numV(2), numV(10), numV(1.5) });
     try near(try num(&e, "tnonct", &.{ numV(2), numV(10), numV(t_p) }), 1.5, 1e-2);
 
-    // PROBMED — sample-median CDF. PDF example: PROBMED(5,-0.1)=0.4256380897 (odd n);
+    // PROBMED - sample-median CDF. PDF example: PROBMED(5,-0.1)=0.4256380897 (odd n);
     // even n symmetric at x=0 → 0.5; n=1 → Phi(x).
     try near(try num(&e, "probmed", &.{ numV(5), numV(-0.1) }), 0.4256380897, 1e-8); // odd: closed form
     try near(try num(&e, "probmed", &.{ numV(4), numV(0) }), 0.5, 1e-5); // even: Simpson integral
@@ -7180,7 +7180,7 @@ test "cryptographic hashes: md5/sha256/hashing/hmac (Phase F batch 16)" {
     // SHA256HEX
     try t.expectEqualStrings("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", try str(&e, "sha256hex", &.{strV("abc")}));
 
-    // SHA256HMACHEX — SAS's own documented example
+    // SHA256HMACHEX - SAS's own documented example
     try t.expectEqualStrings(
         "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8",
         try str(&e, "sha256hmachex", &.{ strV("key"), strV("The quick brown fox jumps over the lazy dog") }),
@@ -7206,7 +7206,7 @@ test "cryptographic hashes: md5/sha256/hashing/hmac (Phase F batch 16)" {
         try str(&e, "hashing_hmac", &.{ strV("SHA256"), strV("key"), strV("The quick brown fox jumps over the lazy dog") }),
     );
 
-    // HASHING_INIT/PART/TERM — streaming digest. Feed "abc" as "a"+"bc"; TERM's
+    // HASHING_INIT/PART/TERM - streaming digest. Feed "abc" as "a"+"bc"; TERM's
     // final digest equals one-shot sha256("abc"), UPPERCASE (doc p.986 example).
     const hs = try dispatch(&e, "hashing_init", &.{strV("SHA256")});
     try t.expect(hs.num > 0); // positive-integer handle
@@ -7232,7 +7232,7 @@ test "cryptographic hashes: md5/sha256/hashing/hmac (Phase F batch 16)" {
     );
     // invalid method → missing handle; invalid handle → NUMERIC missing digest.
     // That last one is NOT the BUG-charfnsmissingtype class and must not be
-    // "fixed": p.986 states the split explicitly — "If the handle is invalid,
+    // "fixed": p.986 states the split explicitly - "If the handle is invalid,
     // HASHING_TERM returns a numeric missing value" (here) versus "If the final
     // digest cannot be computed, the result is blank" (the digest arms, which are
     // unreachable today because INIT validates the method).
@@ -7240,7 +7240,7 @@ test "cryptographic hashes: md5/sha256/hashing/hmac (Phase F batch 16)" {
     try t.expect((try dispatch(&e, "hashing_term", &.{numV(9999)})).isMissing());
     try t.expect((try dispatch(&e, "hashing_part", &.{ numV(9999), strV("x") })).isMissing());
 
-    // HASHING_HMAC_INIT — streaming HMAC. SAS's own doc example (p.982): key="key",
+    // HASHING_HMAC_INIT - streaming HMAC. SAS's own doc example (p.982): key="key",
     // msg="The quick brown fox jumps over the lazy dog", uppercase hex.
     const msg = "The quick brown fox jumps over the lazy dog";
     const cases = .{
@@ -7313,7 +7313,7 @@ test "random-variate generators: reproducible stream + distributions (Phase F ba
     const tbl = (try dispatch(&e, "rantbl", &.{ numV(9), numV(0.2), numV(0.3), numV(0.5) })).num;
     try t.expect(tbl >= 1 and tbl <= 3);
 
-    // RAND(dist,…) over the shared stream — distribution sanity
+    // RAND(dist,…) over the shared stream - distribution sanity
     var ru: f64 = 0;
     var rc: f64 = 0;
     i = 0;
@@ -7352,7 +7352,7 @@ test "PRX regex functions wired through dispatch (prxparse/match/posn/paren/chan
     try t.expectEqualStrings("345", (try dispatch(&e, "prxposn", &.{ numV(id), numV(2), strV("code 12-345") })).str);
     try t.expectEqual(@as(f64, 2), (try dispatch(&e, "prxparen", &.{numV(id)})).num);
 
-    // PRXCHANGE(id, times, src) — substitution with a capture reference
+    // PRXCHANGE(id, times, src) - substitution with a capture reference
     const sid = (try dispatch(&e, "prxparse", &.{strV("s/(\\w+)@(\\w+)/$2.$1/")})).num;
     try t.expectEqualStrings("b.a", (try dispatch(&e, "prxchange", &.{ numV(sid), numV(-1), strV("a@b") })).str);
     const gid = (try dispatch(&e, "prxparse", &.{strV("s/\\s+/_/g")})).num;
@@ -7370,7 +7370,7 @@ test "PATHNAME(libref) returns the bound dir; blank for unknown ref / type 'F' (
 
     const refs = [_]DiskLibref{.{ .name = "target", .dir = "/study/sdtm" }};
     bindLibrefs(&refs);
-    defer bindLibrefs(&.{}); // test isolation — the slice dies with this frame
+    defer bindLibrefs(&.{}); // test isolation - the slice dies with this frame
 
     // case-insensitive libref, trimmed arg (the %sysfunc text route pads)
     try t.expectEqualStrings("/study/sdtm", (try dispatch(&e, "pathname", &.{strV("TARGET")})).str);
@@ -7380,7 +7380,7 @@ test "PATHNAME(libref) returns the bound dir; blank for unknown ref / type 'F' (
     try t.expectEqualStrings("", (try dispatch(&e, "pathname", &.{ strV("target"), strV("F") })).str);
     // unknown ref → blank
     try t.expectEqualStrings("", (try dispatch(&e, "pathname", &.{strV("nope")})).str);
-    // WORK is never blank — real SAS always has a WORK temp dir; study macros
+    // WORK is never blank - real SAS always has a WORK temp dir; study macros
     // probe PATHNAME(WORK) as a health check (QA-pathnamework).
     try t.expectEqualStrings("/tmp", (try dispatch(&e, "pathname", &.{strV("WORK")})).str);
 }
@@ -7412,7 +7412,7 @@ test "BUG-sclbind: SCL OPEN->FETCH->GETVARN returns a REAL value through dispatc
     try t.expectEqual(@as(f64, 2), (try dispatch(&e, "attrn", &.{ numV(id), strV("NOBS") })).num);
     try t.expectEqual(@as(f64, 2), (try dispatch(&e, "varnum", &.{ numV(id), strV("age") })).num);
 
-    // the crux of BUG-sclbind — fetch a row and read a variable → a REAL value
+    // the crux of BUG-sclbind - fetch a row and read a variable → a REAL value
     try t.expectEqual(@as(f64, 0), (try dispatch(&e, "fetch", &.{numV(id)})).num);
     const age = (try dispatch(&e, "getvarn", &.{ numV(id), numV(2) })).num;
     try t.expect(!std.math.isNan(age)); // NOT missing
@@ -7432,7 +7432,7 @@ test "FMTINFO metadata + unknown function logs a single ERROR diagnostic" {
     h.prime();
     var e = h.ev();
 
-    // FMTINFO — the doc's BEST example, plus category for common formats
+    // FMTINFO - the doc's BEST example, plus category for common formats
     try t.expectEqualStrings("num", (try dispatch(&e, "fmtinfo", &.{ strV("best"), strV("cat") })).str);
     try t.expectEqualStrings("BOTH", (try dispatch(&e, "fmtinfo", &.{ strV("best"), strV("type") })).str);
     try t.expectEqualStrings("SAS System chooses best notation", (try dispatch(&e, "fmtinfo", &.{ strV("best"), strV("desc") })).str);
@@ -7517,14 +7517,14 @@ test "QA-dollarwdot: plain $w. strips leading blanks and reads a lone '.' as cha
     defer h.deinit();
     h.prime();
     var e = h.ev();
-    // lone '.' (incl. the blank-padded implicit num->char form) -> "" — gen2
+    // lone '.' (incl. the blank-padded implicit num->char form) -> "" - gen2
     // VSSTRESC = input(<numeric missing>, $40.) must be blank, not "."
     try t.expectEqualStrings("", (try dispatch(&e, "input", &.{ strV("."), strV("$8.") })).str);
     try t.expectEqualStrings("", (try dispatch(&e, "input", &.{ strV("           ."), strV("$40.") })).str);
     // leading blanks stripped ($w. left-aligns); interior dots untouched
     try t.expectEqualStrings("abc", (try dispatch(&e, "input", &.{ strV("  abc"), strV("$8.") })).str);
     try t.expectEqualStrings("a.b", (try dispatch(&e, "input", &.{ strV("a.b"), strV("$8.") })).str);
-    // $CHARw. keeps the field verbatim — no strip, no dot rule
+    // $CHARw. keeps the field verbatim - no strip, no dot rule
     try t.expectEqualStrings("  . ", (try dispatch(&e, "input", &.{ strV("  . "), strV("$char4.") })).str);
 }
 
@@ -7656,7 +7656,7 @@ test "INTNX YEAR/SEMIYEAR SAME preserves month/day across leap boundaries (BUG-i
     try t.expectEqual(day(2020, 4, 30), try same(&e, "qtr", 2020, 1, 31, 1)); // Jan(off0,d31) → Apr, clamp 30
 }
 
-test "BUG-numcharwidth: __assignc — char truncates, numeric renders BESTn. right-justified" {
+test "BUG-numcharwidth: __assignc - char truncates, numeric renders BESTn. right-justified" {
     var h = harness();
     defer h.deinit();
     h.prime();
@@ -7665,7 +7665,7 @@ test "BUG-numcharwidth: __assignc — char truncates, numeric renders BESTn. rig
     // char rhs: truncate to n (identical to the old substr(rhs,1,n) desugar)
     try t.expectEqualStrings("abc", (try dispatch(&e, "__assignc", &.{ strV("abcdef"), numV(3) })).str);
     try t.expectEqualStrings("ab", (try dispatch(&e, "__assignc", &.{ strV("ab"), numV(20) })).str); // short stays short
-    // numeric rhs: BESTn. right-justified in n (Language Reference: Concepts p.124) — incl. n < 12
+    // numeric rhs: BESTn. right-justified in n (Language Reference: Concepts p.124) - incl. n < 12
     try t.expectEqualStrings("       5", (try dispatch(&e, "__assignc", &.{ numV(5), numV(8) })).str);
     try t.expectEqualStrings("                   5", (try dispatch(&e, "__assignc", &.{ numV(5), numV(20) })).str);
     try t.expectEqualStrings("     -4.5", (try dispatch(&e, "__assignc", &.{ numV(-4.5), numV(9) })).str);
@@ -7694,7 +7694,7 @@ test "NOTE-informatlow-tick245: INPUT() fn routes Z/BEST/E/D + COMMA/DOLLAR to f
     h.prime();
     var e = h.ev();
 
-    // #9: the fn path used to fall to numFromSpec (drop-all-blanks) — `input("4 2",
+    // #9: the fn path used to fall to numFromSpec (drop-all-blanks) - `input("4 2",
     // z3.)` silently read 42 where the statement path (readNumeric) reads missing.
     // Both paths now agree: w.d aliases → embedded blank invalid → missing.
     try t.expect((try dispatch(&e, "input", &.{ strV("4 2"), strV("z3.") })).isMissing());

@@ -1,16 +1,16 @@
-/* BUG-symputxsymtab — CALL SYMPUTX's THIRD argument, `symbol-table`. SAS 9.4
+/* BUG-symputxsymtab - CALL SYMPUTX's THIRD argument, `symbol-table`. SAS 9.4
    Macro Language: Reference, Fifth Edition, printed p.307 ("CALL SYMPUTX
    Routine"):
 
-     G — "stored in the global symbol table, even if a local symbol table exists"
-     L — "the most local symbol table that exists. ... If a local symbol table
+     G - "stored in the global symbol table, even if a local symbol table exists"
+     L - "the most local symbol table that exists. ... If a local symbol table
           does not exist ... the global symbol table"
-     F — the DEFAULT: "if the macro variable exists in any symbol table, CALL
+     F - the DEFAULT: "if the macro variable exists in any symbol table, CALL
           SYMPUTX uses the version in the most local symbol table in which it
           exists. If the macro variable does not exist, CALL SYMPUTX stores the
           variable in the most local symbol table that it finds."
 
-   It was PARSED AND DISCARDED with no diagnostic — a silent no-op, which D-002
+   It was PARSED AND DISCARDED with no diagnostic - a silent no-op, which D-002
    forbids outright. An argument outside G/L/F is a LOUD error; that arm is
    asserted on the captured reporter in src/exec.zig, not here.
 
@@ -58,7 +58,7 @@ data _null_;
    put "y2=!&y2!";
 run;
 
-/* G — the global table "EVEN IF a local symbol table exists". The macro is
+/* G - the global table "EVEN IF a local symbol table exists". The macro is
    parameterized, so rule 1 would have made this local; 'G' overrides that and
    open code sees it. This is the reporter's repro. */
 %macro gtab(p);
@@ -89,7 +89,7 @@ data _null_;
    put "gshadow-open=[&sh]";
 run;
 
-/* L — "the most local symbol table that exists", so it dies with the macro even
+/* L - "the most local symbol table that exists", so it dies with the macro even
    though a GLOBAL of the same name already existed (that is the whole point of
    the `slots` block above). */
 %let lv = KEEPME;
@@ -129,7 +129,7 @@ data _null_;
    put "ftab-open=[&f1][&f2]";
 run;
 
-/* The value is an EXPRESSION, not just a literal — a variable holding 'G' picks
+/* The value is an EXPRESSION, not just a literal - a variable holding 'G' picks
    the global table exactly the same way, and case does not matter. */
 %macro gvar(p);
    data _null_;

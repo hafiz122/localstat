@@ -1,4 +1,4 @@
-//! PROC SQL — a small query engine over datasets in the `Library`.
+//! PROC SQL - a small query engine over datasets in the `Library`.
 //!
 //! Supported: `select [distinct] <*|items> from T [inner|left join T2 on c]
 //! [where c] [group by … [having c]] [order by …]`, items being a (possibly
@@ -27,7 +27,7 @@
 //! CREATE TABLE (…) integrity constraints (`[constraint name] primary key(…) /
 //! unique(…) / check(…) / foreign key(…) references …`, plus the column-level
 //! `not null` / `primary key` / `unique` / `check(…)` / `references …` forms) are
-//! parsed as constraints — never as phantom columns — and enforced per row on
+//! parsed as constraints - never as phantom columns - and enforced per row on
 //! INSERT/UPDATE: a violating row is rejected with an ERROR (BUG-sqlconstraints).
 //! FOREIGN KEY is enforced child-side only (an inserted/updated value must exist
 //! in the referenced table); parent-side RESTRICT is not enforced.
@@ -49,12 +49,12 @@ const eval = @import("eval.zig");
 const functions = @import("functions.zig");
 const io = @import("io.zig");
 const format = @import("format.zig");
-const proc = @import("proc.zig"); // cmpColl — THE one collation-aware Value compare (NOTE-collationduplicated)
-const dsfns = @import("dsfns.zig"); // libref dir lookup — DROP TABLE's on-disk unlink
+const proc = @import("proc.zig"); // cmpColl - THE one collation-aware Value compare (NOTE-collationduplicated)
+const dsfns = @import("dsfns.zig"); // libref dir lookup - DROP TABLE's on-disk unlink
 
 const Token = lex.Token;
 
-// `variance` (not `var` — Zig keyword) is SQL VAR; `std`/`stderr`/… are the
+// `variance` (not `var` - Zig keyword) is SQL VAR; `std`/`stderr`/… are the
 // summary statistic aggregates (GAP-sqlstataggs). FREQ aliases N; PRT stays
 // unimplemented (needs the t-distribution CDF) and still fails loud.
 const AggFn = enum { count, sum, avg, min, max, n, nmiss, std, variance, stderr, cv, css, uss, range, median, t, sumwgt };
@@ -66,12 +66,12 @@ const Item = struct {
     agg_arg: ?[]const Token = null, // aggregate over a compound expr, e.g. sum(price*qty)
     col: ?[]const u8 = null, // aggregate argument column, or a plain selected column
     alias: ?[]const u8 = null,
-    case_toks: ?[]const Token = null, // `case when … end` — evaluated per row
+    case_toks: ?[]const Token = null, // `case when … end` - evaluated per row
     expr_toks: ?[]const Token = null, // any other expression (arithmetic, coalesce, calculated)
     is_star: bool = false, // a `*` / `alias.*` item in a multi-item SELECT list (ISS-sqlaliasstar)
     star_qual: ?[]const u8 = null, // the `alias` in `alias.*`; null → unqualified `*` (all columns)
     // trailing SELECT column-attribute modifiers `format=`/`informat=`/`label=`/
-    // `length=` (BUG-sqlselectmodifier, BUG-sqlselectlength) — consumed by
+    // `length=` (BUG-sqlselectmodifier, BUG-sqlselectlength) - consumed by
     // parseItem, threaded onto the OutCol.
     format: ?[]const u8 = null,
     informat: ?[]const u8 = null,
@@ -87,14 +87,14 @@ const Item = struct {
 const Order = struct { col: []const u8 = "", desc: bool = false, idx: ?usize = null, case_toks: ?[]const Token = null, expr_toks: ?[]const Token = null };
 
 /// One joined-in table after the first: how it's joined and (for inner/left) the
-/// ON condition. `cross` (also plain `,`) has no condition — a Cartesian product.
-const JoinStep = struct { kind: enum { inner, left, right, full, cross }, table: []const u8, alias: ?[]const u8 = null, on: ?[]const Token, from_sub: ?[]const Token = null, opts: ?[]const Token = null }; // from_sub: `join (SELECT …) alias` inline view, materialized in buildJoin — mirrors Query.from_sub (GH#14). opts: a `join T(where=/keep=/…)` dataset-option list applied to T (GH#33)
+/// ON condition. `cross` (also plain `,`) has no condition - a Cartesian product.
+const JoinStep = struct { kind: enum { inner, left, right, full, cross }, table: []const u8, alias: ?[]const u8 = null, on: ?[]const Token, from_sub: ?[]const Token = null, opts: ?[]const Token = null }; // from_sub: `join (SELECT …) alias` inline view, materialized in buildJoin - mirrors Query.from_sub (GH#14). opts: a `join T(where=/keep=/…)` dataset-option list applied to T (GH#33)
 
 /// One parsed integrity constraint (BUG-sqlconstraints). Column- and table-level
 /// forms both land here; enforcement is per-row on INSERT/UPDATE
 /// (violatesConstraint). FOREIGN KEY is enforced child-side only (a value must
 /// exist in the referenced table); parent-side RESTRICT on UPDATE/DELETE of a
-/// referenced row is NOT enforced (ponytail: no fixture needs it — add if one does).
+/// referenced row is NOT enforced (ponytail: no fixture needs it - add if one does).
 const Constraint = struct {
     kind: enum { pk, unique, not_null, check, fk },
     cols: []const []const u8 = &.{}, // pk/unique key columns; not_null: the one column; fk: child columns
@@ -110,7 +110,7 @@ const Constraint = struct {
 // the old note here argued that stale entries were harmless because a re-created
 // table gets a fresh Dataset pointer. That argument only covered CORRECTNESS, and
 // only while the prior arena is alive; it said nothing about CAPACITY, which is
-// the half that bites — the slots filled up and a later program got "too many
+// the half that bites - the slots filled up and a later program got "too many
 // constrained tables" for tables that earlier, unrelated programs had created.
 // `pruneConstraints` below now bounds the registry by what is actually LIVE, so
 // the staleness argument is no longer load-bearing and is not restated: a stale
@@ -118,11 +118,11 @@ const Constraint = struct {
 var g_cons: [256]struct { ds: *Dataset, cons: []const Constraint } = undefined;
 var g_cons_len: usize = 0;
 
-/// BUG-sqlconsleak — bound the registry by the LIVE library. Drops every entry
+/// BUG-sqlconsleak - bound the registry by the LIVE library. Drops every entry
 /// that can no longer be reached:
-///   - its Dataset is not in `lib` (a PRIOR RUN's table — wasm calls
+///   - its Dataset is not in `lib` (a PRIOR RUN's table - wasm calls
 ///     `main.interpret` many times per module load and each run builds a fresh
-///     Library — or one DROPped/deleted since), and
+///     Library - or one DROPped/deleted since), and
 ///   - it is superseded by a later entry for the same Dataset. `constraintsOf`
 ///     reads the newest match, so the older ones are already dead weight; ALTER
 ///     TABLE ADD CONSTRAINT re-registers the whole merged list every time.
@@ -130,7 +130,7 @@ var g_cons_len: usize = 0;
 /// freed arena is safe to inspect here.
 ///
 /// Called from `run`, this file's only entry point, so there is ONE reset and it
-/// lives with the global it resets — no second list for anyone to forget.
+/// lives with the global it resets - no second list for anyone to forget.
 /// ponytail: per STEP, not per statement. A single `proc sql;` that creates and
 /// drops more than 256 constrained tables without ever hitting `quit;` still
 /// reports the cap; move the call into the statement loop if one ever does.
@@ -180,15 +180,15 @@ const Query = struct {
     items: []Item = &.{},
     table: []const u8 = "", // first FROM table
     alias: ?[]const u8 = null, // its `from T [as] X` alias, for correlated refs (X.col)
-    from_sub: ?[]const Token = null, // `from (SELECT …)` derived table — materialized at exec (BUG-sqlderivedtable)
+    from_sub: ?[]const Token = null, // `from (SELECT …)` derived table - materialized at exec (BUG-sqlderivedtable)
     from_opts: ?[]const Token = null, // `from T(where=/keep=/drop=/…)` dataset-option list applied to T (GH#33)
     into: []const []const u8 = &.{}, // `SELECT … INTO :v1[,:v2…]` macro-var targets (BUG-sqlintomacro)
-    into_sep: ?[]const u8 = null, // `SEPARATED BY 'x'` — join a column's values across rows
-    into_range: bool = false, // `:v1-:vn` numbered range — values go DOWN rows, not across columns
+    into_sep: ?[]const u8 = null, // `SEPARATED BY 'x'` - join a column's values across rows
+    into_range: bool = false, // `:v1-:vn` numbered range - values go DOWN rows, not across columns
     joins: []const JoinStep = &.{}, // subsequent tables (inner/left/cross)
     where: ?[]const Token = null,
     group_exprs: []const []const Token = &.{}, // GROUP BY terms (a column or an expression)
-    having: ?[]const Token = null, // HAVING <cond> — filter groups after aggregation
+    having: ?[]const Token = null, // HAVING <cond> - filter groups after aggregation
     order: []const Order = &.{},
 };
 
@@ -224,7 +224,7 @@ fn addResultCols(ds: *Dataset, cols: []const OutCol) !void {
 
 /// A SELECT-clause `length=n` (BUG-sqlselectlength) caps a character column's
 /// storage: every cell TRUNCATES to n bytes, exactly as a `char(n)` DDL width
-/// does (GAP-sqldatatypewidth — SAS stores 'abcdef' at length=3 as 'abc').
+/// does (GAP-sqldatatypewidth - SAS stores 'abcdef' at length=3 as 'abc').
 /// Numeric lengths are descriptor-only (contentsLen/GH#59); f64 cells stay whole.
 fn applyLens(res: *Result) void {
     for (res.cols, 0..) |c, k| {
@@ -237,7 +237,7 @@ fn applyLens(res: *Result) void {
 }
 
 /// TITLE / FOOTNOTE state, SHARED with main.zig's global-statement handler, which
-/// reaches it as `sas.sql.Titles`. A TITLE is a persistent setting — not emitted
+/// reaches it as `sas.sql.Titles`. A TITLE is a persistent setting - not emitted
 /// where written; SAS stamps the active titles atop each listing proc's output and
 /// footnotes below, until changed. `title1`..`title10` are the numbered lines; the
 /// unnumbered `title` is line 1 and cancels 2..10. Defined HERE (not a new module)
@@ -260,17 +260,17 @@ pub const Titles = struct {
         if (!is_title and !is_footnote) return false;
         const slots = if (is_footnote) &self.footnotes else &self.titles;
         const base: usize = if (is_footnote) "footnote".len else "title".len;
-        // `title` / `titleN` — the digits after the keyword name the 1-based line (none → line 1).
+        // `title` / `titleN` - the digits after the keyword name the 1-based line (none → line 1).
         const n = std.fmt.parseInt(usize, kw[base..], 10) catch 1;
         if (n < 1 or n > slots.len) {
             // F5: SAS 9.4 restricts the line number to 1–10 and errors out of
-            // range — was silently dropped (rc=0, text gone). Fail LOUD.
+            // range - was silently dropped (rc=0, text gone). Fail LOUD.
             try diags.report(.err, toks[0].line, "Invalid line number for the {s} statement.", .{if (is_footnote) "FOOTNOTE" else "TITLE"});
             return true;
         }
         // First quoted string is the text. If there is NO quoted string but there
         // ARE tokens after the keyword, SAS accepts the UNQUOTED text and SETS the
-        // line (`title1 Acme Study;` is valid — Statements: Reference). Only a bare
+        // line (`title1 Acme Study;` is valid - Statements: Reference). Only a bare
         // `title[n];` with nothing past the keyword is the cancel form.
         var text: ?[]const u8 = null;
         for (toks[1..]) |tk| if (tk.tag == .string) {
@@ -290,7 +290,7 @@ pub const Titles = struct {
     /// Rebuild unquoted TITLE/FOOTNOTE text from the tokens after the keyword,
     /// joined by single spaces; `null` if there is no real text (the cancel form).
     /// ponytail: tokens carry no source offset, so exact interior spacing and
-    /// punctuation runs are lost — join the slices; add a raw source span only if
+    /// punctuation runs are lost - join the slices; add a raw source span only if
     /// a study needs byte-exact unquoted titles.
     fn joinUnquoted(arena: std.mem.Allocator, toks: []const Token) diag.Error!?[]const u8 {
         var buf: std.ArrayList(u8) = .empty;
@@ -328,7 +328,7 @@ pub const Titles = struct {
     /// the dataset/row) builds the list in BY order (#BYVAL1 → byvars[0]).
     pub const ByVar = struct { name: []const u8, label: []const u8, value: []const u8 };
 
-    /// True when any active title/footnote line carries a #BYVAL/#BYVAR token —
+    /// True when any active title/footnote line carries a #BYVAL/#BYVAR token -
     /// a PROC with a BY statement then re-resolves the lines per BY group
     /// (emitTitlesBy) instead of stamping the raw text once.
     pub fn hasBySubst(self: *const Titles) bool {
@@ -344,7 +344,7 @@ pub const Titles = struct {
     /// Title lines with #BYVAL(var)/#BYVALn → the BY variable's current-group
     /// formatted value and #BYVAR(var)/#BYVARn → its label-or-name (all
     /// case-insensitive). Unresolvable tokens (unknown var, out-of-range
-    /// position) stay literal — SAS leaves them as-is too.
+    /// position) stay literal - SAS leaves them as-is too.
     pub fn emitTitlesBy(self: *const Titles, a: std.mem.Allocator, out: *std.ArrayList(u8), byvars: []const ByVar) !void {
         for (self.titles) |ln| if (ln) |s| {
             try out.appendSlice(a, try substByLine(a, s, byvars));
@@ -427,19 +427,19 @@ fn substByLine(a: std.mem.Allocator, s: []const u8, byvars: []const Titles.ByVar
 }
 
 /// PROC SQL statement/RESET options that change execution (BUG-sqloptions-tick271).
-/// Process-global, reset at each `run()` entry — SAS scopes these to one PROC SQL
+/// Process-global, reset at each `run()` entry - SAS scopes these to one PROC SQL
 /// step (RESET accumulates/overrides them within the step; QUIT ends it). PROC SQL
 /// never nests here (subqueries call execQuery, not run()), so a global is safe.
 const SqlOpts = struct {
-    outobs: ?usize = null, // cap on rows OUTPUT (displayed / written to a table) — F2
-    inobs: ?usize = null, // cap on rows READ from each source table — F3
-    noexec: bool = false, // syntax-check only: validate but don't execute side effects — F1
-    noprint: bool = false, // suppress the query LISTING (rows still computed, INTO still bound) — F5
-    number: bool = false, // prepend a 1-based "Row" column to the query listing — F6
-    feedback: bool = false, // echo the star-expanded statement to the log — F7
+    outobs: ?usize = null, // cap on rows OUTPUT (displayed / written to a table) - F2
+    inobs: ?usize = null, // cap on rows READ from each source table - F3
+    noexec: bool = false, // syntax-check only: validate but don't execute side effects - F1
+    noprint: bool = false, // suppress the query LISTING (rows still computed, INTO still bound) - F5
+    number: bool = false, // prepend a 1-based "Row" column to the query listing - F6
+    feedback: bool = false, // echo the star-expanded statement to the log - F7
     // GAP-sqlsortseqlinguistic. `null` = the PROC SQL SORTSEQ= option was not
     // given, so the SORTSEQ= SYSTEM option decides; true/false = it was, and it
-    // WINS. That precedence is doc-stated, not inferred — SQL Procedure User's
+    // WINS. That precedence is doc-stated, not inferred - SQL Procedure User's
     // Guide printed p.261 (`=== pdf 276 ===`): "If LINGUISTIC is specified for
     // the SORTSEQ system option, then PROC SQL honors the setting. The setting
     // of the PROC SQL SORTSEQ option overrides the setting of the SORTSEQ
@@ -452,7 +452,7 @@ var g_opts: SqlOpts = .{};
 /// captured by execQuery and emitted by runStmt (null → nothing pending).
 var g_feedback: ?[]const u8 = null;
 
-/// Real SAS 9.4 PROC SQL options we recognize but don't implement — accepted as a
+/// Real SAS 9.4 PROC SQL options we recognize but don't implement - accepted as a
 /// no-op so a valid program isn't rejected. OUTOBS/INOBS/EXEC/NOEXEC and
 /// PRINT/NOPRINT/NUMBER/NONUMBER/FEEDBACK/NOFEEDBACK are handled specially in
 /// parseOptions and are NOT in this list. Anything not here and not special is a
@@ -476,7 +476,7 @@ fn parseOptions(diags: *diag.Diagnostics, toks: []const Token) diag.Error!void {
     var i: usize = 0;
     while (i < toks.len and toks[i].tag != .semicolon and toks[i].tag != .eof) {
         const tok = toks[i];
-        if (tok.tag != .name) { // stray punctuation between options — skip
+        if (tok.tag != .name) { // stray punctuation between options - skip
             i += 1;
             continue;
         }
@@ -507,7 +507,7 @@ fn parseOptions(diags: *diag.Diagnostics, toks: []const Token) diag.Error!void {
             i += 1;
         } else if (eqi(name, "sortseq")) {
             // GAP-sqlsortseqlinguistic. `SORTSEQ=sort-table | LINGUISTIC`, SQL
-            // Procedure User's Guide printed p.261 (`=== pdf 276 ===`) —
+            // Procedure User's Guide printed p.261 (`=== pdf 276 ===`) -
             // "specifies the collating sequence to use when a query contains an
             // ORDER BY clause". Added in 9.4M3: printed p.45 (`=== pdf 60 ===`),
             // "Beginning with SAS 9.4M3, linguistic collation is supported with
@@ -518,12 +518,12 @@ fn parseOptions(diags: *diag.Diagnostics, toks: []const Token) diag.Error!void {
             if (eqi(v, "linguistic")) {
                 // LINGUISTIC(<collating-options>) tunes the collation; honouring
                 // the bare form while dropping the modifiers would collate
-                // differently than asked, so it is LOUD — the same call runSort
+                // differently than asked, so it is LOUD - the same call runSort
                 // makes for `proc sort sortseq=linguistic(...)` (proc.zig).
                 if (i + 1 < toks.len and toks[i + 1].tag == .lparen) {
                     // rc 2, not 1: `LINGUISTIC<(collating-options)>` is documented
                     // valid SAS (Procedures Guide p.2410) that opensas does not
-                    // implement — a gap, per D-009 and the whole
+                    // implement - a gap, per D-009 and the whole
                     // BUG-rcsplitmembership epic. Same class as the EBCDIC arm below.
                     diag.markGap();
                     return diags.fail(error.ExecError, tok.line, "PROC SQL: SORTSEQ=LINGUISTIC(...) collating options are not supported", .{});
@@ -537,7 +537,7 @@ fn parseOptions(diags: *diag.Diagnostics, toks: []const Token) diag.Error!void {
                 // sort-table "specifies a translation table that YOU CREATED
                 // with PROC TRANTAB", so the valid set is user-created names and
                 // NO closed list exists to split a typo from a real table
-                // (§5d's LEFT rows, same shape). D-018 then decides it — an
+                // (§5d's LEFT rows, same shape). D-018 then decides it - an
                 // undecidable value stays on the gap arm, because a wrong rc 2
                 // costs one spurious "file an opensas issue" while a wrong rc 1
                 // tells a user their valid SAS is broken. Loud either way: this
@@ -555,12 +555,12 @@ fn parseOptions(diags: *diag.Diagnostics, toks: []const Token) diag.Error!void {
             i += 1;
         } else if (isNoopSqlOption(name)) {
             i += 1;
-            if (atTag(toks, i, .eq)) { // recognized `opt=value` form — swallow the value
+            if (atTag(toks, i, .eq)) { // recognized `opt=value` form - swallow the value
                 i += 1;
                 if (i < toks.len and toks[i].tag != .semicolon and toks[i].tag != .eof) i += 1;
             }
         } else {
-            // F4: an unrecognized option was silently swallowed — SAS errors, and the
+            // F4: an unrecognized option was silently swallowed - SAS errors, and the
             // house rule is fail-loud. A typo'd `outob=3` lands here instead of a
             // silent no-op that hides an uncapped query.
             return diags.fail(error.ExecError, tok.line, "PROC SQL: unrecognized option {s}", .{name});
@@ -570,7 +570,7 @@ fn parseOptions(diags: *diag.Diagnostics, toks: []const Token) diag.Error!void {
 
 /// Truncate a SELECT Result to OUTOBS= rows (F2) and reflect the cap in &SQLOBS.
 /// Applied at the three statement-level output sites (SELECT print, CREATE TABLE
-/// AS, INSERT … SELECT) — NOT inside execSelect, so a derived-table/subquery source
+/// AS, INSERT … SELECT) - NOT inside execSelect, so a derived-table/subquery source
 /// is never capped.
 fn applyOutobs(res: Result) Result {
     const cap = g_opts.outobs orelse return res;
@@ -597,7 +597,7 @@ pub fn run(arena: std.mem.Allocator, out: *std.ArrayList(u8), lib: *Library, dia
         if (tkKw(toks[i], "quit")) break;
         const end = stmtEnd(toks, i);
         const stmt = toks[i..end];
-        // GAP-titleinsql: TITLE/FOOTNOTE are valid SAS 9.4 inside PROC SQL — update
+        // GAP-titleinsql: TITLE/FOOTNOTE are valid SAS 9.4 inside PROC SQL - update
         // the shared title state (stamped over each SELECT's listing in runStmt),
         // exactly as the top-level global handler does. Not an SQL statement, so it
         // leaves &SQLOBS/&SQLRC untouched.
@@ -613,9 +613,9 @@ pub fn run(arena: std.mem.Allocator, out: *std.ArrayList(u8), lib: *Library, dia
     }
 }
 
-/// A mnemonic operator emitted as a `.name` token — after one of these a `.` is
+/// A mnemonic operator emitted as a `.name` token - after one of these a `.` is
 /// the numeric-missing literal, not a member-access dot (so `col ne . group by`
-/// must NOT fold `ne.group`, which would swallow the GROUP BY — BUG-sqlwherenemiss).
+/// must NOT fold `ne.group`, which would swallow the GROUP BY - BUG-sqlwherenemiss).
 fn isWordOp(tok: Token) bool {
     if (tok.tag != .name) return false;
     // …or a CASE keyword: `then .` / `else .` / `when .` / `case .` put a MISSING
@@ -627,10 +627,10 @@ fn isWordOp(tok: Token) bool {
 }
 
 /// A dot before one of these clause keywords is NOT member access: it is a
-/// trailing format-spec dot (`format=best8. from`) — folding `best8.from` would
+/// trailing format-spec dot (`format=best8. from`) - folding `best8.from` would
 /// hide the FROM clause and break parsing (BUG-sqlselectmodifier). The
 /// constraint keywords are the CREATE/ALTER column-def siblings (`format=date9.
-/// not null` — BUG-sqlddlmed). None of these is ever a valid bare
+/// not null` - BUG-sqlddlmed). None of these is ever a valid bare
 /// qualified-column suffix.
 fn isFoldStop(tok: Token) bool {
     inline for (.{ "from", "where", "group", "having", "order", "into", "union", "intersect", "except", "on", "not", "primary", "unique", "distinct", "check", "references", "constraint" }) |kw|
@@ -674,41 +674,41 @@ fn unqualify(name: []const u8) []const u8 {
 
 /// PROC SQL does NOT get the DATA step's whole operator surface: three symbol
 /// spellings differ here, and all three were leaking, because every one of the
-/// dozen `pe.Parser.init` sites below parses WITHOUT `where_ctx` — the flag
+/// dozen `pe.Parser.init` sites below parses WITHOUT `where_ctx` - the flag
 /// parser_expr uses to apply the WHERE-clause operator rules. Normalizing the
 /// statement's tokens ONCE, here, gives every clause the same rule (WHERE, ON,
 /// HAVING, a CASE arm, a SELECT item, an UPDATE SET, a CHECK constraint) instead
-/// of threading a flag into a dozen call sites — and it avoids what that flag
+/// of threading a flag into a dozen call sites - and it avoids what that flag
 /// would ALSO switch on: parser_expr's CONTAINS/`?`/LIKE arms, which SQL already
 /// desugars itself at the token level (desugarPredicates).
 ///   • `<>` is NOT EQUAL in PROC SQL (Language Reference: Concepts p.219 Table 11.3 lists `<>` among
 ///     the NE spellings), never the DATA-step MAX operator. It was reaching
-///     parser_expr as `.max_op` = MAX, so `where x <> 3` computed max(x, 3) —
-///     non-zero for every row — and the filter KEPT THE WHOLE TABLE. That is
+///     parser_expr as `.max_op` = MAX, so `where x <> 3` computed max(x, 3) -
+///     non-zero for every row - and the filter KEPT THE WHOLE TABLE. That is
 ///     the exact BUG-wherene failure mode, silently, in SQL. `quantCmpOf`
 ///     already mapped `.max_op` → NE for `<> ALL`, so the two now agree.
-///   • `><` (MIN) has no predicate meaning — loud, as in a DATA-step WHERE.
+///   • `><` (MIN) has no predicate meaning - loud, as in a DATA-step WHERE.
 ///   • `=<` / `=>` (the LEGACY spellings of LE / GE) are loud: "It is not
 ///     supported in WHERE clauses or in PROC SQL" (Language Reference: Concepts p.127 Table 6.4
 ///     fn.2/3). That sentence qualifies WHERE with "clauses" but names PROC SQL
-///     WITHOUT qualification, so the ban is procedure-wide, not WHERE-only —
+///     WITHOUT qualification, so the ban is procedure-wide, not WHERE-only -
 ///     which is what one pass over the whole statement gives. The lexer stamps
 ///     the spelling in `text` (`<=` / `>=` carry none), which is the only way to
 ///     tell them apart once both are `.le`/`.ge`.
-///   • EQT / GTT / LTT / GET / LET / NET — the six alphabetic TRUNCATED
+///   • EQT / GTT / LTT / GET / LET / NET - the six alphabetic TRUNCATED
 ///     comparison operators (SQL Procedure User's Guide, Table 8.2 group 7,
 ///     printed p.403-404; "Truncated String Comparison Operators", p.405:
 ///     "Unlike the DATA step, PROC SQL does not support the colon operators
 ///     (such as =:, >:, and <=:) … Use the alphabetic operators (such as EQT,
 ///     GTT, and LET)"; same six with examples in Table 2.5, printed p.55-56).
-///     Each rewrites to the symbol operator token + the colon-modifier token —
-///     the exact pair the DATA step's `=:` parses from — so all six reach
+///     Each rewrites to the symbol operator token + the colon-modifier token -
+///     the exact pair the DATA step's `=:` parses from - so all six reach
 ///     parser_expr's ONE prefix compare, mkTruncCmp, and the two surfaces
 ///     share the shorter-operand rule (p.405), the zero-length EQ guard
 ///     (Language Reference: Concepts p.130) and the numeric-coercion NOTE by construction. The colon
 ///     form itself is NOT banned here (GAP-sqlcolonmodifier, held): this
 ///     change is purely additive. Guard: only BETWEEN two operand edges
-///     (isInfixTruncOp) — a column or table named GET / LET / NET in operand
+///     (isInfixTruncOp) - a column or table named GET / LET / NET in operand
 ///     position must keep resolving as a name.
 /// ponytail: per STATEMENT, so earlier statements in the step still run before
 /// the offending one errors (SAS's own timing). Widen to the step header too if
@@ -730,7 +730,7 @@ fn sqlOperatorRules(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []
                     try out.append(arena, .{ .tag = op, .text = "", .line = tok.line });
                     // NOTE-sqltruncblanks: the colon is MARKED "trim" so
                     // parser_expr applies PROC SQL's trailing-blank rule to it
-                    // and not the DATA step's storage-length rule — p.405 states
+                    // and not the DATA step's storage-length rule - p.405 states
                     // both in one sentence and gives each to a different surface:
                     // "The Base SAS WHERE processor truncates comparisons based
                     // on the actual length of a string, even if a string includes
@@ -763,7 +763,7 @@ fn truncOpTag(text: []const u8) ?lex.Tag {
     return null;
 }
 
-/// Words that can stand right BEFORE an operand in SQL — a clause introducer,
+/// Words that can stand right BEFORE an operand in SQL - a clause introducer,
 /// a DDL verb, or a word operator. After one of these an EQT-family word is an
 /// OPERAND (a column/table named GET, LET, NET, …), never the operator.
 fn isPreOperandKw(text: []const u8) bool {
@@ -772,7 +772,7 @@ fn isPreOperandKw(text: []const u8) bool {
     return false;
 }
 
-/// Words that can stand right AFTER an operand — they end the expression. In
+/// Words that can stand right AFTER an operand - they end the expression. In
 /// front of one an EQT-family word is an operand, not the operator.
 fn isPostOperandKw(text: []const u8) bool {
     inline for (.{ "from", "where", "group", "having", "order", "on", "as", "then", "else", "end", "when", "and", "or", "union", "except", "intersect", "join", "inner", "left", "right", "full", "cross", "using", "set", "values", "into", "desc", "asc", "add", "modify", "drop", "quit" }) |kw|
@@ -780,7 +780,7 @@ fn isPostOperandKw(text: []const u8) bool {
     return false;
 }
 
-/// True when the EQT-family word at toks[i] sits BETWEEN two operands — the
+/// True when the EQT-family word at toks[i] sits BETWEEN two operands - the
 /// infix truncated-comparison operator, never a name in operand position.
 /// Same neighbor shape as isInfixMinMax (`min`/`max`), plus the keyword
 /// guards: `select get from t` must keep resolving GET as a column while
@@ -807,22 +807,22 @@ fn runStmt(arena: std.mem.Allocator, out: *std.ArrayList(u8), lib: *Library, dia
     const stmt = try sqlOperatorRules(arena, diags, stmt_in);
     if (stmt.len == 0) return 0;
     if (tkKw(stmt[0], "select")) {
-        // execSelect returns null for a SELECT … INTO (print suppressed) — read the
+        // execSelect returns null for a SELECT … INTO (print suppressed) - read the
         // processed row count from g_select_rows so &SQLOBS is right either way.
         // GAP-titleinsql: stamp the active TITLEs atop this listing and FOOTNOTEs
         // below, like the other report procs (main.zig runProc). Kept here (not in
         // runProc's pre-emit) because a TITLE set *inside* this PROC SQL isn't in
-        // the shared state until the loop above reads it — so PROC SQL is NOT in
+        // the shared state until the loop above reads it - so PROC SQL is NOT in
         // runProc's `listing` set; it self-stamps around its own output instead.
         g_feedback = null; // drop any echo leaked by a CREATE/INSERT … SELECT
         const sel_res = try execSelect(arena, lib, diags, stmt);
         // F7 FEEDBACK: the expanded-statement echo goes to the log even under
-        // NOEXEC/NOPRINT — SAS writes it while validating the statement.
+        // NOEXEC/NOPRINT - SAS writes it while validating the statement.
         if (g_feedback) |fb| try out.appendSlice(arena, fb);
         if (sel_res) |res0| {
             const res = applyOutobs(res0); // OUTOBS= caps displayed rows (F2)
             // NOEXEC validates the SELECT (bad columns still ERROR) but suppresses
-            // its output — SAS syntax-checks and produces no listing (F1).
+            // its output - SAS syntax-checks and produces no listing (F1).
             // NOPRINT (F5) also suppresses the listing, but the query RAN: rows
             // were computed and INTO macro vars were bound inside execSelect.
             if (!g_opts.noexec and !g_opts.noprint) {
@@ -838,7 +838,7 @@ fn runStmt(arena: std.mem.Allocator, out: *std.ArrayList(u8), lib: *Library, dia
         try parseOptions(diags, stmt[1..]);
         return 0;
     }
-    // F1: under NOEXEC every side-effecting statement is syntax-checked but NOT run —
+    // F1: under NOEXEC every side-effecting statement is syntax-checked but NOT run -
     // a `noexec` dry-run of a destructive DROP/DELETE/UPDATE/CREATE must not mutate.
     if (g_opts.noexec) return 0;
     if (tkKw(stmt[0], "drop")) {
@@ -882,7 +882,7 @@ fn runAlter(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, s
     if (atKw(stmt, i, "table")) i += 1;
     const ds = if (atTag(stmt, i, .name)) lib.find(stmt[i].text) else null;
     if (ds == null) {
-        unsupported("PROC SQL: ALTER TABLE — table not found");
+        unsupported("PROC SQL: ALTER TABLE - table not found");
         return;
     }
     i += 1;
@@ -897,7 +897,7 @@ fn runAlter(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, s
                 // a column def. `constraint`/`primary`/`unique`/`check`/`foreign`
                 // all lex as plain `.name`, so the column path below read
                 // `add constraint c1 check (x > 0)` as a column literally named
-                // `constraint` — a silently corrupted schema at exit 0, the worst
+                // `constraint` - a silently corrupted schema at exit 0, the worst
                 // failure class here. Route it to the SAME parser CREATE TABLE uses
                 // (BUG-sqlconstraints) rather than growing a second one; that also
                 // makes the column-vs-keyword ambiguity resolve identically in both
@@ -933,7 +933,7 @@ fn runAlter(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, s
                     r.* = nr;
                 }
                 // an inline constraint/modifier on ADD used to be silently
-                // dropped — parse the region like a CREATE column def.
+                // dropped - parse the region like a CREATE column def.
                 try parseColSuffix(arena, diags, ds.?, idx, cname, &acons, stmt[tstart..i], 0, ctok.line);
                 if (atTag(stmt, i, .comma)) i += 1 else break;
             }
@@ -942,17 +942,17 @@ fn runAlter(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, s
             while (i < stmt.len and atTag(stmt, i, .name)) {
                 // Sibling of the ADD defect: `drop constraint c1` / `drop primary
                 // key` / `drop foreign key f` name a CONSTRAINT, not a column. We
-                // cannot drop one — a Constraint carries no name (CREATE reads
-                // `constraint <name>` as metadata and skips it) — so this is valid
+                // cannot drop one - a Constraint carries no name (CREATE reads
+                // `constraint <name>` as metadata and skips it) - so this is valid
                 // SAS we do not implement: a GAP, rc 2 per D-009. It already exited
                 // 2, but via "column not found", which sends the reader hunting a
                 // column that was never the subject.
                 if (tkKw(stmt[i], "constraint") or isTableConstraintStart(stmt[i])) {
-                    unsupported("PROC SQL: ALTER TABLE DROP CONSTRAINT — dropping an integrity constraint is not supported");
+                    unsupported("PROC SQL: ALTER TABLE DROP CONSTRAINT - dropping an integrity constraint is not supported");
                     return;
                 }
                 const j = ds.?.indexOf(stmt[i].text) orelse {
-                    unsupported("PROC SQL: ALTER TABLE DROP — column not found");
+                    unsupported("PROC SQL: ALTER TABLE DROP - column not found");
                     return;
                 };
                 _ = ds.?.columns.orderedRemove(j);
@@ -966,26 +966,26 @@ fn runAlter(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, s
                 if (atTag(stmt, i, .comma)) i += 1 else break;
             }
         } else {
-            unsupported("PROC SQL: ALTER TABLE — only ADD column / ADD constraint / DROP column supported");
+            unsupported("PROC SQL: ALTER TABLE - only ADD column / ADD constraint / DROP column supported");
             return;
         }
     }
     if (acons.items.len > 0) {
         // register merged with any CREATE-time constraints (constraintsOf sees
-        // only the newest entry for a table — don't shadow the old ones)
+        // only the newest entry for a table - don't shadow the old ones)
         var all: std.ArrayList(Constraint) = .empty;
         if (constraintsOf(ds.?)) |old| try all.appendSlice(arena, old);
         try all.appendSlice(arena, acons.items);
         registerConstraints(ds.?, all.items, diags);
         // existing rows must comply too (e.g. NOT NULL on a non-empty table,
-        // whose back-filled missings violate it) — one ERROR at the first
+        // whose back-filled missings violate it) - one ERROR at the first
         // violation; the constraint stays enforced on later INSERT/UPDATE.
         for (ds.?.rows.items, 0..) |r, ri|
             if (try violatesConstraint(arena, lib, diags, ds.?, r, ri, stmt[0].line)) break;
     }
 }
 
-/// True at a top-level ALTER clause verb (`add`/`drop`/`modify`) — ends an item's
+/// True at a top-level ALTER clause verb (`add`/`drop`/`modify`) - ends an item's
 /// type region so a bare `add`/`drop` after an untyped column isn't read as a type.
 fn isAlterVerb(stmt: []const Token, i: usize) bool {
     return atKw(stmt, i, "add") or atKw(stmt, i, "drop") or atKw(stmt, i, "modify");
@@ -993,7 +993,7 @@ fn isAlterVerb(stmt: []const Token, i: usize) bool {
 
 /// End of the ALTER clause item starting at `start`: the next TOP-LEVEL comma or
 /// ALTER verb, or the statement end. Paren-depth aware, which the hand-rolled scan
-/// this replaces was not — `primary key (a, b)` and `check (x in (1, 2))` carry
+/// this replaces was not - `primary key (a, b)` and `check (x in (1, 2))` carry
 /// commas that must not split the item, and the same scan feeds the column path,
 /// where `add y num check (a in (1, 2))` was truncated mid-paren for the same reason.
 fn alterItemEnd(stmt: []const Token, start: usize) usize {
@@ -1003,24 +1003,24 @@ fn alterItemEnd(stmt: []const Token, start: usize) usize {
         if (stmt[i].tag == .lparen) {
             depth += 1;
         } else if (stmt[i].tag == .rparen) {
-            if (depth == 0) break; // an unbalanced ')' — stop rather than run off
+            if (depth == 0) break; // an unbalanced ')' - stop rather than run off
             depth -= 1;
         } else if (depth == 0 and (stmt[i].tag == .comma or isAlterVerb(stmt, i))) break;
     }
     return i;
 }
 
-/// `DROP TABLE t [, …]` / `DROP VIEW v [, …]` — remove the named member(s) from
+/// `DROP TABLE t [, …]` / `DROP VIEW v [, …]` - remove the named member(s) from
 /// the library, in memory AND on disk (BUG-sqlupdatedropcol: this was a 100%
 /// silent no-op, exit 0, the table stayed in the library). A member that isn't
 /// there is the SAS "does not exist" ERROR. DROP VIEW always errors here:
-/// CREATE VIEW is unsupported, so no view can exist — and a same-named TABLE
+/// CREATE VIEW is unsupported, so no view can exist - and a same-named TABLE
 /// is not a view (SAS errors on that too).
 fn runDrop(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, stmt: []const Token) diag.Error!void {
     var i: usize = 1;
     const is_view = atKw(stmt, i, "view");
     if (is_view or atKw(stmt, i, "table")) i += 1 else {
-        unsupported("PROC SQL: DROP — only DROP TABLE / DROP VIEW are supported");
+        unsupported("PROC SQL: DROP - only DROP TABLE / DROP VIEW are supported");
         return;
     }
     while (atTag(stmt, i, .name)) {
@@ -1036,12 +1036,12 @@ fn runDrop(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, st
     }
 }
 
-/// Drop a leading `work.` — WORK is the default library (Library.find's rule).
+/// Drop a leading `work.` - WORK is the default library (Library.find's rule).
 fn stripWorkPrefix(name: []const u8) []const u8 {
     return if (name.len >= 5 and eqi(name[0..5], "work.")) name[5..] else name;
 }
 
-/// Remove the member `name` from the library — in memory AND, for a directory
+/// Remove the member `name` from the library - in memory AND, for a directory
 /// libname, on disk (else the per-slice `loadLibInputs` preload resurrects it at
 /// the next `lib.member` token). proc.zig dsDelete's SQL twin. True when a
 /// member went. The Library index self-heals: slotOf reindexes on the shrink.
@@ -1063,7 +1063,7 @@ fn libRemove(arena: std.mem.Allocator, lib: *Library, name: []const u8) bool {
 }
 
 /// The table a CREATE/INSERT/UPDATE/DELETE targets (`create table N`, `insert
-/// into N`, `update N`, `delete from N`) — skips the connector keyword.
+/// into N`, `update N`, `delete from N`) - skips the connector keyword.
 fn sqlTargetName(stmt: []const Token) ?[]const u8 {
     var i: usize = 1; // past the leading keyword
     if (atKw(stmt, i, "table") or atKw(stmt, i, "into") or atKw(stmt, i, "from")) i += 1;
@@ -1099,11 +1099,11 @@ fn runCreate(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
         try lib.put(name, ds);
         return;
     }
-    if (atKw(stmt, i, "like")) { // `CREATE TABLE new LIKE old` — copy schema, no rows (GAP-sqlddl)
+    if (atKw(stmt, i, "like")) { // `CREATE TABLE new LIKE old` - copy schema, no rows (GAP-sqlddl)
         i += 1;
         const src = if (atTag(stmt, i, .name)) lib.find(stmt[i].text) else null;
         if (src == null) {
-            unsupported("PROC SQL: CREATE TABLE LIKE — source table not found");
+            unsupported("PROC SQL: CREATE TABLE LIKE - source table not found");
             return;
         }
         const ds = try arena.create(Dataset);
@@ -1119,7 +1119,7 @@ fn runCreate(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
         // The paren body splits on top-level commas; each item is either a column
         // def (`x num [not null|primary key|unique|check(…)|references …]`) or a
         // table-level constraint clause (`[constraint name] primary key(…) |
-        // unique(…) | check(…) | foreign key(…) references …`) — BUG-sqlconstraints:
+        // unique(…) | check(…) | foreign key(…) references …`) - BUG-sqlconstraints:
         // these used to be parsed as COLUMNS literally named `constraint`/`primary`.
         const bstart = i;
         var depth: usize = 0;
@@ -1173,7 +1173,7 @@ fn parenColList(arena: std.mem.Allocator, toks: []const Token, i: *usize) !?[]co
     return cols.items;
 }
 
-/// Append a constraint after validating its columns exist in the schema — a
+/// Append a constraint after validating its columns exist in the schema - a
 /// typo'd column must not silently drop the constraint (fail LOUD: one ERROR,
 /// the constraint is skipped).
 fn appendCheckedCons(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Dataset, cons: *std.ArrayList(Constraint), c: Constraint, line: usize) !void {
@@ -1188,7 +1188,7 @@ fn appendCheckedCons(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Da
 /// (add it to `ds`) or a table-level constraint clause (append to `cons`).
 fn parseColumnOrConstraint(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Dataset, cons: *std.ArrayList(Constraint), item: []const Token) !void {
     if (item.len == 0) return;
-    // `[constraint <name>] <clause>` — the name is metadata only; skip it.
+    // `[constraint <name>] <clause>` - the name is metadata only; skip it.
     if (tkKw(item[0], "constraint")) {
         var i: usize = 1;
         if (atTag(item, i, .name)) i += 1;
@@ -1196,10 +1196,10 @@ fn parseColumnOrConstraint(arena: std.mem.Allocator, diags: *diag.Diagnostics, d
     }
     if (isTableConstraintStart(item[0]))
         return parseTableConstraint(arena, diags, ds, cons, item);
-    if (item[0].tag != .name) return; // a stray token — pre-fix code skipped these too
+    if (item[0].tag != .name) return; // a stray token - pre-fix code skipped these too
     const cname = item[0].text;
     // A duplicate column name is a malformed column list: fail LOUD at CREATE and
-    // skip it — the old code added a second same-named column, and the corrupt
+    // skip it - the old code added a second same-named column, and the corrupt
     // schema later panicked dataset.appendRow on INSERT (BUG-sqlcreatedupcol).
     if (ds.indexOf(cname) != null) {
         try diags.report(.err, item[0].line, "PROC SQL: duplicate column name {s} in CREATE TABLE {s}", .{ cname, ds.name });
@@ -1208,7 +1208,7 @@ fn parseColumnOrConstraint(arena: std.mem.Allocator, diags: *diag.Diagnostics, d
     var i: usize = 1;
     // type region: everything up to the first constraint keyword or column
     // modifier (`num`, `char(8)`, …). More than one type keyword in it
-    // (`c num num`) is a stray extra token — fail LOUD and skip the item (same
+    // (`c num num`) is a stray extra token - fail LOUD and skip the item (same
     // BUG). Unknown trailing single names keep the old lenient skip, so
     // `double precision`-style phrases pass.
     var ty: VarType = .num;
@@ -1218,7 +1218,7 @@ fn parseColumnOrConstraint(arena: std.mem.Allocator, diags: *diag.Diagnostics, d
         if (isTypeKeyword(item[i])) type_kws += 1;
         if (tkKw(item[i], "char") or tkKw(item[i], "varchar") or tkKw(item[i], "character")) {
             ty = .char;
-            // `char ( n )` — the declared storage width. A numeric type's
+            // `char ( n )` - the declared storage width. A numeric type's
             // `(p,s)` is precision/scale metadata: SAS stores every numeric as
             // a double regardless, so only char widths are captured.
             if (atTag(item, i + 1, .lparen) and atTag(item, i + 2, .number) and atTag(item, i + 3, .rparen))
@@ -1238,7 +1238,7 @@ fn parseColumnOrConstraint(arena: std.mem.Allocator, diags: *diag.Diagnostics, d
 /// (`not null` / `primary key` / `unique` / `check(…)` / `references …`,
 /// optionally `constraint <name>`-prefixed) and the `format=` / `informat=` /
 /// `label=` column modifiers. BUG-sqlddlmed: the modifiers used to be silently
-/// dropped — they now attach to the column like a data-step ATTRIB. Shared by
+/// dropped - they now attach to the column like a data-step ATTRIB. Shared by
 /// CREATE TABLE and ALTER TABLE ADD (which passes its type region too; bare
 /// type tokens fall through the final skip).
 fn parseColSuffix(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Dataset, col_idx: usize, cname: []const u8, cons: *std.ArrayList(Constraint), item: []const Token, start: usize, line: usize) !void {
@@ -1253,14 +1253,14 @@ fn parseColSuffix(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Datas
                     i += 1;
                 }
             } else if (eqi(kw, "length")) {
-                // LENGTH= is a SELECT-clause modifier, not a DDL column-def one —
+                // LENGTH= is a SELECT-clause modifier, not a DDL column-def one -
                 // skip the count (as before BUG-sqlselectlength) rather than let
                 // captureFmtSpec swallow it into a bogus informat.
                 if (atTag(item, i, .number)) i += 1;
             } else if (try captureFmtSpec(arena, item, &i)) |spec| {
                 if (eqi(kw, "format")) ds.columns.items[col_idx].format = spec else ds.columns.items[col_idx].informat = spec;
             }
-        } else if (tkKw(item[i], "constraint")) { // a named column-level clause — skip the name, the kind follows
+        } else if (tkKw(item[i], "constraint")) { // a named column-level clause - skip the name, the kind follows
             i += 1;
             if (atTag(item, i, .name)) i += 1;
         } else if (tkKw(item[i], "not") and atKw(item, i + 1, "null")) {
@@ -1278,7 +1278,7 @@ fn parseColSuffix(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Datas
             try appendCheckCons(arena, diags, cons, captureDsOpts(item, &i), line);
         } else if (tkKw(item[i], "references")) {
             try cons.append(arena, try parseReferences(arena, item, &i, try oneCol(arena, cname)));
-        } else i += 1; // a type-region token (num/char(8)/double precision/…) — skip
+        } else i += 1; // a type-region token (num/char(8)/double precision/…) - skip
     }
 }
 
@@ -1306,7 +1306,7 @@ fn parseTableConstraint(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: 
 }
 
 /// Store a CHECK constraint from its `( expr )` capture, after verifying the
-/// predicate parses — silent acceptance of an unparseable one would let every
+/// predicate parses - silent acceptance of an unparseable one would let every
 /// row pass (evalSpan maps a parse error to missing = UNKNOWN), so fail loud at
 /// CREATE and skip the constraint.
 fn appendCheckCons(arena: std.mem.Allocator, diags: *diag.Diagnostics, cons: *std.ArrayList(Constraint), pred: ?[]const Token, line: usize) !void {
@@ -1336,7 +1336,7 @@ fn parseReferences(arena: std.mem.Allocator, toks: []const Token, i: *usize, chi
 
 /// `INSERT INTO n [(cols)] VALUES (…) [VALUES (…)…]` or `INSERT INTO n [(cols)]
 /// <select>`. VALUES map to `cols` (or all columns, in order); a value/column
-/// count mismatch — or an unknown target-list name — is an ERROR
+/// count mismatch - or an unknown target-list name - is an ERROR
 /// (BUG-sqlddlmed: both used to silently drop/pad). SELECT rows append
 /// positionally.
 fn runInsert(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, stmt: []const Token) !void {
@@ -1359,7 +1359,7 @@ fn runInsert(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
         if (atTag(stmt, i, .rparen)) i += 1;
         // BUG-sqlddlmed: a target-list name that isn't a column of the table is
         // the SAS "columns were not found" ERROR (mirrors UPDATE SET's check,
-        // BUG-sqlupdatedropcol) — the old code silently dropped those values.
+        // BUG-sqlupdatedropcol) - the old code silently dropped those values.
         for (cols.items) |cn|
             if (ds.indexOf(cn) == null)
                 return diags.fail(error.ExecError, stmt[0].line, "PROC SQL: the following columns were not found in the contributing tables: {s}", .{cn});
@@ -1399,11 +1399,11 @@ fn runInsert(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
                 // BUG-sqlcreatedupcol: a ragged SELECT row (width ≠ the target
                 // table's schema) must fail LOUD, not trip appendRow's assert.
                 if (row.len != ds.columns.items.len) {
-                    try diags.report(.err, stmt[0].line, "PROC SQL: INSERT into {s} — SELECT has {d} columns but the table has {d}", .{ name, row.len, ds.columns.items.len });
+                    try diags.report(.err, stmt[0].line, "PROC SQL: INSERT into {s} - SELECT has {d} columns but the table has {d}", .{ name, row.len, ds.columns.items.len });
                     break;
                 }
                 // BUG-sqlinsertoverwidth: the SELECT form must store through the
-                // SAME coerceToColumn as the VALUES form — the SQL volume's
+                // SAME coerceToColumn as the VALUES form - the SQL volume's
                 // INSERT section (pp.290-292) is silent on truncation, but a
                 // stored cell wider than its own descriptor is not a doc
                 // question (2a4a2b6a: "a descriptor must not disagree with the
@@ -1432,8 +1432,8 @@ fn consMissing(v: Value) bool {
 
 /// Check candidate row `cells` (aligned to `ds.columns`) against the table's
 /// registered constraints (BUG-sqlconstraints). `skip` excludes one existing row
-/// from the key scans (UPDATE's own pre-update row). Returns true — after
-/// reporting one ERROR — when the row violates a constraint and must be
+/// from the key scans (UPDATE's own pre-update row). Returns true - after
+/// reporting one ERROR - when the row violates a constraint and must be
 /// rejected (INSERT skips it, UPDATE keeps the original row).
 fn violatesConstraint(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, ds: *Dataset, cells: []const Value, skip: ?usize, line: usize) !bool {
     const cons = constraintsOf(ds) orelse return false;
@@ -1454,7 +1454,7 @@ fn violatesConstraint(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diag
                     if (consMissing(cells[idx])) any_missing = true;
                     try idxs.append(arena, idx);
                 }
-                if (idxs.items.len != c.cols.len) continue; // schema drift — not this table's constraint
+                if (idxs.items.len != c.cols.len) continue; // schema drift - not this table's constraint
                 if (any_missing) {
                     if (c.kind == .pk) { // a PRIMARY KEY column is implicitly NOT NULL
                         try diags.report(.err, line, "Add/Update failed for data set {s} because data value(s) do not comply with integrity constraint: PRIMARY KEY column would be missing", .{ds.name});
@@ -1552,7 +1552,7 @@ fn violatesConstraint(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diag
 }
 
 /// BUG-sqltypeconsistency: a CHARACTER value stored into a NUMERIC column
-/// (INSERT VALUES / UPDATE SET) converts the SAS way — implicit w. informat,
+/// (INSERT VALUES / UPDATE SET) converts the SAS way - implicit w. informat,
 /// NOT an error and never the raw text in a num cell: blank → missing
 /// silently; a special missing ('.K') → that missing; parseable → the number
 /// with the "converted" NOTE; unparseable → missing after the "converted" +
@@ -1566,7 +1566,7 @@ fn violatesConstraint(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diag
 /// path. ponytail: SAS rejects a mismatched informat at CREATE; add that
 /// check if a program hits it.
 /// NOTE-invalidnumdataloc (GH#78): `line` is the REAL statement line the
-/// caller already had in hand (tokens carry one; no column exists —
+/// caller already had in hand (tokens carry one; no column exists -
 /// NOTE-arrayoorlineno); it rides the diag's line field, rendered "NOTE(L<n>):",
 /// instead of the old frozen in-text "at line 0 column 0."
 /// ponytail: num→char and INSERT…SELECT cell sinks are not coerced (no
@@ -1578,21 +1578,21 @@ fn coerceToColumn(arena: std.mem.Allocator, diags: *diag.Diagnostics, line: usiz
         // GAP-sqlinputfnnote: the invalid-data half of Language Reference:
         // Concepts p.518 that the INPUT()-function dispatch pairs with
         // readInformat's loud ERROR (functions.zig, GH#5 + GH#4a). This call
-        // bypassed that dispatch, so an unknown informat — or a known one that
-        // cannot read the field — stored MISSING with no NOTE. The coercion
+        // bypassed that dispatch, so an unknown informat - or a known one that
+        // cannot read the field - stored MISSING with no NOTE. The coercion
         // models "the INPUT() function's exact semantics" (GAP-sqlcolumnattr),
         // so mirror the dispatch guard's exact shape: judge the field the
         // informat actually READ (the w-slice, trimmed), and note only a
-        // NON-blank field that is not `.` and not a special missing — a
+        // NON-blank field that is not `.` and not a special missing - a
         // legitimate missing stays silent, like io.zig's noteInvalidNum guard.
         // Same text as the function family ("Invalid argument to function
         // INPUT."), so a log reader sees one contract. _ERROR_ (p.518 action 3)
         // is a DATA-step PDV automatic (eval.zig setError) with NO SQL row
-        // sink — a SELECT result is a table, not an observation — so NOTE +
+        // sink - a SELECT result is a table, not an observation - so NOTE +
         // missing is the whole contract here; there is no Evaluator on this
         // path to invent one with. (The SELECT-side input() call reaches the
         // dispatch through sqlDispatch and its ev.setError lands in SQL's
-        // scratch PDV — likewise unobservable.) The INFORMAT= column attribute
+        // scratch PDV - likewise unobservable.) The INFORMAT= column attribute
         // carries no `?`/`??` modifier, so the NOTE never scales down.
         // ponytail: fired only where the missing read IS the stored result
         // (num column); a type-mismatched informat falls through to the raw
@@ -1624,7 +1624,7 @@ fn coerceToColumn(arena: std.mem.Allocator, diags: *diag.Diagnostics, line: usiz
     }
     // GAP-sqldatatypewidth: a declared char(n)/varchar(n) width TRUNCATES a
     // too-long stored value (Language Reference: Concepts/SQL: the declared width IS the storage
-    // length — SAS stores 'abcdef' into char(3) as 'abc'). Under-width values
+    // length - SAS stores 'abcdef' into char(3) as 'abc'). Under-width values
     // stay unpadded: char storage is dynamic and comparisons trim trailing
     // blanks, so blank-padding would only churn goldens.
     if (c.type == .char and val == .str) if (c.len) |n| {
@@ -1636,11 +1636,11 @@ fn coerceToColumn(arena: std.mem.Allocator, diags: *diag.Diagnostics, line: usiz
 fn insertRow(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, ds: *Dataset, cols: []const []const u8, valToks: []const Token) !void {
     const vals = try splitTopComma(arena, valToks);
     // BUG-sqlddlmed: SAS ERRORs when the VALUES count doesn't match the target
-    // column count (the explicit list's, else the whole table's) — the old code
+    // column count (the explicit list's, else the whole table's) - the old code
     // silently dropped extra values / padded a short row with missings.
     const want = if (cols.len > 0) cols.len else ds.columns.items.len;
     if (vals.len != want) {
-        try diags.report(.err, if (valToks.len > 0) valToks[0].line else 0, "PROC SQL: INSERT into {s} — VALUES lists {d} value(s) for {d} targeted column(s)", .{ ds.name, vals.len, want });
+        try diags.report(.err, if (valToks.len > 0) valToks[0].line else 0, "PROC SQL: INSERT into {s} - VALUES lists {d} value(s) for {d} targeted column(s)", .{ ds.name, vals.len, want });
         return;
     }
     const cells = try arena.alloc(Value, ds.columns.items.len);
@@ -1671,7 +1671,7 @@ fn runUpdate(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
         unsupported("PROC SQL: UPDATE target not found");
         return;
     };
-    // optional `[as] alias` (`update m as x set …`) — needed so a correlated SET
+    // optional `[as] alias` (`update m as x set …`) - needed so a correlated SET
     // subquery binds the outer row via `x.col` (ISS-sqlupdate #42). `set` is a
     // .name token, so guard against consuming it as the alias.
     var alias: ?[]const u8 = null;
@@ -1686,7 +1686,7 @@ fn runUpdate(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
     }
     i += 1;
     const setStart = i;
-    // paren-aware SET/WHERE split — a `set c=(select … where …)` subquery holds its
+    // paren-aware SET/WHERE split - a `set c=(select … where …)` subquery holds its
     // own `where` inside parens, which must not end the SET clause (ISS-sqlupdate).
     var sdepth: usize = 0;
     while (i < stmt.len and !(sdepth == 0 and tkKw(stmt[i], "where"))) : (i += 1) {
@@ -1694,7 +1694,7 @@ fn runUpdate(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
     }
     const asgs = try splitTopComma(arena, stmt[setStart..i]);
     // A SET target naming no column of the table is the SAS "columns were not
-    // found" ERROR — the per-row write lookup below (ds.indexOf) skips an
+    // found" ERROR - the per-row write lookup below (ds.indexOf) skips an
     // unknown name, so without this check a typo'd SET silently no-ops
     // (BUG-sqlupdatedropcol). Mirrors validateWhereCols (BUG-sqldmlwhere).
     for (asgs) |asg| {
@@ -1713,7 +1713,7 @@ fn runUpdate(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
     // PERF-sqlupdatecorr: a SET RHS that is exactly a correlated scalar subquery
     // `(select v from t where t.k = m.k)` reuses the SELECT list's hash path
     // (PERF-sqlcorrsubqsel): build the inner key→value map ONCE and probe per
-    // row — O(N+M) instead of re-executing the inner query per target row
+    // row - O(N+M) instead of re-executing the inner query per target row
     // (O(N·M), 82 s/4.4 GB at N=20k). null → the correct per-row
     // substituteSubqueries path below (same scope as the SELECT fast path).
     const usels = try arena.alloc(?ScalarSel, asgs.len);
@@ -1731,7 +1731,7 @@ fn runUpdate(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
         for (asgs, 0..) |asg, ai| {
             if (asg.len < 3 or asg[1].tag != .eq) continue; // col = expr
             if (usels[ai]) |sm| {
-                // hash probe — same value the per-row path yields (first match /
+                // hash probe - same value the per-row path yields (first match /
                 // empty-group fold / missing), see buildScalarSel.
                 if (ds.indexOf(asg[0].text)) |ci| {
                     pkb.clearRetainingCapacity();
@@ -1741,7 +1741,7 @@ fn runUpdate(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
                 }
                 continue;
             }
-            // a `(select …)` scalar subquery RHS parser_expr can't parse — collapse
+            // a `(select …)` scalar subquery RHS parser_expr can't parse - collapse
             // it to its value first, correlated to this row via the table alias
             // (ISS-sqlupdate #42); plain expressions pass through untouched.
             const rhs0 = if (hasSubquery(asg[2..]))
@@ -1764,7 +1764,7 @@ fn runUpdate(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
     }
 }
 
-/// `DELETE FROM n [WHERE pred]` — drop matching rows (all rows if no WHERE).
+/// `DELETE FROM n [WHERE pred]` - drop matching rows (all rows if no WHERE).
 fn runDelete(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, stmt: []const Token) !void {
     var i: usize = 1;
     if (atKw(stmt, i, "from")) i += 1;
@@ -1845,10 +1845,10 @@ fn followsFromKw(tok: Token) bool {
     return false;
 }
 
-/// A `(` immediately after a FROM/JOIN table NAME is a dataset-option list — a
+/// A `(` immediately after a FROM/JOIN table NAME is a dataset-option list - a
 /// subquery would have REPLACED the name, so here it can only be options (GH#33).
 /// Returns the tokens BETWEEN the parens (what io.applyDatasetOptions expects)
-/// and advances `i` past the closing `)`. Null if not on a `(` (or unbalanced —
+/// and advances `i` past the closing `)`. Null if not on a `(` (or unbalanced -
 /// downstream parsing then errors).
 fn captureDsOpts(toks: []const Token, i: *usize) ?[]const Token {
     if (i.* >= toks.len or toks[i.*].tag != .lparen) return null;
@@ -1867,7 +1867,7 @@ fn captureDsOpts(toks: []const Token, i: *usize) ?[]const Token {
 }
 
 /// Apply a FROM/JOIN table's dataset options to a COPY (never the live library
-/// dataset — mutating it would corrupt later reads) via the shared DATA-step
+/// dataset - mutating it would corrupt later reads) via the shared DATA-step
 /// implementation, so where=/keep=/drop=/rename=/obs=/firstobs= all behave
 /// exactly as they do on a SET (GH#33). No opts → the source, untouched.
 fn withOptions(arena: std.mem.Allocator, diags: *diag.Diagnostics, src: *Dataset, opts: ?[]const Token) !*Dataset {
@@ -1910,7 +1910,7 @@ fn parseQuery(arena: std.mem.Allocator, toks: []const Token) !Query {
         q.items = try items.toOwnedSlice(arena);
     }
 
-    // `INTO :v1 [, :v2 …] [SEPARATED BY 'delim']` — bind query values to macro vars
+    // `INTO :v1 [, :v2 …] [SEPARATED BY 'delim']` - bind query values to macro vars
     // (BUG-sqlintomacro). The write happens in execSelect once the result exists.
     if (atKw(toks, i, "into")) {
         i += 1;
@@ -1946,7 +1946,7 @@ fn parseQuery(arena: std.mem.Allocator, toks: []const Token) !Query {
     if (!(atKw(toks, i, "from"))) return error.ParseError;
     i += 1;
     if (atTag(toks, i, .lparen)) {
-        // `from (SELECT …)` — a derived table: capture the balanced-paren subquery
+        // `from (SELECT …)` - a derived table: capture the balanced-paren subquery
         // tokens; execQuery materializes them and runs the outer query against the
         // result (BUG-sqlderivedtable).
         const sub_start = i + 1;
@@ -1964,10 +1964,10 @@ fn parseQuery(arena: std.mem.Allocator, toks: []const Token) !Query {
     } else if (atTag(toks, i, .name)) {
         q.table = toks[i].text;
         i += 1;
-        q.from_opts = captureDsOpts(toks, &i); // `from T(where=/keep=/…)` — GH#33
+        q.from_opts = captureDsOpts(toks, &i); // `from T(where=/keep=/…)` - GH#33
     } else return error.ParseError;
 
-    // optional table alias `from T [as] X` — needed so a correlated subquery can
+    // optional table alias `from T [as] X` - needed so a correlated subquery can
     // bind the outer row via `X.col` and resolve its own `X.col` (BUG-sqlcorrscalar).
     if (atKw(toks, i, "as")) i += 1;
     if (atTag(toks, i, .name) and !followsFromKw(toks[i])) {
@@ -2001,7 +2001,7 @@ fn parseQuery(arena: std.mem.Allocator, toks: []const Token) !Query {
 
         // The joined term is either a table name or an inline view `(select …)`.
         // Capture the balanced-paren subquery the same way the FROM clause does
-        // (GH#14) — materialized in buildJoin.
+        // (GH#14) - materialized in buildJoin.
         var tn: []const u8 = "";
         var sub: ?[]const Token = null;
         var topts: ?[]const Token = null;
@@ -2020,9 +2020,9 @@ fn parseQuery(arena: std.mem.Allocator, toks: []const Token) !Query {
         } else if (atTag(toks, i, .name)) {
             tn = toks[i].text;
             i += 1;
-            topts = captureDsOpts(toks, &i); // `join T(where=/keep=/…)` — GH#33
+            topts = captureDsOpts(toks, &i); // `join T(where=/keep=/…)` - GH#33
         } else return error.ParseError;
-        // optional `[as] alias` on the joined table (BUG-sqljoinalias) — required
+        // optional `[as] alias` on the joined table (BUG-sqljoinalias) - required
         // for self-joins; an alias hides the table name, so columns qualify by it.
         var talias: ?[]const u8 = null;
         if (atKw(toks, i, "as")) i += 1;
@@ -2050,7 +2050,7 @@ fn parseQuery(arena: std.mem.Allocator, toks: []const Token) !Query {
         if (tkKw(toks[i], "where")) {
             i += 1;
             const s = i;
-            // A subquery's own GROUP BY/HAVING/ORDER BY lives inside parens — only a
+            // A subquery's own GROUP BY/HAVING/ORDER BY lives inside parens - only a
             // clause keyword at paren depth 0 ends this WHERE (BUG-sqlsubqnest).
             var depth: usize = 0;
             while (i < toks.len and !(depth == 0 and (tkKw(toks[i], "group") or tkKw(toks[i], "having") or tkKw(toks[i], "order")))) : (i += 1) {
@@ -2061,7 +2061,7 @@ fn parseQuery(arena: std.mem.Allocator, toks: []const Token) !Query {
             i += 1;
             if (atKw(toks, i, "by")) i += 1;
             // each GROUP BY term is a token span (a column or a whole expression),
-            // split on top-level commas — BUG-groupexpr
+            // split on top-level commas - BUG-groupexpr
             var exprs: std.ArrayList([]const Token) = .empty;
             var depth: usize = 0;
             var start2 = i;
@@ -2089,7 +2089,7 @@ fn parseQuery(arena: std.mem.Allocator, toks: []const Token) !Query {
             var ords: std.ArrayList(Order) = .empty;
             while (i < toks.len) {
                 // Capture one ORDER BY term as a whole token span (paren/CASE aware),
-                // up to a top-level comma or a trailing ASC/DESC — then classify it.
+                // up to a top-level comma or a trailing ASC/DESC - then classify it.
                 // A bare expression (`10-x`, `abs(x)`, `a+b`) becomes `expr_toks`,
                 // evaluated per output row at sort time (BUG-sqlorderexpr); the old
                 // token-by-token loop split it into phantom per-token keys.
@@ -2119,16 +2119,16 @@ fn parseQuery(arena: std.mem.Allocator, toks: []const Token) !Query {
 /// Classify one ORDER BY term (its whole token span, without any trailing
 /// ASC/DESC) into an `Order`: a positional `<n>`, a `case … end`, a matched
 /// `agg(col|*)`, a bare column, or (the general case) an arbitrary expression
-/// evaluated per output row at sort time — BUG-sqlorderexpr.
+/// evaluated per output row at sort time - BUG-sqlorderexpr.
 fn classifyOrder(q: Query, span: []const Token) Order {
     if (span.len == 1 and span[0].tag == .number) {
-        // ORDER BY <n> — the n-th SELECT column (1-based) — BUG-orderbypos
+        // ORDER BY <n> - the n-th SELECT column (1-based) - BUG-orderbypos
         const n = std.fmt.parseInt(usize, span[0].text, 10) catch 0;
         return .{ .idx = if (n > 0) n - 1 else null };
     }
     if (isPureCase(span)) return .{ .case_toks = span[1 .. span.len - 1] }; // BUG-ordercase
     if (isPureAgg(span) and aggOf(span[0].text) != null) {
-        // ORDER BY <agg(col|*)> — match it to a SELECT item — BUG-orderbyagg.
+        // ORDER BY <agg(col|*)> - match it to a SELECT item - BUG-orderbyagg.
         // Only the simple `agg(*)` / `agg(col)` forms match; a compound arg falls
         // through to the per-row expression path below.
         const arg = span[2 .. span.len - 1];
@@ -2142,7 +2142,7 @@ fn classifyOrder(q: Query, span: []const Token) Order {
 }
 
 /// True when `toks[i]` begins a SELECT column-attribute modifier (`format=`/
-/// `informat=`/`label=`/`length=`) — a `name` keyword immediately followed by
+/// `informat=`/`label=`/`length=`) - a `name` keyword immediately followed by
 /// `=` (BUG-sqlselectmodifier, BUG-sqlselectlength). These end the value span
 /// and attach to the item.
 fn isColModAt(toks: []const Token, i: usize) bool {
@@ -2218,7 +2218,7 @@ fn parseItem(arena: std.mem.Allocator, toks: []const Token, start: usize) !struc
     }
     if (span.len == 0) return error.ParseError;
 
-    // A qualified star `alias.*` (name·dot·star — coalesceDots only folds name·dot·name,
+    // A qualified star `alias.*` (name·dot·star - coalesceDots only folds name·dot·name,
     // so it survives as three tokens) or a bare `*` mid-list expands at exec time to
     // the matching source columns (ISS-sqlaliasstar).
     if (span.len == 1 and span[0].tag == .star) {
@@ -2232,7 +2232,7 @@ fn parseItem(arena: std.mem.Allocator, toks: []const Token, start: usize) !struc
         item.case_toks = span[1 .. span.len - 1]; // between `case` and `end`
     } else if (isPureAgg(span) and aggAt(span, 0) != null) {
         // single-arg summary aggregate; a multi-arg call (aggAt == null) falls
-        // through to expr_toks — the per-row DATA-step function (median(x,y) etc.)
+        // through to expr_toks - the per-row DATA-step function (median(x,y) etc.)
         item.agg = aggAt(span, 0);
         var arg = span[2 .. span.len - 1]; // between the agg's parens
         if (arg.len >= 1 and tkKw(arg[0], "distinct")) {
@@ -2242,12 +2242,12 @@ fn parseItem(arena: std.mem.Allocator, toks: []const Token, start: usize) !struc
         if (arg.len == 1 and arg[0].tag == .star) {
             item.agg_star = true;
         } else if (arg.len == 1 and arg[0].tag == .name) {
-            item.col = arg[0].text; // simple column — fast path
+            item.col = arg[0].text; // simple column - fast path
         } else {
-            item.agg_arg = arg; // compound expression — evaluated per row then folded
+            item.agg_arg = arg; // compound expression - evaluated per row then folded
         }
     } else {
-        item.expr_toks = span; // arbitrary expression — evaluated per row
+        item.expr_toks = span; // arbitrary expression - evaluated per row
     }
     return .{ .item = item, .next = i };
 }
@@ -2265,8 +2265,8 @@ fn isPureCase(span: []const Token) bool {
     return false;
 }
 
-/// True when `span` is exactly one `agg(…)` call — the `(` after the function
-/// name matches the last token — so agg(col), agg(*) and agg(price*qty) all
+/// True when `span` is exactly one `agg(…)` call - the `(` after the function
+/// name matches the last token - so agg(col), agg(*) and agg(price*qty) all
 /// qualify but `sum(a)+1` / `sum(a)+sum(b)` do not (BUG-sqlaggexpr).
 fn isPureAgg(span: []const Token) bool {
     if (span.len < 4 or span[0].tag != .name or aggOf(span[0].text) == null or span[1].tag != .lparen) return false;
@@ -2282,14 +2282,14 @@ fn isPureAgg(span: []const Token) bool {
     return false;
 }
 
-/// True if `toks` contains an aggregate call anywhere — an aggregate name directly
+/// True if `toks` contains an aggregate call anywhere - an aggregate name directly
 /// followed by `(`. Used to detect an aggregate NESTED in an outer expression
 /// (`sum(v)+10`, `max(v)-min(v)`), which must still collapse to one row per group
 /// (BUG-sqlaggouter).
 fn exprHasAgg(toks: []const Token) bool {
     var i: usize = 0;
     while (i < toks.len) : (i += 1) {
-        // skip a nested `( select … )` subquery — its aggregates are its own, not the
+        // skip a nested `( select … )` subquery - its aggregates are its own, not the
         // outer query's (a correlated scalar subquery must stay per-row).
         if (toks[i].tag == .lparen and atKw(toks, i + 1, "select")) {
             var depth: usize = 0;
@@ -2308,7 +2308,7 @@ fn exprHasAgg(toks: []const Token) bool {
     return false;
 }
 
-/// True when `name` is a single-name GROUP BY term — constant per group, so a BARE
+/// True when `name` is a single-name GROUP BY term - constant per group, so a BARE
 /// selection of it collapses normally and never forces a remerge. `gexprs` are the
 /// RESOLVED group expressions (aliases/positionals already expanded).
 fn isGroupTerm(gexprs: []const []const Token, name: []const u8) bool {
@@ -2331,12 +2331,12 @@ fn inGroupExpr(gexprs: []const []const Token, name: []const u8) bool {
 /// True when `toks` references a non-summarized detail column: a column name that
 /// is NOT an aggregate argument and NOT covered by the GROUP BY (e.g. `sal` inside
 /// `sal/sum(sal)` grouped by dept). Aggregate calls and nested subqueries are
-/// skipped whole — the former summarize their args, the latter own their columns
+/// skipped whole - the former summarize their args, the latter own their columns
 /// (BUG-sqlexprdetailremerge).
 fn exprHasDetailCol(toks: []const Token, gexprs: []const []const Token, ds: *Dataset) bool {
     var i: usize = 0;
     while (i < toks.len) : (i += 1) {
-        // skip a nested `( select … )` subquery whole — its columns are its own
+        // skip a nested `( select … )` subquery whole - its columns are its own
         if (toks[i].tag == .lparen and atKw(toks, i + 1, "select")) {
             var depth: usize = 0;
             while (i < toks.len) : (i += 1) {
@@ -2368,7 +2368,7 @@ fn exprHasDetailCol(toks: []const Token, gexprs: []const []const Token, ds: *Dat
     return false;
 }
 
-/// True when the select list has a non-summarized detail column — the trigger for
+/// True when the select list has a non-summarized detail column - the trigger for
 /// SAS remerge. A BARE column (BUG-sqlremergedetail/BUG-sqlgroupremerge) or a column
 /// referenced inside an EXPRESSION/CASE (`sal/sum(sal)`, BUG-sqlexprdetailremerge),
 /// as long as it is not covered by the GROUP BY (constant per group → collapses).
@@ -2452,7 +2452,7 @@ fn writeInto(arena: std.mem.Allocator, lib: *Library, q: Query, res: Result) !vo
     }
 }
 
-/// Rows the last SELECT processed — captured here (not from the returned Result)
+/// Rows the last SELECT processed - captured here (not from the returned Result)
 /// because a `SELECT … INTO` returns null to suppress its print, yet &SQLOBS must
 /// still report the rows it selected (BUG-sqlobs).
 var g_select_rows: usize = 0;
@@ -2467,7 +2467,7 @@ fn execSelect(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics,
         };
         var res = try execQuery(arena, lib, diags, q);
         g_select_rows = if (res) |r| r.rows.len else 0;
-        if (q.into.len > 0) { // SELECT … INTO :mac — bind macro vars, suppress the print
+        if (q.into.len > 0) { // SELECT … INTO :mac - bind macro vars, suppress the print
             if (res) |r| try writeInto(arena, lib, q, r);
             return null;
         }
@@ -2516,7 +2516,7 @@ fn execSelect(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics,
 /// Combine two SELECT results by one set operator. `left`'s columns and row
 /// order are kept. For `ALL`, the ANSI multiset rules apply per value:
 /// INTERSECT ALL keeps min(countA, countB); EXCEPT ALL keeps max(0, countA−countB)
-/// — realised by CONSUMING a distinct right match per left row (BUG-sqlsetopall).
+/// - realised by CONSUMING a distinct right match per left row (BUG-sqlsetopall).
 /// Without `ALL` the result is deduped to distinct values.
 /// Pad each row to `ncol` columns, filling the new trailing slots with the missing
 /// value for that column's type. A no-op copy when rows are already `ncol` wide.
@@ -2592,14 +2592,14 @@ fn corrAlign(arena: std.mem.Allocator, left: Result, right: Result) !struct { le
 /// SQL Procedure User's Guide, printed p.397-398, Table 8.1 "Resolving Different
 /// Lengths for the Same Variable": with two data-set sources, "the length of VAR1
 /// in NewTable is the maximum length of VAR1 across both sources". So MAX, not the
-/// left arm's — the left-wins width made applyLens TRUNCATE the right arm's longer
+/// left arm's - the left-wins width made applyLens TRUNCATE the right arm's longer
 /// values ('ABCDEF' from a `$6` column → 'ABC' under a `$3` left arm), silent data
 /// loss (found by differential probe while landing BUG-sqlcolwidthloss; before that
 /// fix a pass-through column carried no width at all, so nothing truncated).
 /// A null (unknown) width on either side stays null: opensas records null when no
 /// LENGTH was ever declared, and enforcing one arm's width over data of unknown
 /// width is the same trap. Table 8.1's SQL-view rows (an explicitly specified view
-/// length wins over the max) are DOC-SILENT here — opensas has no SQL-view length
+/// length wins over the max) are DOC-SILENT here - opensas has no SQL-view length
 /// declaration distinct from a table's, so there is no case to distinguish.
 fn setOpLen(a: ?usize, b: ?usize) ?usize {
     return @max(a orelse return null, b orelse return null);
@@ -2616,7 +2616,7 @@ fn combineSetOp(arena: std.mem.Allocator, left0: Result, right0: Result, op: Set
     }
     // Cross-type set-op (BUG-sqlunioncoerce): where the arms disagree on a
     // column's type, SAS 9.4 coerces the RESULT column to CHARACTER (char wins)
-    // — the numeric arm's values render via BEST (cellText) into the char slot.
+    // - the numeric arm's values render via BEST (cellText) into the char slot.
     // Done before stacking/compare so INTERSECT/EXCEPT also match on the coerced
     // (char) text. Only overlapping positions are considered; column-count
     // padding (below) fills the rest with type-correct missing.
@@ -2634,7 +2634,7 @@ fn combineSetOp(arena: std.mem.Allocator, left0: Result, right0: Result, op: Set
         }
     }
     // The result column keeps the LEFT arm's name/attributes, but its WIDTH must
-    // be the MAX of the two arms — see setOpLen. Merged here, before the
+    // be the MAX of the two arms - see setOpLen. Merged here, before the
     // column-count padding below overwrites right.cols with the widened set.
     {
         const lc = try arena.dupe(OutCol, left.cols);
@@ -2642,10 +2642,10 @@ fn combineSetOp(arena: std.mem.Allocator, left0: Result, right0: Result, op: Set
         left = .{ .cols = lc, .rows = left.rows };
     }
     // A column-count mismatch WITHOUT CORRESPONDING: SAS 9.4 matches by position,
-    // pads the shorter arm with missing values (and warns) — it does NOT error, and
+    // pads the shorter arm with missing values (and warns) - it does NOT error, and
     // must never emit ragged rows (which panicked appendRow). Names come from the
     // first (left) query for overlapping positions; extra columns from the wider arm.
-    // ponytail: SAS also logs a WARNING here — skipped (combineSetOp has no diags);
+    // ponytail: SAS also logs a WARNING here - skipped (combineSetOp has no diags);
     // the padded values are the load-bearing part. Add the note if a program needs it.
     if (left.cols.len != right.cols.len) {
         var cols: std.ArrayList(OutCol) = .empty;
@@ -2682,7 +2682,7 @@ fn combineSetOp(arena: std.mem.Allocator, left0: Result, right0: Result, op: Set
 }
 
 /// OUTER UNION concatenates EVERY row of both arms and keeps EVERY column of both
-/// — unlike plain UNION it does NOT overlay same-named columns nor align by
+/// - unlike plain UNION it does NOT overlay same-named columns nor align by
 /// position: each row fills only its own arm's columns, the rest stay missing.
 /// OUTER UNION CORR *does* overlay same-named columns (align by name) while still
 /// concatenating rows. Neither form de-duplicates (it is a concatenation).
@@ -2727,7 +2727,7 @@ fn combineOuterUnion(arena: std.mem.Allocator, left: Result, right: Result, corr
     return .{ .cols = try cols.toOwnedSlice(arena), .rows = try rows.toOwnedSlice(arena) };
 }
 
-/// Mark and report the first unused right row equal to `r` — one left row consumes
+/// Mark and report the first unused right row equal to `r` - one left row consumes
 /// at most one right row, giving the correct INTERSECT/EXCEPT ALL multiplicity.
 fn consumeMatch(right: [][]Value, used: []bool, r: []const Value) bool {
     for (right, 0..) |o, j| if (!used[j] and rowEq(o, r)) {
@@ -2756,7 +2756,7 @@ fn splitSetOps(arena: std.mem.Allocator, toks: []const Token) !struct { arms: []
         } else if (toks[i].tag == .rparen) {
             if (depth > 0) depth -= 1;
         } else if (depth == 0 and tkKw(toks[i], "outer") and atKw(toks, i + 1, "union")) {
-            // `OUTER UNION [CORR|CORRESPONDING]` — must be caught before the bare
+            // `OUTER UNION [CORR|CORRESPONDING]` - must be caught before the bare
             // `union` check below, else the trailing UNION would be read alone.
             try arms.append(arena, toks[start..i]);
             i += 1; // now on UNION
@@ -2772,7 +2772,7 @@ fn splitSetOps(arena: std.mem.Allocator, toks: []const Token) !struct { arms: []
                 if (tkKw(toks[i], "union")) .union_ else if (tkKw(toks[i], "intersect")) .intersect else if (tkKw(toks[i], "except")) .except else null;
             if (kind) |k| {
                 try arms.append(arena, toks[start..i]);
-                // `UNION|INTERSECT|EXCEPT [ALL] [CORR|CORRESPONDING]` — CORR applies
+                // `UNION|INTERSECT|EXCEPT [ALL] [CORR|CORRESPONDING]` - CORR applies
                 // to all four set operators, not only OUTER UNION (GAP-sqlunioncorr).
                 var all = false;
                 var corr = false;
@@ -2810,18 +2810,18 @@ fn appendAll(arena: std.mem.Allocator, out: *std.ArrayList(Token), items: []cons
 ///   L IS [NOT] NULL|MISSING    → [not] missing(L)
 ///   L [NOT] LIKE pat           → [not] like(L, pat)
 ///   L [NOT] CONTAINS sub       → ( index(L, sub) gt|eq 0 )
-/// ponytail: the left operand is captured as a FULL term by `popLeftOperand` —
+/// ponytail: the left operand is captured as a FULL term by `popLeftOperand` -
 /// a balanced function-call/parenthesized group (`lowcase(c)`, `substr(c,1,7)`)
 /// or a single column/literal/coalesced `t.c`. Right operands: LIKE pat and
 /// CONTAINS sub are FULL expressions via `scanOperand` (BUG-wherecontainslikeexpr
-/// — `like "&p"||'%'` used to drop everything past the first token, silently
+/// - `like "&p"||'%'` used to drop everything past the first token, silently
 /// matching ZERO rows); BETWEEN lo/hi are full expressions too, stopping at
-/// the top-level AND (BUG-wherebetweenexpr — Language Reference: Concepts p.221 "constants or
+/// the top-level AND (BUG-wherebetweenexpr - Language Reference: Concepts p.221 "constants or
 /// expressions": `between salary*0.30 and salary*0.50`).
 ///
 /// Pop one full left operand off the tail of `out` (in source order). A
 /// trailing `)` back-scans to its matching `(`, then swallows a preceding
-/// function-name identifier — so `lowcase ( c )` comes off whole, not just the
+/// function-name identifier - so `lowcase ( c )` comes off whole, not just the
 /// `)`. Otherwise the single tail token (column/literal/coalesced `t.c`).
 fn popLeftOperand(arena: std.mem.Allocator, diags: *diag.Diagnostics, out: *std.ArrayList(Token)) diag.Error![]const Token {
     if (out.items.len == 0)
@@ -2855,10 +2855,10 @@ fn popLeftOperand(arena: std.mem.Allocator, diags: *diag.Diagnostics, out: *std.
 /// CONTAINS substring; BETWEEN reuses it), advancing `j.*` past it: literals,
 /// names, `.`, arithmetic/concat operators and balanced (…) groups at any
 /// depth. A depth-0 boolean/comparison keyword, comma, `;` or a foreign `)`
-/// ENDS it — so `like "&p"||'%'` and `contains trim(a)` come through whole
+/// ENDS it - so `like "&p"||'%'` and `contains trim(a)` come through whole
 /// (Language Reference: Concepts p.223 "a SAS character expression", p.221 CONTAINS-with-TRIM).
 /// `allow_fn`=false rejects a `name (` call: p.223 forbids a SAS function in
-/// a LIKE pattern. Every failure reports via diags — never a bare ParseError.
+/// a LIKE pattern. Every failure reports via diags - never a bare ParseError.
 fn scanOperand(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const Token, j: *usize, op_line: usize, opname: []const u8, allow_fn: bool) diag.Error![]const Token {
     const start = j.*;
     var k = start;
@@ -2874,7 +2874,7 @@ fn scanOperand(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const
                 prev_name = false;
             },
             .rparen => {
-                if (depth == 0) break :scan; // closes an outer group — not ours
+                if (depth == 0) break :scan; // closes an outer group - not ours
                 depth -= 1;
                 prev_name = false;
             },
@@ -2895,7 +2895,7 @@ fn scanOperand(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const
     return try arena.dupe(Token, toks[start..k]);
 }
 
-/// scanOperand's WALK without the dupe/errors — the end index of the depth-0
+/// scanOperand's WALK without the dupe/errors - the end index of the depth-0
 /// operand starting at `start`. For validators that only need the extent
 /// (validateWhereCols' LIKE…ESCAPE check); keep the break set in sync with
 /// scanOperand.
@@ -2918,7 +2918,7 @@ fn operandEnd(toks: []const Token, start: usize) usize {
     return k;
 }
 
-/// True when toks[i] is `min`/`max` sitting BETWEEN two operands — the infix
+/// True when toks[i] is `min`/`max` sitting BETWEEN two operands - the infix
 /// MIN/MAX operator (Language Reference: Concepts p.225), never a column reference. Both neighbors
 /// must look like operand edges so `min > 3` (column) and `min(a,b)` (call)
 /// are untouched.
@@ -2961,7 +2961,7 @@ pub fn desugarPredicates(arena: std.mem.Allocator, diags: *diag.Diagnostics, tok
             }
             // GAP-wherelow-tick266: `IS` is ONLY `IS [NOT] NULL|MISSING`
             // (Language Reference: Concepts p.224). A bare `x is` used to desugar to missing(x) and
-            // `x is not` to not missing(x) — an incomplete statement completed
+            // `x is not` to not missing(x) - an incomplete statement completed
             // by guesswork (silent wrong filter). Fail loud instead (D-002).
             if (atKw(toks, j, "null") or atKw(toks, j, "missing")) {
                 j += 1;
@@ -3010,7 +3010,7 @@ pub fn desugarPredicates(arena: std.mem.Allocator, diags: *diag.Diagnostics, tok
                 // ref printed p.364) that we do not implement. It used to
                 // desugar the bare LIKE and leave `escape 'c'` in the stream,
                 // so `escape` was blamed as an unknown COLUMN the user never
-                // wrote, at rc 1. Honest gap instead: name the clause, rc 2 —
+                // wrote, at rc 1. Honest gap instead: name the clause, rc 2 -
                 // real SAS runs this clean (D-009/D-009b(i)).
                 if (atKw(toks, j, "escape")) {
                     diag.markGap();
@@ -3040,10 +3040,10 @@ pub fn desugarPredicates(arena: std.mem.Allocator, diags: *diag.Diagnostics, tok
 
 /// Row indices of `ds` whose `wtoks` predicate is true (SQL-predicate aware).
 /// Used by DELETE/UPDATE; no CALCULATED/CASE support (ponytail: add if a DML
-/// fixture needs it — SELECT's WHERE path already handles both).
+/// fixture needs it - SELECT's WHERE path already handles both).
 fn rowsMatching(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, ds: *Dataset, wtoks: []const Token, table: []const u8, alias: ?[]const u8) diag.Error![]const usize {
     // GAP-sqldmlwhere: DML WHERE gets the same unknown-column fail-loud as the
-    // SELECT path (BUG-sqlwhereunknown) — an unbound name must ERROR naming the
+    // SELECT path (BUG-sqlwhereunknown) - an unbound name must ERROR naming the
     // column, not bind to missing and silently match nothing/everything. DML
     // has no SELECT items, so any CALCULATED-style alias simply fails as an
     // unknown column (not SAS-legal in DML anyway).
@@ -3052,7 +3052,7 @@ fn rowsMatching(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostic
     var ev: eval.Evaluator = .{ .arena = arena, .pdv = &pdv, .diags = diags, .call_fn = &sqlDispatch };
     var kept: std.ArrayList(usize) = .empty;
     // EXISTS / NOT EXISTS or a correlated subquery in a DML WHERE must be resolved
-    // per row — mirror the SELECT-WHERE path (execQuery). The old code ran only
+    // per row - mirror the SELECT-WHERE path (execQuery). The old code ran only
     // substituteSubqueries, so a raw `exists(select …)` reached the parser as a
     // bare name → falsy → the DELETE/UPDATE matched zero rows (BUG-sqldmlexists).
     if (hasExists(wtoks) or hasCorrelatedSubq(wtoks, ds, table, alias)) {
@@ -3080,7 +3080,7 @@ fn rowsMatching(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostic
 fn execQuery(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, q_in: Query) diag.Error!?Result {
     var q = q_in;
     // GAP-sqlstataggs: unimplemented statistic aggregates (std/var/…) must not
-    // fall through to the per-row expression path (silent wrong numbers — see
+    // fall through to the per-row expression path (silent wrong numbers - see
     // statAggCall). ponytail: guards SELECT items + HAVING; a std() buried in a
     // CASE or ORDER BY expression still slips through.
     for (q.items) |it| {
@@ -3098,7 +3098,7 @@ fn execQuery(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
     // temp dataset, then aim the outer query at that name (BUG-sqlderivedtable).
     if (q.from_sub) |subtoks| {
         const res = (try execSelect(arena, lib, diags, subtoks)) orelse return null;
-        // Materialize under a UNIQUE internal name — NEVER the alias. Downstream alias
+        // Materialize under a UNIQUE internal name - NEVER the alias. Downstream alias
         // resolution assumes q.table (real dataset name) ≠ q.alias, exactly like
         // `from realtable as t`; reusing the alias as the table name made table==alias
         // and silently returned no rows (BUG-sqlderivedtable). q.alias stays as-is so
@@ -3116,7 +3116,7 @@ fn execQuery(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
     else if (lib.find(q.table)) |d|
         try withOptions(arena, diags, d, q.from_opts) // GH#33: apply from T(where=/keep=/…)
     else if (dictKind(q.table) != null)
-        // a `dictionary.*` / `sashelp.v*` introspection view — synthesized fresh
+        // a `dictionary.*` / `sashelp.v*` introspection view - synthesized fresh
         // from live library/macro state at query time (ISS-dictviews).
         try withOptions(arena, diags, (try synthDictView(arena, lib, q.table)) orelse return null, q.from_opts)
     else if (isUnsupportedDict(q.table)) {
@@ -3128,7 +3128,7 @@ fn execQuery(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
     };
 
     // `alias.*` / bare `*` items now expand against the resolved (possibly joined)
-    // dataset — each becomes a plain-column item (ISS-sqlaliasstar).
+    // dataset - each becomes a plain-column item (ISS-sqlaliasstar).
     q.items = try expandStars(arena, ds, q);
     // F7 FEEDBACK: capture the star-expanded statement for runStmt to echo.
     if (g_opts.feedback) g_feedback = try feedbackEcho(arena, ds, q);
@@ -3137,13 +3137,13 @@ fn execQuery(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
     // silently return 0 rows (BUG-sqlwhereunknown / BUG-sqlwherecalcagg).
     if (!(try validateWhereCols(diags, ds, q))) return null;
 
-    // An unqualified column present in >1 joined table is ambiguous — SAS errors;
+    // An unqualified column present in >1 joined table is ambiguous - SAS errors;
     // taking the first table silently corrupts a merge (a bare RIGHT/FULL join key
-    // then drops right-only rows to a missing key) — BUG-sqlambigcol.
+    // then drops right-only rows to a missing key) - BUG-sqlambigcol.
     if (!(try validateNoAmbiguity(diags, ds, q))) return null;
 
     // A summary function in WHERE is illegal in SAS ("Summary functions are not
-    // allowed in the WHERE clause." — aggregates belong in HAVING). Left alone, a
+    // allowed in the WHERE clause." - aggregates belong in HAVING). Left alone, a
     // single-arg sum/min/max/count/… was silently dispatched as the per-row
     // DATA-step function of the same name (max(v) → v, so `v >= max(v)` kept ALL
     // rows), dropping the filter entirely (BUG-sqlaggwherefilter). exprHasAgg skips
@@ -3158,7 +3158,7 @@ fn execQuery(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
         // PERF-sqlcorrsubq: the safe single-equality semi-join shape resolves via a
         // hash of the inner table built ONCE, O(N+M) instead of re-executing the
         // inner query per outer row (was O(N*M), 4.7 GB OOM). Bails (→ per-row loop)
-        // on any other shape — correctness first.
+        // on any other shape - correctness first.
         if (try trySemiJoin(arena, lib, diags, q, ds)) |ks| {
             kept = ks;
         } else {
@@ -3189,7 +3189,7 @@ fn execQuery(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
         const names = if (uses_calc) try itemNames(arena, q) else &.{};
         var pdv = Pdv.init(arena);
         var ev: eval.Evaluator = .{ .arena = arena, .pdv = &pdv, .diags = diags, .call_fn = &sqlDispatch };
-        // A CASE in the predicate is row-dependent, so it can't parse once — the
+        // A CASE in the predicate is row-dependent, so it can't parse once - the
         // parser_expr grammar has no CASE. When present, replace each CASE with its
         // per-row value, then parse/eval the resulting ordinary expression per row
         // (BUG-casewhere). Otherwise parse the condition once (the common path).
@@ -3214,26 +3214,26 @@ fn execQuery(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
     const has_agg = !q.star and blk: {
         for (q.items) |it| {
             if (it.agg != null) break :blk true;
-            // an aggregate nested in a compound expression or CASE still aggregates —
+            // an aggregate nested in a compound expression or CASE still aggregates -
             // route it through execGrouped, which resolves it over the group then
             // folds the outer expression once (BUG-sqlaggouter).
             if (it.expr_toks) |et| if (exprHasAgg(et)) break :blk true;
             if (it.case_toks) |ct| if (exprHasAgg(ct)) break :blk true;
         }
-        // an aggregate appearing ONLY in HAVING still makes this a summary query —
+        // an aggregate appearing ONLY in HAVING still makes this a summary query -
         // it must group/remerge, not pass through row-wise (BUG-sqlgroupnoagg).
         if (q.having) |h| if (exprHasAgg(h)) break :blk true;
         break :blk false;
     };
     var res = if (q.star and q.having != null)
         // `select * … having <agg cond>` needs GROUP BY+HAVING remerge, which the
-        // plain select* fast-path (ORDER BY only) skipped — it returned every row
+        // plain select* fast-path (ORDER BY only) skipped - it returned every row
         // (ISS-sqlremerge #37). Remerge is row-wise (one output row per surviving
         // detail row), so it is its own path, not execGrouped's group collapse.
         try execStarRemerge(arena, lib, ds, diags, q, kept.items)
     else if (q.star or !has_agg)
         // GROUP BY but no summary function anywhere (SELECT or HAVING): SAS treats
-        // the GROUP BY as an ORDER BY — every detail row, ordered by the group keys
+        // the GROUP BY as an ORDER BY - every detail row, ordered by the group keys
         // (BUG-sqlgroupnoagg). An explicit ORDER BY wins when present.
         try execRowWise(arena, lib, ds, diags, q, if (!has_agg and q.group_exprs.len != 0 and q.order.len == 0)
             try sortByGroupKeys(arena, diags, ds, q, kept.items)
@@ -3242,7 +3242,7 @@ fn execQuery(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
     else if (has_agg and try hasDetailCol(arena, q, ds))
         // SAS remerge: a select that mixes an aggregate with a bare non-group
         // detail column broadcasts each group's aggregate across every detail row
-        // of that group, so the result has one row per input row — not the single
+        // of that group, so the result has one row per input row - not the single
         // collapsed group row execGrouped emits. Covers both the no-GROUP-BY case
         // (whole table = one group, BUG-sqlremergedetail) and the GROUP BY case
         // (per-group broadcast, BUG-sqlgroupremerge).
@@ -3256,8 +3256,8 @@ fn execQuery(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
 /// Hash + eql context for a row tuple → membership set (PERF-sqldistinct). eql
 /// delegates to `rowEq` so dedup semantics can't drift from the linear scan;
 /// `hash` agrees with it: equal rows hash equal. Canonicalizations matching
-/// `cmpVal` — missings bucket by special-missing rank (.A ≠ ., BUG-sqlmissdistinct),
-/// -0.0 → +0.0, char trailing blanks insignificant — plus a per-cell type tag so
+/// `cmpVal` - missings bucket by special-missing rank (.A ≠ ., BUG-sqlmissdistinct),
+/// -0.0 → +0.0, char trailing blanks insignificant - plus a per-cell type tag so
 /// a numeric and a char cell differ.
 const RowKeyCtx = struct {
     pub fn hash(_: RowKeyCtx, key: []const Value) u64 {
@@ -3320,19 +3320,19 @@ fn distinctFirst(arena: std.mem.Allocator, seen: *DistinctSet, v: Value) !bool {
     const probe = [_]Value{v};
     const gop = try seen.getOrPutContext(arena, &probe, .{});
     if (gop.found_existing) return false;
-    gop.key_ptr.* = try arena.dupe(Value, &probe); // probe is a stack temp — stabilize the stored key
+    gop.key_ptr.* = try arena.dupe(Value, &probe); // probe is a stack temp - stabilize the stored key
     return true;
 }
 
 /// The GROUP-CONSTANT half of a HAVING predicate: `calculated` rewound, scalar
 /// subqueries collapsed, predicates desugared, and every aggregate replaced by
-/// its value over `grp`. Depends only on the group, never on one row — which is
+/// its value over `grp`. Depends only on the group, never on one row - which is
 /// why the remerge paths can prepare it once per group and re-run only the
 /// per-row half (PERF-sqlremergeagg); evalHaving is prepare+evaluate in one call.
 fn havingPrepare(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, ds: *Dataset, htoks: []const Token, grp: []const usize) diag.Error![]const Token {
     const bare = try removeCalculated(arena, htoks); // `calculated alias` → the bound alias (BUG-calcwhere)
-    // Collapse any `(select …)` scalar subquery to its value FIRST — same helper the
-    // WHERE path uses — so `having sum(v) > (select avg(v) from t)` parses instead of
+    // Collapse any `(select …)` scalar subquery to its value FIRST - same helper the
+    // WHERE path uses - so `having sum(v) > (select avg(v) from t)` parses instead of
     // choking on the inner SELECT and silently keeping every group (BUG-sqlhavingsubq).
     const nosubq = try substituteSubqueries(arena, lib, diags, bare, null);
     // IS [NOT] NULL|MISSING (and BETWEEN/LIKE/CONTAINS) → function form through the
@@ -3347,7 +3347,7 @@ fn havingPrepare(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnosti
 /// The PER-ROW half of a HAVING predicate: bind one row (and its SELECT cells)
 /// into a PDV, then parse and evaluate the prepared predicate against it.
 /// `grp_len == 0` (zero-row table, no GROUP BY): no rep row exists to load;
-/// HAVING still runs — its aggregates resolved over the empty set (BUG-sqlemptyaggexpr).
+/// HAVING still runs - its aggregates resolved over the empty set (BUG-sqlemptyaggexpr).
 fn evalHavingPrepared(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Dataset, pre: []const Token, rep: usize, grp_len: usize, cols: []const OutCol, cells: []const Value) diag.Error!bool {
     var pdv = Pdv.init(arena);
     if (grp_len > 0) try loadForEval(&pdv, ds, ds.row(rep)); // group key columns are constant within the group
@@ -3355,14 +3355,14 @@ fn evalHavingPrepared(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *D
     // The VALUE's type governs, not the column's declared one: HAVING runs INSIDE
     // the grouped/remerge row loop, i.e. before retypeComputed has corrected a
     // computed column's declared type, so trusting `c.type` here bound a `.str`
-    // cell to a `.num` var and pdv.setAt converted it to MISSING — `having` on a
+    // cell to a `.num` var and pdv.setAt converted it to MISSING - `having` on a
     // char computed alias always failed (BUG-sqlremergecharcol). Matches how the
     // two `calculated` binds in execGrouped/execRemerge already do it.
     for (cols, cells) |c, v| try bindCol(&pdv, c.name, if (v == .num) .num else .char, c.len, v);
     var ev: eval.Evaluator = .{ .arena = arena, .pdv = &pdv, .diags = diags, .call_fn = &sqlDispatch };
     const resolved = try substituteCase(arena, diags, &ev, pre); // any CASE → its value (BUG-havingcase)
     var wp = pe.Parser.init(arena, try withEof(arena, resolved), diags);
-    const cond = try wp.parseExpr(); // fail loud on a genuinely unparseable HAVING (was `catch return true` — hid wrong output)
+    const cond = try wp.parseExpr(); // fail loud on a genuinely unparseable HAVING (was `catch return true` - hid wrong output)
     return (try ev.eval(cond)).truthy();
 }
 
@@ -3383,7 +3383,7 @@ fn substituteAggs(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Datas
         if (aggAt(toks, i)) |f| {
             var j = i + 2;
             const distinct = atKw(toks, j, "distinct");
-            if (distinct) j += 1; // `count(distinct …)` — skip the keyword
+            if (distinct) j += 1; // `count(distinct …)` - skip the keyword
             // Capture the whole argument span up to the matching ')', tracking paren
             // depth so a compound expression like sum(price*qty) is aggregated as a
             // unit rather than just its first column (BUG-sqlaggexpr).
@@ -3421,20 +3421,20 @@ fn substituteAggs(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Datas
 /// first operand (BUG-sqlaggexpr). MIN/MAX use a generic (numeric-or-character)
 /// compare; COUNT skips missing and honours DISTINCT; SUM/AVG coerce to numeric.
 fn computeAggExpr(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Dataset, f: AggFn, arg: []const Token, grp: []const usize, distinct: bool) diag.Error!Value {
-    // BUG-sqlnestedagg: an aggregate's ARGUMENT may not itself contain an aggregate —
+    // BUG-sqlnestedagg: an aggregate's ARGUMENT may not itself contain an aggregate -
     // SAS errors "Summary functions nested in this fashion are not supported." This is
     // the sole compound-argument path (bare col/`*` never nest); the old code ran
     // `max(v)` per row (= v) then summed, silently flattening to a wrong number.
-    // exprHasAgg skips a nested `(select …)` — its aggregates are its own.
+    // exprHasAgg skips a nested `(select …)` - its aggregates are its own.
     if (exprHasAgg(arg))
         return diags.fail(error.ParseError, if (arg.len > 0) arg[0].line else 0, "PROC SQL: Summary functions nested in this fashion are not supported.", .{});
     const vals = try arena.alloc(Value, grp.len);
     // `sum(case when … end)` (or any aggregate over a CASE): the DATA-step expression
-    // parser can't parse SQL CASE — evaluate it per row through the SQL CASE evaluator,
+    // parser can't parse SQL CASE - evaluate it per row through the SQL CASE evaluator,
     // then fold (BUG-sqlsumcase; the old path returned missing / could null-unwrap).
     if (arg.len >= 2 and tkKw(arg[0], "case") and isPureCase(arg)) {
         const inner = arg[1 .. arg.len - 1]; // tokens between `case` and `end`
-        // BUG-sqlcasesubquery: checked BEFORE the fold, not inside it — the per-row
+        // BUG-sqlcasesubquery: checked BEFORE the fold, not inside it - the per-row
         // `catch Value.missing` below would otherwise fold missings into a plausible
         // aggregate and print it ahead of the diagnostic (TODO-sqlcasesubqagg: the
         // aggregate path has no Library to resolve the subquery with).
@@ -3464,7 +3464,7 @@ fn computeAggExpr(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Datas
     }
     if (f == .count or f == .n or f == .nmiss) {
         var n: usize = 0; // count of NON-missing (distinct applies only to COUNT)
-        var seen: DistinctSet = .empty; // COUNT(DISTINCT) membership — O(1)/row (PERF-sqlcountdistinct)
+        var seen: DistinctSet = .empty; // COUNT(DISTINCT) membership - O(1)/row (PERF-sqlcountdistinct)
         for (vals) |v| {
             if (aggMissing(v)) continue;
             if (distinct and f == .count and !(try distinctFirst(arena, &seen, v))) continue;
@@ -3485,14 +3485,14 @@ fn computeAggExpr(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Datas
         return best orelse Value.missing;
     }
     // BUG-sqlsumwgtcharzero: character-argument guard for the EXPRESSION path
-    // (e.g. sumwgt(upcase(b))) — an expression has no declared type, so test the
+    // (e.g. sumwgt(upcase(b))) - an expression has no declared type, so test the
     // evaluated values: any .str means the argument resolves character, which
     // SAS rejects for every aggregate still live below (SUM/AVG + the isStatAgg
     // set; COUNT/N/NMISS and MIN/MAX returned above and stay type-agnostic).
     // An all-missing NUMERIC expression is .num-NaN throughout and passes
     // untouched, so the SUMWGT=0 all-missing pins are unaffected.
     // ponytail: a zero-row group evaluates nothing, so a char expression over an
-    // EMPTY table slips past — detecting that needs static expression typing.
+    // EMPTY table slips past - detecting that needs static expression typing.
     for (vals) |v|
         if (v == .str)
             return diags.fail(error.ParseError, if (arg.len > 0) arg[0].line else 0, "PROC SQL: summary function {s} requires a numeric argument", .{aggName(f)});
@@ -3509,7 +3509,7 @@ fn computeAggExpr(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Datas
     }
     var cnt: usize = 0;
     var sum: f64 = 0;
-    var seen: DistinctSet = .empty; // SUM/AVG(DISTINCT) dedup — same membership as COUNT(DISTINCT) (BUG-sqldistinctagg)
+    var seen: DistinctSet = .empty; // SUM/AVG(DISTINCT) dedup - same membership as COUNT(DISTINCT) (BUG-sqldistinctagg)
     for (vals) |v| {
         const x = toNum(v);
         if (std.math.isNan(x)) continue;
@@ -3529,20 +3529,20 @@ fn computeAggExpr(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Datas
 /// Build the joined table for `T1 [inner|left] join T2 on <cond>`: a dataset
 /// whose columns are qualified `T1.col` / `T2.col`. A nested loop pairs rows and
 /// keeps those satisfying ON; a LEFT join also keeps each unmatched T1 row with
-/// missing T2 columns. ponytail: O(n·m) nested loop — fine for corpus sizes.
+/// missing T2 columns. ponytail: O(n·m) nested loop - fine for corpus sizes.
 /// Build the joined table for `T1 <join>*`. Start from a qualified copy of T1,
 /// then fold each JoinStep in (cross = Cartesian, inner = ON-matching pairs, left
 /// = also unmatched left rows with missing right columns). Columns end up
-/// qualified `Table.col`. ponytail: O(product) nested loops — fine for corpus sizes.
+/// qualified `Table.col`. ponytail: O(product) nested loops - fine for corpus sizes.
 /// PERF-sqlcommajoin: a comma (cross) step whose equijoin predicate sits in the
-/// query WHERE (`from a, b, c where a.k=b.k and b.k=c.k`) — pick the top-level
+/// query WHERE (`from a, b, c where a.k=b.k and b.k=c.k`) - pick the top-level
 /// `col = col` conjuncts that link the accumulated left side with THIS step's
 /// table and return them as a synthetic ON, so joinTwo's hash fast path runs
 /// instead of materializing the cartesian product (O(∏N) time+RAM). The full
 /// WHERE still filters afterward, so the result rows are unchanged. Null →
 /// nothing links this step (a real cross join) → the nested loop, as before.
 fn commaStepOn(arena: std.mem.Allocator, acc: *Dataset, t2: *Dataset, t2q: []const u8, wtoks: []const Token) diag.Error!?[]const Token {
-    if (hasCase(wtoks)) return null; // `and` inside CASE…WHEN is not a top-level conjunct — bail
+    if (hasCase(wtoks)) return null; // `and` inside CASE…WHEN is not a top-level conjunct - bail
     var on: std.ArrayList(Token) = .empty;
     var depth: usize = 0;
     var start: usize = 0;
@@ -3581,7 +3581,7 @@ fn commaStepOn(arena: std.mem.Allocator, acc: *Dataset, t2: *Dataset, t2q: []con
         if (conj[1].tag != .eq and !tkKw(conj[1], "eq")) continue;
         // Same acceptance as extractEqKeys: exactly one side in acc, the other
         // in t2, matching column types (a char=num pair coerces in eval but
-        // never shares a hash key — leave it to the loop).
+        // never shares a hash key - leave it to the loop).
         const l_acc = resolveCol(acc, conj[0].text);
         const r_acc = resolveCol(acc, conj[2].text);
         const l_t2 = t2ColOf(t2, t2q, conj[0].text);
@@ -3609,7 +3609,7 @@ fn buildJoin(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
     }, t1opts); // GH#33: apply the FROM table's dataset options before joining
     var acc = try arena.create(Dataset);
     acc.* = Dataset.init(arena, "_join");
-    // An alias hides the table name — qualify columns by it so `x.col` resolves
+    // An alias hides the table name - qualify columns by it so `x.col` resolves
     // and a self-join's two sides get distinct qualifiers (BUG-sqljoinalias).
     const t1q = t1alias orelse t1name;
     for (t1.columns.items) |c| _ = try acc.addColumnLike(try qualify(arena, t1q, c.name), c); // GH#49: keep format
@@ -3630,7 +3630,7 @@ fn buildJoin(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
             if (isUnsupportedDict(step.table)) unsupportedDict(arena, step.table) else unsupported("PROC SQL: JOIN table not found");
             return null;
         }, step.opts); // GH#33: apply the joined table's dataset options
-        // PERF-sqlcommajoin: a comma step has no ON — push the top-level
+        // PERF-sqlcommajoin: a comma step has no ON - push the top-level
         // `col = col` WHERE conjuncts linking the accumulated left side with
         // this step's table into a synthetic ON so joinTwo's hash fast path
         // runs instead of materializing the cartesian product.
@@ -3645,7 +3645,7 @@ fn buildJoin(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
 /// Parse a span that is supposed to be ONE WHOLE predicate and REFUSE a
 /// leftover tail. `pe.Parser.parseExpr` consumes exactly one expression and, by
 /// its documented contract, leaves the cursor on the first token it could not
-/// use — it never reports that it stopped early. So a predicate whose tail uses
+/// use - it never reports that it stopped early. So a predicate whose tail uses
 /// an operator we do not understand was silently TRUNCATED to its parsable
 /// head, and a bare column head is ALWAYS TRUTHY: `on a.x between b.lo and
 /// b.hi` became `on a.x`, i.e. the full cartesian product at rc 0
@@ -3653,7 +3653,7 @@ fn buildJoin(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, 
 /// defect, so the tail is now loud. rc 2, not 1: `ON sql-expression`
 /// (joined-table Component, printed p.373 / pdf 389) admits every operator in
 /// Table 8.2 "Operators and Order of Evaluation" (printed p.403 / pdf 419), so
-/// a tail we cannot consume is legal SAS that opensas has not implemented —
+/// a tail we cannot consume is legal SAS that opensas has not implemented -
 /// D-009/D-009b(i). Null = already reported; the caller abandons the statement.
 /// ponytail: only the JOIN ON site calls this today. The WHERE/HAVING spans run
 /// the same `parseExpr`-over-a-span shape and deserve the same guard, but they
@@ -3668,10 +3668,10 @@ fn parseWholeSpan(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []co
     const tail = p.peek();
     if (tail.tag != .eof) {
         // A punctuation token carries no `text` (`?` lexes as `.question` with
-        // an empty string), and `unconsumed token ``` names nothing — fall back
+        // an empty string), and `unconsumed token ``` names nothing - fall back
         // to the tag so the message always identifies the offender.
         const shown = if (tail.text.len > 0) tail.text else @tagName(tail.tag);
-        unsupported(try std.fmt.allocPrint(arena, "PROC SQL: {s}: unconsumed token `{s}` (line {d}) — refusing a TRUNCATED predicate, which would silently match the wrong rows (a full sql-expression is required: SQL Procedure Components printed p.403 / pdf 419)", .{ what, shown, tail.line }));
+        unsupported(try std.fmt.allocPrint(arena, "PROC SQL: {s}: unconsumed token `{s}` (line {d}) - refusing a TRUNCATED predicate, which would silently match the wrong rows (a full sql-expression is required: SQL Procedure Components printed p.403 / pdf 419)", .{ what, shown, tail.line }));
         return null;
     }
     return e;
@@ -3690,11 +3690,11 @@ fn joinTwo(arena: std.mem.Allocator, diags: *diag.Diagnostics, acc: *Dataset, st
     // BUG-sqlonpredicates (GH#18): the ON span never went through
     // desugarPredicates, so every SQL-only predicate in it (BETWEEN, LIKE,
     // CONTAINS, IS [NOT] NULL/MISSING) reached the expression parser raw and was
-    // truncated away at rc 0 — over-matching (BETWEEN → cartesian product) and
+    // truncated away at rc 0 - over-matching (BETWEEN → cartesian product) and
     // under-matching (LIKE/CONTAINS/IS NOT NULL → zero rows) in the same bug.
-    // `ON sql-expression` is the SAME grammar as WHERE and HAVING — "IS NULL and
+    // `ON sql-expression` is the SAME grammar as WHERE and HAVING - "IS NULL and
     // IS MISSING are used in the WHERE, ON, and HAVING expressions" (IS
-    // Operator, SQL Procedure Components printed p.372 / pdf 388) — so it
+    // Operator, SQL Procedure Components printed p.372 / pdf 388) - so it
     // desugars through the ONE shared helper the other eight sites already use
     // rather than growing a second, drifting copy.
     const oncond = if (step.on) |ot|
@@ -3766,12 +3766,12 @@ fn joinTwo(arena: std.mem.Allocator, diags: *diag.Diagnostics, acc: *Dataset, st
             if (oncond) |cond| {
                 try loadForEval(&pdv, acc, r1);
                 for (t2.columns.items, 0..) |c, j| {
-                    // joined's schema already holds the qualified name — reuse it;
+                    // joined's schema already holds the qualified name - reuse it;
                     // an allocPrint here ran once per PAIR and OOMed (BUG-sqljoinoom)
                     const nm = joined.columns.items[n1 + j].name;
                     try bindCol(&pdv, nm, c.type, c.len, r2[j]);
                     // Pass the QUALIFIED nm so aliasUnqualified defines the bare
-                    // name too — an unqualified joined-col ref in ON (`d>lo`) must
+                    // name too - an unqualified joined-col ref in ON (`d>lo`) must
                     // resolve, not read missing (BUG-sqljoinunqual).
                     try aliasUnqualified(&pdv, nm, c.type, c.len, r2[j]);
                 }
@@ -3876,7 +3876,7 @@ fn resolveCol(ds: *Dataset, name: []const u8) ?usize {
     if (ds.indexOf(name)) |j| return j;
     for (ds.columns.items, 0..) |c, j| if (eqi(unqualify(c.name), name)) return j;
     // A `qualifier.col` lookup (e.g. `t.g`) against an UNqualified column resolves on
-    // the bare name — the single-source case: `from x as t` and derived tables store
+    // the bare name - the single-source case: `from x as t` and derived tables store
     // columns unqualified, so `t.g` never matched (BUG-sqlqualcol). Restricted to
     // dot-free columns so a JOIN's qualified columns (`a.g`/`b.g`) are never
     // cross-matched by the wrong qualifier.
@@ -3888,14 +3888,14 @@ fn resolveCol(ds: *Dataset, name: []const u8) ?usize {
 }
 
 /// The SAS "columns were not found" ERROR for a SELECT/CREATE-AS column that
-/// resolved to nothing — recorded so the failure is the precise SAS message,
+/// resolved to nothing - recorded so the failure is the precise SAS message,
 /// not main.zig's generic "unreported error" fallback (BUG-sqlupdatedropcol).
 fn colNotFound(diags: *diag.Diagnostics, name: []const u8) diag.Error {
     return diags.fail(error.ParseError, 0, "PROC SQL: the following columns were not found in the contributing tables: {s}", .{unqualify(name)});
 }
 
 /// Bind one value into the PDV under `name`, CARRYING the column's declared char
-/// width — BUG-sqlcolwidthloss. Every SQL bind goes through here; the row loader
+/// width - BUG-sqlcolwidthloss. Every SQL bind goes through here; the row loader
 /// used to `define(name, type)` and drop `len`, so LENGTHC/VLENGTH inside PROC SQL
 /// read the VALUE's byte count where the DATA step reads the STORAGE length:
 /// `lengthc(b)` was 2 in PROC SQL and 4 in a DATA step for the same `$4` column
@@ -3904,23 +3904,23 @@ fn colNotFound(diags: *diag.Diagnostics, name: []const u8) diag.Error {
 /// SQL Procedure User's Guide, printed p.37 ("Specifying Column Attributes"),
 /// lists LENGTH= as one of four column attributes and settles the default:
 /// "If you do not specify these attributes, then PROC SQL uses attributes that
-/// are already saved in the table" — so a column keeps its saved width. opensas
+/// are already saved in the table" - so a column keeps its saved width. opensas
 /// stores char values UNPADDED (EPIC-charfixedwidth deferred) where SAS pads to
 /// the declared length (printed p.362, BTRIM note: a length-10 variable holding
 /// `xxabcxx` is stored "with three blanks after the last x"), so the width rides
-/// along as the PDV var's `len` — exactly as the DATA step's SET loader carries a
+/// along as the PDV var's `len` - exactly as the DATA step's SET loader carries a
 /// source column's width (exec.seedColumnsOf, BUG-vlength).
 ///
 /// The bind is AUTHORITATIVE: a null width CLEARS a width an earlier bind of this
 /// name set, because the only way one name gets two widths in one scan is an
-/// aliased computed item shadowing a same-named source column — and there the
+/// aliased computed item shadowing a same-named source column - and there the
 /// expression governs, not the column. Leaving the column's width in place would
 /// make `pdv.setAt` silently TRUNCATE the computed value a `calculated` reference
 /// then reads.
 ///
 /// ponytail: char only. A numeric `Column.len` is the NUMLEN byte-length (GH#59),
 /// whose PDV twin is `numlen` and whose store-side effect is bit-truncation of the
-/// double (GH#46) — carrying it would change numeric VALUES, which no reported
+/// double (GH#46) - carrying it would change numeric VALUES, which no reported
 /// symptom asks for. Wire it when a fixture needs SQL to honour numeric LENGTH.
 fn bindCol(pdv: *Pdv, name: []const u8, ty: VarType, len: ?usize, v: Value) !void {
     const i = try pdv.define(name, ty);
@@ -3928,12 +3928,12 @@ fn bindCol(pdv: *Pdv, name: []const u8, ty: VarType, len: ?usize, v: Value) !voi
     try pdv.set(name, v);
 }
 
-/// A pass-through column's output descriptor: `select col` — even `col as alias`,
-/// even `*` — carries EVERY attribute already saved on the source column: the
+/// A pass-through column's output descriptor: `select col` - even `col as alias`,
+/// even `*` - carries EVERY attribute already saved on the source column: the
 /// attached format/informat/label (GH#49) and the declared LENGTH (p.37 again,
 /// BUG-sqlcolwidthloss). A computed/aggregate/CASE/literal item is NOT a
 /// pass-through and gets none of them: this volume assigns no width to a derived
-/// column, so none is invented (DOC-SILENT — the width then falls back to the
+/// column, so none is invented (DOC-SILENT - the width then falls back to the
 /// data-derived one, unchanged from before). An explicit SELECT `length=n` still
 /// overrides, via applyItemMods (p.368, LENGTH= column-modifier).
 fn passCol(name: []const u8, c: Column) OutCol {
@@ -3948,7 +3948,7 @@ fn loadForEval(pdv: *Pdv, ds: *Dataset, row: []const Value) !void {
 
 /// As loadForEval, but a single-table column `col` also answers to `<alias>.col`
 /// (the query's `from T alias`), so a correlated subquery's own `alias.col`
-/// references resolve — BUG-sqlcorrscalar.
+/// references resolve - BUG-sqlcorrscalar.
 fn loadForEvalAlias(pdv: *Pdv, ds: *Dataset, row: []const Value, alias: ?[]const u8) !void {
     for (ds.columns.items, 0..) |c, j| {
         try bindCol(pdv, c.name, c.type, c.len, row[j]);
@@ -4000,17 +4000,17 @@ fn substituteSubqueries(arena: std.mem.Allocator, lib: *Library, diags: *diag.Di
         const orig_inner = toks[i + 1 .. j];
         // A correlated subquery references the outer row and resolves per row; a
         // duplicate inner key there is first-match-wins (pinned: sql_corr_scalarsel),
-        // NOT a cardinality error — so the >1-row scalar guard applies only when the
+        // NOT a cardinality error - so the >1-row scalar guard applies only when the
         // subquery is NOT correlated to the current outer context (BUG-sqlscalarsubqcard).
         const correlated = if (corr) |c| subqRefsOuter(orig_inner, c) else false;
         const inner = if (corr) |c| try correlateSubq(arena, orig_inner, c.ds, c.ri, c.table, c.alias) else orig_inner;
         const sq = parseQuery(arena, inner) catch {
-            try out.append(arena, toks[i]); // not a real subquery — leave the '(' be
+            try out.append(arena, toks[i]); // not a real subquery - leave the '(' be
             i += 1;
             continue;
         };
         const res = (try execQuery(arena, lib, diags, sq)) orelse return error.ParseError;
-        // GAP-sqladvanced: `L <cmp> ANY|SOME|ALL (select …)` — a quantified
+        // GAP-sqladvanced: `L <cmp> ANY|SOME|ALL (select …)` - a quantified
         // comparison. The subquery may return MANY rows; collapse per SQL rules.
         if (quantPattern(out.items)) |qp| {
             try collapseQuantified(arena, &out, qp, res, toks[i].line, diags);
@@ -4027,7 +4027,7 @@ fn substituteSubqueries(arena: std.mem.Allocator, lib: *Library, diags: *diag.Di
             }
             try out.append(arena, .{ .tag = .rparen });
         } else {
-            // BUG-sqlscalarsubqcard: a scalar subquery must return at most one row —
+            // BUG-sqlscalarsubqcard: a scalar subquery must return at most one row -
             // SAS aborts otherwise; silently taking the first row is wrong.
             if (!correlated and res.rows.len > 1)
                 return diags.fail(error.ParseError, toks[i].line, "PROC SQL: subquery evaluated to more than one row (or more than one value)", .{});
@@ -4067,7 +4067,7 @@ fn quantCmpOf(tok: Token) ?QuantCmp {
 
 const QuantPat = struct { cmp: QuantCmp, all: bool };
 
-/// The tail of `out` is `<cmp> ANY|SOME|ALL` — the keyword immediately before a
+/// The tail of `out` is `<cmp> ANY|SOME|ALL` - the keyword immediately before a
 /// `(select …)` is unambiguously the quantifier (a column ref can't precede a
 /// paren unless it's a call, and ANY/ALL take no argument list).
 fn quantPattern(items: []const Token) ?QuantPat {
@@ -4079,11 +4079,11 @@ fn quantPattern(items: []const Token) ?QuantPat {
 }
 
 /// Collapse a quantified comparison whose subquery yielded `res` (GAP-sqladvanced):
-///   `= ANY` ⇔ IN, `<> ALL` ⇔ NOT IN — reuse the IN-predicate token shape;
-///   `L > ANY S` ⇔ `L > min(S)`, `L <= ALL S` ⇔ `L <= max(S)` etc. — the whole
+///   `= ANY` ⇔ IN, `<> ALL` ⇔ NOT IN - reuse the IN-predicate token shape;
+///   `L > ANY S` ⇔ `L > min(S)`, `L <= ALL S` ⇔ `L <= max(S)` etc. - the whole
 ///   comparison reduces to ONE bound value (SAS ordering, missing sorts low), so
 ///   the comparison operator stays and only the keyword becomes the bound literal.
-/// Empty set: ANY→false, ALL→true per SQL — the predicate becomes `L ne|eq L`.
+/// Empty set: ANY→false, ALL→true per SQL - the predicate becomes `L ne|eq L`.
 fn collapseQuantified(arena: std.mem.Allocator, out: *std.ArrayList(Token), qp: QuantPat, res: Result, line: usize, diags: *diag.Diagnostics) diag.Error!void {
     if (res.cols.len > 1)
         return diags.fail(error.ParseError, line, "PROC SQL: the subquery of an ANY/ALL comparison may have only one column", .{});
@@ -4100,7 +4100,7 @@ fn collapseQuantified(arena: std.mem.Allocator, out: *std.ArrayList(Token), qp: 
         try out.append(arena, synTok(.rparen, ")"));
         return;
     }
-    if (qp.cmp == .eq or qp.cmp == .ne) // `= ALL` / `<> ANY` — fail loud, never silently wrong
+    if (qp.cmp == .eq or qp.cmp == .ne) // `= ALL` / `<> ANY` - fail loud, never silently wrong
         return diags.fail(error.ParseError, line, "PROC SQL: {s} {s} quantified comparison is not supported (use {s})", .{
             if (qp.cmp == .eq) "=" else "<>",
             if (qp.all) "ALL" else "ANY",
@@ -4118,12 +4118,12 @@ fn collapseQuantified(arena: std.mem.Allocator, out: *std.ArrayList(Token), qp: 
 }
 
 /// Empty quantified set: `L op ANY ()` is FALSE, `L op ALL ()` TRUE (SQL).
-/// Rewrite the whole predicate to `L ne L` / `L eq L` — constant and
+/// Rewrite the whole predicate to `L ne L` / `L eq L` - constant and
 /// type-agnostic (even missing equals itself in SAS).
 fn rewriteQuantEmpty(arena: std.mem.Allocator, diags: *diag.Diagnostics, out: *std.ArrayList(Token), all: bool) diag.Error!void {
     out.shrinkRetainingCapacity(out.items.len - 2); // drop the cmp op + ANY/ALL keyword
     // ponytail: popLeftOperand takes a SINGLE operand (a compound `a+b` LHS keeps
-    // `a+`) — same accepted ceiling as the BETWEEN desugar above.
+    // `a+`) - same accepted ceiling as the BETWEEN desugar above.
     const L = try popLeftOperand(arena, diags, out);
     try appendAll(arena, out, L);
     try out.append(arena, synName(if (all) "eq" else "ne"));
@@ -4136,7 +4136,7 @@ fn hasExists(toks: []const Token) bool {
 }
 
 /// True when the subquery body `inner` references the outer row via a qualified
-/// `<outer_table>.col` / `<outer_alias>.col` — i.e. it is correlated to `corr`.
+/// `<outer_table>.col` / `<outer_alias>.col` - i.e. it is correlated to `corr`.
 fn subqRefsOuter(inner: []const Token, corr: RowCtx) bool {
     for (inner) |tk| {
         if (tk.tag != .name) continue;
@@ -4153,7 +4153,7 @@ fn hasSubquery(toks: []const Token) bool {
 }
 
 /// True when some `(select …)` in `toks` references an `<outer_table>.col` or
-/// `<outer_alias>.col` (a correlated subquery), so it must run per outer row —
+/// `<outer_alias>.col` (a correlated subquery), so it must run per outer row -
 /// BUG-sqlcorrscalar.
 fn hasCorrelatedSubq(toks: []const Token, ds: *Dataset, outer_table: []const u8, outer_alias: ?[]const u8) bool {
     var i: usize = 0;
@@ -4200,14 +4200,14 @@ fn classifyRef(text: []const u8, q: Query, iq: Query, ds: *Dataset, itbl: *Datas
 /// PERF-sqlcorrsubq fast path. Recognizes a correlated WHERE that is a single
 /// equality semi-join and resolves it by building the inner table's key-set ONCE
 /// (reusing `appendJoinKey`'s eval.cmp-equal canonical bytes), then probing each
-/// outer row — O(N+M) time/mem instead of re-executing the inner query per outer
+/// outer row - O(N+M) time/mem instead of re-executing the inner query per outer
 /// row (O(N*M), the 4.7 GB OOM). Returns the kept row indices, or null to BAIL to
 /// the correct per-row loop.
 ///
 /// Fast path ONLY for these EXACT shapes (whole WHERE, nothing else):
 ///   `<outer.ocol> [NOT] IN (select <inner.icol> from <itbl> where <i.icol> = <o.ocol>)`
 ///   `[NOT] EXISTS (select * from <itbl> [as a] where <i.icol> = <o.ocol>)`
-/// BAIL (return null) on ANYTHING else — conservative, correctness first:
+/// BAIL (return null) on ANYTHING else - conservative, correctness first:
 ///   • extra outer WHERE terms (AND/OR, trailing tokens after the subquery ')')
 ///   • inner WHERE not exactly `ref = ref`, or either operand unqualified
 ///   • not exactly one inner-qualified + one outer-qualified correlation operand
@@ -4303,7 +4303,7 @@ fn trySemiJoin(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics
     return kept;
 }
 
-/// The resolved pieces of a plain correlated scalar subquery in a SELECT list —
+/// The resolved pieces of a plain correlated scalar subquery in a SELECT list -
 /// `(select <selcol> from <itbl> where <corr_icol> = <outer.ocol>)` (PERF-sqlcorrsubqsel).
 /// When `agg` is set it is the AGGREGATE sibling (PERF-sqlcorrsubqsel-agg):
 /// `(select <agg>(<agg_col>) from <itbl> where <corr_icol> = <outer.ocol>)`.
@@ -4328,7 +4328,7 @@ const IneqShape = struct { icol: usize, ocol: usize, op: lex.Tag };
 /// A prebuilt scalar-subquery lookup for one SELECT item: outer.eq_ocols key → the
 /// inner value (FIRST matching row for a plain select, or the per-key aggregate
 /// fold for an aggregate select). A key absent from the map → `miss` (missing for
-/// a plain select; the empty-group fold — 0 for count/n, else missing — for an
+/// a plain select; the empty-group fold - 0 for count/n, else missing - for an
 /// aggregate), mirroring a no-match inner subquery's single-row result.
 const ScalarSel = struct {
     map: std.StringHashMapUnmanaged(Value),
@@ -4344,7 +4344,7 @@ const IneqSel = struct {
     bmap: std.StringHashMapUnmanaged(IneqBucket),
     ocol: usize, // outer threshold column
     op: lex.Tag, // .lt/.le/.gt/.ge, normalized to `inner OP outer`
-    f: AggFn, // .count/.min/.max only — sum/avg would reorder the f64 additions the
+    f: AggFn, // .count/.min/.max only - sum/avg would reorder the f64 additions the
     // per-row path performs in table order (prefix sums over sorted values differ in
     // the last ulp → NOT byte-identical), so they stay on the per-row fallback.
     star: bool, // count(*)
@@ -4357,7 +4357,7 @@ const IneqBucket = struct {
 };
 const IneqPair = struct { v: f64, w: usize };
 
-/// cmpNum on raw f64 — SAS order: missings below every number, ranked among
+/// cmpNum on raw f64 - SAS order: missings below every number, ranked among
 /// themselves (._ < . < .A < … < .Z); -0 == +0. Mirrors eval.cmpNum exactly so the
 /// sorted bucket answers the same set the per-row path's WHERE would pass.
 fn cmpNumF(a: f64, b: f64) std.math.Order {
@@ -4403,13 +4403,13 @@ fn upperBoundF(vals: []const f64, thr: f64) usize {
 /// Probe one sorted bucket with outer threshold `t`: count / min / max over the
 /// inner inequality values `v` with `v OP t`, byte-identical to the per-row path's
 /// computeAgg fold over the filtered bucket rows. A NaN `t` is normalized to plain
-/// `.` — the per-row path substitutes the outer value via valueToken, which
+/// `.` - the per-row path substitutes the outer value via valueToken, which
 /// degrades ANY missing (incl. special .A–.Z) to a plain `.` literal.
 fn probeIneqSel(sel: *const IneqSel, key: []const u8, t0: f64) Value {
     const b = sel.bmap.get(key) orelse return sel.miss;
     const thr = if (std.math.isNan(t0)) Value.missing.num else t0;
     const vals = b.v;
-    var lo: usize = 0; // qualifying range is [lo, hi) — a single inequality
+    var lo: usize = 0; // qualifying range is [lo, hi) - a single inequality
     var hi: usize = vals.len; // bounds exactly one side
     switch (sel.op) {
         .gt => lo = upperBoundF(vals, thr),
@@ -4439,7 +4439,7 @@ fn probeIneqSel(sel: *const IneqSel, key: []const u8, t0: f64) Value {
 /// correlation (one inner-qualified + one outer-qualified operand) over a plain
 /// table. Also accepts the AGGREGATE sibling (PERF-sqlcorrsubqsel-agg): a single
 /// safe `count|sum|avg|min|max(<plain col>)` select (count(*) too). Returns null
-/// (→ per-row path) on ANYTHING else — an expression around the subquery, DISTINCT,
+/// (→ per-row path) on ANYTHING else - an expression around the subquery, DISTINCT,
 /// an unsupported/expression-arg aggregate, an absent/non-conjunctive inner WHERE,
 /// unqualified refs, or inner join/derived/from-opts/GROUP BY/HAVING/ORDER/INTO.
 /// Conservative: correctness beats coverage.
@@ -4463,7 +4463,7 @@ fn detectScalarSubq(arena: std.mem.Allocator, lib: *Library, q: Query, ds: *Data
     // PERF-sqlcorrsubq-ineq: the inner WHERE is a top-level AND of `ref OP ref`
     // conjuncts. Each operand must be one inner-qualified + one outer-qualified
     // column ref (either order). Equalities form the composite bucket key; at most
-    // one inequality (numeric columns only — the sorted-prefix probe mirrors
+    // one inequality (numeric columns only - the sorted-prefix probe mirrors
     // eval.cmpNum) rides along. Anything else (OR/NOT/parens, an inner-only or
     // outer-only conjunct, a second inequality) → per-row fallback.
     var eq_icols: std.ArrayList(usize) = .empty;
@@ -4523,7 +4523,7 @@ fn detectScalarSubq(arena: std.mem.Allocator, lib: *Library, q: Query, ds: *Data
         if (it.agg_arg != null) return null;
         const agg_col: ?usize = if (it.agg_star) null else if (it.col) |c| (resolveCol(itbl, unqualify(c)) orelse return null) else return null;
         if (ineq != null) {
-            // Inequality-filtered fold: only order-exact aggregates — count (an
+            // Inequality-filtered fold: only order-exact aggregates - count (an
             // integer) and min/max (order-independent), min/max restricted to the
             // inequality column itself so the sorted values answer it directly.
             // sum/avg need sorted-order prefix sums, which reorder the f64
@@ -4561,7 +4561,7 @@ fn buildScalarSel(arena: std.mem.Allocator, diags: *diag.Diagnostics, sh: Scalar
         if (sh.ineq) |iqsh| {
             // PERF-sqlcorrsubq-ineq: bucket inner rows by the composite equality
             // key ONCE, sort each bucket's inequality-col values (SAS cmpNum order),
-            // then count/min/max per outer row by binary search — O(M log M) build,
+            // then count/min/max per outer row by binary search - O(M log M) build,
             // O(N log M) probes, instead of re-executing the inner query per row.
             const want_w = f == .count and sh.agg_col != null;
             var pbuckets: std.StringHashMapUnmanaged(std.ArrayList(IneqPair)) = .empty;
@@ -4597,7 +4597,7 @@ fn buildScalarSel(arena: std.mem.Allocator, diags: *diag.Diagnostics, sh: Scalar
         }
         // PERF-sqlcorrsubqsel-agg: bucket inner rows by correlation key ONCE, then
         // fold each bucket with the SAME computeAgg call the per-row path makes for
-        // `select <agg>(v) from itbl where icol = <key>` (execGrouped, one group) —
+        // `select <agg>(v) from itbl where icol = <key>` (execGrouped, one group) -
         // so char min/max, distinct, overflow, stat folds stay byte-identical.
         // O(N+M): one inner scan to bucket, folds sum to O(M) rows, N outer probes.
         var buckets: std.StringHashMapUnmanaged(std.ArrayList(usize)) = .empty;
@@ -4672,7 +4672,7 @@ fn substituteExists(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagno
 
 /// Bind a subquery's correlated references to the outer row `ri`, leaving the
 /// subquery's own columns alone. The outer qualifier is its alias when it has one
-/// (`from T x` → `x.col`), else the table name — an alias shadows the name, so
+/// (`from T x` → `x.col`), else the table name - an alias shadows the name, so
 /// matching only the effective qualifier avoids rebinding the inner table's refs.
 fn correlateSubq(arena: std.mem.Allocator, toks: []const Token, ds: *Dataset, ri: usize, outer_table: []const u8, outer_alias: ?[]const u8) diag.Error![]const Token {
     const outer_q = outer_alias orelse outer_table;
@@ -4722,7 +4722,7 @@ fn dictKind(name: []const u8) ?DictKind {
 }
 
 /// True for a `dictionary.*` / `sashelp.v*` name that is NOT one of the
-/// implemented introspection views — so the FROM error names the unsupported
+/// implemented introspection views - so the FROM error names the unsupported
 /// dictionary table instead of a misleading "table not found" (GAP-sqladvanced).
 fn isUnsupportedDict(name: []const u8) bool {
     if (dictKind(name) != null) return false;
@@ -4736,23 +4736,23 @@ fn unsupportedDict(arena: std.mem.Allocator, name: []const u8) void {
 }
 
 /// Synthesize a dictionary view fresh from live library state (ISS-dictviews).
-/// COLUMNS/TABLES read the in-memory members; MACROS is FAIL LOUD — PROC SQL only
+/// COLUMNS/TABLES read the in-memory members; MACROS is FAIL LOUD - PROC SQL only
 /// sees `Library.macro_vars` (CALL SYMPUT / SQL INTO), not the macro processor's
 /// symbol table (%let vars, %macro defs), so a vmacro built here would silently
-/// omit most symbols — worse than a visible error for clinical use.
+/// omit most symbols - worse than a visible error for clinical use.
 fn synthDictView(arena: std.mem.Allocator, lib: *Library, name: []const u8) !?*Dataset {
     return switch (dictKind(name).?) {
         .columns => try io.buildVcolumn(arena, lib.names.items, lib.sets.items),
         .tables => try io.buildVtable(arena, lib.names.items, lib.sets.items),
         .macros => blk: {
-            unsupported("PROC SQL: dictionary.macros / sashelp.vmacro is not implemented (the macro symbol table is not visible to PROC SQL — only CALL SYMPUT / INTO vars are)");
+            unsupported("PROC SQL: dictionary.macros / sashelp.vmacro is not implemented (the macro symbol table is not visible to PROC SQL - only CALL SYMPUT / INTO vars are)");
             break :blk null;
         },
     };
 }
 
 /// Expand `alias.*` / bare `*` SELECT items into one plain-column item per matching
-/// column of the resolved (possibly joined) dataset — ISS-sqlaliasstar. A qualified
+/// column of the resolved (possibly joined) dataset - ISS-sqlaliasstar. A qualified
 /// star `a.*` yields only table/alias `a`'s columns; a bare `*` item yields every
 /// column. Non-star items pass through untouched. A qualified star naming an unknown
 /// table/alias matches nothing → fail LOUD (never silently drop the columns).
@@ -4778,14 +4778,14 @@ fn expandStars(arena: std.mem.Allocator, ds: *Dataset, q: Query) ![]Item {
             matched += 1;
         }
         if (matched == 0) {
-            unsupported(try std.fmt.allocPrint(arena, "PROC SQL: SELECT {s}.* — no columns for table/alias '{s}'", .{ it.star_qual orelse "", it.star_qual orelse "" }));
+            unsupported(try std.fmt.allocPrint(arena, "PROC SQL: SELECT {s}.* - no columns for table/alias '{s}'", .{ it.star_qual orelse "", it.star_qual orelse "" }));
         }
     }
     return out.toOwnedSlice(arena);
 }
 
 /// True if column `cname` belongs to qualifier `ql`: either it is pre-qualified as
-/// `ql.<x>` (the join case — buildJoin qualifies every column by its table/alias),
+/// `ql.<x>` (the join case - buildJoin qualifies every column by its table/alias),
 /// or it is unqualified and `ql` names the query's sole FROM table/alias (single
 /// table `t.*`).
 fn starMatches(cname: []const u8, ql: []const u8, q: Query) bool {
@@ -4794,11 +4794,11 @@ fn starMatches(cname: []const u8, ql: []const u8, q: Query) bool {
     return eqi(unqualify(q.table), ql);
 }
 
-/// `select * … [group by …] having <cond>` — SAS remerge (ISS-sqlremerge #37):
+/// `select * … [group by …] having <cond>` - SAS remerge (ISS-sqlremerge #37):
 /// the group aggregate is computed per group and joined back onto each DETAIL row,
 /// then HAVING filters rows. One output row per surviving input row, NOT one per
 /// group (execGrouped collapses groups; that's wrong for `select *`). An empty
-/// GROUP BY makes the whole table one group — HAVING-without-GROUP-BY.
+/// GROUP BY makes the whole table one group - HAVING-without-GROUP-BY.
 fn execStarRemerge(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *diag.Diagnostics, q: Query, kept: []const usize) !Result {
     // partition kept rows into groups keyed by the evaluated GROUP BY tuple
     const gexprs = try resolveGroupAliases(arena, q);
@@ -4826,7 +4826,7 @@ fn execStarRemerge(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags:
     for (ds.columns.items) |c| try cols.append(arena, passCol(c.name, c)); // GH#49: pass-through keeps format; + its declared LENGTH (BUG-sqlcolwidthloss)
     // PERF-sqlremergeagg: a HAVING predicate is a CONSTANT of its group (every
     // aggregate in it is), but the row loop below used to re-run the whole
-    // substitute pipeline — substituteAggs folds the full group PER ROW, i.e.
+    // substitute pipeline - substituteAggs folds the full group PER ROW, i.e.
     // O(N·|grp|): quadratic for `select * … having <agg>` without GROUP BY, where
     // the group is the whole table. Prepare it once per group; the loop only
     // re-binds the row and re-evaluates (evalHavingPrepared).
@@ -4839,7 +4839,7 @@ fn execStarRemerge(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags:
     var srows: std.ArrayList(usize) = .empty; // res row → ds row, for ORDER BY on a non-selected source col
     for (kept) |ri| {
         // HAVING against THIS row's values, aggregates resolved over its group
-        // (rep = ri, no extra SELECT bindings — prepared above per group).
+        // (rep = ri, no extra SELECT bindings - prepared above per group).
         if (q.having != null)
             if (!try evalHavingPrepared(arena, diags, ds, hpre[rowgrp[ri]], ri, groups.items[rowgrp[ri]].items.len, &.{}, &.{})) continue;
         const cells = try arena.alloc(Value, ds.columns.items.len);
@@ -4854,11 +4854,11 @@ fn execStarRemerge(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags:
 
 fn execRowWise(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *diag.Diagnostics, q: Query, kept_in: []const usize) !Result {
     // BUG-sqlhavingnogroup: a HAVING with no aggregate of its own routes here
-    // (has_agg false — an aggregate inside a `(select …)` subquery is the
+    // (has_agg false - an aggregate inside a `(select …)` subquery is the
     // subquery's own, exprHasAgg skips it) and was silently DROPPED, returning
     // every row. Apply it per row via the shared HAVING evaluator, mirroring
     // execStarRemerge: the whole kept set is one group, rep = this row.
-    // ponytail: fresh PDV per row inside evalHaving — same cost class as the
+    // ponytail: fresh PDV per row inside evalHaving - same cost class as the
     // star+having path; hoist only if a big-table no-agg HAVING profiles hot.
     var kept = kept_in;
     if (q.having) |htoks| {
@@ -4888,7 +4888,7 @@ fn execRowWise(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
     // `calculated <alias>` reference sees the width its OUTPUT column will carry:
     // a plain column's source width (kept even under an alias, p.37), overridden
     // by an explicit SELECT `length=n` (p.368) exactly as applyItemMods does to the
-    // OutCol. A computed/aggregate/CASE/literal item stays null — DOC-SILENT.
+    // OutCol. A computed/aggregate/CASE/literal item stays null - DOC-SILENT.
     const ilens = try arena.alloc(?usize, q.items.len);
     for (q.items, 0..) |it, k|
         ilens[k] = it.length orelse if (it.col) |cn|
@@ -4899,7 +4899,7 @@ fn execRowWise(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
     var rows: std.ArrayList([]Value) = .empty;
     // ONE PDV for the whole scan (BUG-sqlrowwiseoom): a fresh PDV per row
     // re-allocated every column name (dupe + lowercased key + map entry) into
-    // the run arena — 22GB on a 740k-row × 36-col joined SELECT. Reuse is
+    // the run arena - 22GB on a 740k-row × 36-col joined SELECT. Reuse is
     // value-safe: loadForEvalAlias re-sets every ds column each row and the
     // computed names[k] are re-bound below.
     // PERF-sqlcorrsubqsel: for each SELECT item that is a plain correlated scalar
@@ -4916,7 +4916,7 @@ fn execRowWise(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
     var pkb: std.ArrayList(u8) = .empty; // reused scalar-probe key buffer
 
     // BUG-sqlcasesubquery, hoist half: an UNCORRELATED subquery inside a SELECT-list
-    // CASE has the same value for every row, so collapse it ONCE here — the same
+    // CASE has the same value for every row, so collapse it ONCE here - the same
     // one-shot the WHERE path gets from its `corr = null` call site (substituteSubqueries
     // at the `} else if (q.where) |wtoks|` branch). Without this, CASE being a per-row
     // evaluation would re-execute the inner query once per outer row. A CORRELATED span
@@ -4966,7 +4966,7 @@ fn execRowWise(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
     // column types: a plain column follows its source; a computed column follows
     // its first row's value (a CASE falls back to its first THEN literal).
     for (q.items, 0..) |it, k| {
-        // A plain column (even `col as alias`) is pass-through — carry its source
+        // A plain column (even `col as alias`) is pass-through - carry its source
         // format/informat/label (GH#49); a computed/CASE column gets none.
         var src: ?Column = null;
         const ty: VarType = if (it.col) |c| blk: {
@@ -4994,7 +4994,7 @@ fn caseResultType(toks: []const Token) VarType {
     return .num;
 }
 
-/// BUG-lagdifsql: LAG/LAGn/DIF/DIFn carry observation-order queue state — a
+/// BUG-lagdifsql: LAG/LAGn/DIF/DIFn carry observation-order queue state - a
 /// DATA-step concept. PROC SQL has no observation order, so SAS 9.4 errors
 /// (function-cannot-be-located class) instead of evaluating them; opensas used
 /// to run the queue anyway and invent data. Guarded here, at the ONE call_fn
@@ -5002,10 +5002,10 @@ fn caseResultType(toks: []const Token) VarType {
 /// through the same path; the DATA step keeps plain functions.dispatch.
 fn sqlDispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval.Error!Value {
     if (isLagDif(name))
-        // NOTE-typoarmgapwording: rc-1 vocabulary — real SAS ERRORS on LAG in
+        // NOTE-typoarmgapwording: rc-1 vocabulary - real SAS ERRORS on LAG in
         // SQL (the user's code is wrong), so this is "invalid", never the
         // rc-2 "not supported" a downstream agent routes on (D-009).
-        return ev.diags.fail(error.ParseError, 0, "PROC SQL: {s}() is invalid here — LAG/DIF are DATA-step functions (SQL has no observation order)", .{name});
+        return ev.diags.fail(error.ParseError, 0, "PROC SQL: {s}() is invalid here - LAG/DIF are DATA-step functions (SQL has no observation order)", .{name});
     return functions.dispatch(ev, name, args);
 }
 
@@ -5025,17 +5025,17 @@ fn isLagDif(name: []const u8) bool {
 }
 
 /// BUG-sqlcasesubquery: the loud gap for a `(select …)` inside a CASE that the caller
-/// cannot resolve because it has no `Library` in scope — ORDER BY, GROUP BY, a
+/// cannot resolve because it has no `Library` in scope - ORDER BY, GROUP BY, a
 /// summary-function argument, a CHECK constraint. It is valid SAS (a CASE operand may
-/// be "a query expression" — SQL Procedure Reference, sql-expression Component p.401)
+/// be "a query expression" - SQL Procedure Reference, sql-expression Component p.401)
 /// that opensas does not implement at those sites, so it is an opensas GAP
 /// (rc 2, D-009/D-009b(i)) and it ABORTS the statement. It must abort rather than fold
 /// a MISSING, because the per-row `catch Value.missing` callers would otherwise print a
-/// plausible wrong row BEFORE the error — exactly the failure class this bug was filed
+/// plausible wrong row BEFORE the error - exactly the failure class this bug was filed
 /// for. Callers that CAN reach a Library resolve the subquery instead (evalCase).
 fn caseSubqGap(diags: *diag.Diagnostics, toks: []const Token) diag.Error {
     diag.markGap();
-    return diags.fail(error.ParseError, if (toks.len > 0) toks[0].line else 0, "PROC SQL: a subquery inside a CASE expression is supported in the SELECT list, WHERE and HAVING clauses only — not in ORDER BY, GROUP BY, a summary-function argument, or a CHECK constraint", .{});
+    return diags.fail(error.ParseError, if (toks.len > 0) toks[0].line else 0, "PROC SQL: a subquery inside a CASE expression is supported in the SELECT list, WHERE and HAVING clauses only - not in ORDER BY, GROUP BY, a summary-function argument, or a CHECK constraint", .{});
 }
 
 /// Evaluate `case when C then V … [else E] end` for one row: the first WHEN whose
@@ -5047,12 +5047,12 @@ fn caseSubqGap(diags: *diag.Diagnostics, toks: []const Token) diag.Error {
 /// case-aware, so a CASE nested in any part works (BUG-casenest).
 ///
 /// BUG-sqlcasesubquery: a `(select …)` anywhere in the CASE is collapsed to its value
-/// HERE, before any arm is parsed — CASE's `when-condition` and `result-expression` are
+/// HERE, before any arm is parsed - CASE's `when-condition` and `result-expression` are
 /// both sql-expressions (SQL Procedure Reference, CASE expression: "See sql-expression
 /// Component on page 401") and an sql-expression operand may be "a query expression"
 /// (p.401), so a subquery is a legal CASE operand. parser_expr has no subquery grammar:
 /// left raw, the `(` stopped the parse at the inner `select` ("expected ')'") and
-/// `evalSpan`'s `catch return Value.missing` turned the whole arm into a MISSING — which
+/// `evalSpan`'s `catch return Value.missing` turned the whole arm into a MISSING - which
 /// is how plausible-but-WRONG rows reached stdout *ahead of* the error. Doing it in this
 /// one function covers every nested CASE too (the arms are already collapsed when the
 /// recursive `evalCase` sees them), so the sub-evaluators need no Library.
@@ -5065,7 +5065,7 @@ fn evalCase(arena: std.mem.Allocator, lib: ?*Library, diags: *diag.Diagnostics, 
         // The CASE sites with no Library in scope, each one PROBED rather than
         // assumed (D-025): ORDER BY (`orderRows`), a summary-function argument
         // (`computeAggExpr`), GROUP BY (`groupKey`) and a CHECK constraint. NOT
-        // COALESCE — a `coalesce(case …)` SELECT item is an `.expr` item, so the
+        // COALESCE - a `coalesce(case …)` SELECT item is an `.expr` item, so the
         // row loop collapses its subqueries before substituteCoalesce ever runs,
         // and it answers correctly today. A subquery at the four sites above is
         // valid SAS we do not implement yet → an opensas gap, rc 2 (D-009), and it
@@ -5074,7 +5074,7 @@ fn evalCase(arena: std.mem.Allocator, lib: ?*Library, diags: *diag.Diagnostics, 
     };
     // BUG-sqltypeconsistency: a proven char/num mix in the result arms is a
     // SAS ERROR, not a silently mistyped column. (Per-row callers that
-    // `catch Value.missing` still record the ERROR each row — loud, just
+    // `catch Value.missing` still record the ERROR each row - loud, just
     // repeated; the `try` paths abort the statement on the first row.)
     if (caseArmTypeBits(ev, toks) == 3)
         return diags.fail(error.ParseError, if (toks.len > 0) toks[0].line else 0, "PROC SQL: CASE expression has both character and numeric result values", .{});
@@ -5101,22 +5101,22 @@ fn evalCase(arena: std.mem.Allocator, lib: ?*Library, diags: *diag.Diagnostics, 
         } else i += 1;
     }
     // BUG-sqlcasechartype: fall-through of a character CASE is a CHAR missing
-    // (blank), not a numeric `.` — keeps render, column-type inference, and
+    // (blank), not a numeric `.` - keeps render, column-type inference, and
     // `where flag=''` consistent; caseResultType is the single type oracle.
     return if (caseResultType(toks) == .char) .{ .str = "" } else Value.missing;
 }
 
 /// BUG-sqltypeconsistency: SAS ERRORs when a CASE expression's THEN/ELSE
-/// results mix character and numeric ("Type mismatch") — it never builds a
+/// results mix character and numeric ("Type mismatch") - it never builds a
 /// first-arm-wins column. OR of the static arm-type bits (1 = proven char,
 /// 2 = proven num) over every THEN/ELSE result arm; a simple-CASE subject and
 /// the WHEN values are not result arms and are skipped. Compound expressions
-/// contribute 0 (unknown) — ponytail: no static expression typer, so a mix is
+/// contribute 0 (unknown) - ponytail: no static expression typer, so a mix is
 /// only caught when a literal / PDV-typed column ref / nested CASE proves it;
 /// unknown arms keep today's first-arm-wins inference, never a false ERROR.
 fn caseArmTypeBits(ev: *eval.Evaluator, toks: []const Token) u2 {
     var seen: u2 = 0;
-    var i = firstWhen(toks); // skip a simple-CASE subject — not a result arm
+    var i = firstWhen(toks); // skip a simple-CASE subject - not a result arm
     while (i < toks.len) {
         if (tkKw(toks[i], "when")) {
             i += 1;
@@ -5184,7 +5184,7 @@ fn hasCalc(toks: []const Token) bool {
     return false;
 }
 
-/// Drop `calculated` keyword tokens — it just marks that its operand is a computed
+/// Drop `calculated` keyword tokens - it just marks that its operand is a computed
 /// output column (which the caller has bound into the PDV), not a source column.
 fn removeCalculated(arena: std.mem.Allocator, toks: []const Token) ![]const Token {
     if (!hasCalc(toks)) return toks;
@@ -5194,7 +5194,7 @@ fn removeCalculated(arena: std.mem.Allocator, toks: []const Token) ![]const Toke
 }
 
 /// True when `tok` is a WHERE-clause keyword / word operator that lexes as a
-/// `.name` — never a column reference (BETWEEN/LIKE/IS NULL/CONTAINS are still
+/// `.name` - never a column reference (BETWEEN/LIKE/IS NULL/CONTAINS are still
 /// un-desugared at validation time).
 fn isWhereKw(tok: Token) bool {
     if (tok.tag != .name) return false;
@@ -5204,7 +5204,7 @@ fn isWhereKw(tok: Token) bool {
 }
 
 /// True when `name` resolves to a column of the (possibly joined) contributing
-/// dataset — mirroring the names loadForEvalAlias binds per row: the stored
+/// dataset - mirroring the names loadForEvalAlias binds per row: the stored
 /// name, its unqualified form, and `<table>.col` / `<alias>.col` for a
 /// single-table column.
 fn whereColVisible(ds: *Dataset, alias: ?[]const u8, name: []const u8) bool {
@@ -5223,11 +5223,11 @@ fn whereColVisible(ds: *Dataset, alias: ?[]const u8, name: []const u8) bool {
 /// Validate every column reference in `q.where` against the contributing
 /// columns + the CALCULATED-reachable SELECT aliases (BUG-sqlwhereunknown /
 /// BUG-sqlwherecalcagg): an unknown name used to bind to missing and silently
-/// filter out every row. SAS errors instead — "The following columns were not
+/// filter out every row. SAS errors instead - "The following columns were not
 /// found in the contributing tables: X", and for a CALCULATED reference to a
 /// summary alias "Summary functions are restricted to the SELECT and HAVING
 /// clauses". Returns false (having reported the ERROR) on the first offender.
-/// HAVING is NOT validated here — aggregates are legal there. ponytail:
+/// HAVING is NOT validated here - aggregates are legal there. ponytail:
 /// `(select …)` groups are skipped whole (an inner query validates itself when
 /// it runs).
 fn validateWhereCols(diags: *diag.Diagnostics, ds: *Dataset, q: Query) diag.Error!bool {
@@ -5236,7 +5236,7 @@ fn validateWhereCols(diags: *diag.Diagnostics, ds: *Dataset, q: Query) diag.Erro
     var i: usize = 0;
     while (i < wtoks.len) : (i += 1) {
         const tok = wtoks[i];
-        // skip a `( select … )` subquery whole — its names are its own query's
+        // skip a `( select … )` subquery whole - its names are its own query's
         if (tok.tag == .lparen and atKw(wtoks, i + 1, "select")) {
             var depth: usize = 0;
             while (i < wtoks.len) : (i += 1) {
@@ -5261,7 +5261,7 @@ fn validateWhereCols(diags: *diag.Diagnostics, ds: *Dataset, q: Query) diag.Erro
             // the DATA-step WHERE has the same clause, Statements ref printed
             // p.364) that we do not implement. Catch it HERE, before the name
             // check below misblames `escape` as an unknown COLUMN the user
-            // never wrote (rc 1) — honest gap, rc 2 (D-009/D-009b(i)). The
+            // never wrote (rc 1) - honest gap, rc 2 (D-009/D-009b(i)). The
             // `pat_end > i + 1` guard keeps a pattern that IS the name
             // `escape` on its old "expected an operand" error instead of a
             // false positive. desugarPredicates refuses the same clause on the
@@ -5274,14 +5274,14 @@ fn validateWhereCols(diags: *diag.Diagnostics, ds: *Dataset, q: Query) diag.Erro
             }
         }
         if (isWhereKw(tok)) continue;
-        // Infix MIN/MAX word operators (Language Reference: Concepts p.225 — valid in WHERE): between
+        // Infix MIN/MAX word operators (Language Reference: Concepts p.225 - valid in WHERE): between
         // two operands the word is the operator, not a column. In OPERAND
         // position (`where min > 3`) fall through so a column named MIN still
-        // resolves — and a non-column typo still fails loud (GAP-whereminmax).
+        // resolves - and a non-column typo still fails loud (GAP-whereminmax).
         if (isInfixMinMax(wtoks, i)) continue;
         if (atTag(wtoks, i + 1, .lparen)) continue; // a function call, not a column
         if (whereColVisible(ds, q.alias, tok.text)) continue;
-        // not a contributing column — a SELECT alias is only visible via CALCULATED
+        // not a contributing column - a SELECT alias is only visible via CALCULATED
         for (q.items) |it| {
             const al = it.alias orelse continue;
             if (!eqi(al, tok.text)) continue;
@@ -5293,7 +5293,7 @@ fn validateWhereCols(diags: *diag.Diagnostics, ds: *Dataset, q: Query) diag.Erro
                 return false;
             }
             if (was_calc and !is_agg) break; // a legal CALCULATED non-aggregate alias
-            // SAS: an alias is not a contributing column — same not-found ERROR
+            // SAS: an alias is not a contributing column - same not-found ERROR
             // whether it is a summary alias used bare or a plain alias without
             // CALCULATED.
             try diags.report(.err, tok.line, "PROC SQL: the following columns were not found in the contributing tables: {s}", .{tok.text});
@@ -5307,14 +5307,14 @@ fn validateWhereCols(diags: *diag.Diagnostics, ds: *Dataset, q: Query) diag.Erro
 }
 
 /// BUG-sqlambigcol: an UNQUALIFIED column present in MORE THAN ONE contributing
-/// table of a join is an ambiguous reference — SAS errors; opensas silently took
+/// table of a join is an ambiguous reference - SAS errors; opensas silently took
 /// the FIRST table, so a bare join key in a RIGHT/FULL join dropped right-only rows
 /// to a MISSING key (a corrupted merge). Precision: a QUALIFIED `a.k` names its
 /// table (has a '.'), a single-table column is stored unqualified and unique
-/// (indexOf hits), and `select *` expands to qualified names — none reach the >1
+/// (indexOf hits), and `select *` expands to qualified names - none reach the >1
 /// branch. Fires only on a genuine join where the bare name matches two tables.
 fn ambiguousCol(ds: *Dataset, name: []const u8) bool {
-    if (std.mem.indexOfScalar(u8, name, '.') != null) return false; // qualified — names its table
+    if (std.mem.indexOfScalar(u8, name, '.') != null) return false; // qualified - names its table
     if (ds.indexOf(name) != null) return false; // an exact stored (unqualified) column
     var n: usize = 0;
     for (ds.columns.items) |c| {
@@ -5323,7 +5323,7 @@ fn ambiguousCol(ds: *Dataset, name: []const u8) bool {
     return n > 1;
 }
 
-/// True when `name` is a SELECT output alias — ORDER BY / HAVING / CALCULATED
+/// True when `name` is a SELECT output alias - ORDER BY / HAVING / CALCULATED
 /// resolve against output columns first, so such a reference is NOT an ambiguous
 /// contributing-table column (precision: SELECT alias unaffected by BUG-sqlambigcol).
 fn isSelectAlias(q: Query, name: []const u8) bool {
@@ -5332,14 +5332,14 @@ fn isSelectAlias(q: Query, name: []const u8) bool {
 }
 
 /// BUG-sqlorderbyambig (GH#26): true when `name` matches EXACTLY ONE SELECT
-/// output column name — ORDER BY resolves result columns before contributing
+/// output column name - ORDER BY resolves result columns before contributing
 /// tables (the same order orderRows documents and implements), so `select a.id
 /// … order by id` is valid SAS 9.4 even though `id` lives in both join inputs:
 /// the bare name designates the projected output column, not either table's.
 /// UNIQUENESS is the exemption, not existence: `select a.id, b.id` leaves two
-/// output columns named `id` — still an ambiguous reference. Names mirror
+/// output columns named `id` - still an ambiguous reference. Names mirror
 /// itemNames (an `as` alias; else the unqualified projected column). ponytail:
-/// a computed item's generated `_colN` is skipped to stay allocation-free —
+/// a computed item's generated `_colN` is skipped to stay allocation-free -
 /// the generated names are unique, so they can't affect the >1 count.
 fn uniqueOutputCol(q: Query, name: []const u8) bool {
     var n: usize = 0;
@@ -5408,7 +5408,7 @@ fn validateNoAmbiguity(diags: *diag.Diagnostics, ds: *Dataset, q: Query) diag.Er
             if (firstAmbiguous(ds, q, ct)) |c| return ambigErr(diags, c);
         } else if (o.idx == null and o.col.len > 0 and !isSelectAlias(q, o.col) and !uniqueOutputCol(q, o.col)) {
             // BUG-sqlorderbyambig (GH#26): a bare name that names exactly one
-            // output column resolves there (see uniqueOutputCol) — only a name
+            // output column resolves there (see uniqueOutputCol) - only a name
             // with no unique output match falls through to table ambiguity.
             if (ambiguousCol(ds, o.col)) return ambigErr(diags, o.col);
         }
@@ -5426,8 +5426,8 @@ fn itemNames(arena: std.mem.Allocator, q: Query) ![]const []const u8 {
 
 /// Compute each computed SELECT item for source row `ri` and bind it into `ev`'s
 /// PDV under its output name, so a WHERE/HAVING CALCULATED reference resolves.
-/// `corr` is that outer row, so a SELECT item holding a `(select …)` — inside a CASE or
-/// standing alone — resolves here exactly as it does in the main row loop; both arms
+/// `corr` is that outer row, so a SELECT item holding a `(select …)` - inside a CASE or
+/// standing alone - resolves here exactly as it does in the main row loop; both arms
 /// used to hand the raw `(` to parser_expr and bind a MISSING, so `where calculated f`
 /// filtered against a fabricated value (BUG-sqlcasesubquery).
 fn bindComputed(arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, ev: *eval.Evaluator, q: Query, names: []const []const u8, corr: RowCtx) diag.Error!void {
@@ -5461,7 +5461,7 @@ fn substituteCoalesce(arena: std.mem.Allocator, diags: *diag.Diagnostics, ev: *e
             }
             const inner = toks[i + 2 .. j]; // between `(` and `)`
             // BUG-sqltypeconsistency: SAS requires COALESCE arguments to be all
-            // character or all numeric — a proven mix (same static oracle as
+            // character or all numeric - a proven mix (same static oracle as
             // CASE) is an ERROR, not a per-row type surprise. The eval loop
             // below stops at the first non-missing arg, so this static pass
             // must scan ALL top-level comma-separated args first.
@@ -5507,7 +5507,7 @@ fn substituteCoalesce(arena: std.mem.Allocator, diags: *diag.Diagnostics, ev: *e
     return out.items;
 }
 
-/// True if the token stream calls `monotonic(` (case-insensitive) — the cheap gate
+/// True if the token stream calls `monotonic(` (case-insensitive) - the cheap gate
 /// so the common no-monotonic case allocates nothing.
 fn hasMonotonic(toks: []const Token) bool {
     for (toks, 0..) |tk, i| if (tk.tag == .name and eqi(tk.text, "monotonic") and atTag(toks, i + 1, .lparen)) return true;
@@ -5516,7 +5516,7 @@ fn hasMonotonic(toks: []const Token) bool {
 
 /// Replace each `monotonic()` (undocumented SAS row-id function, GH#24) with the
 /// 1-based sequential row number `n`. There is no functions.dispatch entry because
-/// dispatch has no row context — the counter is supplied by the projection loop, so
+/// dispatch has no row context - the counter is supplied by the projection loop, so
 /// numbering follows read/processing order over WHERE-surviving rows (before ORDER BY).
 fn substituteMonotonic(arena: std.mem.Allocator, toks: []const Token, n: usize) ![]const Token {
     if (!hasMonotonic(toks)) return toks;
@@ -5572,7 +5572,7 @@ fn substituteCase(arena: std.mem.Allocator, diags: *diag.Diagnostics, ev: *eval.
             }
             // null Library: every substituteCase caller runs substituteSubqueries over
             // the stream FIRST (the WHERE/ON/HAVING/UPDATE-SET sites) or arrives from
-            // evalCase, which collapsed the subqueries before splitting the arms — so
+            // evalCase, which collapsed the subqueries before splitting the arms - so
             // nothing is left to resolve here. A caller that forgets gets evalCase's
             // loud rc-2 gap instead of a missing-valued arm (BUG-sqlcasesubquery).
             try out.append(arena, try valueToken(arena, try evalCase(arena, null, diags, ev, toks[i + 1 .. j], null)));
@@ -5588,8 +5588,8 @@ fn substituteCase(arena: std.mem.Allocator, diags: *diag.Diagnostics, ev: *eval.
 /// Aggregates and/or GROUP BY: one output row per group.
 fn execGrouped(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *diag.Diagnostics, q: Query, kept: []const usize) !Result {
     // partition kept rows into groups keyed by the *evaluated* GROUP BY tuple (a
-    // term may be a column or an expression like year(dt)) — by value, not by
-    // adjacency (SQL GROUP BY does not require sorted input) — BUG-groupexpr.
+    // term may be a column or an expression like year(dt)) - by value, not by
+    // adjacency (SQL GROUP BY does not require sorted input) - BUG-groupexpr.
     var groups: std.ArrayList(std.ArrayList(usize)) = .empty;
     var reps: std.ArrayList(usize) = .empty; // a representative row per group
     var repkeys: std.ArrayList([]Value) = .empty; // each group's key tuple (for sorting)
@@ -5625,7 +5625,7 @@ fn execGrouped(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
     // output columns from the select items
     var cols: std.ArrayList(OutCol) = .empty;
     for (q.items, 0..) |it, k| {
-        if (it.case_toks) |ct| { // a CASE under GROUP BY — evaluated on the group's rep row
+        if (it.case_toks) |ct| { // a CASE under GROUP BY - evaluated on the group's rep row
             try cols.append(arena, .{ .name = it.alias orelse try std.fmt.allocPrint(arena, "_col{d}", .{k + 1}), .type = caseResultType(ct) });
         } else if (it.expr_toks != null) { // an expression under GROUP BY
             try cols.append(arena, .{ .name = it.alias orelse try std.fmt.allocPrint(arena, "_col{d}", .{k + 1}), .type = .num });
@@ -5656,7 +5656,7 @@ fn execGrouped(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
     for (0..groups.items.len) |gi| try idxs.append(arena, gi);
     std.mem.sort(usize, idxs.items, GroupSort{ .repkeys = repkeys.items }, GroupSort.less);
 
-    // An ORDER BY CASE can contain an aggregate (BUG-ordercaseagg) — orderRows sees
+    // An ORDER BY CASE can contain an aggregate (BUG-ordercaseagg) - orderRows sees
     // only the output row and can't resolve it, so when a CASE is present we build
     // the sort keys here, per group, where substituteAggs resolves the aggregate.
     const order_has_case = blk: {
@@ -5673,19 +5673,19 @@ fn execGrouped(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
     for (idxs.items) |gi| {
         const grp = groups.items[gi].items;
         // zero-row table, no GROUP BY: the single group is empty and reps.items[gi]
-        // is a bogus 0 — there is no rep row to load. The aggregates already yield
+        // is a bogus 0 - there is no rep row to load. The aggregates already yield
         // missing over the empty set, so evaluate the expression/CASE against that
-        // (SAS emits one row, missing) — BUG-sqlemptyaggexpr.
+        // (SAS emits one row, missing) - BUG-sqlemptyaggexpr.
         const has_rows = grp.len > 0;
         const cells = try arena.alloc(Value, q.items.len);
         for (q.items, 0..) |it, k| {
             if (it.case_toks) |ct| {
                 // a CASE under GROUP BY: resolve any aggregate it uses over the group
                 // first, then evaluate against the rep row (its group-key columns are
-                // constant across the group) — BUG-casegroupcrash
+                // constant across the group) - BUG-casegroupcrash
                 if (has_rows) try loadForEval(&pdv, ds, ds.row(reps.items[gi]));
                 // BUG-sqlcasesubquery: a `(select …)` the CASE holds resolves FIRST,
-                // correlated to the rep row — BEFORE substituteAggs, for the same
+                // correlated to the rep row - BEFORE substituteAggs, for the same
                 // reason the `.expr` arm below does it in that order: substituteAggs
                 // walks the whole stream, so run second it would fold the SUBQUERY's
                 // own `avg(x)` over the OUTER group and leave `select 2 from t` behind
@@ -5697,19 +5697,19 @@ fn execGrouped(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
                 // an expression under GROUP BY: a `(select …)` scalar subquery is
                 // resolved first (correlated to the group's rep row, whose key
                 // columns are constant across the group) so its own aggregates stay
-                // inside it — BUG-sqlscalargroup; then this query's aggregates are
+                // inside it - BUG-sqlscalargroup; then this query's aggregates are
                 // resolved over the group, and the rest evaluated against the rep row.
                 const et2 = if (hasSubquery(et))
                     try substituteSubqueries(arena, lib, diags, et, if (has_rows) RowCtx{ .ds = ds, .ri = reps.items[gi], .table = q.table, .alias = q.alias } else null)
                 else
                     et;
                 if (has_rows) try loadForEvalAlias(&pdv, ds, ds.row(reps.items[gi]), q.alias);
-                // bind earlier SELECT items so a `calculated <alias>` resolves — incl.
+                // bind earlier SELECT items so a `calculated <alias>` resolves - incl.
                 // an AGGREGATE alias (`sum(x) as s, calculated s/2`), which substituteAggs
                 // can't reach because `s` is a name, not an agg call (BUG-sqlcalcgroupagg).
                 for (0..k) |j|
                     try bindCol(&pdv, cols.items[j].name, if (cells[j] == .num) .num else .char, cols.items[j].len, cells[j]);
-                // monotonic() here numbers output groups in emission order (GH#24) —
+                // monotonic() here numbers output groups in emission order (GH#24) -
                 // ponytail: grouped monotonic is output-row order, not per-input-row.
                 const bare = try removeCalculated(arena, et2); // `calculated s` → the bound `s`
                 cells[k] = try evalExprItem(arena, diags, &ev, try substituteMonotonic(arena, try substituteAggs(arena, diags, ds, bare, grp), rows.items.len + 1));
@@ -5724,7 +5724,7 @@ fn execGrouped(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
             } else cells[k] = Value.missing;
         }
         // HAVING is checked after the row is built so it can see SELECT aliases
-        // (e.g. `having tot > 15` where `tot` is `sum(v) as tot`) — BUG-havingalias.
+        // (e.g. `having tot > 15` where `tot` is `sum(v) as tot`) - BUG-havingalias.
         if (q.having) |htoks|
             if (!try evalHaving(arena, lib, diags, ds, htoks, grp, reps.items[gi], cols.items, cells)) continue;
         try rows.append(arena, cells);
@@ -5758,17 +5758,17 @@ fn execGrouped(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
 }
 
 /// Correct each COMPUTED output column's declared type from the value it actually
-/// produced — BUG-sqlremergecharcol.
+/// produced - BUG-sqlremergecharcol.
 ///
 /// execGrouped and execRemerge must DECLARE their columns BEFORE the row loop,
 /// because that loop binds `calculated <alias>` by name out of `cols`. At
 /// declaration time no value exists, so an expression column was typed `.num`
-/// outright and a CASE column from its first THEN literal — which put a CHARACTER
+/// outright and a CASE column from its first THEN literal - which put a CHARACTER
 /// expression standing next to an aggregate (`select upcase(b) as ub, max(b) as mb`)
 /// into a NUMERIC column while its cells stayed `.str`. The descriptor then LIED:
 /// PROC SQL's own listing still printed the text (it renders the cell), but the
 /// created table said `ub Num 8`, so a DATA step `set` of it read the character
-/// value as numeric MISSING — 'AB' silently destroyed, and a nested SELECT
+/// value as numeric MISSING - 'AB' silently destroyed, and a nested SELECT
 /// re-rendered it BEST12. Only the descriptor was wrong, which is exactly why a
 /// green listing hid it.
 ///
@@ -5776,7 +5776,7 @@ fn execGrouped(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
 /// columns, so this makes the three paths agree rather than adding a fourth rule;
 /// with no rows there is nothing to learn from and the declared guess stands
 /// (caseResultType, or `.num`). Pass-through columns follow their source column and
-/// aggregates follow `aggType` — neither is touched.
+/// aggregates follow `aggType` - neither is touched.
 fn retypeComputed(cols: []OutCol, items: []const Item, rows: []const []Value) void {
     if (rows.len == 0) return;
     for (items, 0..) |it, k| {
@@ -5787,7 +5787,7 @@ fn retypeComputed(cols: []OutCol, items: []const Item, rows: []const []Value) vo
 
 /// SAS "remerge": a no-GROUP-BY select mixing aggregates with detail columns
 /// computes each aggregate over the whole table, then broadcasts it back across
-/// every input row — the result keeps one row per input row rather than the
+/// every input row - the result keeps one row per input row rather than the
 /// single collapsed group row execGrouped would emit (BUG-sqlremergedetail).
 /// The whole kept set is one group; every item is then evaluated per detail row.
 fn execRemerge(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *diag.Diagnostics, q: Query, kept: []const usize) !Result {
@@ -5795,7 +5795,7 @@ fn execRemerge(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
 
     // Partition kept rows into groups by the GROUP BY key; each detail row then
     // resolves its aggregates over ITS group. With no GROUP BY the whole kept set
-    // is one group (broadcast across every row) — BUG-sqlgroupremerge.
+    // is one group (broadcast across every row) - BUG-sqlgroupremerge.
     var groups: std.ArrayList(std.ArrayList(usize)) = .empty;
     var repkeys: std.ArrayList([]Value) = .empty;
     const rowgrp = try arena.alloc(usize, ds.rows.items.len); // ds row index → its group
@@ -5828,7 +5828,7 @@ fn execRemerge(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
         }
     }
 
-    // output columns — same shape as execGrouped's
+    // output columns - same shape as execGrouped's
     var cols: std.ArrayList(OutCol) = .empty;
     for (q.items, 0..) |it, k| {
         if (it.case_toks) |ct| {
@@ -5848,13 +5848,13 @@ fn execRemerge(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
     var rows: std.ArrayList([]Value) = .empty;
     var srows: std.ArrayList(usize) = .empty; // res row → ds row, for ORDER BY on a non-selected source col
     // PERF-sqlremergeagg: every aggregate in a remerge is a CONSTANT of its group,
-    // but the row loop below used to fold the whole group PER ROW — O(N·|grp|·aggs).
+    // but the row loop below used to fold the whole group PER ROW - O(N·|grp|·aggs).
     // For the no-GROUP-BY remerge the group IS the table (measured: 10k rows 0.2s
     // → 100k rows 20s, i.e. quadratic; 1M extrapolates to ~half an hour), and a
     // GROUP BY remerge scales by the same 1/G law. Compute each group-constant
-    // ONCE into the flat tables below — aggvals[g·nitem+k] for a SELECT-item
+    // ONCE into the flat tables below - aggvals[g·nitem+k] for a SELECT-item
     // aggregate, aggsub[g·nitem+k] for the aggregate-substituted CASE/expression
-    // tokens (a substituted aggregate is a group value too) — and let the row loop
+    // tokens (a substituted aggregate is a group value too) - and let the row loop
     // index them. Strictly less memory as well: one substituted token stream per
     // GROUP, where the old loop built one per ROW.
     const nitem = q.items.len;
@@ -5876,7 +5876,7 @@ fn execRemerge(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
     for (groups.items, 0..) |g, gi| {
         const grp = g.items;
         // an empty group (zero-row table) has no row to broadcast to, and the old
-        // loop never folded anything for it — skip it, so an aggregate that would
+        // loop never folded anything for it - skip it, so an aggregate that would
         // fail loud on an empty fold (e.g. a char argument) only fails where the
         // old path would have reached it
         if (grp.len == 0) continue;
@@ -5913,16 +5913,16 @@ fn execRemerge(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
         const cells = try arena.alloc(Value, q.items.len);
         for (q.items, 0..) |it, k| {
             if (it.case_toks) |ct| {
-                // aggregates already substituted (a group constant — PERF-sqlremergeagg),
+                // aggregates already substituted (a group constant - PERF-sqlremergeagg),
                 // then the CASE evaluated per row
                 try loadForEval(&pdv, ds, ds.row(ri));
                 const corr = RowCtx{ .ds = ds, .ri = ri, .table = q.table, .alias = q.alias };
                 // BUG-sqlcasesubquery: a `(select …)` the CASE holds binds THIS row, so
-                // it has no per-group pre-substitution (aggsub skipped it above) —
+                // it has no per-group pre-substitution (aggsub skipped it above) -
                 // collapse the subquery first, THEN substitute this query's aggregates
                 // over the post-collapse tokens, so the subquery's own aggregates stay
                 // inside it. Same order, same reason as the `.expr` arm below.
-                // ponytail: an UNCORRELATED subquery here re-runs once per row — the
+                // ponytail: an UNCORRELATED subquery here re-runs once per row - the
                 // remerge path has no equivalent of the SELECT fast path's one-shot hoist.
                 const cts = if (hasSubquery(ct))
                     try substituteAggs(arena, diags, ds, try substituteSubqueries(arena, lib, diags, ct, corr), grp)
@@ -5933,7 +5933,7 @@ fn execRemerge(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
                 // bind earlier SELECT items so `calculated <alias>` (incl. an aggregate
                 // alias) resolves in the remerge path too (BUG-sqlcalcgroupagg).
                 if (hasSubquery(et)) {
-                    // the scalar subquery binds THIS row — collapse it first, then the
+                    // the scalar subquery binds THIS row - collapse it first, then the
                     // aggregate substitution on the post-collapse tokens, per row
                     const et2 = try substituteSubqueries(arena, lib, diags, et, .{ .ds = ds, .ri = ri, .table = q.table, .alias = q.alias });
                     try loadForEvalAlias(&pdv, ds, ds.row(ri), q.alias);
@@ -5947,12 +5947,12 @@ fn execRemerge(arena: std.mem.Allocator, lib: *Library, ds: *Dataset, diags: *di
                     for (0..k) |j|
                         try bindCol(&pdv, cols.items[j].name, if (cells[j] == .num) .num else .char, cols.items[j].len, cells[j]);
                     // aggregates already substituted (a group constant); the row's own
-                    // expression — and MONOTONIC(), which counts OUTPUT rows — stays per row
+                    // expression - and MONOTONIC(), which counts OUTPUT rows - stays per row
                     cells[k] = try evalExprItem(arena, diags, &ev, try substituteMonotonic(arena, aggsub[gi * nitem + k].?, rows.items.len + 1));
                 }
             } else if (it.agg != null) {
                 // folded once per group above; the row loop only broadcasts it
-                // (was: a full group fold per row — the quadratic PERF-sqlremergeagg removes)
+                // (was: a full group fold per row - the quadratic PERF-sqlremergeagg removes)
                 cells[k] = aggvals[gi * nitem + k];
             } else if (it.col) |c| {
                 cells[k] = ds.row(ri)[resolveCol(ds, c) orelse return colNotFound(diags, c)];
@@ -5982,10 +5982,10 @@ fn computeAgg(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Dataset, 
     if (f == .count or f == .n or f == .nmiss) {
         if (star) return .{ .num = @floatFromInt(if (f == .nmiss) @as(usize, 0) else grp.len) };
         // No resolvable column (e.g. a mis-parsed arg) → 0, never a null deref
-        // (BUG-countdistinctcrash — this used to `col.?`-panic on a missing value).
+        // (BUG-countdistinctcrash - this used to `col.?`-panic on a missing value).
         const ci = col orelse return .{ .num = 0 };
         var n: usize = 0; // non-missing count (distinct applies only to COUNT)
-        var seen: DistinctSet = .empty; // COUNT(DISTINCT) membership — O(1)/row (PERF-sqlcountdistinct)
+        var seen: DistinctSet = .empty; // COUNT(DISTINCT) membership - O(1)/row (PERF-sqlcountdistinct)
         for (grp) |ri| {
             const v = ds.row(ri)[ci];
             if (aggMissing(v)) continue; // COUNT/N skip missing (incl. blank char)
@@ -5997,10 +5997,10 @@ fn computeAgg(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Dataset, 
     }
     // SUM/AVG/MIN/MAX need a resolvable column; a null one (mis-parsed or
     // unresolved qualified name) yields SAS missing rather than a null-deref
-    // panic (BUG-sqlaggqualcol — was an unchecked `col.?` at the loops below).
+    // panic (BUG-sqlaggqualcol - was an unchecked `col.?` at the loops below).
     const ci = col orelse return Value.missing;
     // BUG-sqlsumwgtcharzero: a CHARACTER argument to a numeric summary aggregate
-    // is an ERROR in SAS, and must be one here — every fold below toNum-drops
+    // is an ERROR in SAS, and must be one here - every fold below toNum-drops
     // char cells, so a char column arrives as an EMPTY xs: SUMWGT then reports a
     // computed 0 (since 9bc08694 hoisted it over the n==0 early-out) on a column
     // N() counts as 2, while STD/CSS/… report missing as if there were no data.
@@ -6008,7 +6008,7 @@ fn computeAgg(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Dataset, 
     // … ¹ In the SQL procedure, each row has a weight of 1" (Table 2.6, printed
     // p.60; pdf 75 at offset +15, footer verified) and the summary-function
     // Component (printed pp.411-413; pdf 426-428) defines the rest as
-    // statistical calculations over the column's values — weights and
+    // statistical calculations over the column's values - weights and
     // statistics are numbers, a character value contributes none, and no
     // reading of those pages yields 0 or missing for this input, so we fail
     // loud (house rule) rather than invent one. One guard at the funnel every
@@ -6032,7 +6032,7 @@ fn computeAgg(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Dataset, 
         return statAgg(f, xs[0..m]);
     }
     // MIN/MAX over a character column: lexical (blank-padded) comparison, not
-    // numeric — toNum would coerce every char to NaN and drop the whole column.
+    // numeric - toNum would coerce every char to NaN and drop the whole column.
     if ((f == .min or f == .max) and ds.columns.items[ci].type == .char) {
         var best: ?Value = null;
         for (grp) |ri| {
@@ -6071,7 +6071,7 @@ fn computeAgg(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Dataset, 
         .max => hi,
         else => unreachable, // count/n/nmiss above; stat aggs in the isStatAgg block
     };
-    // Overflow (±inf) collapses to SAS missing, as the DATA-step evaluator does —
+    // Overflow (±inf) collapses to SAS missing, as the DATA-step evaluator does -
     // so an overflowed aggregate never gets stored/printed as a literal "inf".
     return if (std.math.isFinite(r)) .{ .num = r } else Value.missing;
 }
@@ -6081,7 +6081,7 @@ fn computeAgg(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Dataset, 
 /// list still sorts by its real per-row value (BUG-sqlordernonselected).
 const OrderSrc = struct { ds: *Dataset, rows: []const usize };
 
-/// `precomp`, when given, is the sort-key vector per row (aligned with res.rows) —
+/// `precomp`, when given, is the sort-key vector per row (aligned with res.rows) -
 /// used by the grouped path so a CASE containing an aggregate resolves over its
 /// group (BUG-ordercaseagg), which orderRows can't do from the output row alone.
 fn orderRows(arena: std.mem.Allocator, diags: *diag.Diagnostics, res: *Result, order: []const Order, precomp: ?[][]Value, src: ?OrderSrc) diag.Error!void {
@@ -6091,7 +6091,7 @@ fn orderRows(arena: std.mem.Allocator, diags: *diag.Diagnostics, res: *Result, o
         break :blk false;
     };
     // Resolve each named ORDER BY key once: the SELECT output column wins; else a
-    // contributing-table column — SAS sorts by it (NOTE that it isn't in the SELECT
+    // contributing-table column - SAS sorts by it (NOTE that it isn't in the SELECT
     // list). Used to fall through to sort-every-row-as-missing, i.e. the stable
     // input order (BUG-sqlordernonselected). A name matching neither fails loud,
     // like the WHERE validation (BUG-sqlwhereunknown).
@@ -6139,7 +6139,7 @@ fn orderRows(arena: std.mem.Allocator, diags: *diag.Diagnostics, res: *Result, o
                 else nm: {
                     for (res.cols, 0..) |c, ci| if (eqi(c.name, unqualify(o.col))) break :nm row[ci];
                     if (src_col[oi]) |j| break :nm src.?.ds.row(src.?.rows[ri])[j];
-                    break :nm Value.missing; // unreachable — named keys pre-validated above
+                    break :nm Value.missing; // unreachable - named keys pre-validated above
                 };
             }
         }
@@ -6151,7 +6151,7 @@ fn orderRows(arena: std.mem.Allocator, diags: *diag.Diagnostics, res: *Result, o
     // collation is decided here and every ORDER BY path inherits it (all eight
     // callers of orderRows route through this sort). PROC SQL never nests
     // (subqueries call execQuery, not run()), which is why g_opts is safe to
-    // read directly here — the same reason `report` reads g_opts.number.
+    // read directly here - the same reason `report` reads g_opts.number.
     // Precedence per p.261: the statement option WINS when given, else the
     // system option decides. `orelse` IS that sentence.
     const ling = g_opts.sortseq_ling orelse io.global_sortseq_linguistic;
@@ -6175,7 +6175,7 @@ fn orderRows(arena: std.mem.Allocator, diags: *diag.Diagnostics, res: *Result, o
     // otherwise ship nondeterministic row order. proc.zig's sortRows carries
     // the same note from the same bug ("an unstable sort made gen2 AE's
     // value-identical rows land in a different order than golden"). Stable is a
-    // VALID SAS outcome — 9.4 defaults to NOEQUALS, i.e. tie order unspecified.
+    // VALID SAS outcome - 9.4 defaults to NOEQUALS, i.e. tie order unspecified.
     std.sort.block(usize, perm, Sort{ .kv = kv, .ord = order, .ling = ling }, Sort.less);
     const sorted = try arena.alloc([]Value, res.rows.len);
     for (perm, 0..) |p, i| sorted[i] = res.rows[p];
@@ -6185,16 +6185,16 @@ fn orderRows(arena: std.mem.Allocator, diags: *diag.Diagnostics, res: *Result, o
 /// Aligned column report: numeric columns right-justified, char left-justified,
 /// each column as wide as its header or widest value, a 2-blank gutter between.
 /// ponytail: content-fit width, not SAS's format-driven width (BEST12. would
-/// pad numerics wider); no rule line — add if a fixture pins the exact listing.
+/// pad numerics wider); no rule line - add if a fixture pins the exact listing.
 /// F7 FEEDBACK: the statement after star expansion, as echo text for the log.
-/// ponytail: minimal faithful echo — SAS lays the transform out over indented
+/// ponytail: minimal faithful echo - SAS lays the transform out over indented
 /// lines with two-level names and `as <alias>`; one flat `select … from …;`
 /// line pair here. Nested subquery expansions overwrite the slot (last wins);
 /// CREATE/INSERT … SELECT echoes are captured but never emitted.
 fn feedbackEcho(arena: std.mem.Allocator, ds: *Dataset, q: Query) ![]const u8 {
     var buf: std.ArrayList(u8) = .empty;
     try buf.appendSlice(arena, "NOTE: Statement transforms to:\n  select ");
-    if (q.star and q.items.len == 0) { // bare `select *` — every resolved column
+    if (q.star and q.items.len == 0) { // bare `select *` - every resolved column
         for (ds.columns.items, 0..) |c, k| {
             if (k > 0) try buf.appendSlice(arena, ", ");
             try buf.appendSlice(arena, unqualify(c.name));
@@ -6262,7 +6262,7 @@ fn reportFlush(arena: std.mem.Allocator, out: *std.ArrayList(u8), line: *std.Arr
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 /// The GROUP BY key tuple for source row `ri`: each term evaluated to a value.
-/// The underlying token span of a SELECT item that carries a computed value —
+/// The underlying token span of a SELECT item that carries a computed value -
 /// its arithmetic expr, a reconstructed `case … end`, or (for a plain column
 /// alias) a single name token. Null for an aggregate item.
 fn groupItemToks(arena: std.mem.Allocator, it: Item) ?[]const Token {
@@ -6284,7 +6284,7 @@ fn groupItemToks(arena: std.mem.Allocator, it: Item) ?[]const Token {
 
 /// Resolve each GROUP BY term that is a bare SELECT-list alias (optionally
 /// `calculated alias`) or a 1-based positional (`group by 1`) to that item's real
-/// expression tokens — otherwise the alias is not a dataset column and evaluates to
+/// expression tokens - otherwise the alias is not a dataset column and evaluates to
 /// missing for every row, collapsing all rows into one group (BUG-sqlgroupbyalias).
 fn resolveGroupAliases(arena: std.mem.Allocator, q: Query) ![]const []const Token {
     const out = try arena.alloc([]const Token, q.group_exprs.len);
@@ -6313,7 +6313,7 @@ fn groupKey(arena: std.mem.Allocator, ev: *eval.Evaluator, ds: *Dataset, ri: usi
     const key = try arena.alloc(Value, exprs.len);
     // ponytail: reuse the caller's PDV/Evaluator (hoisted above the partition loop).
     // A fresh Pdv.init per row copied EVERY column of the row into the run arena and
-    // never freed — ~3.9GB dead per-row PDVs at 1.6M rows (PERF-sqlgroupmem). loadForEval
+    // never freed - ~3.9GB dead per-row PDVs at 1.6M rows (PERF-sqlgroupmem). loadForEval
     // re-sets the shared PDV's cells each row; only the key tuple is retained.
     try loadForEval(ev.pdv, ds, ds.row(ri));
     for (exprs, 0..) |e, i| key[i] = try evalExprItem(arena, ev.diags, ev, e);
@@ -6321,7 +6321,7 @@ fn groupKey(arena: std.mem.Allocator, ev: *eval.Evaluator, ds: *Dataset, ri: usi
 }
 
 /// GROUP BY with no summary function anywhere in the query: SAS treats the GROUP
-/// BY as an ORDER BY — all detail rows, ordered by the group keys
+/// BY as an ORDER BY - all detail rows, ordered by the group keys
 /// (BUG-sqlgroupnoagg). Sort `kept` by the evaluated key tuple; the `a < b`
 /// tiebreak keeps ties in input order (deterministic fixtures).
 fn sortByGroupKeys(arena: std.mem.Allocator, diags: *diag.Diagnostics, ds: *Dataset, q: Query, kept: []const usize) diag.Error![]usize {
@@ -6364,20 +6364,20 @@ fn cmpVal(x: Value, y: Value) std.math.Order {
     return proc.cmpColl(x, y, false);
 }
 
-/// The collation choice lives in proc.cmpColl (NOTE-collationduplicated — the
+/// The collation choice lives in proc.cmpColl (NOTE-collationduplicated - the
 /// private `cmpValColl` copy here was deleted; the bodies were verified
 /// byte-equivalent first: same blank-pad, same ASCII case-fold, same
 /// missingRank NaN handling, same toNum).
 ///
 /// ONLY `orderRows` passes `ling = true`, and that is a doc restriction, not an
-/// oversight: SQL Procedure User's Guide printed p.45 (`=== pdf 60 ===`) —
+/// oversight: SQL Procedure User's Guide printed p.45 (`=== pdf 60 ===`) -
 /// "Note: SORTSEQ= affects only the ORDER BY clause. It does not override your
 /// operating environment's default comparison operations for the WHERE clause."
 /// The surfaces actually at risk are DISTINCT / GROUP BY / UNION, which DO run
 /// on `cmpVal`: folding `cmpVal` itself would have been the one-word change and
-/// it would collapse "apple" and "APPLE" into one row — a row silently
-/// destroyed. (WHERE is safe for a different reason — it compares through
-/// eval.zig, never here — so the sql_sortseq_scope fixture's WHERE block is a
+/// it would collapse "apple" and "APPLE" into one row - a row silently
+/// destroyed. (WHERE is safe for a different reason - it compares through
+/// eval.zig, never here - so the sql_sortseq_scope fixture's WHERE block is a
 /// belt-and-braces check, not the load-bearing one; the DISTINCT and GROUP BY
 /// blocks are what a mutation of this function actually reds.)
 
@@ -6463,7 +6463,7 @@ fn isStatAgg(f: AggFn) bool {
 /// directly followed by `(` whose top-level argument list has NO comma. In SAS a
 /// MULTI-argument call of the same name (min(a,b), median(x,y)) is the per-row
 /// DATA-step function, not the summary aggregate, so it is not detected here
-/// (GAP-sqlstataggs) — the caller leaves those tokens for the per-row evaluator.
+/// (GAP-sqlstataggs) - the caller leaves those tokens for the per-row evaluator.
 fn aggAt(toks: []const Token, i: usize) ?AggFn {
     if (i >= toks.len or toks[i].tag != .name or !atTag(toks, i + 1, .lparen)) return null;
     const f = aggOf(toks[i].text) orelse return null;
@@ -6486,14 +6486,14 @@ fn aggAt(toks: []const Token, i: usize) ?AggFn {
 /// via an explicit deviation pass) exactly as proc.zig computeStats, so PROC SQL
 /// and PROC MEANS agree. Missing when undefined (VAR/STD/STDERR/CV/T need n≥2).
 /// SUMWGT = n (PROC SQL has no WEIGHT, every obs weighs 1). MEDIAN sorts `xs` in
-/// place — the caller's array is scratch.
+/// place - the caller's array is scratch.
 fn statAgg(f: AggFn, xs: []f64) Value {
     const nan = std.math.nan(f64);
     const n = xs.len;
     // SUMWGT is ONE statistic shared by both surfaces, so it must not disagree
     // between them: Base SAS 9.4 Procedures Guide, Table 2.1 (printed p.70-71)
     // lists `SUMWGT | Sum of weights | CORR, MEANS or SUMMARY, REPORT, SQL,
-    // TABULATE, UNIVARIATE` — PROC SQL and PROC UNIVARIATE, one row. proc.zig
+    // TABULATE, UNIVARIATE` - PROC SQL and PROC UNIVARIATE, one row. proc.zig
     // already prints `Sum Weights 0` next to `N 0`; PROC SQL returned MISSING,
     // because the n==0 early-out below swallowed SUMWGT with the rest
     // (BUG-sqlsumwgtallmiss).
@@ -6501,13 +6501,13 @@ fn statAgg(f: AggFn, xs: []f64) Value {
     // It is 0, not missing, and that is settled twice over. Statistical
     // Procedures printed p.410 ("Sum of the Weights"): "the sum of the weights is
     // calculated as Σⁿᵢ₌₁wᵢ … If there is no WEIGHT variable, the SUM OF THE
-    // WEIGHTS IS n" — PROC SQL has no WEIGHT clause at all, so Σwᵢ is
+    // WEIGHTS IS n" - PROC SQL has no WEIGHT clause at all, so Σwᵢ is
     // unconditionally n, and n here is 0. And the Procedures Guide's
     // "Computational Requirements for Statistics" (printed p.72) lists exactly
-    // what needs data — "N and NMISS do not require any nonmissing observations",
+    // what needs data - "N and NMISS do not require any nonmissing observations",
     // "SUM, MEAN, MAX, MIN, RANGE, USS, and CSS require at least one nonmissing
     // observation", "VAR, STD, STDERR, and CV require at least two observations"
-    // — and SUMWGT is in NONE of the three. Its closing rule, "Statistics are
+    // - and SUMWGT is in NONE of the three. Its closing rule, "Statistics are
     // reported as missing if they cannot be computed", does not reach a sum over
     // an empty set: that is computable and it is 0. So SUM/USS/CSS/RANGE staying
     // MISSING below is conformant by the same passage, not an inconsistency
@@ -6554,11 +6554,11 @@ fn statAgg(f: AggFn, xs: []f64) Value {
 }
 
 /// SAS SQL statistic aggregates we still do NOT compute (aggOf's set is what we
-/// DO — GAP-sqlstataggs implemented std/var/stderr/cv/css/uss/range/median/t/
+/// DO - GAP-sqlstataggs implemented std/var/stderr/cv/css/uss/range/median/t/
 /// sumwgt/freq). In SAS a SINGLE-argument call of one of these is the summary
 /// aggregate; multiple arguments make it the per-row DATA-step function. Our
-/// expression path would evaluate the single-arg form per row and remerge —
-/// prt(x) of one value is meaningless — silent wrong numbers, so it must fail
+/// expression path would evaluate the single-arg form per row and remerge -
+/// prt(x) of one value is meaningless - silent wrong numbers, so it must fail
 /// loud instead. PRT needs the t-distribution CDF; left unimplemented.
 const unimpl_stat_aggs = [_][]const u8{"prt"};
 
@@ -6591,7 +6591,7 @@ fn statAggCall(toks: []const Token) ?[]const u8 {
             }
         }
         if (commas == 0) return nm;
-        i = j; // multi-arg: a real DATA-step call — skip past it
+        i = j; // multi-arg: a real DATA-step call - skip past it
     }
     return null;
 }
@@ -6600,7 +6600,7 @@ fn statAggCall(toks: []const Token) ?[]const u8 {
 /// idiom for token-keyword tests across the tree instead of a per-file dup.
 const tkKw = @import("parser.zig").tkKw;
 
-/// True if token `i` exists and is keyword `kw` — the bound stated positively,
+/// True if token `i` exists and is keyword `kw` - the bound stated positively,
 /// once, so call sites don't each re-derive `i < toks.len and …` (taste #13b:
 /// one forgotten bound among the hand-copies is an OOB token read).
 fn atKw(toks: []const Token, i: usize, kw: []const u8) bool {
@@ -6638,7 +6638,7 @@ pub var g_test_last_unsup: []const u8 = "";
 
 fn unsupported(msg: []const u8) void {
     // BUG-sqlgapexit: this never called markGap, so every unsupported-SQL run
-    // exited 0 — a silent D-009 contract break (proc.zig's twin marks the gap).
+    // exited 0 - a silent D-009 contract break (proc.zig's twin marks the gap).
     diag.markGap();
     if (@import("builtin").is_test) {
         g_test_last_unsup = std.fmt.bufPrint(&g_test_unsup_buf, "{s}", .{msg}) catch "unsupported message too long";
@@ -6716,7 +6716,7 @@ test "PROC SQL operator rules: <> is NE, >< and the legacy =< / => are loud (GAP
     try runSql(a, &lib, &d1, "proc sql; create table ne2 as select x from t where x ne 3; quit;");
     try t.expectEqual(ne1.rowCount(), lib.find("ne2").?.rowCount());
 
-    // The legacy LE/GE spellings are loud ANYWHERE in the procedure — the
+    // The legacy LE/GE spellings are loud ANYWHERE in the procedure - the
     // Language Reference: Concepts p.127 fn.2/3 exclusion names PROC SQL without qualifying it to the
     // WHERE clause, so a SELECT item and a HAVING are refused too.
     for ([_][]const u8{
@@ -6737,7 +6737,7 @@ test "PROC SQL operator rules: <> is NE, >< and the legacy =< / => are loud (GAP
         try t.expect(named); // the diagnostic names the operator, D-002
     }
 
-    // `><` (MIN) has no predicate meaning in SQL either — loud, not a silent MIN.
+    // `><` (MIN) has no predicate meaning in SQL either - loud, not a silent MIN.
     var d2 = diag.Diagnostics.init(a);
     runSql(a, &lib, &d2, "proc sql; select x from t where x >< 3; quit;") catch {};
     try t.expect(d2.hasErrors());
@@ -6768,7 +6768,7 @@ test "PROC SQL truncated-comparison operators EQT/NET/GTT/LTT/GET/LET (GAP-sqltr
     // the six alphabetic truncated-comparison operators; p.405: "PROC SQL does
     // not support the colon operators (such as =:, >:, and <=:) … Use the
     // alphabetic operators (such as EQT, GTT, and LET)". Each must agree with
-    // its DATA-step `=:`-family counterpart ROW FOR ROW — both route through
+    // its DATA-step `=:`-family counterpart ROW FOR ROW - both route through
     // parser_expr's ONE prefix compare, mkTruncCmp.
     const Pair = struct { word: []const u8, colon: []const u8 };
     for ([_]Pair{
@@ -6800,7 +6800,7 @@ test "PROC SQL truncated-comparison operators EQT/NET/GTT/LTT/GET/LET (GAP-sqltr
     try runSql(a, &lib, &d3, "proc sql; create table pre as select name from t where name eqt 'TWO'; quit;");
     try t.expectEqual(@as(usize, 3), lib.find("pre").?.rowCount()); // TWOSTORY, TWO, TWOFOLD
 
-    // Zero-length: the shared helper's guard (Language Reference: Concepts p.130) — '' eqt '' and
+    // Zero-length: the shared helper's guard (Language Reference: Concepts p.130) - '' eqt '' and
     // '' =: '' are BOTH false, and agree. The volume is silent for SQL; the
     // agreement is by construction (same helper).
     var d4 = diag.Diagnostics.init(a);
@@ -6817,7 +6817,7 @@ test "PROC SQL truncated-comparison operators EQT/NET/GTT/LTT/GET/LET (GAP-sqltr
     try t.expect(!d6.hasErrors());
 
     // Name collision guard: a COLUMN named GET / LET / NET in operand
-    // position keeps resolving as a name — only the infix word is an operator.
+    // position keeps resolving as a name - only the infix word is an operator.
     const ds2 = try a.create(Dataset);
     ds2.* = Dataset.init(a, "g");
     _ = try ds2.addColumn("get", .num);
@@ -6931,7 +6931,7 @@ test "dictionary.tables reports member row/var counts (ISS-dictviews)" {
     try t.expectEqual(@as(f64, 2), tt.row(0)[1].num); // nvar
 }
 
-test "dictionary.macros fails loud — not silently wrong (ISS-dictviews)" {
+test "dictionary.macros fails loud - not silently wrong (ISS-dictviews)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -6979,7 +6979,7 @@ test "ALTER TABLE ADD <constraint> adds no phantom column (BUG-sqlalteraddconstr
     try runSql(a, &lib, &diags, "proc sql; create table p (y num); quit;"); // FK parent
     // Every table-level spelling. All five lex as plain `.name`, so each one used
     // to become a column literally named `constraint`/`primary`/`unique`/`check`/
-    // `foreign` — silently, at exit 0.
+    // `foreign` - silently, at exit 0.
     inline for (.{
         "constraint c1 check (x > 0)",
         "primary key (x)",
@@ -6993,7 +6993,7 @@ test "ALTER TABLE ADD <constraint> adds no phantom column (BUG-sqlalteraddconstr
             .{ n, n, clause },
         ));
         const ds = lib.find(std.fmt.comptimePrint("m{d}", .{n})).?;
-        try t.expectEqual(@as(usize, 2), ds.columns.items.len); // x, z — and nothing else
+        try t.expectEqual(@as(usize, 2), ds.columns.items.len); // x, z - and nothing else
         try t.expectEqualStrings("x", ds.columns.items[0].name);
         try t.expectEqualStrings("z", ds.columns.items[1].name);
     }
@@ -7012,7 +7012,7 @@ test "ALTER TABLE DROP CONSTRAINT is a gap, and says so (BUG-sqlalteraddconstrai
     var diags = diag.Diagnostics.init(a);
     var lib = Library.init(a);
     // Dropping a named constraint is valid SAS we cannot do (a Constraint carries
-    // no name), so it stays a gap — but it must not report a missing COLUMN, which
+    // no name), so it stays a gap - but it must not report a missing COLUMN, which
     // is what it did when `constraint` fell through into the DROP-COLUMN loop.
     inline for (.{ "constraint c1", "primary key", "foreign key f1" }) |clause| {
         g_test_last_unsup = "";
@@ -7092,7 +7092,7 @@ test "quantified ANY/ALL subquery comparisons incl. empty-set edges (GAP-sqladva
         " create table r4 as select x from a where x <> all (select y from b); quit;");
     try t.expectEqual(@as(usize, 0), lib.find("r3").?.rowCount());
     try t.expectEqual(@as(usize, 3), lib.find("r4").?.rowCount());
-    // Empty set: ANY→FALSE (0 rows), ALL→TRUE (all rows) — per SQL.
+    // Empty set: ANY→FALSE (0 rows), ALL→TRUE (all rows) - per SQL.
     try runSql(a, &lib, &diags,
         "proc sql; create table r5 as select x from a where x > any (select y from empty);" ++
         " create table r6 as select x from a where x <= all (select y from empty);" ++
@@ -7137,7 +7137,7 @@ test "aggregate over a compound expression folds the whole expr, not the first o
     try lib.put("have", ds);
 
     // whole-table (no GROUP BY): the query must collapse to one row and aggregate
-    // the products 20,20,30 — not sum(price)=18 or the pre-fix 36.
+    // the products 20,20,30 - not sum(price)=18 or the pre-fix 36.
     try runSql(a, &lib, &diags,
         "proc sql; create table s as select sum(price*qty) as rev, avg(price*qty) as ar, " ++
         "max(price*qty) as mx, count(distinct price*qty) as dc from have; quit;");
@@ -7203,7 +7203,7 @@ test "DML: CREATE TABLE col-defs, INSERT VALUES, UPDATE, DELETE (G-sqldml)" {
     try t.expect(tt.row(1)[2].isMissing()); // score never inserted
 }
 
-test "DELETE * — SAS 9.4 leniently ignores the stray '*' and executes (#61 reverses #41/#53)" {
+test "DELETE * - SAS 9.4 leniently ignores the stray '*' and executes (#61 reverses #41/#53)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -7246,7 +7246,7 @@ test "BUG-sqlcreatedupcol: malformed CREATE TABLE column list fails loud, no pan
         " quit;") catch {};
     try t.expect(d1.hasErrors()); // loud ERRORs, no crash (captured, not spawned)
     const u = lib.find("u").?;
-    try t.expectEqual(@as(usize, 3), u.columns.items.len); // a, b, c — dup/extra items skipped
+    try t.expectEqual(@as(usize, 3), u.columns.items.len); // a, b, c - dup/extra items skipped
     try t.expectEqual(@as(usize, 0), u.rowCount()); // ragged INSERT rejected, not panicked
 
     // duplicate column name alone → ERROR, first definition kept
@@ -7269,7 +7269,7 @@ test "BUG-sqlcreatedupcol: malformed CREATE TABLE column list fails loud, no pan
     try runSql(a, &lib, &d4, "proc sql;" ++
         " create table ok (id num, nm char(8));" ++
         " insert into ok values (1, 'Ann');" ++
-        " insert into ok select * from ok;" ++ // 2 into 2 — fine
+        " insert into ok select * from ok;" ++ // 2 into 2 - fine
         " quit;");
     try t.expect(!d4.hasErrors());
     const ok = lib.find("ok").?;
@@ -7282,7 +7282,7 @@ test "BUG-sqlddlmed: INSERT arity fail-loud, CREATE col format/label, ALTER ADD 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
-    var lib = Library.init(a); // BUG-sqlconsleak: `run` prunes prior tests' entries — no hand reset here
+    var lib = Library.init(a); // BUG-sqlconsleak: `run` prunes prior tests' entries - no hand reset here
 
     // M4: too few VALUES for the table → ERROR, row rejected (not padded)
     var d1 = diag.Diagnostics.init(a);
@@ -7296,7 +7296,7 @@ test "BUG-sqlddlmed: INSERT arity fail-loud, CREATE col format/label, ALTER ADD 
     var d2b = diag.Diagnostics.init(a);
     runSql(a, &lib, &d2b, "proc sql; insert into t (bogus) values(1); quit;") catch {};
     try t.expect(d2b.hasErrors());
-    // correct-arity INSERTs unchanged — no errors, rows land
+    // correct-arity INSERTs unchanged - no errors, rows land
     var d3 = diag.Diagnostics.init(a);
     try runSql(a, &lib, &d3, "proc sql; insert into t values(1, 'a'); insert into t (y) values('b'); quit;");
     try t.expect(!d3.hasErrors());
@@ -7335,7 +7335,7 @@ test "BUG-sqlddlmed: INSERT arity fail-loud, CREATE col format/label, ALTER ADD 
     try t.expect(d8.hasErrors());
     // M6: CREATE-time constraints survive an ALTER ADD (registry merge)
     var d9 = diag.Diagnostics.init(a);
-    try runSql(a, &lib, &d9, "proc sql; insert into e values(3, ., 4); quit;"); // b (CREATE-era? no — ADD'd) still NOT NULL
+    try runSql(a, &lib, &d9, "proc sql; insert into e values(3, ., 4); quit;"); // b (CREATE-era? no - ADD'd) still NOT NULL
     try t.expect(d9.hasErrors());
     try t.expectEqual(@as(usize, 1), lib.find("e").?.rowCount());
 }
@@ -7354,7 +7354,7 @@ test "SQL INFORMAT= coercion notes invalid data like the INPUT function (GAP-sql
     // the loud ERROR and stored MISSING with NO invalid-data NOTE. Language
     // Reference: Concepts p.518 "How SAS Handles Invalid Data": the value is
     // MISSING (pinned below), the invalid-data NOTE prints (same text as the
-    // function dispatch), _ERROR_=1 — but _ERROR_ is a DATA-step PDV automatic
+    // function dispatch), _ERROR_=1 - but _ERROR_ is a DATA-step PDV automatic
     // (eval.zig setError) with NO SQL row sink: a SELECT result is a table, not
     // an observation, so NOTE + missing is the whole contract here. Captured
     // diagnostics, never an aborting process (D-003).
@@ -7366,7 +7366,7 @@ test "SQL INFORMAT= coercion notes invalid data like the INPUT function (GAP-sql
         var lib = Library.init(a);
         var d = diag.Diagnostics.init(a);
         // the not-found ERROR rides format.zig's captured reporter in test
-        // builds (format.g_test_last_err), not the Diagnostics — same as
+        // builds (format.g_test_last_err), not the Diagnostics - same as
         // functions.zig's GH#5 test
         format.g_fmt_error = false;
         format.g_test_last_err = "";
@@ -7377,12 +7377,12 @@ test "SQL INFORMAT= coercion notes invalid data like the INPUT function (GAP-sql
         try t.expect(lib.find("t").?.row(0)[0].isMissing()); // p.518 action 1
         format.g_fmt_error = false; // reset module state for other tests
     }
-    { // a KNOWN informat that cannot read the field notes too (GH#4a class —
+    { // a KNOWN informat that cannot read the field notes too (GH#4a class -
         // `input('abc', 8.)` has noted since the dispatch guard; this twin was silent)
         var lib = Library.init(a);
         var d = diag.Diagnostics.init(a);
         try runSql(a, &lib, &d, "proc sql; create table k (n num informat=8.); insert into k values ('abc'); quit;");
-        try t.expect(!d.hasErrors()); // the informat itself loaded — no ERROR at all
+        try t.expect(!d.hasErrors()); // the informat itself loaded - no ERROR at all
         try t.expect(!format.formatErrored());
         try t.expect(hasNote(&d, "Invalid argument to function INPUT."));
         try t.expect(lib.find("k").?.row(0)[0].isMissing());
@@ -7482,7 +7482,7 @@ test "GAP-wherelow-tick266: malformed IS fails loud; valid IS spellings still fi
     try t.expectEqual(@as(usize, 1), lib.find("n3").?.rowCount());
     try t.expectEqual(@as(usize, 1), lib.find("n4").?.rowCount());
 
-    // Incomplete `IS` — `v is` / `v is not` were silently `missing(v)` /
+    // Incomplete `IS` - `v is` / `v is not` were silently `missing(v)` /
     // `not missing(v)` and now carry the named WHERE IS diagnostic (D-002).
     // runSql reports to the captured diags (D-003), so assert on the reporter.
     const silent = [_][]const u8{ "v is", "v is not" };
@@ -7498,7 +7498,7 @@ test "GAP-wherelow-tick266: malformed IS fails loud; valid IS spellings still fi
         for (d.list.items) |e| named = named or std.mem.indexOf(u8, e.message, "WHERE IS") != null;
         try t.expect(named); // the diagnostic names the IS construct
     }
-    // `v is <name>` was already loud on the SQL route (column validator) —
+    // `v is <name>` was already loud on the SQL route (column validator) -
     // keep it loud (the where=/WHERE-stmt routes report the WHERE IS one).
     for ([_][]const u8{ "v is bananas", "v is not bananas" }) |pred| {
         var d = diag.Diagnostics.init(a);
@@ -7526,7 +7526,7 @@ test "GAP-wherelow-tick291: LIKE ESCAPE is a named rc-2 gap on both WHERE routes
     try ds.appendRow(&.{strV("100x sure")});
     try lib.put("have", ds);
 
-    // Plain LIKE (no ESCAPE) keeps filtering — the guard must not eat it.
+    // Plain LIKE (no ESCAPE) keeps filtering - the guard must not eat it.
     var d_ok = diag.Diagnostics.init(a);
     try runSql(a, &lib, &d_ok, "proc sql; create table n1 as select name from have where name like '100x%'; quit;");
     try t.expect(!d_ok.hasErrors());
@@ -7546,7 +7546,7 @@ test "GAP-wherelow-tick291: LIKE ESCAPE is a named rc-2 gap on both WHERE routes
     try t.expect(named); // the diagnostic names the ESCAPE clause, not a phantom column
     try t.expect(diag.gapHit()); // gap class → rc 2, not the old rc 1
 
-    // The shared-desugar route (DATA-step where=/WHERE stmt — tick266 covers
+    // The shared-desugar route (DATA-step where=/WHERE stmt - tick266 covers
     // that sharing): the same refusal fires from desugarPredicates itself.
     diag.resetGap();
     var d_de = diag.Diagnostics.init(a);
@@ -7810,7 +7810,7 @@ test "grouped IN-subquery: WHERE x in (select … group by … having …) (BUG-
     try lib.put("d", d);
 
     // groups with count>=2 are A(3) and B(2); the outer WHERE keeps every row in
-    // those groups — 5 rows. (The subquery's GROUP BY/HAVING must stay inside the
+    // those groups - 5 rows. (The subquery's GROUP BY/HAVING must stay inside the
     // subquery, not be grabbed as the outer query's group-by.)
     try runSql(a, &lib, &diags,
         "proc sql; create table r as select g, v from d where g in (select g from d group by g having count(*) >= 2) order by g, v; quit;");
@@ -7869,7 +7869,7 @@ test "correlated scalar-aggregate subquery, WHERE and select list (BUG-sqlcorrsc
     emp.* = Dataset.init(a, "emp");
     _ = try emp.addColumn("dept", .num);
     _ = try emp.addColumn("sal", .num);
-    // dept 10 avg = 150, dept 20 avg = 600 (global avg = 375 — the old bug's value)
+    // dept 10 avg = 150, dept 20 avg = 600 (global avg = 375 - the old bug's value)
     for ([_][2]f64{ .{ 10, 100 }, .{ 10, 200 }, .{ 20, 300 }, .{ 20, 900 } }) |r|
         try emp.appendRow(&.{ numV(r[0]), numV(r[1]) });
     try lib.put("emp", emp);
@@ -7920,7 +7920,7 @@ test "correlated scalar-aggregate subquery, WHERE and select list (BUG-sqlcorrsc
         "proc sql; create table hw as select g, v from d x " ++
         "where v > (select avg(v) from d y where y.g=x.g) order by g; quit;");
     const hw = lib.find("hw").?;
-    try t.expectEqual(@as(usize, 2), hw.rowCount()); // a 30 (>20), b 9 (>7) — was only a 30
+    try t.expectEqual(@as(usize, 2), hw.rowCount()); // a 30 (>20), b 9 (>7) - was only a 30
     try t.expectEqual(@as(f64, 30), hw.row(0)[hw.indexOf("v").?].num);
     try t.expectEqual(@as(f64, 9), hw.row(1)[hw.indexOf("v").?].num);
 }
@@ -7958,7 +7958,7 @@ test "cross / implicit / 3+-table joins + unqualified cols (SQL-joinmore)" {
     try t.expectEqual(@as(f64, 10), j1.row(0)[j1.indexOf("x").?].num); // x=10 pairs with y=200,300
     try t.expectEqual(@as(f64, 200), j1.row(0)[j1.indexOf("y").?].num);
 
-    // 2. explicit CROSS JOIN keyword — same Cartesian
+    // 2. explicit CROSS JOIN keyword - same Cartesian
     try runSql(a, &lib, &diags, "proc sql; create table j2 as select x, y from a cross join b; quit;");
     try t.expectEqual(@as(usize, 6), lib.find("j2").?.rowCount());
 
@@ -7992,7 +7992,7 @@ test "ORDER BY a CASE containing an aggregate, grouped (BUG-ordercaseagg)" {
     ds.* = Dataset.init(a, "d");
     _ = try ds.addColumn("g", .char);
     _ = try ds.addColumn("v", .num);
-    // group sums: a=5, b=100, c=50 — the CASE (sum>=50 → 0) puts b,c ahead of a,
+    // group sums: a=5, b=100, c=50 - the CASE (sum>=50 → 0) puts b,c ahead of a,
     // and within the 0-key the tie breaks on g → b,c,a. Group-key order would be a,b,c.
     for ([_]struct { g: []const u8, v: f64 }{
         .{ .g = "a", .v = 5 }, .{ .g = "b", .v = 100 }, .{ .g = "c", .v = 50 },
@@ -8039,7 +8039,7 @@ test "scalar subquery in a grouped SELECT list (BUG-sqlscalargroup)" {
 
     // correlated scalar subquery bound to the group key. The max() belongs to the
     // subquery, so the OUTER query has no summary function: SAS treats GROUP BY g
-    // as ORDER BY g and returns every detail row (BUG-sqlgroupnoagg) — the
+    // as ORDER BY g and returns every detail row (BUG-sqlgroupnoagg) - the
     // subquery still correlates per row to the same per-key maxima.
     try runSql(a, &lib, &diags,
         "proc sql; create table c as select g, (select max(v) from d y where y.g=x.g) as mx " ++
@@ -8164,7 +8164,7 @@ test "HAVING, SELECT DISTINCT, and UNION (SQL-adv)" {
     try t.expectEqual(@as(f64, 30), h.row(0)[1].num);
     try t.expectEqualStrings("c", h.row(1)[0].str);
 
-    // DISTINCT collapses the duplicate 'a' rows of v — build a table with dups first
+    // DISTINCT collapses the duplicate 'a' rows of v - build a table with dups first
     const nums = try a.create(Dataset);
     nums.* = Dataset.init(a, "nums");
     _ = try nums.addColumn("x", .num);
@@ -8295,7 +8295,7 @@ test "simple CASE compares the subject to each WHEN value (BUG-casesimple)" {
     for ([_][]const u8{ "A", "B", "C" }) |g| try d.appendRow(&.{.{ .str = g }});
     try lib.put("d", d);
 
-    // simple form: `case grade when "A" then 4 …` — subject compared to each value
+    // simple form: `case grade when "A" then 4 …` - subject compared to each value
     try runSql(a, &lib, &diags,
         "proc sql; create table t as select grade, case grade when \"A\" then 4 when \"B\" then 3 else 0 end as gpa from d; quit;");
     const t2 = lib.find("t").?;
@@ -8322,7 +8322,7 @@ test "CASE inside a WHERE predicate filters correctly (BUG-casewhere)" {
     try runSql(a, &lib, &diags,
         "proc sql; create table t as select x from d where case when x < 10 then \"lo\" else \"hi\" end = \"hi\"; quit;");
     const t2 = lib.find("t").?;
-    try t.expectEqual(@as(usize, 2), t2.rowCount()); // 15, 25 (not empty — was data loss)
+    try t.expectEqual(@as(usize, 2), t2.rowCount()); // 15, 25 (not empty - was data loss)
     try t.expectEqual(@as(f64, 15), t2.row(0)[0].num);
     try t.expectEqual(@as(f64, 25), t2.row(1)[0].num);
 }
@@ -8359,7 +8359,7 @@ test "nested CASE and ORDER BY a CASE expression (SQLCASE2)" {
     try t.expectEqual(@as(f64, 25), o.row(2)[0].num);
 }
 
-test "CASE in a GROUP BY select — no crash, aggregates resolve (BUG-casegroupcrash)" {
+test "CASE in a GROUP BY select - no crash, aggregates resolve (BUG-casegroupcrash)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -8540,7 +8540,7 @@ test "ORDER BY sorts the whole UNION result, not just the last arm (BUG-unionord
     for ([_]f64{ 3, 9, 2 }) |v| try db.appendRow(&.{numV(v)});
     try lib.put("b", db);
 
-    // ascending: the combined {5,1,3,9,2} sorts to 1,2,3,5,9 — not concat order
+    // ascending: the combined {5,1,3,9,2} sorts to 1,2,3,5,9 - not concat order
     try runSql(a, &lib, &diags, "proc sql; create table u as select x from a union select x from b order by x; quit;");
     const u = lib.find("u").?;
     try t.expectEqual(@as(usize, 5), u.rowCount());
@@ -8656,7 +8656,7 @@ test "grouped STD/VAR/STDERR/CV/USS/RANGE/MEDIAN aggregates (GAP-sqlstataggs, VA
     try t.expectEqual(@as(usize, 1), h.rowCount());
     try t.expectEqual(@as(f64, 2), h.row(0)[0].num);
 
-    // PRT is not implemented — single-arg call must still refuse loudly and create nothing
+    // PRT is not implemented - single-arg call must still refuse loudly and create nothing
     diag.resetGap();
     try runSql(a, &lib, &diags,
         "proc sql; create table p as select g, prt(x) as pv from have group by g; quit;");
@@ -8664,7 +8664,7 @@ test "grouped STD/VAR/STDERR/CV/USS/RANGE/MEDIAN aggregates (GAP-sqlstataggs, VA
     try t.expect(std.mem.indexOf(u8, g_test_last_unsup, "statistic aggregate") != null);
     try t.expect(lib.find("p") == null);
 
-    // multi-argument = the per-row DATA-step function — stays allowed, not aggregated
+    // multi-argument = the per-row DATA-step function - stays allowed, not aggregated
     diag.resetGap();
     try runSql(a, &lib, &diags,
         "proc sql; create table m as select median(x, x + 2) as md from have; quit;");
@@ -8979,7 +8979,7 @@ test "BUG-sqlconstraints: PK/NOT NULL/CHECK/UNIQUE enforced, no phantom columns"
     try t.expect(d2.hasErrors());
 
     // column-level CHECK: the failing row is rejected. SAS predicates are
-    // 2-valued — a missing age makes `age >= 18` FALSE (not SQL UNKNOWN), so
+    // 2-valued - a missing age makes `age >= 18` FALSE (not SQL UNKNOWN), so
     // the missing row is rejected as well.
     var d3 = diag.Diagnostics.init(a);
     try runSql(a, &lib, &d3,
@@ -9039,7 +9039,7 @@ test "BUG-sqlconsleak: the constraint registry is bounded by the LIVE library, n
     // fixture runners spawn one process per fixture, so a registry that survives
     // from one program to the next is unexpressible there even with `expect-rc:`.
     // This in-file test is the only automated protection for it, and it is a real
-    // one — `run` is exactly the function `main.interpret` drives once per program,
+    // one - `run` is exactly the function `main.interpret` drives once per program,
     // and wasm.zig runs many programs per module load against a fresh Library each
     // time. NOTHING below resets `g_cons_len` by hand; the point is that `run`
     // itself must do it (the three tests that used to hand-reset now rely on this).
@@ -9056,7 +9056,7 @@ test "BUG-sqlconsleak: the constraint registry is bounded by the LIVE library, n
         try runSql(a1, &lib1, &d1,
             "proc sql; create table r1 (x num, primary key(x)); create table r2 (y num not null); " ++
                 "create table r3 (z num unique); quit;");
-        // EXACTLY three — every earlier test's registration was pruned on entry,
+        // EXACTLY three - every earlier test's registration was pruned on entry,
         // which is the same assertion as "a prior program's entries are gone".
         try t.expectEqual(@as(usize, 3), g_cons_len);
     }
@@ -9086,7 +9086,7 @@ test "BUG-sqlconsleak: the constraint registry is bounded by the LIVE library, n
     // single program. `constraintsOf` only ever reads the newest entry for a table,
     // so dropping the superseded ones is behaviour-preserving by construction.
     // (Spelling matters here: `alter table m add constraint c check (…)` is NOT the
-    // table-level form — this file's ALTER only does ADD COLUMN, so that text adds a
+    // table-level form - this file's ALTER only does ADD COLUMN, so that text adds a
     // phantom column named `constraint`. A first draft of this test used it and
     // passed on an INSERT ARITY error instead of on a constraint. Reported, not
     // fixed here.)
@@ -9109,7 +9109,7 @@ test "BUG-sqlconsleak: the constraint registry is bounded by the LIVE library, n
     try t.expectEqual(@as(usize, 1), lib.find("m").?.rowCount());
     try t.expect(!d5b.hasErrors());
 
-    // (3) A DROPped table's entry goes too — it is unreachable, and holding it was
+    // (3) A DROPped table's entry goes too - it is unreachable, and holding it was
     // the third way the slots filled.
     const before = g_cons_len;
     var d6 = diag.Diagnostics.init(a);
@@ -9324,7 +9324,7 @@ test "BUG-sqltypeconsistency: mixed-type CASE results fail loud, consistent CASE
     // char THEN literal + numeric ELSE literal → ERROR (SAS: "Type mismatch")
     var d1 = diag.Diagnostics.init(a);
     runSql(a, &lib, &d1, "proc sql; create table bad as select case when x > 0 then 'yes' else 5 end as m from have; quit;") catch {};
-    try t.expect(d1.hasErrors()); // captured diagnostics — no spawned process
+    try t.expect(d1.hasErrors()); // captured diagnostics - no spawned process
     try t.expect(lib.find("bad") == null);
     var loud = false;
     for (d1.list.items) |m|
@@ -9340,7 +9340,7 @@ test "BUG-sqltypeconsistency: mixed-type CASE results fail loud, consistent CASE
     try t.expect(lib.find("bad2") == null);
 
     // all-char arms, all-num arms, and a simple CASE with a char subject over
-    // numeric results are all CONSISTENT — no error, values unchanged.
+    // numeric results are all CONSISTENT - no error, values unchanged.
     var d3 = diag.Diagnostics.init(a);
     try runSql(a, &lib, &d3, "proc sql; create table ok as select" ++
         " case when x > 0 then 'yes' else 'no' end as f1," ++
@@ -9412,7 +9412,7 @@ test "BUG-sqlcasesubquery: a subquery in a SELECT-list CASE resolves; the lib-le
     try cap.appendRow(&.{ numV(30), numV(30) });
     try lib.put("lot", cap);
 
-    // avg(qty) = 20 — the value the broken path never computed, so every arm fell to
+    // avg(qty) = 20 - the value the broken path never computed, so every arm fell to
     // MISSING and 'over' was unreachable. UNCORRELATED (hoisted once) …
     var d1 = diag.Diagnostics.init(a);
     try runSql(a, &lib, &d1, "proc sql; create table b1 as select qty, case when qty > (select avg(qty) from part) then 'over' else 'under' end as band from part; quit;");
@@ -9443,7 +9443,7 @@ test "BUG-sqlcasesubquery: a subquery in a SELECT-list CASE resolves; the lib-le
 
     // The two sites with no Library in scope stay LOUD and emit NOTHING. `out` is
     // asserted empty because the whole point of this bug was that the wrong rows
-    // reached output BEFORE the diagnostic — a loud error after a printed answer is
+    // reached output BEFORE the diagnostic - a loud error after a printed answer is
     // still a silent-wrong-output failure for whoever read stdout (D-002).
     inline for (.{
         "proc sql; select sum(case when qty > (select avg(qty) from part) then 1 else 0 end) as n from part; quit;",
@@ -9478,10 +9478,10 @@ test "BUG-sqltypeconsistency: char literal into a NUMERIC column converts (NOTE)
         " create table t (a num, b char(8));" ++
         " insert into t values ('12.5', 'x');" ++ // parseable → 12.5
         " insert into t values ('abc', 'y');" ++ // unparseable → missing
-        " insert into t values (7, 'z');" ++ // already numeric — untouched
+        " insert into t values (7, 'z');" ++ // already numeric - untouched
         " update t set a = '3.25' where b = 'z';" ++ // UPDATE SET converts too
         " quit;");
-    try t.expect(!diags.hasErrors()); // SAS converts with NOTEs — never an ERROR
+    try t.expect(!diags.hasErrors()); // SAS converts with NOTEs - never an ERROR
     const tab = lib.find("t").?;
     try t.expectEqual(@as(f64, 12.5), tab.row(0)[0].num);
     try t.expect(tab.row(1)[0].isMissing()); // 'abc' → missing, not the raw text
@@ -9503,7 +9503,7 @@ test "NOTE-invalidnumdataloc: SQL invalid-data NOTE carries the REAL line, never
     var diags = diag.Diagnostics.init(a);
 
     var lib = Library.init(a);
-    // The bad VALUES row sits on line 3, the bad UPDATE on line 4 — the NOTEs
+    // The bad VALUES row sits on line 3, the bad UPDATE on line 4 - the NOTEs
     // must carry those REAL lines via the (L<n>) machinery (no column exists:
     // NOTE-arrayoorlineno), never an in-text "at line 0 column 0."
     try runSql(a, &lib, &diags, "proc sql;\n" ++
@@ -9553,7 +9553,7 @@ test "ambiguous unqualified column in a join fails loud (BUG-sqlambigcol)" {
         };
     try t.expect(named);
 
-    // PRECISION, all legal — no error:
+    // PRECISION, all legal - no error:
     // coalesced (qualified) full join keeps every key
     var d2 = diag.Diagnostics.init(a);
     try runSql(a, &lib, &d2, "proc sql; create table ok1 as select coalesce(a.k,b.k) as k from a full join b on a.k=b.k; quit;");
@@ -9593,7 +9593,7 @@ test "order by unqualified shared column over a unique projection runs (BUG-sqlo
 
     // GH#26 repro shape: `id` is in BOTH tables, but the SELECT list projects
     // exactly one of them (`a.id` → output column `id`), so `order by id`
-    // names that output column — valid SAS 9.4, not an ambiguous reference.
+    // names that output column - valid SAS 9.4, not an ambiguous reference.
     // Rows are inserted id=2,1 so the sort is observable, both directions.
     var d1 = diag.Diagnostics.init(a);
     try runSql(a, &lib, &d1, "proc sql; create table asc1 as select a.id, a.x, b.y from a inner join b on a.id=b.id order by id; quit;");
@@ -9605,7 +9605,7 @@ test "order by unqualified shared column over a unique projection runs (BUG-sqlo
     try t.expectEqual(@as(f64, 100), t1.row(0)[2].num);
     try t.expectEqual(@as(f64, 2), t1.row(1)[0].num);
 
-    // `desc` variant — same resolution, descending direction
+    // `desc` variant - same resolution, descending direction
     var d2 = diag.Diagnostics.init(a);
     try runSql(a, &lib, &d2, "proc sql; create table desc1 as select a.id, a.x, b.y from a inner join b on a.id=b.id order by id desc; quit;");
     try t.expect(!d2.hasErrors());
@@ -9613,7 +9613,7 @@ test "order by unqualified shared column over a unique projection runs (BUG-sqlo
     try t.expectEqual(@as(f64, 2), t2.row(0)[0].num);
     try t.expectEqual(@as(f64, 1), t2.row(1)[0].num);
 
-    // PRECISION — the exemption is a UNIQUE output-name check, not existence:
+    // PRECISION - the exemption is a UNIQUE output-name check, not existence:
     // BOTH `a.id, b.id` projected → two output columns named `id` → still the
     // ambiguous-reference ERROR (real SAS errors here too), no output table.
     var d3 = diag.Diagnostics.init(a);
@@ -9627,7 +9627,7 @@ test "order by unqualified shared column over a unique projection runs (BUG-sqlo
         };
     try t.expect(named);
 
-    // a bare name with NO output match and >1 table hit keeps erroring — the
+    // a bare name with NO output match and >1 table hit keeps erroring - the
     // fix widened only the ORDER BY arm, nothing else (SELECT-list `select id`
     // is caught above by the items loop, as before).
     var d4 = diag.Diagnostics.init(a);
@@ -9651,7 +9651,7 @@ test "nested summary functions fail loud (BUG-sqlnestedagg)" {
     try d.appendRow(&.{ numV(10), numV(3), numV(4) });
     try lib.put("t", d);
 
-    // sum(max(v)) — an aggregate nested in an aggregate → loud ERROR (was 15)
+    // sum(max(v)) - an aggregate nested in an aggregate → loud ERROR (was 15)
     var d1 = diag.Diagnostics.init(a);
     runSql(a, &lib, &d1, "proc sql; create table bad as select sum(max(v)) from t; quit;") catch {};
     try t.expect(d1.hasErrors());
@@ -9687,7 +9687,7 @@ test "summary function in WHERE fails loud; HAVING + plain WHERE still filter (B
     try d.appendRow(&.{numV(30)});
     try lib.put("t", d);
 
-    // `where v > sum(v)/3` — a summary function in WHERE → loud ERROR (was: dropped
+    // `where v > sum(v)/3` - a summary function in WHERE → loud ERROR (was: dropped
     // the filter, kept all rows since sum(v) dispatched as the per-row DATA-step SUM).
     var d1 = diag.Diagnostics.init(a);
     runSql(a, &lib, &d1, "proc sql; create table bad as select * from t where v > sum(v)/3; quit;") catch {};
@@ -9813,7 +9813,7 @@ test "BUG-sqlsumwgtcharzero: character argument to a numeric summary aggregate f
     try lib.put("am", am);
 
     // char COLUMN to every numeric summary aggregate → loud ERROR (was 0 for
-    // SUMWGT, missing for the rest — both silent); the message names the fn.
+    // SUMWGT, missing for the rest - both silent); the message names the fn.
     inline for (.{ "sumwgt", "sum", "avg", "std", "css", "uss", "range", "median", "t", "stderr", "cv", "var" }) |fname| {
         var dd = diag.Diagnostics.init(a);
         runSql(a, &lib, &dd, "proc sql; create table bad as select " ++ fname ++ "(b) as v from t; quit;") catch {};
@@ -9856,7 +9856,7 @@ test "BUG-sqlsumwgtcharzero: character argument to a numeric summary aggregate f
     try t.expect(!d4.hasErrors());
     const amiss = lib.find("amiss").?;
     try t.expectEqual(@as(f64, 0), amiss.row(0)[0].num);
-    try t.expectEqual(@as(f64, 0), amiss.row(0)[1].num); // SUMWGT=0 — must NOT regress
+    try t.expectEqual(@as(f64, 0), amiss.row(0)[1].num); // SUMWGT=0 - must NOT regress
     try t.expect(amiss.row(0)[2].isMissing());
     try t.expect(amiss.row(0)[3].isMissing());
 }
@@ -9866,7 +9866,7 @@ test "GAP-sqlsortseqlinguistic: ORDER BY honours SORTSEQ=LINGUISTIC; statement o
     defer arena.deinit();
     const a = arena.allocator();
     var lib = Library.init(a);
-    // the system option is a process global — restore it, like main.zig's rc
+    // the system option is a process global - restore it, like main.zig's rc
     // test and the BUG-optionsstmtswallow test do.
     defer io.global_sortseq_linguistic = false;
 
@@ -9889,10 +9889,10 @@ test "GAP-sqlsortseqlinguistic: ORDER BY honours SORTSEQ=LINGUISTIC; statement o
     const ling = [_][]const u8{ "apple", "Banana", "Zebra" }; // case-folded dictionary
     const ascii = [_][]const u8{ "Banana", "Zebra", "apple" }; // every upper before any lower
 
-    // 1. SYSTEM option only — p.2403's Note / p.261 "PROC SQL honors the setting".
+    // 1. SYSTEM option only - p.2403's Note / p.261 "PROC SQL honors the setting".
     io.global_sortseq_linguistic = true;
     try H.order(a, &lib, "proc sql; create table o as select name from t order by name; quit;", &ling);
-    // 2. STATEMENT option only (system explicitly ASCII) — p.45, added in 9.4M3.
+    // 2. STATEMENT option only (system explicitly ASCII) - p.45, added in 9.4M3.
     io.global_sortseq_linguistic = false;
     try H.order(a, &lib, "proc sql sortseq=linguistic; create table o as select name from t order by name; quit;", &ling);
     // 3. PRECEDENCE, the direction that PROVES the rule instead of agreeing with
@@ -9908,7 +9908,7 @@ test "GAP-sqlsortseqlinguistic: ORDER BY honours SORTSEQ=LINGUISTIC; statement o
     // p.45: "SORTSEQ= affects only the ORDER BY clause. It does not override
     // your operating environment's default comparison operations for the WHERE
     // clause." WHERE compares through eval.zig rather than cmpVal, so this
-    // asserts the guarantee rather than guarding this change — the surfaces a
+    // asserts the guarantee rather than guarding this change - the surfaces a
     // cmpVal leak would actually break are DISTINCT and GROUP BY, held by
     // tests/corpus/sql_sortseq_scope.sas.
     io.global_sortseq_linguistic = true;
@@ -9977,7 +9977,7 @@ test "PROC SQL: a JOIN ON desugars its SQL predicates (BUG-sqlonpredicates GH#18
         .{ .on = "b.nm is not null", .rows = 6 },
         .{ .on = "b.nm is missing", .rows = 0 },
         .{ .on = "b.nm is not missing", .rows = 6 },
-        // Already correct before the fix — the desugar must not disturb them.
+        // Already correct before the fix - the desugar must not disturb them.
         .{ .on = "a.x = b.lo", .rows = 0 }, // no x equals any lo
         .{ .on = "a.x ^= b.lo", .rows = 6 },
         .{ .on = "a.x <> b.lo", .rows = 6 }, // `<>` is NE in SQL, not MAX
@@ -10016,8 +10016,8 @@ test "PROC SQL: an ON tail the parser cannot consume fails loud, never truncates
     try tb.appendRow(&.{strV("xyz")});
     try lib.put("b", tb);
 
-    // `?` is the documented CONTAINS alias — "CONTAINS Operator … Alias: ?"
-    // (SQL Procedure Components printed p.370 / pdf 386) — and opensas does not
+    // `?` is the documented CONTAINS alias - "CONTAINS Operator … Alias: ?"
+    // (SQL Procedure Components printed p.370 / pdf 386) - and opensas does not
     // implement it. parseExpr stops ON it and, by contract, says nothing, so the
     // condition used to degrade to a bare `b.nm`: a wrong row set at rc 0. The
     // tail is now refused BY NAME. D-003: the assertion reads the CAPTURED
@@ -10055,7 +10055,7 @@ test "PROC SQL: the equi-join hash fast path survives the ON desugar (BUG-sqlonp
     // Routing ON through desugarPredicates must NOT cost the O(n+m) hash join
     // (BUG-sqljoinoom's fix): a plain `col = col` is still recognized, while a
     // rewritten BETWEEN/LIKE correctly falls OUT of the eq block into the nested
-    // loop — keeping it there would be a correctness bug, losing it on the plain
+    // loop - keeping it there would be a correctness bug, losing it on the plain
     // equality a perf one.
     const Case = struct { on: []const u8, fast: bool };
     for ([_]Case{

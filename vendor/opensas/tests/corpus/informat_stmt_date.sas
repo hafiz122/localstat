@@ -1,5 +1,5 @@
 /* The INFORMAT statement applies DATE/TIME informats to list INPUT (not just the
-   :modifier form) — date9./mmddyy./ddmmyy./yymmdd./time. read to SAS numerics,
+   :modifier form) - date9./mmddyy./ddmmyy./yymmdd./time. read to SAS numerics,
    comma. still works. corpus-informatstmtdate. */
 data _null_;
   informat a date9. b mmddyy10. c ddmmyy10. d yymmdd10. t time8. n comma8.;

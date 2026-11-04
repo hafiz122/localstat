@@ -8,7 +8,7 @@ data d;
 run;
 
 /* ORDER BY a column NOT in the SELECT list: SAS sorts by it anyway
-   (with a NOTE) — x comes out ordered by y, not in input order. */
+   (with a NOTE) - x comes out ordered by y, not in input order. */
 proc sql;
   create table t as select x from d order by y;
 quit;

@@ -1,5 +1,5 @@
 /* %if / %do %while honor logical and/or and the mnemonic comparison operators
-   (eq ne gt ge lt le), matching %eval — regression guard for BUG-macroevalcond. */
+   (eq ne gt ge lt le), matching %eval - regression guard for BUG-macroevalcond. */
 %macro band(x);
   data _null_;
   %if &x >= 1 and &x <= 10 %then %do; put "&x in-range"; %end;

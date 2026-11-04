@@ -1,5 +1,5 @@
 /* BUG-temparray-noretain: an UNINITIALIZED _TEMPORARY_ array is retained
-   across DATA-step iterations in SAS 9.4 (always, inits or not) — the
+   across DATA-step iterations in SAS 9.4 (always, inits or not) - the
    accumulation idiom depends on it; opensas reset uninited cells to missing
    each iteration. Expected final acc: 15 100 . */
 data src;

@@ -1,4 +1,4 @@
-/* PRX /s (dotall) and /m (multiline) modifiers — a session-landed PRX feature
+/* PRX /s (dotall) and /m (multiline) modifiers - a session-landed PRX feature
    with no corpus coverage. /s makes `.` span an embedded newline; /m makes
    `^`/`$` anchor at every internal line boundary. Each is contrasted with its
    modifier-less form on the SAME two-line subject so the semantics are pinned,

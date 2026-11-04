@@ -1,4 +1,4 @@
-/* BUG-modifyoutnamemismatch — MODIFY's MASTER must also be an output data set
+/* BUG-modifyoutnamemismatch - MODIFY's MASTER must also be an output data set
    of the DATA statement.
 
    DATA Step Statements ref printed p.241 (pdf 252; the page's own footer reads
@@ -12,8 +12,8 @@
    the data set."
 
    `data b; modify d;` used to degrade SILENTLY to `data b; set d;` at exit 0:
-   the edits landed in a brand-new `b` and `d` — the data set the author asked
-   to update IN PLACE — was left byte-identical, with no diagnostic. Real-world
+   the edits landed in a brand-new `b` and `d` - the data set the author asked
+   to update IN PLACE - was left byte-identical, with no diagnostic. Real-world
    shape is a typo in the DATA statement (`data mater; modify master;`).
 
    The controls run FIRST, so they print before the erroring step halts the run:
@@ -41,7 +41,7 @@ run;
 
 /* ---- controls: the legal MODIFY shapes, all of which must still work ---- */
 
-/* C1 matching name, single data set — plain sequential in-place rewrite */
+/* C1 matching name, single data set - plain sequential in-place rewrite */
 data d;
   modify d;
   x = x + 1;
@@ -55,7 +55,7 @@ data D;
 run;
 proc print data=d noobs; title "C2 case-insensitive"; run;
 
-/* C3 `work.d` and `d` are the SAME member — Library.put/find compare through
+/* C3 `work.d` and `d` are the SAME member - Library.put/find compare through
    the same strip, so the membership test must too or this legal shape dies */
 data work.d;
   modify d;
@@ -71,7 +71,7 @@ run;
 proc print data=d noobs; title "C4 master + extra output"; run;
 
 /* C5 master is an EXTRA rather than the primary, and the TRANSACTION data set
-   is not an output at all — only master-data-set carries the restriction */
+   is not an output at all - only master-data-set carries the restriction */
 data t;
   input id x;
   datalines;
@@ -95,7 +95,7 @@ data b;
   x = x * 100;
 run;
 
-/* Never reached once the step errors — and that is the point. Under the bug
+/* Never reached once the step errors - and that is the point. Under the bug
    these printed, and what they printed was the wrong answer. */
 proc print data=d noobs; title "d MUST NOT be reachable here"; run;
 proc print data=b noobs; title "b MUST NOT EXIST"; run;

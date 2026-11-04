@@ -4,7 +4,7 @@ data _null_;
   b = mod(0.6, 0.2);  /* SAS: 0 (fuzzed) */
   c = mod(10, 3);     /* exact integer remainder, unchanged */
   d = mod(-7, 3);     /* sign of dividend, unchanged */
-  e = modz(0.3, 0.1); /* MODZ: no fuzzing — dust leaks through */
+  e = modz(0.3, 0.1); /* MODZ: no fuzzing - dust leaks through */
   f = modz(10, 3);
   put "a=" a " b=" b " c=" c " d=" d;
   put "e=" e best20. " f=" f;

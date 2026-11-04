@@ -1,4 +1,4 @@
-/* Column input's documented feature list — SAS 9.4 Language Reference: Concepts
+/* Column input's documented feature list - SAS 9.4 Language Reference: Concepts
    p.514 (PDF 532), "Column Input":
      - "Input values can be read in any order, regardless of their position in
        the record."
@@ -21,7 +21,7 @@ datalines;
 ;
 run;
 
-/* an all-blank numeric field is missing — no period needed, no error */
+/* an all-blank numeric field is missing - no period needed, no error */
 data _null_;
   infile datalines truncover;
   input x 1-3 y 5-7;

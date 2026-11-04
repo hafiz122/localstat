@@ -1,4 +1,4 @@
-/* ORACLE-unblocked-batch item 5 (NOTE-updatedupmaster) — UPDATE with DUPLICATE
+/* ORACLE-unblocked-batch item 5 (NOTE-updatedupmaster) - UPDATE with DUPLICATE
    BY keys in the MASTER data set. Pinned CONFORMANT against three sentences of
    SAS 9.4 DATA Step Statements: Reference, all verified against the page
    markers, not copied from a board line:
@@ -19,7 +19,7 @@
      - 5 master obs in  ->  5 obs out (one per MASTER obs, not per BY group);
      - only the FIRST id=2 obs is updated; the 2nd and 3rd keep 'c' and 'd';
      - BOTH id=2 transactions (Y then Z) land on that first obs, so it is 'Z'
-       and not 'Y' — the parenthesised sentence above.
+       and not 'Y' - the parenthesised sentence above.
 
    The Statements Ref is SILENT on whether SAS also logs a "MASTER contains
    more than one observation for a BY group" WARNING; that half stays parked.

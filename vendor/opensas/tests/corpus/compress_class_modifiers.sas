@@ -2,7 +2,7 @@
    (classMod/matchesClass): keep-mode k with n/l/u and remove-mode with
    a/d/p/s. Regression guard for BUG-compressclass (silent drop of every
    class modifier beyond a/d/p/s). Unknown modifier errors loudly (D-002);
-   the bad row prints missing — and since COMPRESS is a CHARACTER function that
+   the bad row prints missing - and since COMPRESS is a CHARACTER function that
    missing is a BLANK CHARACTER, not the numeric `.` this golden used to show
    (BUG-scanmissingtype). The vtype line below pins the type, so the assertion
    is STRONGER than the `bad=.` it replaces, not weaker.
@@ -22,7 +22,7 @@ data _null_;
 run;
 
 /* unknown modifier letter errors loudly (stderr ERROR, non-zero exit) and
-   yields missing — never silently ignored (D-002). */
+   yields missing - never silently ignored (D-002). */
 data _null_;
   bad = compress('abc',,'kz');
   badt = vtype(bad);

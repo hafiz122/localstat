@@ -1,4 +1,4 @@
-/* BUG-xportwritefidelity F1: XPORT WRITE keeps special missings — a .A/.Z/._
+/* BUG-xportwritefidelity F1: XPORT WRITE keeps special missings - a .A/.Z/._
    numeric must ride the file as its TS-140 letter byte (byte0 + zero
    mantissa), not collapse to plain '.'. Write d → xport_specialmiss_write.xpt,
    read it back fresh through a second libname, print. The READ side is locked

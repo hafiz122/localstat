@@ -1,7 +1,7 @@
 /* PERF-sqlupdatecorr correctness fixture: a correlated scalar SET subquery
    `update m set v = (select nv from t where t.id = m.id)` reuses the
    SELECT-list single-equality hash path (was: the inner query re-executed per
-   target row — O(N*M), 82s/4.4GB at N=20k). Pure optimization — values must be
+   target row - O(N*M), 82s/4.4GB at N=20k). Pure optimization - values must be
    byte-identical to the per-row path: first-match-wins on duplicate inner
    keys, no-match -> missing, empty-group aggregate fold, alias + WHERE forms. */
 data m;

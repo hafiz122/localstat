@@ -1,4 +1,4 @@
-/* BUG-procmissingfilerc (GH#21) — a DATAFILE= that cannot be read is the
+/* BUG-procmissingfilerc (GH#21) - a DATAFILE= that cannot be read is the
    USER's error, exit 1: their path is wrong or the file was never delivered.
    It used to exit 2, which under the D-009 contract tells a downstream agent
    "opensas cannot do this, file an issue" about a path typo. Twin of exec.zig's
@@ -6,7 +6,7 @@
    BUG-procmissingrc2 absent-input arms.
 
    All FOUR delimited/workbook DBMS values funnel through one io.readFileRaw
-   call, so all four must land on the same class — `options nosyntaxcheck;`
+   call, so all four must land on the same class - `options nosyntaxcheck;`
    (D-024) keeps the later steps running so this one fixture exercises every
    one of them. The pin is the whole point: a gap OUTRANKS a user error in
    diag.exitCode, so if ANY of the four still marked a gap the run would exit 2

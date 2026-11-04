@@ -1,9 +1,9 @@
 /* BUG-filelibrefmember (doc-finder tick220 F6 + F9-sidecar): a libref pointed
    straight at ONE .sas7bdat FILE must apply the sibling `.labels` sidecar on
-   read — labels/formats/informats survive exactly like a directory-libref
-   read (F9) — and must serve ONLY the member the file actually holds (F6; the
+   read - labels/formats/informats survive exactly like a directory-libref
+   read (F9) - and must serve ONLY the member the file actually holds (F6; the
    wrong-name "ERROR: File ... does not exist" half is asserted by the
-   captured-diag test in src/main.zig — corpus diffs stdout only). PROC COPY
+   captured-diag test in src/main.zig - corpus diffs stdout only). PROC COPY
    through a directory libname stamps src.sas7bdat + src.labels eagerly; the
    FILE libref then reads the member back by its correct name. */
 data src;

@@ -1,5 +1,5 @@
 /* BUG-setstmtorder (doc-finder tick293 F1): statements textually BEFORE the
-   driving SET execute BEFORE its read — Language Reference: Concepts Ch.24's read happens where the
+   driving SET execute BEFORE its read - Language Reference: Concepts Ch.24's read happens where the
    SET statement sits, not at the top of the iteration. Pinned SAS semantics:
    - iteration 1's BEFORE sees k MISSING (the SET has not executed yet);
    - iteration 2's BEFORE sees k=1: SET-read variables are NOT reset to

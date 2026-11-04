@@ -4,7 +4,7 @@
    example (01APR2020: MONTH2→2, MONTH6→1, QTR2→1). h..k are the same
    documented fold (SEMIMONTH2 = monthly periods → 3; MONTH3 May → Apr-Jun
    bucket 2). Non-multiplied cases (c,d,cc,cd,cg) unchanged. l,cf are NOT
-   SAS-verified — week-cycle multipliers return honest missing by design. */
+   SAS-verified - week-cycle multipliers return honest missing by design. */
 data _null_;
   a  = intindex('month2',  '15MAR2020'd);  put "a=" a;   /* SAS 2 */
   b  = intindex('qtr2',    '15AUG2020'd);  put "b=" b;   /* SAS 2 */

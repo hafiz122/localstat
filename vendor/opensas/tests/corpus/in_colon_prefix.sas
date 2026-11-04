@@ -1,13 +1,13 @@
-/* GAP-inoperators (3/3): `IN:` — the colon prefix-match modifier on IN. "You
+/* GAP-inoperators (3/3): `IN:` - the colon prefix-match modifier on IN. "You
    can add a colon (:) modifier to any of the operators to compare only a
    specified prefix of a character string" (Language Reference: Concepts p.127); p.130 names the "IN:
    comparison" beside the "EQ: comparison" in the zero-length rule. Each
    membership test therefore truncates BOTH operands to the shorter one's
-   length — the very same prefix compare `=:` already uses, so the two colon
+   length - the very same prefix compare `=:` already uses, so the two colon
    forms agree by construction, including the rule that a zero-length value
    never matches (Language Reference: Concepts p.130: "The result always evaluates to 0").
 
-   `x in: (1:3)` — the colon modifier over the M:N integer-range form — is a
+   `x in: (1:3)` - the colon modifier over the M:N integer-range form - is a
    loud parse error (captured-diagnostics test in parser_expr.zig): the doc
    defines the prefix compare for character strings only. */
 data _null_;

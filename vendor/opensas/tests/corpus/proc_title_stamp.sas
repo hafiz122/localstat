@@ -1,5 +1,5 @@
 /* BUG-proctitlestamp-univcontents: a user TITLE stamps atop (and FOOTNOTE below)
-   PROC UNIVARIATE and PROC CONTENTS listings, exactly as PRINT/MEANS/FREQ do —
+   PROC UNIVARIATE and PROC CONTENTS listings, exactly as PRINT/MEANS/FREQ do -
    both were silently skipping the shared title-emit path. n=3 keeps the moments
    trivial; the point is the "Hdr" line above each proc and "ftr" below. */
 title "Hdr";

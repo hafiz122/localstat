@@ -1,5 +1,5 @@
 /* GH#71 ISS-dkricond: an INPUT-side drop= of a never-referenced var is FATAL in
-   SAS 9.4 (DKRICOND=ERROR) — unlike the DROP/KEEP *statement*, which is a
+   SAS 9.4 (DKRICOND=ERROR) - unlike the DROP/KEEP *statement*, which is a
    DKROCOND=WARN case (see keep_nonexist_warn). The step aborts with 0 obs and
    poisons downstream (syntax-check mode), so the final PUT never runs. Contrast
    keep_nonexist_warn, where the trailing step DOES print. Expected stdout is

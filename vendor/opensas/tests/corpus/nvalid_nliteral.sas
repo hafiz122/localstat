@@ -1,5 +1,5 @@
 /* BUG-nvalidnliteral (doc-finder tick243 F1/F2): NVALID honors its 2nd
-   argument (V7/ANY/NLITERAL/UPCASE) and trims only TRAILING blanks — a
+   argument (V7/ANY/NLITERAL/UPCASE) and trims only TRAILING blanks - a
    LEADING blank makes a name invalid. NLITERAL returns an already-valid V7
    name unchanged, else quotes per doc p.1225-1226: SINGLE quotes when the
    string contains &, %, or more " than '; double quotes otherwise. */

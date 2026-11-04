@@ -1,6 +1,6 @@
 /* Multi-key BY first./last.: inner key (b) resets on every outer (a) change,
    even when the inner VALUE repeats across the boundary. first.a implies
-   first.b; a single-obs group has both flags 1. (tick217 audit — locks the
+   first.b; a single-obs group has both flags 1. (tick217 audit - locks the
    verified-correct multi-key reset semantics.) */
 data have;
   input a b;

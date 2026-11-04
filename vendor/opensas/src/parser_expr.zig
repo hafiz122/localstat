@@ -1,13 +1,13 @@
-//! Expression parser — tokens → `ast.Expr`. Precedence climbing (Pratt): one
+//! Expression parser - tokens → `ast.Expr`. Precedence climbing (Pratt): one
 //! `parseBin(min_prec)` loop with a per-operator precedence, `**` right-assoc,
 //! unary `-`/`NOT` binding looser than `**` (so `-2**2` is `-(2**2)`), function
 //! calls, and the lone `.` numeric-missing literal.
 //!
-//! Input contract — the `Token` stream:
+//! Input contract - the `Token` stream:
 //!   Tokens come from `lexer.zig`, which OWNS the `Token`/`Tag` types (they were
 //!   seeded here while no lexer existed and have since been hoisted, L1). The
-//!   statement parser (A2) reuses this same `Parser` — the cursor helpers are
-//!   `pub` — over the whole token stream.
+//!   statement parser (A2) reuses this same `Parser` - the cursor helpers are
+//!   `pub` - over the whole token stream.
 //!
 //! Arena: every node is `arena.create`d; the caller owns the arena and frees
 //! the whole tree at once. Errors go through the shared `Diagnostics` (M0.4).
@@ -28,10 +28,10 @@ pub const Tag = lexer.Tag;
 // ── Precedence table ─────────────────────────────────────────────────────
 // Higher binds tighter. Mirrors SAS operator priority (OR<AND<compare<concat<
 // add<mul<pow). Unary operands parse at `prec_pow` so `**` binds into them but
-// `*`/`/` do not — this is what makes `-2**2` == `-(2**2)`.
+// `*`/`/` do not - this is what makes `-2**2` == `-(2**2)`.
 
 // minmax (`><`/`<>`/MIN/MAX) is SAS Group I TOGETHER with `**` and the unary
-// ops: one precedence level, evaluated right-to-left — `2 ** 3 <> 4` is
+// ops: one precedence level, evaluated right-to-left - `2 ** 3 <> 4` is
 // 2**(3<>4)=16 and `-2 <> 3` is -(2<>3)=-3, the same rule that makes -2**2=-4
 // (BUG-minmaxprec; a separate left-assoc level 7 silently mis-grouped exactly
 // those mixes).
@@ -69,8 +69,8 @@ pub const Parser = struct {
     diags: *diag.Diagnostics,
     pos: usize = 0,
     arrays: std.ArrayList(ArrayDef) = .empty, // declared arrays, for a{i} refs
-    // Inside a WHERE expression `<>` means NOT-EQUAL, not the MAX operator —
-    // the documented SAS WHERE quirk — and `><` (MIN) is not valid at all.
+    // Inside a WHERE expression `<>` means NOT-EQUAL, not the MAX operator -
+    // the documented SAS WHERE quirk - and `><` (MIN) is not valid at all.
     // Set by every WHERE parse site (WHERE statement, where= option, PROC
     // WHERE); silently keeping MAX turned `where x <> 3` into a filter that
     // kept every row (BUG-wherene).
@@ -81,10 +81,10 @@ pub const Parser = struct {
     // parser drains the list into `hash_op` statements around the enclosing
     // statement. Temps are minted through the statement parser's own counter so
     // they share its `__hashattr:` drop wildcard. Null = disabled (WHERE/SQL
-    // sub-parsers) — a hash call there stays the loud parse error it was.
+    // sub-parsers) - a hash call there stays the loud parse error it was.
     hash_hoists: std.ArrayList(ast.HashCall) = .empty,
     hashattr_n: ?*usize = null,
-    // Live recursion depth of parseBin — every nesting level (a paren, a unary
+    // Live recursion depth of parseBin - every nesting level (a paren, a unary
     // op, a call/array arg) routes through it, so one counter here guards the
     // whole Pratt loop. Adversarial input (`(((…1…)))` ~100k deep) overflowed
     // the native stack and SEGFAULTed instead of failing loud (BUG-parser-deepnest).
@@ -104,7 +104,7 @@ pub const Parser = struct {
 
     /// Offset an array subscript by an explicit lower bound: `a{i}` on an array
     /// declared `{lo:hi}` reads the (i-lo)-th 0-based member, so rewrite the
-    /// subscript to `i - (lo-1)` — then the shared `elements[i-1]` runtime path
+    /// subscript to `i - (lo-1)` - then the shared `elements[i-1]` runtime path
     /// lands on the right slot with NO runtime change (ARRAY-lobound-impl). A
     /// default lower bound (lo=1) returns the index untouched.
     pub fn offsetArrayIndex(self: *Parser, index: *const ast.Expr, lo: i64) Error!*const ast.Expr {
@@ -123,12 +123,12 @@ pub const Parser = struct {
     /// fastest): flat = 1 + Σ_m (idx_m − lo_m)·(Π sizes after m).
     ///
     /// SAS 9.4 validates EACH subscript against ITS dimension's bounds and
-    /// truncates it to an integer BEFORE folding — a per-dimension OOR (`a{1,3}`
+    /// truncates it to an integer BEFORE folding - a per-dimension OOR (`a{1,3}`
     /// on a{2,2}) must fail loud, not silently carry into a valid-but-wrong flat
     /// slot (BUG-arraymultidimoor, data corruption). Two encodings, both hit the
     /// unchanged `elements[flat-1]` runtime path:
     ///   • all-literal subscripts → fold to a constant flat index HERE, checking
-    ///     bounds at parse time (SAS reports constant OOR at compile time) — keeps
+    ///     bounds at parse time (SAS reports constant OOR at compile time) - keeps
     ///     the fold const-foldable (GAP-multidimarray tests) and fixes truncation.
     ///   • any dynamic subscript → a synthetic `__dimchk` call (resolved in
     ///     eval.zig) carrying each dim's (index, lo, size) so the truncate + check
@@ -168,7 +168,7 @@ pub const Parser = struct {
 
     pub fn peek(self: *Parser) Token {
         // The eof-sentinel contract can be broken upstream: a truncated `of`
-        // list (`sum(of a` — no closing paren) makes the token-level of-list
+        // list (`sum(of a` - no closing paren) makes the token-level of-list
         // rewrite drop the trailing .eof, and the cursor then walks past the
         // array (BUG-ofcrashtruncated: panic/SIGABRT). Clamp to a synthetic
         // eof so the parse fails loud via expect() like any other truncated
@@ -220,18 +220,18 @@ pub const Parser = struct {
         self.depth += 1;
         defer self.depth -= 1;
         var lhs = try self.parseUnary();
-        // rhs operand of the last comparison built at THIS level — a following
+        // rhs operand of the last comparison built at THIS level - a following
         // comparison op chains SAS-style (QA-chaincmp below).
         var chain_rhs: ?*const ast.Expr = null;
         while (true) {
             // IN / NOT IN sit at comparison precedence (3) but take a parenthesized
             // LIST, not a single operand, so peekBinOp can't model them. Desugar to
-            // an OR of equalities (AND of inequalities for NOT IN) — no new AST node.
+            // an OR of equalities (AND of inequalities for NOT IN) - no new AST node.
             if (self.peekIn()) |negated| {
                 if (3 < min_prec) break;
                 if (negated) _ = self.advance(); // 'not'
                 _ = self.advance(); // 'in'
-                // `IN:` — the colon prefix-match modifier, the same family as
+                // `IN:` - the colon prefix-match modifier, the same family as
                 // `=:` ("You can add a colon (:) modifier to any of the
                 // operators", Language Reference: Concepts p.127; p.130 names the "IN: comparison"
                 // explicitly). Each membership test truncates to the shorter
@@ -254,7 +254,7 @@ pub const Parser = struct {
                 chain_rhs = null;
                 continue;
             }
-            // LIKE / NOT LIKE — WHERE-only comparison operator (prec 3). `%` matches
+            // LIKE / NOT LIKE - WHERE-only comparison operator (prec 3). `%` matches
             // any string, `_` exactly one char. Desugar to the like() runtime call,
             // mirroring sql.zig:1011 so DATA-step and PROC/SQL WHERE agree (GH#20).
             if (self.peekLike()) |negated| {
@@ -267,11 +267,11 @@ pub const Parser = struct {
                 continue;
             }
             // Infix `NOT` before a comparison operator (`x not eq 4`) or before
-            // `=*` (`lastname not =* 'Smith'`) — Language Reference: Concepts p.226: "You can use the
+            // `=*` (`lastname not =* 'Smith'`) - Language Reference: Concepts p.226: "You can use the
             // NOT logical operator in combination with any SAS and WHERE
             // expression operator", p.224 (sounds-like). The six sibling
             // negations (not in/contains/like/between, is not missing) already
-            // worked; desugar to the NEGATED operator — no new AST node, the
+            // worked; desugar to the NEGATED operator - no new AST node, the
             // same trick as NOT IN (GAP-wherenotinfix). Ungated like NOT IN:
             // a PREFIX not never reaches here (parseUnary eats it), so
             // `not x eq 4` keeps SAS's (not x) eq 4 precedence.
@@ -297,13 +297,13 @@ pub const Parser = struct {
                 continue;
             }
             // `=*` sounds-like comparison (prec 3): TRUE when SOUNDEX(L) =
-            // SOUNDEX(R). The lexer has no `=*` token — it lexes as `.eq` then
-            // `.star` — so peek the pair here and desugar to
+            // SOUNDEX(R). The lexer has no `=*` token - it lexes as `.eq` then
+            // `.star` - so peek the pair here and desugar to
             // `soundex(L) = soundex(R)`, the same no-new-BinOp trick as
             // mkLike/mkTruncCmp (GAP-soundslike). `a = * b` was a parse error
             // before, so stealing the pair breaks nothing. soundex() coerces
             // both operands to char and yields '' for blanks, so two blanks
-            // compare equal — exactly SAS's rule.
+            // compare equal - exactly SAS's rule.
             if (self.peek().tag == .eq and self.toks[self.pos + 1].tag == .star) {
                 if (3 < min_prec) break;
                 _ = self.advance(); // '='
@@ -317,18 +317,18 @@ pub const Parser = struct {
             }
             const info = self.peekBinOp() orelse break;
             if (info.prec < min_prec) break;
-            // The `><` SYMBOL has no WHERE meaning (and `<>` became NE above) —
+            // The `><` SYMBOL has no WHERE meaning (and `<>` became NE above) -
             // erroring beats silently computing a MIN nobody asked for
             // (BUG-wherene). The word form MIN is fine (Language Reference: Concepts p.225).
             if (self.where_ctx and info.op == .min and self.peek().tag == .min_op)
                 return self.diags.fail(error.ParseError, self.peek().line, "the >< (MIN) operator is not valid in a WHERE expression", .{});
             // The LEGACY `=<`/`=>` spellings of LE/GE are accepted everywhere a
-            // DATA-step expression is — but NOT in a WHERE clause (Language Reference: Concepts p.127
+            // DATA-step expression is - but NOT in a WHERE clause (Language Reference: Concepts p.127
             // Table 6.4 fn.2/3). The lexer stamped the spelling on the token, so
             // reject it loud here rather than silently comparing, exactly like
             // `><` above. ponytail: the same footnote excludes PROC SQL, which
             // parses its WHERE through this parser WITHOUT where_ctx (sql.zig
-            // owns that path) — so the SQL half is not enforced yet.
+            // owns that path) - so the SQL half is not enforced yet.
             if (self.where_ctx and (std.mem.eql(u8, self.peek().text, "=<") or std.mem.eql(u8, self.peek().text, "=>")))
                 return self.diags.fail(error.ParseError, self.peek().line, "the {s} operator is not valid in a WHERE expression", .{self.peek().text});
             _ = self.advance();
@@ -339,7 +339,7 @@ pub const Parser = struct {
             // NOTE-sqltruncblanks: a colon MARKED "trim" was planted by sql.zig's
             // EQT-family rewrite and carries PROC SQL's trailing-blank rule
             // (p.405); an unmarked one is the DATA step's own `=:` and keeps the
-            // storage-length rule. Read before eating — `eat` discards the token.
+            // storage-length rule. Read before eating - `eat` discards the token.
             const trim_blanks = self.check(.colon) and std.mem.eql(u8, self.peek().text, "trim");
             const truncate = isCmpOp(info.op) and self.eat(.colon);
             // right-assoc: recurse at the same prec so a following same-prec op
@@ -347,16 +347,16 @@ pub const Parser = struct {
             const next_min = if (info.right) info.prec else info.prec + 1;
             const rhs = try self.parseBin(next_min);
             if (truncate) {
-                // ponytail: truncated compares don't chain — build and move on.
+                // ponytail: truncated compares don't chain - build and move on.
                 lhs = try self.mkTruncCmp(info.op, lhs, rhs, trim_blanks);
                 chain_rhs = null;
                 continue;
             }
             // SAS chained comparison (QA-chaincmp): `a <= x <= b` means
-            // (a<=x) AND (x<=b) — NOT the C-style ((a<=x))<=b, whose 0/1 result
+            // (a<=x) AND (x<=b) - NOT the C-style ((a<=x))<=b, whose 0/1 result
             // compared to a date/datetime is almost always true (this silently
             // broke every low<=x<=high window check, e.g. an EPOCH macro's). The
-            // shared middle operand is one AST node evaluated twice — SAS
+            // shared middle operand is one AST node evaluated twice - SAS
             // expressions are pure, so that's safe.
             if (isCmpOp(info.op) and chain_rhs != null) {
                 const cmp = try self.mk(.{ .binary = .{ .op = info.op, .lhs = chain_rhs.?, .rhs = rhs } });
@@ -416,7 +416,7 @@ pub const Parser = struct {
     /// `x not =* 'S'`)? Returns the NEGATED operator, or .sounds_like for
     /// `not =*` (GAP-wherenotinfix). Null when `not` is the prefix operator
     /// (followed by an operand) or precedes a non-comparison word (`not and`,
-    /// `not min`) — those are not this form.
+    /// `not min`) - those are not this form.
     fn peekNotCmp(self: *Parser) ?NotCmp {
         const t = self.peek();
         if (t.tag != .name or !std.ascii.eqlIgnoreCase(t.text, "not")) return null;
@@ -460,18 +460,18 @@ pub const Parser = struct {
         return self.mk(.{ .unary = .{ .op = .not, .operand = call } });
     }
 
-    /// `L op: R` — colon-modified (truncated) comparison. SAS truncates the
+    /// `L op: R` - colon-modified (truncated) comparison. SAS truncates the
     /// LONGER operand to the SHORTER one's length before comparing (Language Reference: Concepts Ch.6
     /// p.129: "SAS truncates the longer value to the length of the shorter
-    /// value"), so BOTH operands are cut to `min(lengthc(L), lengthc(R))` —
+    /// value"), so BOTH operands are cut to `min(lengthc(L), lengthc(R))` -
     /// LENGTHC (storage length incl. trailing blanks, declared width for vars),
     /// not trimmed LENGTH (BUG-coloncmplen: `"ca" =: "cat"` is 1 in SAS;
     /// `v/$10 =: w/$5` compares 5 chars). Reuses the substr/lengthc/min runtime
     /// rather than adding a BinOp+eval path (GH#29).
-    /// ponytail: this is a CHAR operator — numeric operands coerce to char via
+    /// ponytail: this is a CHAR operator - numeric operands coerce to char via
     /// substr/lengthc, matching SAS's own character-context handling.
     ///
-    /// NOTE-sqltruncblanks — `trim_blanks` picks WHICH SURFACE'S RULE applies,
+    /// NOTE-sqltruncblanks - `trim_blanks` picks WHICH SURFACE'S RULE applies,
     /// and the SQL Procedure User's Guide p.405 assigns the two itself, in one
     /// sentence naming both: "The Base SAS WHERE processor truncates comparisons
     /// based on the ACTUAL LENGTH of a string, EVEN IF A STRING INCLUDES BLANKS
@@ -499,7 +499,7 @@ pub const Parser = struct {
         // comparison or an EQ: comparison, the two-character values are not
         // considered equal. The result always evaluates to 0." A blank IS the
         // zero-length/missing character value (p.129), so min(lengthn)=0 marks
-        // the case (LENGTHN: 0 for blank; LENGTH blanks→1) — `'' =: ''`
+        // the case (LENGTHN: 0 for blank; LENGTH blanks→1) - `'' =: ''`
         // truncated to ' ' = ' ' and trivially matched.
         // The page settles EQ: (IN: is unimplemented here and already fails
         // loud), so the guard wraps .eq only; <=:/>=: at zero length stay
@@ -526,8 +526,8 @@ pub const Parser = struct {
 
     /// SUBSTRN, not SUBSTR: "Returns a substring, ALLOWING A RESULT WITH A
     /// LENGTH OF ZERO" (SAS 9.4 Functions and CALL Routines: Reference p.1534).
-    /// A truncated compare can legally ask for a zero-length prefix — `x =: ''`
-    /// is the documented false case (Language Reference: Concepts p.130) — and SUBSTR treats length 0
+    /// A truncated compare can legally ask for a zero-length prefix - `x =: ''`
+    /// is the documented false case (Language Reference: Concepts p.130) - and SUBSTR treats length 0
     /// as an INVALID ARGUMENT: it writes "Invalid third argument to function
     /// SUBSTR", sets _ERROR_=1, and returns the whole REMAINDER of the string.
     /// All three are wrong here: the user wrote a comparison and never called
@@ -553,14 +553,14 @@ pub const Parser = struct {
         return self.mk(.{ .binary = .{ .op = if (negated) .eq else .gt, .lhs = call, .rhs = zero } });
     }
 
-    /// The right operand of IN, `in` already consumed: either an ARRAY NAME —
+    /// The right operand of IN, `in` already consumed: either an ARRAY NAME -
     /// "You can also use the IN operator to search an array" (Language Reference: Concepts p.128
-    /// numeric / p.130 character) — or the parenthesized value list. A name that
+    /// numeric / p.130 character) - or the parenthesized value list. A name that
     /// is not a declared array falls through, so `x in y` stays the loud
     /// "expected '(' after IN" it was.
     fn parseInRhs(self: *Parser, lhs: *const ast.Expr, negated: bool, truncate: bool) Error!*const ast.Expr {
         const t = self.peek();
-        // A subscripted `a{i}` / `a(i)` is an ELEMENT, not the array — not an IN
+        // A subscripted `a{i}` / `a(i)` is an ELEMENT, not the array - not an IN
         // right operand, so leave it to parseInList's loud '(' expectation.
         if (t.tag == .name and self.tokAt(1).tag != .lbrace and self.tokAt(1).tag != .lparen) {
             if (self.lookupArray(t.text)) |def| return self.parseInArray(lhs, def, negated, truncate);
@@ -568,14 +568,14 @@ pub const Parser = struct {
         return self.parseInList(lhs, negated, truncate);
     }
 
-    /// `lhs in a` — membership over array `a`'s elements, the same OR-of-equalities
+    /// `lhs in a` - membership over array `a`'s elements, the same OR-of-equalities
     /// desugar the value-list form uses (element ORDER cannot matter: the result is
     /// 1 as soon as any element matches, Language Reference: Concepts Example Code 6.2/6.3). Missing and
-    /// blank elements are compared like any other value — an all-blank char array
+    /// blank elements are compared like any other value - an all-blank char array
     /// simply never matches a non-blank probe, which is exactly Example Code 6.3.
     fn parseInArray(self: *Parser, lhs: *const ast.Expr, def: ArrayDef, negated: bool, truncate: bool) Error!*const ast.Expr {
         const tok = self.advance(); // the array name
-        // `array v{*} _numeric_` members are a runtime fact (GH#48) — expanding
+        // `array v{*} _numeric_` members are a runtime fact (GH#48) - expanding
         // them here would silently search the wrong set, so stay loud.
         if (def.special != null or def.elements.len == 0)
             return self.diags.fail(error.ParseError, tok.line, "IN over array {s}: its members are not known until run time", .{tok.text});
@@ -591,7 +591,7 @@ pub const Parser = struct {
         return acc.?; // elements.len > 0 was checked above
     }
 
-    /// One IN membership test: `lhs = value` (`ne` when negated), or — for `IN:` —
+    /// One IN membership test: `lhs = value` (`ne` when negated), or - for `IN:` -
     /// the prefix-truncated compare, reusing the `=:` implementation so the two
     /// colon forms share ONE prefix compare (including the zero-length rule of
     /// Language Reference: Concepts p.130, which names IN: and EQ: in the same sentence).
@@ -610,7 +610,7 @@ pub const Parser = struct {
     /// `(e1, e2, …)` → `lhs=e1 or lhs=e2 …` (IN), or `lhs<>e1 and lhs<>e2 …`
     /// (NOT IN). An empty list is a SAS syntax error (IN requires ≥1 value).
     /// A `M:N` item enumerates the INTEGERS M..N (Language Reference: Concepts p.128): membership is
-    /// `lhs>=M and lhs<=N and floor(lhs)=lhs` — `2.5 in (1:3)` is FALSE
+    /// `lhs>=M and lhs<=N and floor(lhs)=lhs` - `2.5 in (1:3)` is FALSE
     /// (BUG-inrangecontinuous). Bounds must be integer literals; `(1.5:3)` is
     /// a syntax error. Singletons and ranges mix freely (PG-inrange).
     fn parseInList(self: *Parser, lhs: *const ast.Expr, negated: bool, truncate: bool) Error!*const ast.Expr {
@@ -647,7 +647,7 @@ pub const Parser = struct {
                         .rhs = cmp,
                     } });
                 } else acc = cmp;
-                // SAS accepts a SPACE- or comma-separated IN list — the comma is
+                // SAS accepts a SPACE- or comma-separated IN list - the comma is
                 // optional; keep taking elements until the closing ')' (BUG-inspacelist).
                 _ = self.eat(.comma);
                 if (self.check(.rparen)) break;
@@ -657,7 +657,7 @@ pub const Parser = struct {
         return acc orelse self.diags.fail(error.ParseError, in_line, "IN operator requires at least one value", .{});
     }
 
-    /// Integer-literal value of an IN-range bound (`3`, `-3`), else null — SAS
+    /// Integer-literal value of an IN-range bound (`3`, `-3`), else null - SAS
     /// requires M and N of `M:N` to be integers (BUG-inrangecontinuous).
     fn inRangeBound(e: *const ast.Expr) ?f64 {
         const v: f64 = switch (e.*) {
@@ -676,7 +676,7 @@ pub const Parser = struct {
                 const e = try self.parseBin(prec_pow);
                 return self.mk(.{ .unary = .{ .op = .neg, .operand = e } });
             },
-            .plus => { // unary plus is identity — no node
+            .plus => { // unary plus is identity - no node
                 _ = self.advance();
                 return self.parseBin(prec_pow);
             },
@@ -719,14 +719,14 @@ pub const Parser = struct {
             },
             .name => {
                 // GAP-hashinexpr: `obj.method(…)` / `obj.attr` in expression
-                // position — hoist the call (see parseHashExpr). Gated on the
+                // position - hoist the call (see parseHashExpr). Gated on the
                 // statement parser opting in via hashattr_n.
                 if (self.hashattr_n) |cnt|
                     if (self.tokAt(1).tag == .dot and self.tokAt(2).tag == .name)
                         return self.parseHashExpr(cnt);
                 _ = self.advance();
                 if (self.check(.lparen)) {
-                    // `a(i)` is an array subscript when `a` is a declared array —
+                    // `a(i)` is an array subscript when `a` is a declared array -
                     // SAS 9.4 allows ()/{}/[] interchangeably (`[`/`{` lex to
                     // .lbrace; `(` stays .lparen for genuine calls). Only divert
                     // when the name resolves to an array; else it's a function
@@ -810,7 +810,7 @@ pub const Parser = struct {
             _ = try self.expect(.rbrace, "'}}' to close array subscript");
         const def = self.lookupArray(name_tok.text) orelse
             return self.diags.fail(error.ParseError, name_tok.line, "{s} is not a declared array", .{name_tok.text});
-        // A special-list array (`array v{*} _numeric_;`) is 1-D and dynamic — keep
+        // A special-list array (`array v{*} _numeric_;`) is 1-D and dynamic - keep
         // its single subscript verbatim (resolved against the live PDV at eval).
         if (def.special != null) return .{ .def = def, .index = indices.items[0] };
         if (indices.items.len != def.dims.len)
@@ -818,7 +818,7 @@ pub const Parser = struct {
         return .{ .def = def, .index = try self.arraySubscript(name_tok, indices.items, def.dims) };
     }
 
-    /// `a{ i[,j] }` — resolve `a` to its members and fold the subscript(s).
+    /// `a{ i[,j] }` - resolve `a` to its members and fold the subscript(s).
     fn parseArrayRef(self: *Parser, name_tok: Token) Error!*const ast.Expr {
         const r = try self.parseArraySubscript(name_tok);
         return self.mk(.{ .array_ref = .{ .name = name_tok.text, .elements = r.def.elements, .index = r.index, .special = r.def.special, .line = name_tok.line } });
@@ -836,7 +836,7 @@ pub const Parser = struct {
                 // Routines Reference, INPUT, printed pp.1038-39; doc Example 3
                 // prints _ERROR_=1 under `?`). Was dropped here with a
                 // "silent-missing is correct" claim the doc falsifies
-                // (BUG-inputqq): the count now rides into functions.zig — for
+                // (BUG-inputqq): the count now rides into functions.zig - for
                 // the INPUT family the call NAME gains the `__…q`/`__…qq`
                 // desugar at the return below, because eval's call_fn boundary
                 // forwards name+args only (eval.zig evalCall; the `__assignc`
@@ -846,7 +846,7 @@ pub const Parser = struct {
                     _ = self.advance();
                     if (qq < 2) qq += 1;
                 }
-                // an omitted positional arg (`compress(x, , "kd")`) — the slot
+                // an omitted positional arg (`compress(x, , "kd")`) - the slot
                 // before a comma or `)` is empty. Emit an empty-string default so
                 // the arg *count* is preserved (the function decides how to
                 // default it: e.g. compress's char set becomes empty).
@@ -854,7 +854,7 @@ pub const Parser = struct {
                     try args.append(self.arena, .{ .str = "" });
                 }
                 // an informat argument (`input(x, date9.)`) is a name followed by
-                // a dot — not a valid expression, so reconstruct it as a string.
+                // a dot - not a valid expression, so reconstruct it as a string.
                 else if (try self.tryInformatSpec()) |spec| {
                     try args.append(self.arena, .{ .str = spec });
                 } else {
@@ -868,7 +868,7 @@ pub const Parser = struct {
         // dim/hbound/lbound(array [, d]): a named array's size is a compile-time
         // fact only the parser holds, so resolve the array-name argument to its
         // element count here; functions.zig turns that into the bound. (opensas dim)
-        // A SPECIAL-LIST array (`array v{*} _numeric_;`) has no parse-time count —
+        // A SPECIAL-LIST array (`array v{*} _numeric_;`) has no parse-time count -
         // leave the arg as an `array_ref` carrying its `special` kind so the
         // evaluator counts the matching PDV vars at runtime (GH#48).
         if (isBoundFn(name_tok.text) and args.items.len >= 1) {
@@ -881,7 +881,7 @@ pub const Parser = struct {
                 // typo like `dim(cnt)`, or an array renamed without updating the
                 // call). Without this guard the variable sailed through to
                 // charfns' generic handler, which returned its VALUE as the
-                // "bound" — silent-wrong. SAS: the argument must be an ARRAY name.
+                // "bound" - silent-wrong. SAS: the argument must be an ARRAY name.
                 const def = self.lookupArray(nm) orelse
                     return self.diags.fail(error.ParseError, name_tok.line, "{s}: the argument must be an ARRAY name; {s} is not a declared array", .{ name_tok.text, nm });
                 if (def.special) |k| {
@@ -891,12 +891,12 @@ pub const Parser = struct {
                     // 1-based 1-D array, so fold the answer here where the per-dimension
                     // lo/size are known (ARRAY-lobound / GAP-multidimarray). The optional
                     // 2nd arg picks the dimension k (1-based, default 1); it must be a
-                    // parse-time constant — a dynamic k on such an array isn't supported.
+                    // parse-time constant - a dynamic k on such an array isn't supported.
                     var kdim: usize = 1;
                     if (args.items.len >= 2) {
                         if (args.items[1] == .num) kdim = @intFromFloat(args.items[1].num) else {
                             // `dim(arr, k)` with a runtime k is valid SAS 9.4 we don't
-                            // fold — an opensas gap → exit 2 (D-009; parser.failGap's twin).
+                            // fold - an opensas gap → exit 2 (D-009; parser.failGap's twin).
                             diag.markGap();
                             return self.diags.fail(error.ParseError, name_tok.line, "{s}: a non-constant dimension index is not supported for array {s}", .{ name_tok.text, nm });
                         }
@@ -932,39 +932,39 @@ pub const Parser = struct {
         } });
     }
 
-    /// If the cursor is at an informat spec — `[$] NAME (. | .digits)`, e.g.
-    /// `date9.`, `yymmdd10.`, `comma8.2` (which tokenize unevenly) — consume it
+    /// If the cursor is at an informat spec - `[$] NAME (. | .digits)`, e.g.
+    /// `date9.`, `yymmdd10.`, `comma8.2` (which tokenize unevenly) - consume it
     /// and return the reconstructed spec string; else consume nothing, return
     /// null. A bare name or number is not an informat (left to `parseExpr`).
     fn tryInformatSpec(self: *Parser) Error!?[]const u8 {
         var j = self.pos;
-        if (j >= self.toks.len) return null; // truncated call at EOF (`sum(of` — BUG-ofcrashtruncated-2): guard before the toks[j] index, matching peek()'s clamp
+        if (j >= self.toks.len) return null; // truncated call at EOF (`sum(of` - BUG-ofcrashtruncated-2): guard before the toks[j] index, matching peek()'s clamp
         const has_dollar = self.toks[j].tag == .dollar;
         if (has_dollar) j += 1;
         if (j >= self.toks.len) return null;
         // Two shapes after the optional `$`:
-        //   NAME [. | .digits]  — date9., comma8.2, $char100. (name-based format)
-        //   NUMBER              — $100., $8. (dollar-width char format `$w.[d]`); the
+        //   NAME [. | .digits]  - date9., comma8.2, $char100. (name-based format)
+        //   NUMBER              - $100., $8. (dollar-width char format `$w.[d]`); the
         //                         lexer folds "100." into one number token. Requires
-        //                         the `$` — a bare numeric format (`8.2`) is left to
+        //                         the `$` - a bare numeric format (`8.2`) is left to
         //                         parseExpr, unchanged (BUG-putcharfmt).
         if (self.toks[j].tag == .name) {
             const after = if (j + 1 < self.toks.len) self.toks[j + 1] else self.toks[self.toks.len - 1];
             const is_inf = after.tag == .dot or (after.tag == .number and after.text.len > 0 and after.text[0] == '.');
             if (!is_inf) return null;
             // GAP-hashinexpr, function-argument slot: `NAME . NAME` is never an
-            // informat — a spec ENDS at its '.' (`date9.`) or carries digits
+            // informat - a spec ENDS at its '.' (`date9.`) or carries digits
             // (`comma8.2`), so a name after the dot cannot belong to it. Left
             // to the greedy grab above, `sum(h.num_items, 1)` was read as the
             // spec "h." and then blamed the paren ("expected ')' to close
-            // function call") while `if h.find() = 0` — the SAME operand one
-            // position over — already parsed. Hand the shape back to
+            // function call") while `if h.find() = 0` - the SAME operand one
+            // position over - already parsed. Hand the shape back to
             // parsePrimary, which routes it to parseHashExpr. Declared librefs
             // are folded to ONE token upstream (main.coalesceLibrefs), so this
             // cannot steal a `lib.member`. Gated on hashattr_n like
             // parsePrimary's arm, so WHERE/SQL sub-parsers are untouched.
             // ponytail: a LIBRARY-QUALIFIED informat (`input(x, lib.fmt.)`) also
-            // matches NAME.NAME and now takes the hash path — but informat_ref
+            // matches NAME.NAME and now takes the hash path - but informat_ref
             // has no qualified form in the grammar, so it was a loud parse error
             // before this and is a loud "hash object lib is not declared" after;
             // ceiling is the error WORDING, not acceptance. Add a
@@ -1008,7 +1008,7 @@ pub const Parser = struct {
             .slash => .{ .op = .div, .prec = 6, .right = false },
             .star2 => .{ .op = .pow, .prec = prec_pow, .right = true },
             .min_op => .{ .op = .min, .prec = prec_minmax, .right = true },
-            // WHERE context: `<>` is NE (comparison prec) — only the SYMBOLS are
+            // WHERE context: `<>` is NE (comparison prec) - only the SYMBOLS are
             // WHERE-special (`><` errors in parseBin); the MIN/MAX word forms are
             // ordinary Group-I operators in a WHERE too (Language Reference: Concepts p.225, GAP-whereminmax).
             .max_op => if (self.where_ctx)
@@ -1027,7 +1027,7 @@ pub const Parser = struct {
     }
 };
 
-/// A comparison operator — the ops that chain SAS-style (QA-chaincmp).
+/// A comparison operator - the ops that chain SAS-style (QA-chaincmp).
 fn isCmpOp(op: ast.BinOp) bool {
     return switch (op) {
         .eq, .ne, .lt, .le, .gt, .ge => true,
@@ -1064,7 +1064,7 @@ fn mnemonicOp(text: []const u8) ?OpInfo {
     if (eqi(text, "ge")) return .{ .op = .ge, .prec = 3, .right = false };
     if (eqi(text, "and")) return .{ .op = .@"and", .prec = 2, .right = false };
     if (eqi(text, "or")) return .{ .op = .@"or", .prec = 1, .right = false };
-    // Infix MIN/MAX operators (GAP-minmaxop). Only reached in operator position —
+    // Infix MIN/MAX operators (GAP-minmaxop). Only reached in operator position -
     // a `min(a,b)`/`max(a,b)` function call is consumed in parsePrimary first.
     if (eqi(text, "min")) return .{ .op = .min, .prec = prec_minmax, .right = true };
     if (eqi(text, "max")) return .{ .op = .max, .prec = prec_minmax, .right = true };
@@ -1165,7 +1165,7 @@ test "minmax operators: >< / <> and MIN/MAX bind at Group I (GAP-minmaxop)" {
     try std.testing.expect((try parseSrc(a, &diags, "min(5, 3)")).call.args.len == 2);
 
     // BUG-minmaxprec: **, unary and minmax are ONE right-to-left group.
-    // `2 ** 3 <> 4` → pow(2, max(3,4)) — the rightmost operator binds first.
+    // `2 ** 3 <> 4` → pow(2, max(3,4)) - the rightmost operator binds first.
     const h = try parseSrc(a, &diags, "2 ** 3 <> 4");
     try std.testing.expect(h.binary.op == .pow);
     try std.testing.expect(h.binary.rhs.binary.op == .max);
@@ -1185,12 +1185,12 @@ test "where context: <> is NE, >< errors, word MIN/MAX stay operators (BUG-where
     p.where_ctx = true;
     try std.testing.expect((try p.parseExpr()).binary.op == .ne);
 
-    // `><` is not valid in a WHERE expression — loud, not a silent MIN.
+    // `><` is not valid in a WHERE expression - loud, not a silent MIN.
     var q = Parser.init(a, try lexer.tokenize(a, "x >< 3", &diags), &diags);
     q.where_ctx = true;
     try std.testing.expectError(error.ParseError, q.parseExpr());
 
-    // The word forms ARE operators in a WHERE (Language Reference: Concepts p.225) — only the symbols
+    // The word forms ARE operators in a WHERE (Language Reference: Concepts p.225) - only the symbols
     // are WHERE-special. `x max 3` → max(x, 3), `a min b` → min(a, b).
     var r = Parser.init(a, try lexer.tokenize(a, "x max 3", &diags), &diags);
     r.where_ctx = true;
@@ -1261,7 +1261,7 @@ test "colon-modified comparison desugars to substrn(both,1,min(lengthc both)) op
     try std.testing.expectEqualStrings("x", mn.args[0].call.args[0].variable);
     try std.testing.expectEqualStrings("lengthc", mn.args[1].call.name);
     try std.testing.expectEqualStrings("T", mn.args[1].call.args[0].str);
-    // RHS is cut to the same min too — `"ca" =: "cat"` truncates the LONGER (RHS).
+    // RHS is cut to the same min too - `"ca" =: "cat"` truncates the LONGER (RHS).
     try std.testing.expectEqualStrings("substrn",eqe.binary.rhs.call.name);
     try std.testing.expectEqualStrings("T", eqe.binary.rhs.call.args[0].str);
 
@@ -1284,7 +1284,7 @@ test "INPUT ?/?? desugars the call name and records Call.qq (GH#4a BUG-inputqq)"
 
     // `input('2025', ?? zzznotreal.)` evaluates as __inputqq(...): eval's
     // call_fn boundary forwards name+args only (eval.zig evalCall), so the
-    // suppress level rides the NAME — the `__assignc` desugar pattern. The
+    // suppress level rides the NAME - the `__assignc` desugar pattern. The
     // informat argument parses clean of the markers either way.
     const qq = try parseSrc(a, &diags, "input('2025', ?? zzznotreal.)");
     try std.testing.expectEqualStrings("__inputqq", qq.call.name);
@@ -1292,7 +1292,7 @@ test "INPUT ?/?? desugars the call name and records Call.qq (GH#4a BUG-inputqq)"
     try std.testing.expectEqual(@as(usize, 2), qq.call.args.len);
     try std.testing.expectEqualStrings("zzznotreal.", qq.call.args[1].str);
 
-    // a single `?` — one marker, one q.
+    // a single `?` - one marker, one q.
     const q = try parseSrc(a, &diags, "input(x, ? date9.)");
     try std.testing.expectEqualStrings("__inputq", q.call.name);
     try std.testing.expectEqual(@as(u2, 1), q.call.qq);
@@ -1445,7 +1445,7 @@ test "IN M:N range enumerates integers M..N; mixes with singletons (BUG-inrangec
     const a = arena.allocator();
     var diags = diag.Diagnostics.init(a);
 
-    // x in (1:3) → ((x>=1) and (x<=3)) and (x = floor(x)) — integer-enumerated
+    // x in (1:3) → ((x>=1) and (x<=3)) and (x = floor(x)) - integer-enumerated
     // (Language Reference: Concepts p.128): 2.5 in (1:3) is FALSE.
     const e = try parseSrc(a, &diags, "x in (1:3)");
     try std.testing.expect(e.binary.op == .@"and");
@@ -1537,7 +1537,7 @@ test "deep-nested parens fail loud past the ceiling, not a segfault (BUG-parser-
     const a = arena.allocator();
     var diags = diag.Diagnostics.init(a);
 
-    // Build `((((…1…))))` a few hundred levels past the ceiling — the guard
+    // Build `((((…1…))))` a few hundred levels past the ceiling - the guard
     // trips (returning error.ParseError) long before the native stack does.
     const n = Parser.max_depth + 200;
     var src: std.ArrayList(u8) = .empty;
@@ -1589,7 +1589,7 @@ test "truncated of-list at the informat-spec probe fails loud, not SIGABRT (BUG-
 
     // `sum(of` at end-of-input: after the token-level of-list rewrite drops the
     // trailing .eof, parseCall consumes `(` and lands the cursor AT toks.len,
-    // then probes tryInformatSpec — which indexed self.toks[j] (j = self.pos)
+    // then probes tryInformatSpec - which indexed self.toks[j] (j = self.pos)
     // before its own bounds guard (SIGABRT). Reproduce that exact cursor state
     // by stripping the sentinel from `sum(`: tryInformatSpec is entered with
     // self.pos == toks.len. The added guard turns it into a loud ParseError.
@@ -1616,7 +1616,7 @@ test "legacy =< / => parse as LE / GE, loud in a WHERE (Language Reference: Conc
     const a = arena.allocator();
     var diags = diag.Diagnostics.init(a);
 
-    // `=<` is LE and `=>` is GE — the SAME node as the modern spelling, so
+    // `=<` is LE and `=>` is GE - the SAME node as the modern spelling, so
     // precedence, chaining and the mnemonics are shared by construction.
     try std.testing.expect((try parseSrc(a, &diags, "x =< 5")).binary.op == .le);
     try std.testing.expect((try parseSrc(a, &diags, "x => 5")).binary.op == .ge);
@@ -1685,7 +1685,7 @@ test "IN over an ARRAY name searches its members (Language Reference: Concepts p
     try std.testing.expectEqualStrings("substrn",tr.binary.rhs.binary.lhs.call.name);
 
     // A name that is NOT a declared array stays the loud value-list form, and a
-    // `{*} _numeric_` array (members are a runtime fact, GH#48) is loud too —
+    // `{*} _numeric_` array (members are a runtime fact, GH#48) is loud too -
     // expanding an empty member list would silently search nothing.
     var s = Parser.init(a, try lexer.tokenize(a, "x in notanarray", &diags), &diags);
     try std.testing.expectError(error.ParseError, s.parseExpr());
@@ -1704,7 +1704,7 @@ test "IN: is the prefix compare, sharing the =: desugar (Language Reference: Con
     const a = arena.allocator();
     var diags = diag.Diagnostics.init(a);
 
-    // `v in: ('AB')` builds EXACTLY what `v =: 'AB'` builds — one prefix
+    // `v in: ('AB')` builds EXACTLY what `v =: 'AB'` builds - one prefix
     // compare, including the zero-length guard (Language Reference: Concepts p.130 names both forms).
     const e = try parseSrc(a, &diags, "v in: ('AB')");
     const f = try parseSrc(a, &diags, "v =: 'AB'");
@@ -1721,7 +1721,7 @@ test "IN: is the prefix compare, sharing the =: desugar (Language Reference: Con
     try std.testing.expect(h.binary.op == .@"and");
     try std.testing.expect(h.binary.lhs.unary.op == .not);
 
-    // the M:N integer-range item has no prefix meaning — loud, not invented
+    // the M:N integer-range item has no prefix meaning - loud, not invented
     try std.testing.expectError(error.ParseError, parseSrc(a, &diags, "v in: (1:3)"));
     try std.testing.expect(diags.hasErrors());
     // plain IN still compares in full, and the range form still works there

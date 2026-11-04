@@ -1,4 +1,4 @@
-/* Regression: BUG-dsfnsclose — close() on a bad dataset id must not panic.
+/* Regression: BUG-dsfnsclose - close() on a bad dataset id must not panic.
    A missing (NaN), huge, or zero dsid once slipped the guard and aborted
    (SIGABRT) via @intFromFloat. Now every bad id returns -1. */
 data _null_;

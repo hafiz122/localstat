@@ -1,4 +1,4 @@
-//! The SCL dataset-access engine — the OPEN/FETCH/GETVAR family of functions that
+//! The SCL dataset-access engine - the OPEN/FETCH/GETVAR family of functions that
 //! read an in-memory Dataset through an integer data-set id (`dsid`).
 //!
 //! OPEN(member) looks the table up in the bound Library and returns a dsid into a
@@ -7,7 +7,7 @@
 //!
 //! The executor binds the live Library once via `bind()`; until then OPEN/EXIST
 //! find nothing (they return 0). ponytail: no update/where/by clauses, no engine
-//! options — read-only sequential/positional access over the in-memory tables.
+//! options - read-only sequential/positional access over the in-memory tables.
 
 const std = @import("std");
 const exec = @import("exec.zig");
@@ -27,7 +27,7 @@ var g_arena: ?std.heap.ArenaAllocator = null;
 var opens: std.ArrayList(OpenDs) = .empty;
 var bound: ?*Library = null;
 
-/// Drop all handles from a prior run (taste #12) — open dsids point at that
+/// Drop all handles from a prior run (taste #12) - open dsids point at that
 /// run's (now-freed) Library, the disk-load cache at this module's arena.
 pub fn resetPerRun() void {
     if (g_arena) |*ar| ar.deinit();
@@ -50,13 +50,13 @@ pub fn bind(lib: *Library) void {
 
 /// A `libname NAME "dir"` declaration, as bound by the CLI (BUG-existdisk):
 /// EXIST must see members that live on disk in a libref dir even when nothing
-/// preloaded them into memory — a member named only inside macro text is
+/// preloaded them into memory - a member named only inside macro text is
 /// invisible to main's literal-`lib.ds`-token preload.
 pub const Libref = struct { name: []const u8, dir: []const u8 };
 var librefs: []const Libref = &.{};
 
 /// Bound once per run by the CLI; empty for pure-in-memory runs (io == null),
-/// which have no disk semantics. A rebind is a run boundary — drop the OPEN
+/// which have no disk semantics. A rebind is a run boundary - drop the OPEN
 /// disk-load cache, whose names could otherwise resolve against the previous
 /// run's libref dirs.
 pub fn bindLibrefs(refs: []const Libref) void {
@@ -64,7 +64,7 @@ pub fn bindLibrefs(refs: []const Libref) void {
     disk_loaded.clearRetainingCapacity();
 }
 
-/// The directory bound to `libref`, if any — PROC DATASETS DELETE/KILL unlink
+/// The directory bound to `libref`, if any - PROC DATASETS DELETE/KILL unlink
 /// member files through this, else the disk probe below makes deleted members
 /// undead (BUG-datasetsdeletedisk).
 pub fn librefDir(name: []const u8) ?[]const u8 {
@@ -72,7 +72,7 @@ pub fn librefDir(name: []const u8) ?[]const u8 {
     return null;
 }
 
-/// Every bound libref — SASHELP.VTABLE enumerates their dirs so disk-only
+/// Every bound libref - SASHELP.VTABLE enumerates their dirs so disk-only
 /// members show in the dictionary view (GAP-vtabledisk).
 pub fn boundLibrefs() []const Libref {
     return librefs;
@@ -89,7 +89,7 @@ fn memberPath(dir: []const u8, member: []const u8) ?[]const u8 {
 
 /// The on-disk file behind `libref.member` under a bound libref: the libref's
 /// file itself when it points straight at a dataset file, else
-/// `dir/member.{sas7bdat,xpt,csv}` — probing the member as written and
+/// `dir/member.{sas7bdat,xpt,csv}` - probing the member as written and
 /// lower-cased (SAS names are case-insensitive; disk files usually aren't).
 /// Arena-owned path, or null. EXIST uses it as a pure probe; OPEN loads
 /// through it (GAP-opendisk).
@@ -112,11 +112,11 @@ fn diskPath(name: []const u8) ?[]const u8 {
     return memberPath(lr.dir, lower);
 }
 
-/// Disk members OPEN has lazy-loaded, keyed by name — one load per member no
+/// Disk members OPEN has lazy-loaded, keyed by name - one load per member no
 /// matter how often a dataset-existence-check pattern re-opens it.
 var disk_loaded: std.ArrayList(struct { name: []const u8, ds: *Dataset }) = .empty;
 
-/// Lazy-load a disk-only member for OPEN, into the dsfns arena — deliberately
+/// Lazy-load a disk-only member for OPEN, into the dsfns arena - deliberately
 /// NOT into the bound Library, so writeLibOutputs/loaded_ro semantics stay
 /// untouched (GAP-opendisk). Applies the `.labels` sidecar (VARLABEL/VARFMT/
 /// VARINFMT read those attrs). Null when the member isn't on disk or won't parse.
@@ -173,7 +173,7 @@ pub fn exist(name: []const u8) f64 {
 
 /// The DISK half of EXIST on its own: does `libref.member` have a file under a
 /// bound libref? main's step-commit rule needs this WITHOUT `find`'s bare-member
-/// fallback — a WORK data set of the same short name must not be mistaken for a
+/// fallback - a WORK data set of the same short name must not be mistaken for a
 /// permanent member (GAP-errgatereplaces). Always false with no bound librefs
 /// (a pure in-memory run has no disk semantics).
 pub fn onDisk(name: []const u8) bool {
@@ -184,7 +184,7 @@ pub fn onDisk(name: []const u8) bool {
 /// that lives only on disk under a bound libref (never SET) is lazy-loaded
 /// (GAP-opendisk). ponytail: the load cache is per run (cleared on rebind);
 /// a within-run DELETE then re-OPEN of the same disk member serves the cached
-/// rows — evict on delete if a real program ever does that.
+/// rows - evict on delete if a real program ever does that.
 pub fn open(name: []const u8) f64 {
     const ds = find(name) orelse loadFromDisk(name) orelse return 0;
     opens.append(arena(), .{ .ds = ds }) catch return 0;
@@ -199,7 +199,7 @@ pub fn close(dsid: f64) f64 {
     return 0;
 }
 
-/// ATTRN(dsid, attr): a numeric attribute — NOBS/NLOBS (observations), NVARS
+/// ATTRN(dsid, attr): a numeric attribute - NOBS/NLOBS (observations), NVARS
 /// (variables), ANY (1 when the set has rows/vars). Missing for the unknown.
 pub fn attrn(dsid: f64, attr: []const u8) f64 {
     const o = entry(dsid) orelse return miss;
@@ -209,7 +209,7 @@ pub fn attrn(dsid: f64, attr: []const u8) f64 {
     return miss;
 }
 
-/// ATTRC(dsid, attr): a character attribute — currently MEMNAME (the table name).
+/// ATTRC(dsid, attr): a character attribute - currently MEMNAME (the table name).
 pub fn attrc(dsid: f64, attr: []const u8) []const u8 {
     const o = entry(dsid) orelse return "";
     if (eqi(attr, "MEMNAME")) return o.ds.name;
@@ -286,7 +286,7 @@ pub fn varname(dsid: f64, n: f64) []const u8 {
     return if (col(dsid, n)) |c| c.name else "";
 }
 
-/// VARLABEL(dsid, n): the n-th variable's label — its name, since the dataset
+/// VARLABEL(dsid, n): the n-th variable's label - its name, since the dataset
 /// model carries no labels (SAS also falls back to the name for an unlabeled var).
 pub fn varlabel(dsid: f64, n: f64) []const u8 {
     // CALL LABEL semantics: the LABEL, falling back to the variable NAME when none.
@@ -294,7 +294,7 @@ pub fn varlabel(dsid: f64, n: f64) []const u8 {
     return c.label orelse varname(dsid, n);
 }
 
-/// VARLABEL() function semantics: the LABEL, or BLANK when none (BUG-sclmeta) —
+/// VARLABEL() function semantics: the LABEL, or BLANK when none (BUG-sclmeta) -
 /// unlike CALL LABEL, which falls back to the name.
 pub fn varlabelRaw(dsid: f64, n: f64) []const u8 {
     const c = col(dsid, n) orelse return "";
@@ -319,7 +319,7 @@ pub fn varinfmt(dsid: f64, n: f64) []const u8 {
     return c.informat orelse "";
 }
 
-/// VARLEN(dsid, n): the n-th variable's storage length — 8 for a numeric, and the
+/// VARLEN(dsid, n): the n-th variable's storage length - 8 for a numeric, and the
 /// widest stored value for a character (the model keeps no declared length).
 pub fn varlen(dsid: f64, n: f64) f64 {
     const c = col(dsid, n) orelse return miss;
@@ -336,7 +336,7 @@ pub fn varlen(dsid: f64, n: f64) f64 {
 }
 
 /// CEXIST(entry): whether a catalog entry exists. ponytail: no catalog store, so
-/// nothing is ever found — a safe conservative answer until catalogs land.
+/// nothing is ever found - a safe conservative answer until catalogs land.
 pub fn cexist(spec: []const u8) f64 {
     _ = spec;
     return 0;
@@ -548,7 +548,7 @@ test "GAP-opendisk: OPEN lazy-loads a disk-only member into the dsfns arena, not
     defer ga.deinit();
     const a = ga.allocator();
 
-    var lib = Library.init(a); // EMPTY — the member is never SET/preloaded
+    var lib = Library.init(a); // EMPTY - the member is never SET/preloaded
     bind(&lib);
     bindLibrefs(&.{.{ .name = "l", .dir = "tests/programs/sas7bdat_read/inputs" }});
     defer bindLibrefs(&.{});

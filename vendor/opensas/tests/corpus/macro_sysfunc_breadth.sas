@@ -1,4 +1,4 @@
-/* %sysfunc breadth — the common wrapped functions used in SDTM driver macros
+/* %sysfunc breadth - the common wrapped functions used in SDTM driver macros
    (string/date/numeric + compress modifiers). Deterministic. macro-sysfunccompress. */
 data _null_; length s $24;
   s="%sysfunc(catx(-,a,b,c))";         put "catx=[" s "]";

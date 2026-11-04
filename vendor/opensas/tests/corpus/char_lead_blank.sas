@@ -1,6 +1,6 @@
 /* BUG-charwleadblank: the INPUT statement must choose leading-blank treatment
-   by informat (Language Reference: Concepts p.510/517) — $CHARw. KEEPS leading blanks, plain $w.
-   STRIPS them (left-aligns) — on both the column-pointer (@n) read and the
+   by informat (Language Reference: Concepts p.510/517) - $CHARw. KEEPS leading blanks, plain $w.
+   STRIPS them (left-aligns) - on both the column-pointer (@n) read and the
    non-pointer formatted read. Mirror of the INPUT() function path.
    Dataline is "  XY ZZZ" (two leading blanks, significant). */
 data _null_;

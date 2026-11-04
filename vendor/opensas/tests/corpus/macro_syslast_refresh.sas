@@ -1,4 +1,4 @@
-/* BUG-syslastrefresh — &SYSLAST and &SYSNOBS refresh when a data set is created.
+/* BUG-syslastrefresh - &SYSLAST and &SYSNOBS refresh when a data set is created.
 
    They were seeded once at session start and NEVER updated, so `&syslast` read
    `_NULL_` and `&sysnobs` read `0` for the whole run. Macro Language ref printed
@@ -15,13 +15,13 @@
    THE DANGEROUS HALF IS &SYSNOBS, and block G is the single most important
    assertion in this fixture. `%if &sysnobs = 0 %then %return;` is the standard
    guard in SDTM domain drivers; with &sysnobs frozen at 0 the guard fired on
-   EVERY data set, so a populated clinical domain was silently NOT PRODUCED — no
+   EVERY data set, so a populated clinical domain was silently NOT PRODUCED - no
    diagnostic, no bad exit code. An earlier partial fix made this worse rather
    than better: it added the SEEDING without the refresh, converting a LOUD
    unresolved-reference warning into a SILENT stale 0.
 
    ONE PRODUCER, so there are no per-PROC rules to get wrong: every creator routes
-   through Library.put — the DATA-step commit, all 151 proc.zig OUT= writes, PROC
+   through Library.put - the DATA-step commit, all 151 proc.zig OUT= writes, PROC
    SORT, SQL CREATE TABLE, PROC APPEND. Blocks S/Q/M/A pin five of them and they
    agree by construction, not by five separate patches.
    expect-rc: 1 */
@@ -53,14 +53,14 @@ proc print data=viaref noobs; title "viaref built via syslast: WORK.THREE rows";
 title;
 
 /* ---- N: `data _NULL_;` creates nothing, so the pair must NOT advance. No
-        special case does this — main.zig never commits _NULL_, so it never
+        special case does this - main.zig never commits _NULL_, so it never
         reaches the choke point. ---- */
 data _null_; junk=1; run;
 data _null_; file print; put "N1 after-_null_ [&syslast] [&sysnobs]"; run;
 
 /* ---- Z: a REAL zero-observation data set. &sysnobs = 0 here is a GENUINE
         count, and it is distinguishable from the old frozen 0 because &syslast
-        moves with it — conflating the two was the original trap. ---- */
+        moves with it - conflating the two was the original trap. ---- */
 data emptyds; stop; run;
 data _null_; file print; put "Z1 real-zero [&syslast] [&sysnobs]"; run;
 
@@ -72,7 +72,7 @@ data _null_; file print; put "M1 means-out [&syslast] [&sysnobs]"; run;
 /* PROC APPEND creating BASE= is the ONE case the doc states explicitly
    (Procedures Guide printed p.109: "When the BASE= data set does not exist and
    PROC APPEND creates it, PROC APPEND sets _LAST_ to the name of the BASE= data
-   set") — and it comes free from the shared choke point. */
+   set") - and it comes free from the shared choke point. */
 proc append base=newbase data=one; run;
 data _null_; file print; put "A4 append-creates-base [&syslast] [&sysnobs]"; run;
 
@@ -80,7 +80,7 @@ data _null_; file print; put "A4 append-creates-base [&syslast] [&sysnobs]"; run
 proc print data=one noobs; title "print creates nothing"; run;
 data _null_; file print; put "P1 after-print [&syslast] [&sysnobs]"; run;
 
-/* ---- T: a two-level name keeps its OWN libref, uppercased — the doc's form is
+/* ---- T: a two-level name keeps its OWN libref, uppercased - the doc's form is
         libref.dataset, demonstrated as FIRSTLIB.SALESRPT from mixed-case input. */
 data work.mixedCase; c=1; output; c=2; output; c=3; output; run;
 data _null_; file print; put "T1 [&syslast] [&sysnobs]"; run;
@@ -88,15 +88,15 @@ data _null_; file print; put "T1 [&syslast] [&sysnobs]"; run;
 /* ---- E: DOC-SILENT, settled on INTERNAL CONSISTENCY and labelled as such.
         The volumes say nothing about a step that ERRORS. opensas's own
         GAP-errgatereplaces rule (Language Reference: Concepts printed p.175, Example Code 8.6) is that a
-        stopped step still CREATES a new member — a following PROC PRINT reports
+        stopped step still CREATES a new member - a following PROC PRINT reports
         "No variables in data set" and not "does not exist". So the member DOES
         exist, and naming it is consistent; the pair follows the member store
         exactly. Last, because errhalt ends the run here.
 
         WHAT IS AND IS NOT PINNED HERE, stated because the difference is easy to
         miss: E1 pins the value BEFORE the failing step, and the rc-1 pins that the
-        step failed. The value AFTER it is NOT pinnable in a corpus fixture — the
-        error stops every later step, including any probe — so the sharper case
+        step failed. The value AFTER it is NOT pinnable in a corpus fixture - the
+        error stops every later step, including any probe - so the sharper case
         (output name ALREADY EXISTS, live member NOT replaced, `put` never called,
         pair correctly left naming WORK.MARKER) was verified by hand probe instead
         and is recorded in the commit message. No unreachable probe is left below

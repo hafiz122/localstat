@@ -1,4 +1,4 @@
-/* BUG-sortseqbaresuperset DECLINED — bare `options sortseq=linguistic;` is
+/* BUG-sortseqbaresuperset DECLINED - bare `options sortseq=linguistic;` is
    CONFORMANT, and this pins the half an rc pin cannot state: that it is
    actually HONOURED, not merely accepted.
 
@@ -9,7 +9,7 @@
        ICU": "Starting in the third maintenance release of SAS 9.4, you can
        specify linguistic collation using the SORTSEQ= option in the SQL
        procedure and by specifying the SORTSEQ=LINGUISTIC system option." The
-       date is what settles it — the restriction states the pre-M3 behaviour.
+       date is what settles it - the restriction states the pre-M3 behaviour.
      * same page, Note: "Only PROC SORT and PROC SQL are affected when the
        SORTSEQ=LINGUISTIC system option is specified."
      * SQL Procedure User's Guide printed p.261 (`=== pdf 276 ===`): "If
@@ -25,7 +25,7 @@
    puts apple before Banana before Zebra; the ASCII default (pinned by the
    second sort, which the option must NOT reach because ASCII resets it) puts
    Banana and Zebra before apple. So a change that made this statement inert
-   would show up here even though the rc stayed 0 — an accepted-but-ignored
+   would show up here even though the rc stayed 0 - an accepted-but-ignored
    system option is the silent-superset failure this ticket suspected, and this
    fixture is what would catch it.
 

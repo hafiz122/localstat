@@ -1,4 +1,4 @@
-/* GAP-gapsexitingone §5f — the gap arm of the read-side informat SPLIT:
+/* GAP-gapsexitingone §5f - the gap arm of the read-side informat SPLIT:
    PDw.d is a documented SAS 9.4 informat (Formats & Informats Reference,
    packed-decimal dictionary entry) that opensas does not implement, so the
    INPUT-statement refusal (io.zig's checkInputInformats) is an opensas gap →

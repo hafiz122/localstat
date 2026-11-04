@@ -1,4 +1,4 @@
-//! Format engine — render a `Value` as text under a SAS format spec.
+//! Format engine - render a `Value` as text under a SAS format spec.
 //!
 //! A spec is `<$>NAME<w>.<d>`: an optional `$` (char), a name (empty = the
 //! plain numeric `w.d` / F format), a width `w`, and decimals `d`. Supported:
@@ -20,13 +20,13 @@
 //!
 //! ponytail: unknown numeric names (BEST/DOLLAR/…) fall back to plain `w.d`;
 //! overflow/too-narrow widths return the natural text rather than SAS's `*`
-//! fill — add both when a corpus fixture pins the exact SAS output.
+//! fill - add both when a corpus fixture pins the exact SAS output.
 
 const std = @import("std");
 const assert = std.debug.assert;
 const Value = @import("value.zig").Value;
-const pdv = @import("pdv.zig"); // sasParseFloat (import cycle is fine — Zig is lazy)
-const diag = @import("diag.zig"); // markGap — D-009 §5f documented-name split
+const pdv = @import("pdv.zig"); // sasParseFloat (import cycle is fine - Zig is lazy)
+const diag = @import("diag.zig"); // markGap - D-009 §5f documented-name split
 
 const Error = std.mem.Allocator.Error;
 
@@ -47,17 +47,17 @@ pub const Spec = struct {
 pub const UserFmtEntry = struct {
     lo: f64 = 0, // numeric range low (single value → lo==hi)
     hi: f64 = 0, // numeric range high
-    lo_excl: bool = false, // `<n-m` — low endpoint EXCLUDED (BUG-formatexclrange)
-    hi_excl: bool = false, // `n-<m` — high endpoint EXCLUDED
+    lo_excl: bool = false, // `<n-m` - low endpoint EXCLUDED (BUG-formatexclrange)
+    hi_excl: bool = false, // `n-<m` - high endpoint EXCLUDED
     skey: []const u8 = "", // character key (for `$NAME` formats)
     skey_hi: []const u8 = "", // char RANGE high endpoint (`'A'-'C'=`, GAP-fmtcharrange); "" → single exact key
     label: []const u8, // the display label (a PICTURE template when the fmt is_picture)
     nested: bool = false, // label is a NESTED-FORMAT spec (`range=[fmtname w.d]`,
     // BUG-fmtnestlabel): apply resolves it by rendering the value under that spec.
     is_other: bool = false, // the catch-all `OTHER=` entry
-    prefix: []const u8 = "", // PICTURE PREFIX= — prepended to the rendered digits
-    mult: f64 = 0, // PICTURE MULT= — value multiplier before picturing (0 → 1)
-    round: bool = false, // PICTURE `(round)` — round to the last selector instead of truncating
+    prefix: []const u8 = "", // PICTURE PREFIX= - prepended to the rendered digits
+    mult: f64 = 0, // PICTURE MULT= - value multiplier before picturing (0 → 1)
+    round: bool = false, // PICTURE `(round)` - round to the last selector instead of truncating
 };
 
 pub const UserFmt = struct {
@@ -67,7 +67,7 @@ pub const UserFmt = struct {
     entries: []const UserFmtEntry,
 };
 
-// ponytail: a single process-wide catalog — the interpreter runs one program at a
+// ponytail: a single process-wide catalog - the interpreter runs one program at a
 // time; main clears it per program, proc.zig replaces it. Not threaded through
 // `apply`'s eight callers, which would be far more churn than the feature needs.
 var user_catalog: []const UserFmt = &.{};
@@ -79,7 +79,7 @@ var user_catalog: []const UserFmt = &.{};
 // format's entries ONCE (at setUserFormats): discrete CHAR → key hashmap,
 // discrete NUMERIC (all-single-value formats) → numeric key hashmap, and true
 // low-high RANGE formats → entries sorted by `lo` for a binary search
-// (PERF-fmtrangescan) — kept only when the ranges are provably non-overlapping,
+// (PERF-fmtrangescan) - kept only when the ranges are provably non-overlapping,
 // so the unique containing range IS the linear first-match and output is
 // byte-identical. Overlapping ranges (first-match-by-definition-order) keep the
 // linear scan. `fmt_index[i]`
@@ -104,7 +104,7 @@ pub fn setUserFormats(c: []const UserFmt) void {
     buildIndex(c);
 }
 
-/// Drop any installed formats — main calls this at the start of each program so a
+/// Drop any installed formats - main calls this at the start of each program so a
 /// previous run's (freed) catalog is never read. Also resets YEARCUTOFF to the SAS
 /// default, so an `OPTIONS YEARCUTOFF=` from a prior run doesn't leak.
 /// Per-run callers want `resetPerRun` below; this is the catalog half, kept
@@ -117,7 +117,7 @@ pub fn clearUserFormats() void {
     year_cutoff = 1926;
 }
 
-/// BUG-fmterrorneverreset — EVERY run-scoped process-global this file owns,
+/// BUG-fmterrorneverreset - EVERY run-scoped process-global this file owns,
 /// cleared in one place; `main.interpret` calls it at the start of each program.
 /// The CLI got this for free from process exit, but `wasm.zig` runs many programs
 /// per load, so both flags leaked across programs in a demo session and each leak
@@ -125,7 +125,7 @@ pub fn clearUserFormats() void {
 ///   - `g_fmt_error` (→ D-009 rc 1): ONE unknown format made EVERY LATER program
 ///     exit 1, reporting a correct program as failing with no clue why.
 ///   - `g_nofmterr` (`OPTIONS NOFMTERR`): the same leak with the opposite and
-///     WORSE sign — a prior program's NOFMTERR silently SWALLOWED a later
+///     WORSE sign - a prior program's NOFMTERR silently SWALLOWED a later
 ///     program's format error, so invalid SAS came back clean at rc 0.
 /// `year_cutoff` was already being reset per run inside `clearUserFormats`, which
 /// is the precedent: an OPTIONS-derived global is run-scoped, not session-scoped.
@@ -137,7 +137,7 @@ pub fn resetPerRun() void {
 
 /// Build `fmt_index` for `c`. Best-effort: on OOM the whole index is dropped and
 /// every format falls back to the linear scan (slower, but correct).
-/// ponytail: numeric keys hashed by IEEE bit-pattern — matches the `lo==hi` `==`
+/// ponytail: numeric keys hashed by IEEE bit-pattern - matches the `lo==hi` `==`
 /// the linear scan does for real codelist codes; a -0.0/0.0 mismatch (never in a
 /// codelist) or NaN (excluded by the caller) is the only gap. Owns its own page-
 /// arena rather than threading proc.zig's allocator through setUserFormats.
@@ -165,7 +165,7 @@ fn buildIndex(c: []const UserFmt) void {
 }
 
 fn buildOne(a: std.mem.Allocator, uf: UserFmt, fi: *FmtIndex) !void {
-    // The maps/pointers reference the catalog's entries (arena-owned) directly —
+    // The maps/pointers reference the catalog's entries (arena-owned) directly -
     // an ENTRY is stored (not just its label) so a nested-format label
     // (`=[fmtname]`) still resolves at apply time (BUG-fmtnestlabel).
     for (uf.entries, 0..) |e, k| if (e.is_other) {
@@ -173,7 +173,7 @@ fn buildOne(a: std.mem.Allocator, uf: UserFmt, fi: *FmtIndex) !void {
         break;
     };
     if (uf.is_char) {
-        var has_range = false; // char RANGE entries ('A'-'C'=) can't hash — see below
+        var has_range = false; // char RANGE entries ('A'-'C'=) can't hash - see below
         for (uf.entries, 0..) |e, k| {
             if (e.is_other) continue;
             if (e.skey_hi.len > 0) {
@@ -184,7 +184,7 @@ fn buildOne(a: std.mem.Allocator, uf: UserFmt, fi: *FmtIndex) !void {
             if (!gop.found_existing) gop.value_ptr.* = &uf.entries[k]; // first match wins
         }
         // A range interleaves with discrete keys in DEFINITION order (first match
-        // wins), which a hashmap can't reproduce — such formats keep the linear scan.
+        // wins), which a hashmap can't reproduce - such formats keep the linear scan.
         fi.indexed = !has_range;
         return;
     }
@@ -193,7 +193,7 @@ fn buildOne(a: std.mem.Allocator, uf: UserFmt, fi: *FmtIndex) !void {
     for (uf.entries) |e| {
         if (e.is_other) continue;
         // BIT-compare, not `!=`: a special-missing key (.A=, from a sas7bcat
-        // catalog or CNTLIN START=.A — NOTE-sas7bcatspecialmiss) is a NaN whose
+        // catalog or CNTLIN START=.A - NOTE-sas7bcatspecialmiss) is a NaN whose
         // lo==hi must still count as ONE discrete value (NaN != NaN by IEEE).
         if (@as(u64, @bitCast(e.lo)) != @as(u64, @bitCast(e.hi)) or e.lo_excl or e.hi_excl) {
             all_discrete = false;
@@ -214,7 +214,7 @@ fn buildOne(a: std.mem.Allocator, uf: UserFmt, fi: *FmtIndex) !void {
     fi.ranges = try sortedRanges(a, uf.entries);
 }
 
-/// The non-OTHER entries sorted by (lo,hi) for the binary-search range path — or
+/// The non-OTHER entries sorted by (lo,hi) for the binary-search range path - or
 /// an empty slice when the format must keep the linear scan: NaN bounds, or any
 /// OVERLAP (sorted adjacent pair not provably disjoint), where SAS first-match
 /// by definition order is the tie-break a bsearch can't reproduce. When every
@@ -249,9 +249,9 @@ fn sortedRanges(a: std.mem.Allocator, entries: []const UserFmtEntry) ![]const Us
 }
 
 /// Binary-search the sorted, verified-non-overlapping ranges for the entry whose
-/// [lo,hi] contains `x` (endpoint exclusions honoured); null on no match — the
+/// [lo,hi] contains `x` (endpoint exclusions honoured); null on no match - the
 /// caller then applies OTHER=/default, exactly like the linear scan. The probe
-/// lands on the LAST entry with lo <= x, the only possible match — except at an
+/// lands on the LAST entry with lo <= x, the only possible match - except at an
 /// exclusion-split boundary (`0-5` / `5<-10`, x=5) where the LEFT NEIGHBOUR
 /// holds it, so both are probed. Same lo_ok/hi_ok test as the linear scan.
 fn rangeLookup(r: []const UserFmtEntry, x: f64) ?UserFmtEntry {
@@ -272,7 +272,7 @@ fn rangeLookup(r: []const UserFmtEntry, x: f64) ?UserFmtEntry {
 }
 
 /// The first year of the 100-year span used to read a 2-digit year (OPTIONS
-/// YEARCUTOFF=, default 1926 — SAS 9.4). BUG-yearcutoff — the caller (main's OPTIONS handler)
+/// YEARCUTOFF=, default 1926 - SAS 9.4). BUG-yearcutoff - the caller (main's OPTIONS handler)
 /// sets it; date informats in io.zig read it.
 var year_cutoff: i64 = 1926;
 
@@ -331,17 +331,17 @@ fn userFmtDefaultWidth(v: Value, spec: Spec) usize {
 
 /// SAS 9.4 DEFAULT width for the width-less date formats (BUG-fmtdefwidth-date,
 /// doc-finder tick250; Language Reference: Concepts p.147/164 "Write SAS date values in recognizable
-/// forms": `MONYY.`→`MAR13`, `JULIAN.`→`13076` — both 5, the 2-DIGIT-year form).
+/// forms": `MONYY.`→`MAR13`, `JULIAN.`→`13076` - both 5, the 2-DIGIT-year form).
 /// The word/name formats pad into their field: WORDDATE/WORDDATX 18, WEEKDATE/
 /// WEEKDATX 29 (right-justified), MONNAME/DOWNAME 9. 0 = keep the renderer's
 /// natural form (every other format; DTMONYY/DTWKDATX/PDJULIAN/NLDATE included).
 /// DATETIME's default is the one this table was missing (NOTE-datetimewidth):
-/// `DATETIMEw.d — w Default 16, Range 7–40` with the entry's own worked example
+/// `DATETIMEw.d - w Default 16, Range 7–40` with the entry's own worked example
 /// `put x datetime.;` → `14MAR18:22:25:33` (SAS 9.4 Formats and Informats:
 /// Reference, printed p.176-177). A width-less `datetime.` was rendering the
 /// renderer's "natural" 18-wide FOUR-digit-year form, i.e. the wrong year width
 /// on every width-less datetime PUT. 16 selects the 2-digit-year form through
-/// the EXISTING width ladder — `datetime16.` already produced exactly the
+/// the EXISTING width ladder - `datetime16.` already produced exactly the
 /// doc's string, so this is a default-width fix, not a renderer change.
 fn dateDefaultWidth(name: []const u8) usize {
     if (eqi(name, "monyy") or eqi(name, "julian")) return 5;
@@ -350,20 +350,20 @@ fn dateDefaultWidth(name: []const u8) usize {
     if (eqi(name, "weekdate") or eqi(name, "weekdatx")) return 29;
     if (eqi(name, "monname") or eqi(name, "downame")) return 9;
     if (eqi(name, "datetime")) return 16;
-    // TIMEw.d — `w Default 8, Range 2–20` (p.478). The field width is what
+    // TIMEw.d - `w Default 8, Range 2–20` (p.478). The field width is what
     // supplies the leading blank the entry states NORMATIVELY, twice: "If hh is
     // a single digit, TIMEw.d places a leading blank before the digit" (p.479)
     // and "The TIMEw.d format writes a leading blank for a single-hour digit"
     // (p.479, Comparisons). Width-less `time.` used the renderer's natural form
     // and so dropped that blank (`9:00:00` where `time8.` gives ` 9:00:00`).
     // Not a contradiction of Language Reference: Concepts p.147's `TIME. 19434 -> 5:23:54` table row:
-    // that CELL cannot show leading whitespace — as the Formats entry's own
+    // that CELL cannot show leading whitespace - as the Formats entry's own
     // inline example, "writes 9:00 instead of 09:00", equally cannot.
     // This is also the blank-pad half of the TOD contrast (NOTE-todhourpad):
     // TOD ZERO-pads its hour, TIME BLANK-pads it. Two rules, both cited.
     if (eqi(name, "time")) return 8;
     // ponytail: DATEw. (Default 7, p.172) and TODw.d (Default 8, p.483) need no
-    // entry — each renderer's natural w==0 form is ALREADY its documented
+    // entry - each renderer's natural w==0 form is ALREADY its documented
     // default width (`date.` == `date7.`; TOD's zero-padded hour makes its body
     // exactly 8), so an entry would be inert. Add one only if that stops holding.
     return 0;
@@ -371,13 +371,13 @@ fn dateDefaultWidth(name: []const u8) usize {
 
 /// If `spec` names an installed VALUE format, return the matching ENTRY (its
 /// range/key match, else the `OTHER=` entry). Null when no such format, no match
-/// and no OTHER — the caller then falls back to the built-in renderers. The
-/// caller renders `.label` — or, for a nested-format label (`range=[fmtname]`,
+/// and no OTHER - the caller then falls back to the built-in renderers. The
+/// caller renders `.label` - or, for a nested-format label (`range=[fmtname]`,
 /// `.nested` set), applies the spec held in `.label` to the value at render time
 /// (BUG-fmtnestlabel).
 /// If `spec` names an installed PICTURE format whose range matches `v`, return the
 /// matching entry (its `.label` is the digit template + PREFIX/MULT). Null otherwise
-/// — a named-but-unmatched picture falls through to a raw render (isUserFmtName).
+/// - a named-but-unmatched picture falls through to a raw render (isUserFmtName).
 fn pictureEntryFor(v: Value, spec: Spec) ?UserFmtEntry {
     if (user_catalog.len == 0 or spec.name.len == 0) return null;
     for (user_catalog) |uf| {
@@ -399,7 +399,7 @@ fn pictureEntryFor(v: Value, spec: Spec) ?UserFmtEntry {
 /// Render a numeric PICTURE. Digit selectors ('0'–'9') consume the value's decimal
 /// digits right-to-left; a leading position with no digit prints a blank under a `0`
 /// selector (leading zeros SUPPRESSED) and '0' under a nonzero selector (zero-fill)
-/// — SAS 9.4 semantics: "nines print zeros, zeros suppress" (BUG-picturedigitsel).
+/// - SAS 9.4 semantics: "nines print zeros, zeros suppress" (BUG-picturedigitsel).
 /// Non-selector chars are message/literal chars. In the leading SUPPRESSED
 /// region of a `0`-selector template (before the first significant digit),
 /// message chars print as blanks and PREFIX= hugs the first significant digit
@@ -412,7 +412,7 @@ fn renderPicture(arena: std.mem.Allocator, x: f64, e: UserFmtEntry) Error![]cons
     // MULT= scales the value before picturing. SAS default: if the picture has a
     // decimal point and no explicit MULT=, the multiplier is 10^(digit selectors
     // after the '.') so the fractional part fills the trailing selectors
-    // (BUG-picturedecimal) — else the value was rounded to an integer and the
+    // (BUG-picturedecimal) - else the value was rounded to an integer and the
     // digits landed in the wrong selectors (12.5 with '0009.99' → "000 .13").
     var mult: f64 = if (e.mult == 0) 1 else e.mult;
     if (e.mult == 0) if (std.mem.indexOfScalar(u8, e.label, '.')) |dot| {
@@ -424,12 +424,12 @@ fn renderPicture(arena: std.mem.Allocator, x: f64, e: UserFmtEntry) Error![]cons
         for (0..ndec) |_| m *= 10;
         mult = m;
     };
-    // SAS 9.4 TRUNCATES the scaled value by default — rounding is opt-in via the
+    // SAS 9.4 TRUNCATES the scaled value by default - rounding is opt-in via the
     // PICTURE `(round)` option (BUG-picturetrunc, GAP-pictureround). Zig's
     // @intFromFloat already truncates toward 0, so the default is a bare cast
     // (12.35×10 → 123, not 124); `(round)` rounds the scaled value first (3.98
     // under '009.9' → 39.8 → 40 → `4.0`). @round is ties-away-from-zero, and the
-    // magnitude is already non-negative — matches SAS half-up rounding.
+    // magnitude is already non-negative - matches SAS half-up rounding.
     const scaled0 = @abs(x) * mult;
     const scaled = if (e.round) @round(scaled0) else scaled0;
     // Guard the @intFromFloat: a scaled magnitude ≥ 2^64 (or inf) traps the
@@ -489,16 +489,16 @@ fn lookupUserFmt(v: Value, spec: Spec) ?UserFmtEntry {
     for (user_catalog, 0..) |uf, i| {
         if (uf.is_picture) continue; // pictures render via renderPicture, not as literal labels
         // A character VALUE resolves a char-typed format referenced WITHOUT the
-        // `$` — SAS matches by name + value type there. THE SHAPE that motivates
+        // `$` - SAS matches by name + value type there. THE SHAPE that motivates
         // it (D-011): a CNTLIN-built codelist catalog whose char entries carry
         // TYPE='C', applied as `put(somecharvar, codelistfmt.)` with no `$` on
-        // the format name — legal SAS, and refusing it silently blanked every
+        // the format name - legal SAS, and refusing it silently blanked every
         // decode (QA-charfmtnodollar). A `$fmt` on a numeric value still falls
         // through to the default renderers.
         const type_ok = uf.is_char == spec.is_char or (uf.is_char and !spec.is_char and v == .str);
         if (!type_ok or !eqi(uf.name, spec.name)) continue;
         // Indexed fast path (PERF-fmtscan): O(1) discrete lookup, precomputed
-        // OTHER. Semantics match the linear scan below exactly — first-match
+        // OTHER. Semantics match the linear scan below exactly - first-match
         // (getOrPut kept the first duplicate), $fmt-on-numeric → null, miss →
         // OTHER-or-null, numeric-missing → its exact missing key, else OTHER-or-null.
         if (i < fmt_index.len and fmt_index[i].indexed) {
@@ -544,7 +544,7 @@ fn lookupUserFmt(v: Value, spec: Spec) ?UserFmtEntry {
                     // on the trimmed value (SAS collating order); `<` excludes an
                     // endpoint exactly like the numeric range path below.
                     // ponytail: a value with bytes < 0x20 sorts differently than
-                    // SAS blank-padding — control chars never appear in codelists.
+                    // SAS blank-padding - control chars never appear in codelists.
                     const hi = std.mem.trimEnd(u8, e.skey_hi, " ");
                     const lo_ok = if (e.lo_excl) std.mem.order(u8, s, lo) == .gt else std.mem.order(u8, s, lo) != .lt;
                     const hi_ok = if (e.hi_excl) std.mem.order(u8, s, hi) == .lt else std.mem.order(u8, s, hi) != .gt;
@@ -555,7 +555,7 @@ fn lookupUserFmt(v: Value, spec: Spec) ?UserFmtEntry {
             const x = valToNum(v);
             if (std.math.isNan(x)) {
                 // A numeric MISSING value matches an exact missing KEY only
-                // (bit-equal, so .A finds .A's label and never .B's) —
+                // (bit-equal, so .A finds .A's label and never .B's) -
                 // NOTE-sas7bcatspecialmiss. `v == .num` keeps a char value out.
                 if (v == .num) for (uf.entries) |e| {
                     if (!e.is_other and @as(u64, @bitCast(e.lo)) == @as(u64, @bitCast(x)) and
@@ -586,7 +586,7 @@ pub fn parseSpec(text: []const u8) Spec {
     }
     const name_start = i;
     // A format name is letters/digits/underscores, but SAS names never END in a
-    // digit — the TRAILING digit run is the width. So scan the whole alnum run,
+    // digit - the TRAILING digit run is the width. So scan the whole alnum run,
     // then peel the final digits off as w (QA-e8601put: `E8601DT19.` is name
     // E8601DT + w 19; the old letters-only scan made it name "e" + w 8601 → the
     // Ew. scientific format, silent wrong output). Underscores are ALWAYS part
@@ -608,14 +608,14 @@ pub fn parseSpec(text: []const u8) Spec {
 
 /// Read a numeric field under an informat `spec_text` (INPUT/INFILE), returning a
 /// SAS numeric Value. Two behaviours a plain float parse misses:
-///   * a `w.d` informat's IMPLIED decimal — a field with no explicit `.` is
+///   * a `w.d` informat's IMPLIED decimal - a field with no explicit `.` is
 ///     scaled by 10^-d, so `12345` under `5.2` reads as 123.45 (BUG-informatdec);
-///   * PERCENTw. — a trailing `%` is dropped and the value divided by 100, so
+///   * PERCENTw. - a trailing `%` is dropped and the value divided by 100, so
 ///     `45%` reads as 0.45 (BUG-percentinformat); parentheses read as a
 ///     negative percentage, so `(25%)` reads as -0.25 (BUG-percentinformat2).
 /// COMMA/DOLLAR grouping (`,` `$` spaces) is stripped while scanning, so those
 /// informats get the implied decimal too. A blank or unparseable field → missing.
-/// This entry slices the field to `w` (INPUT()-fn semantics — the fn's old
+/// This entry slices the field to `w` (INPUT()-fn semantics - the fn's old
 /// numFromSpec did the same); the INPUT STATEMENT routes via readNumericStmt.
 pub fn readNumeric(spec_text: []const u8, field: []const u8) Value {
     return readNumericImpl(spec_text, field, true);
@@ -623,8 +623,8 @@ pub fn readNumeric(spec_text: []const u8, field: []const u8) Value {
 
 /// INPUT-statement entry (io.zig readNum): same rules as readNumeric but the
 /// field is NOT sliced to `w`. Language Reference: Concepts p.513 "Modified List Input": the colon
-/// form tokenizes — SAS reads to a blank column, the defined length of the
-/// variable "(character only)", or end of line — so a numeric `:comma5.` on
+/// form tokenizes - SAS reads to a blank column, the defined length of the
+/// variable "(character only)", or end of line - so a numeric `:comma5.` on
 /// `5,678,999` reads 5678999, not 5678 (qa_tick336_input_fmtnamed_seams S3).
 /// Non-colon column reads arrive pre-sliced to w, so skipping the slice is a
 /// no-op for them (NOTE-informatlow-tick245 review bounce).
@@ -641,10 +641,10 @@ fn readNumericImpl(spec_text: []const u8, field: []const u8, slice_w: bool) Valu
     const nm = if (spec_text.len > 0 and spec_text[0] == '$') spec_text[1..] else spec_text;
     if (startsWithCI(nm, "datetime")) return parseDatetime(field, .native);
     // GH#2 ISS-e8601dt-width: E8601DTw.d honors its width on the read side too
-    // (Informats Reference pp.643-644 — same w Default 19 / Range 16-26 and the
+    // (Informats Reference pp.643-644 - same w Default 19 / Range 16-26 and the
     // same w=16 note as the format): slice to w so `input(x, e8601dt16.)` stops
     // at the minutes and the seconds read as 00. Only the INPUT()-function path
-    // slices (readNumeric, slice_w) — the STATEMENT path hands the whole token
+    // slices (readNumeric, slice_w) - the STATEMENT path hands the whole token
     // over for list/colon reads and column reads arrive pre-sliced to w, so a
     // re-slice there would corrupt the token (same rule as the plain w.d slice
     // below). B8601DT keeps its own (undocumented-here) range and stays unsliced.
@@ -656,7 +656,7 @@ fn readNumericImpl(spec_text: []const u8, field: []const u8, slice_w: bool) Valu
     if (startsWithCI(nm, "b8601dt")) return parseDatetime(field, .iso);
     // GH#5a ISS-e8601dndz: E8601DNw. reads ISO `yyyy-mm-dd` and returns a SAS
     // DATETIME at midnight (Informats Reference p.642: Default 10; "Requirement:
-    // The width of the input field must be 10" — loud outside it, like SAS
+    // The width of the input field must be 10" - loud outside it, like SAS
     // 29-185). An INCOMPLETE value (`2025-01`, `2025`) is not a width error:
     // it is invalid data → missing.
     if (startsWithCI(nm, "e8601dn")) {
@@ -665,7 +665,7 @@ fn readNumericImpl(spec_text: []const u8, field: []const u8, slice_w: bool) Valu
         return Value.missing;
     }
     // E8601DZw.d (p.645: Default 26, Range 20-35) reads the UTC-offset datetime
-    // and rebases it to the zero meridian — parseDatetimeZ below.
+    // and rebases it to the zero meridian - parseDatetimeZ below.
     if (startsWithCI(nm, "e8601dz")) {
         checkWidthRange(spec_text, spec.w, 20, 35);
         if (parseDatetimeZ(field)) |utc| return .{ .num = utc };
@@ -677,7 +677,7 @@ fn readNumericImpl(spec_text: []const u8, field: []const u8, slice_w: bool) Valu
     }
     // TIMEw. reads ONLY its documented separator forms (Informats Reference
     // p.722: "Separate hh, mm, and ss with a special character"), so a
-    // separator-less digit run is ALL HOURS by that grammar — a SAS time value
+    // separator-less digit run is ALL HOURS by that grammar - a SAS time value
     // may be a duration over 24h, and `155300` under TIME8. reads 155300×3600.
     // The packed hhmmss form is NOT TIMEw. grammar; it belongs to the ISO
     // BASIC informats just below (BUG-8601packtime).
@@ -685,11 +685,11 @@ fn readNumericImpl(spec_text: []const u8, field: []const u8, slice_w: bool) Valu
         if (parseTimeSecs(field)) |sc| return .{ .num = sc };
         return Value.missing;
     }
-    // E8601TM/B8601TM: the ISO 8601 time — the extended `hh:mm:ss[.f]` colon
+    // E8601TM/B8601TM: the ISO 8601 time - the extended `hh:mm:ss[.f]` colon
     // form (E8601TM p.650) AND the basic packed `hhmmss<ffffff>` (B8601TM
     // p.623's own example `155300` → 57180). BUG-8601packtime: the packed run
     // used to fall into parseTimeSecs' no-separator branch and read as HOURS
-    // (155300×3600 = 559080000) — a silent wrong numeric on a doc example.
+    // (155300×3600 = 559080000) - a silent wrong numeric on a doc example.
     if (startsWithCI(nm, "e8601tm") or startsWithCI(nm, "b8601tm")) {
         if (parseIsoTimeSecs(field)) |sc| return .{ .num = sc };
         return Value.missing;
@@ -701,7 +701,7 @@ fn readNumericImpl(spec_text: []const u8, field: []const u8, slice_w: bool) Valu
     // TODw. informat: time-of-day → SAS time (seconds since midnight). Was in
     // isKnownInformat's whitelist with NO read branch, so `input t tod8.` on
     // '10:30:00' fell through to the plain numeric read and silently returned
-    // MISSING while the TOD *format* rendered the same value fine — the two
+    // MISSING while the TOD *format* rendered the same value fine - the two
     // directions of one feature disagreed (BUG-todinformat). Reads like TIMEw.
     // (hh:mm:ss[.frac], hh:mm, hh, AM/PM) PLUS the datetime form: a
     // `ddMMMyyyy:hh:mm:ss` field keeps only its time-of-day, the read twin of
@@ -725,14 +725,14 @@ fn readNumericImpl(spec_text: []const u8, field: []const u8, slice_w: bool) Valu
     }
     // JULIANw. informat: packed Julian `yyddd` / `yyyyddd` → SAS day. Was in
     // isKnownInformat's whitelist with NO read branch, so the digits fell
-    // through to the plain numeric read — `input x julian7.` on '1960011'
+    // through to the plain numeric read - `input x julian7.` on '1960011'
     // silently returned 1960011 instead of SAS day 10 (BUG-julianinformat).
     if (eqi(spec.name, "julian")) {
         if (parseJulian(field)) |day| return .{ .num = @floatFromInt(day) };
         return Value.missing;
     }
     // ANYDTDTEw./ANYDTDTMw./ANYDTTMEw. (GAP-anydtinformat, Language Reference: Concepts "ANYDTDTEw.
-    // Informat"): the "any date" informats — try the DATE / DDMMYY / MMDDYY /
+    // Informat"): the "any date" informats - try the DATE / DDMMYY / MMDDYY /
     // YMD / DATETIME parsers in order, first success wins; unparseable →
     // missing. ANYDTDTM date-only input reads as midnight.
     if (eqi(spec.name, "anydtdte")) {
@@ -757,48 +757,48 @@ fn readNumericImpl(spec_text: []const u8, field: []const u8, slice_w: bool) Valu
     // carry their own SAS width ranges and never slice by `w`.
     spec.w = checkWidth(spec_text, spec);
     // An unimplemented/unknown informat must FAIL LOUD, not silently read missing
-    // (BUG-informatreadloud) — the read-side twin of the write-side unknown-format
+    // (BUG-informatreadloud) - the read-side twin of the write-side unknown-format
     // error. Known numeric informats fall through to the plain numeric parse below.
     if (!isKnownInformat(spec.name)) informatNotFound(spec.name, false);
-    // COMMA/DOLLAR-family informats read parentheses as a negative value —
+    // COMMA/DOLLAR-family informats read parentheses as a negative value -
     // `(1,234)` → -1234 (Language Reference: Concepts "Reading Nonstandard Numeric Data": parens require
-    // the COMMA informat). PERCENTw.d reads them the same way — `(25%)` → -0.25
+    // the COMMA informat). PERCENTw.d reads them the same way - `(25%)` → -0.25
     // (BUG-percentinformat2). A plain `w.` informat leaves `(`/`)` in the buffer
-    // so parseFloat rejects them (SAS: invalid → missing) — BUG-commaparen.
-    // SAS 9.4 has NO NEGPAREN informat (the 108-entry informat dictionary — it is
+    // so parseFloat rejects them (SAS: invalid → missing) - BUG-commaparen.
+    // SAS 9.4 has NO NEGPAREN informat (the 108-entry informat dictionary - it is
     // a FORMAT only): accepting it silently read data a typo never asked for, so it
     // was dropped from isKnownInformat above (NOTE-informatlow-tick245 #14, D-002).
     // The statement path now ERRORs at io.zig's whitelist check like SAS 48-59; the
-    // INPUT() fn reports informatNotFound. "negparen" stays OUT of commalike too —
+    // INPUT() fn reports informatNotFound. "negparen" stays OUT of commalike too -
     // a format-only name gets no informat parse rules.
     const commalike = eqi(spec.name, "comma") or eqi(spec.name, "dollar") or
         eqi(spec.name, "commax") or eqi(spec.name, "dollarx") or
         eqi(spec.name, "nlnum") or eqi(spec.name, "percent");
-    // BUG-commaxinformat: COMMAX/DOLLARX reverse the separator roles — PERIOD
+    // BUG-commaxinformat: COMMAX/DOLLARX reverse the separator roles - PERIOD
     // is the grouping separator (dropped), COMMA the decimal point (kept as '.').
     // NUMXw.d is the same European convention (BUG-numxinformat).
     const euro = eqi(spec.name, "commax") or eqi(spec.name, "dollarx") or
         eqi(spec.name, "numx");
     // Blank handling is INFORMAT-SPECIFIC (BUG-bzinformat / BUG-numembeddedblank):
-    //   BZw.d     — every blank (leading, trailing, EMBEDDED) reads as a ZERO
+    //   BZw.d     - every blank (leading, trailing, EMBEDDED) reads as a ZERO
     //               (`bz4.` on "1   " → 1000, `bz5.` on "  1  " → 100);
-    //   plain w.d — leading/trailing blanks trim away, but an EMBEDDED blank is
+    //   plain w.d - leading/trailing blanks trim away, but an EMBEDDED blank is
     //               invalid numeric data → missing + a log NOTE (`4.` on "2 3 " → .);
     //   the COMMA/DOLLAR/PERCENT family keeps the legacy drop-all-blanks (COMMA's
     //   blank-dropping IS documented: "removes embedded … blanks");
     //   Z/BEST/E/D are w.d ALIASES (the w.d informat page names BESTw.d/Dw.d/Ew.d/
     //   Fw.d as aliases) so they follow plain w.d: embedded blank → missing + NOTE
-    //   (NOTE-informatlow-tick245 #9) — they used to drop-all-blanks like COMMA.
+    //   (NOTE-informatlow-tick245 #9) - they used to drop-all-blanks like COMMA.
     const bz = eqi(spec.name, "bz");
     const plain = spec.name.len == 0 or eqi(spec.name, "f") or eqi(spec.name, "z") or
         eqi(spec.name, "best") or eqi(spec.name, "e") or eqi(spec.name, "d");
     // The INPUT() fn reads only the first w bytes of the field (its old
     // numFromSpec did the same). The statement path skips the slice: list/colon
-    // reads hand over the WHOLE token (readNumericStmt; Language Reference: Concepts p.513 — the width
+    // reads hand over the WHOLE token (readNumericStmt; Language Reference: Concepts p.513 - the width
     // limit is character-only) and column reads arrive pre-sliced to w.
     const fld = if (slice_w and spec.w > 0 and spec.w < field.len) field[0..spec.w] else field;
     // HEXw. / OCTALw. informats (GAP-hexinformat/octalinformat, Language Reference: Concepts Table 21.2):
-    // the digits ARE the integer representation — `hex4.` on "000F" → 15,
+    // the digits ARE the integer representation - `hex4.` on "000F" → 15,
     // `octal3.` on "017" → 15. `$HEXw.` (char hex → bytes) is the charInformat
     // path, not here.
     if (!spec.is_char and (eqi(spec.name, "hex") or eqi(spec.name, "octal")))
@@ -807,7 +807,7 @@ fn readNumericImpl(spec_text: []const u8, field: []const u8, slice_w: bool) Valu
     var n: usize = 0;
     var had_dot = false;
     var neg = false;
-    var blank_tail = false; // plain w.d: a blank followed content — embedded if more content comes
+    var blank_tail = false; // plain w.d: a blank followed content - embedded if more content comes
     for (fld) |c| switch (c) {
         ' ', '\t' => if (bz) {
             if (n < buf.len) {
@@ -880,10 +880,10 @@ fn parseBaseInt(field: []const u8, base: u8) Value {
 /// Post-read transform for a named `$` (char) informat, applied after the field
 /// is width-clipped. Shared by the INPUT() function (functions.zig) and the
 /// INPUT statement (io.zig) so both paths agree:
-///   $UPCASE / $LOWCASE — case-fold
-///   $QUOTE            — strip ONE matched pair of surrounding " or ' quotes
-///   $HEX              — decode hex-digit pairs to bytes ("414243" → "ABC")
-/// Any other name (or none) reads verbatim — but an UNRECOGNIZED name first
+///   $UPCASE / $LOWCASE - case-fold
+///   $QUOTE            - strip ONE matched pair of surrounding " or ' quotes
+///   $HEX              - decode hex-digit pairs to bytes ("414243" → "ABC")
+/// Any other name (or none) reads verbatim - but an UNRECOGNIZED name first
 /// fails loud (BUG-charinformatloud, D-002; the char twin of the numeric
 /// BUG-informatreadloud path): SAS errors on an unknown informat, a verbatim
 /// read of `$bogus.` is a false green. `nm` is the informat name only
@@ -910,14 +910,14 @@ pub fn charInformat(arena: std.mem.Allocator, nm: []const u8, field: []const u8)
         }
         return out[0..oi];
     }
-    // BUG-charinformatloud: unknown/unimplemented char informat — FAIL LOUD,
+    // BUG-charinformatloud: unknown/unimplemented char informat - FAIL LOUD,
     // then keep the verbatim field as the fallback so the rest of the output
     // survives (the loud-then-fallback shape of the numeric read side).
     checkCharInformat(nm);
     return field;
 }
 
-/// CHAR informat names the read paths implement — plain `$w.` (no name),
+/// CHAR informat names the read paths implement - plain `$w.` (no name),
 /// $CHAR, $UPCASE/$LOWCASE, $QUOTE, $HEX, $VARYING (io.zig's length-variable
 /// read). Anything else is unimplemented/a typo → fail loud
 /// (BUG-charinformatloud). The char twin of isKnownInformat.
@@ -929,7 +929,7 @@ pub fn isKnownCharInformat(name: []const u8) bool {
 }
 
 /// BUG-charinformatloud: char-read paths that don't route through charInformat
-/// (io.zig's column/list reads) fail loud on an unknown $-informat too —
+/// (io.zig's column/list reads) fail loud on an unknown $-informat too -
 /// same error path/message as the numeric side (informatNotFound).
 pub fn checkCharInformat(name: []const u8) void {
     if (!isKnownCharInformat(name)) informatNotFound(name, true);
@@ -940,7 +940,7 @@ const DtStyle = enum { native, iso };
 /// Parse a datetime informat field → SAS datetime (seconds since 1960-01-01
 /// 00:00:00) = SAS-day × 86400 + seconds-of-day. `native` (DATETIMEw.):
 /// `ddMMMyyyy:hh:mm:ss` (date, then a `:`, then the time). `iso` (E8601DT./
-/// B8601DT.): `yyyy-mm-ddThh:mm:ss` / `yyyymmddThhmmss` — the time half takes
+/// B8601DT.): `yyyy-mm-ddThh:mm:ss` / `yyyymmddThhmmss` - the time half takes
 /// the packed basic digits too (parseIsoTimeSecs). A missing time defaults to
 /// 00:00:00; unparseable →
 /// missing. Reuses the same civil-day math as the DATE informats.
@@ -956,7 +956,7 @@ fn parseDatetime(field: []const u8, style: DtStyle) Value {
     }) orelse return Value.missing;
     // The time half: native DATETIME's `hh:mm:ss` via parseTimeSecs; the ISO
     // styles also accept the basic packed `hhmmss<ffffff>` (B8601DT p.619's own
-    // example `20180915T155300` → 1852645980) — BUG-8601packtime. A missing
+    // example `20180915T155300` → 1852645980) - BUG-8601packtime. A missing
     // time still defaults to 00:00:00.
     const secs = (switch (style) {
         .native => parseTimeSecs(s[sep + 1 ..]),
@@ -965,21 +965,21 @@ fn parseDatetime(field: []const u8, style: DtStyle) Value {
     return .{ .num = @as(f64, @floatFromInt(day * 86400)) + secs };
 }
 
-/// E8601DZw.d informat (Informats Reference p.645): the COMPLETE extended form —
-/// `yyyy-mm-ddThh:mm:ss[.f…]` followed by `+hh:mm` / `-hh:mm` or a trailing `Z` —
+/// E8601DZw.d informat (Informats Reference p.645): the COMPLETE extended form -
+/// `yyyy-mm-ddThh:mm:ss[.f…]` followed by `+hh:mm` / `-hh:mm` or a trailing `Z` -
 /// rebased to the zero meridian. SAS adjusts for the offset (Language Reference:
 /// Concepts p.557: reading 2018-09-15T15:53:00+05:00 yields 1852645980 = 10:53
 /// UTC), so UTC = local − offset. Null when any part fails to parse or the
-/// offset is absent — a plain `yyyy-mm-ddThh:mm:ss` is not the complete
+/// offset is absent - a plain `yyyy-mm-ddThh:mm:ss` is not the complete
 /// representation this informat names, so it is invalid data → missing.
 /// ponytail: `+hh:mm` only (the doc's shape); the packed `+hhmm` is B8601DZ
-/// territory — add a packed branch there, not here, if a program needs it.
+/// territory - add a packed branch there, not here, if a program needs it.
 fn parseDatetimeZ(field: []const u8) ?f64 {
     const s = std.mem.trim(u8, field, " ");
     const sep = std.mem.indexOfAny(u8, s, "Tt") orelse return null;
     const day = parseIsoDate(s[0..sep]) orelse return null;
     const base = @as(f64, @floatFromInt(day * 86400));
-    // The offset sign is the FIRST `+`/`-` in the TIME part — the date's own
+    // The offset sign is the FIRST `+`/`-` in the TIME part - the date's own
     // hyphens (`2018-09-15`) live before the `T`, so the search must not see
     // them; the time digits up to the sign are only digits/colons/a fraction.
     const tail = s[sep + 1 ..];
@@ -1006,7 +1006,7 @@ fn parseUtcOffset(text: []const u8) ?f64 {
     return if (text[0] == '-') -v else v;
 }
 
-/// SAS day for y/m/d, or null if the day-of-month is invalid for that month —
+/// SAS day for y/m/d, or null if the day-of-month is invalid for that month -
 /// e.g. `31FEB2020` must NOT roll over to 02Mar (BUG-infdate-stmt). Mirrors the
 /// INPUT-function validation by round-tripping through civilFromDays.
 pub fn sasDayChecked(y: i64, m: i64, d: i64) ?i64 {
@@ -1018,7 +1018,7 @@ pub fn sasDayChecked(y: i64, m: i64, d: i64) ?i64 {
 
 /// `ddMMMyyyy` (e.g. `25DEC2024`) → SAS day number, or null. The day is 1–2
 /// digits (BUG-datesingledigitday: a hardcoded 2-char day slice rejected
-/// `1MAR90` — Language Reference: Concepts Table 21.2's own example — while the date literal and
+/// `1MAR90` - Language Reference: Concepts Table 21.2's own example - while the date literal and
 /// MMDDYY accepted the class; a silently-missing date).
 pub fn parseDDMMMYYYY(s0: []const u8) ?i64 {
     const s = std.mem.trim(u8, s0, " ");
@@ -1033,7 +1033,7 @@ pub fn parseDDMMMYYYY(s0: []const u8) ?i64 {
 
 /// ANYDTDTEw. helper: try the DATE parser (`15JAN2020`), then a DDMMYY and an
 /// MMDDYY numeric triplet (`15/01/2020`, `01/15/2020`), then the YMD ISO parser
-/// (`2020-01-15`, `20200115`) — first success wins, null if none parse.
+/// (`2020-01-15`, `20200115`) - first success wins, null if none parse.
 /// (GAP-anydtinformat)
 fn parseAnyDate(field: []const u8) ?i64 {
     if (parseDDMMMYYYY(field)) |d| return d;
@@ -1118,7 +1118,7 @@ fn parseJulian(field: []const u8) ?i64 {
 /// packed form (E8601DA-packed-input).
 /// ponytail: packed DATE only. A packed datetime keeps its `T` (`yyyymmddThhmmss`),
 /// so parseDatetime still splits it and the date part lands here; a fully-packed
-/// `yyyymmddhhmmss` (no T) is out of scope — add a length split in parseDatetime
+/// `yyyymmddhhmmss` (no T) is out of scope - add a length split in parseDatetime
 /// if a fixture ever needs it.
 fn parseIsoDate(s0: []const u8) ?i64 {
     const s = std.mem.trim(u8, s0, " ");
@@ -1142,14 +1142,14 @@ fn parseIsoDate(s0: []const u8) ?i64 {
 // 1379): "All values are read in as character strings. If a Date and Time
 // format or a numeric informat can be applied to the data value, the type is
 // declared as numeric. Otherwise, the type remains character." The attached
-// format FAMILY matches the recognised pattern — worked Example 1, printed
+// format FAMILY matches the recognised pattern - worked Example 1, printed
 // p. 1340-41: `JAN2001` → informat+format MONYY7. DATEw. is recognised
 // (`10MAY14` "becomes 10MAY14, which is a date value", p. 1326) and datetimes
-// too (`06JAN2016:10:04:26` — "SAS might try to read it as a date", p. 1324);
-// TIMEw. has no worked example — recognised under the same p. 1330 "Date and
+// too (`06JAN2016:10:04:26` - "SAS might try to read it as a date", p. 1324);
+// TIMEw. has no worked example - recognised under the same p. 1330 "Date and
 // Time format" category rule. DOC-SILENT patterns stay character: mm/dd vs
-// dd/mm slash dates (ambiguous order — the chapter never says which wins),
-// ISO-8601 `T` datetimes, packed 8-digit dates (`20240305` — a plain number to
+// dd/mm slash dates (ambiguous order - the chapter never says which wins),
+// ISO-8601 `T` datetimes, packed 8-digit dates (`20240305` - a plain number to
 // EFI before any date informat is tried), and separator variants beyond the
 // documented contiguous forms.
 pub const ImportDateKind = enum { yymmdd, date, monyy, datetime, time };
@@ -1157,7 +1157,7 @@ pub const ImportDate = struct { kind: ImportDateKind, value: f64 };
 
 /// EFI guess for ONE delimited field: the recognised pattern + its SAS numeric
 /// value, or null when the field fits none of them (the caller keeps a
-/// mixed/non-date column character). STRICT shapes — the INPUT-statement
+/// mixed/non-date column character). STRICT shapes - the INPUT-statement
 /// parsers underneath are lenient by design (packed forms, period times, a
 /// missing time defaulting to midnight); import guessing must not inherit that
 /// leniency: a wrongly-detected date converts a readable string into a number
@@ -1165,26 +1165,26 @@ pub const ImportDate = struct { kind: ImportDateKind, value: f64 };
 pub fn importDateGuess(field: []const u8) ?ImportDate {
     const f = std.mem.trim(u8, field, " ");
     if (f.len == 0) return null;
-    // ISO date `yyyy-mm-dd` / `yyyy/mm/dd` — 4-digit year first (unambiguous
+    // ISO date `yyyy-mm-dd` / `yyyy/mm/dd` - 4-digit year first (unambiguous
     // YMD order); parseIsoDate's packed 8-digit form is excluded (EFI reads
     // that as a plain number, never a date).
     if (f.len >= 8 and f.len <= 10 and std.mem.indexOfAny(u8, f, "-/") != null and allDigits(f[0..4])) {
         if (parseIsoDate(f)) |day| return .{ .kind = .yymmdd, .value = @floatFromInt(day) };
     }
     if (std.mem.indexOfScalar(u8, f, ':')) |colon| {
-        // datetime `ddMONyy[yy]:hh:mm[:ss]` — BOTH sides strict: parseDatetime
+        // datetime `ddMONyy[yy]:hh:mm[:ss]` - BOTH sides strict: parseDatetime
         // alone would default a garbage time part to midnight.
         if (parseDDMMMYYYY(f[0..colon])) |day| {
             if (strictTime(f[colon + 1 ..])) |secs|
                 return .{ .kind = .datetime, .value = @as(f64, @floatFromInt(day * 86400)) + secs };
         }
-        // bare time `hh:mm[:ss]` (p. 1330 category rule — no worked example).
+        // bare time `hh:mm[:ss]` (p. 1330 category rule - no worked example).
         if (strictTime(f)) |secs| return .{ .kind = .time, .value = secs };
         return null; // has a ':' but fits no date/time shape → character
     }
-    // DATEw. `ddMONyy[yy]` — 1-2-digit day, contiguous (`10MAY14`, `05MAR2024`).
+    // DATEw. `ddMONyy[yy]` - 1-2-digit day, contiguous (`10MAY14`, `05MAR2024`).
     if (parseDDMMMYYYY(f)) |day| return .{ .kind = .date, .value = @floatFromInt(day) };
-    // MONYYw. `MONyy` / `MONyyyy` — contiguous, like the p. 1341 `JAN2001`
+    // MONYYw. `MONyy` / `MONyyyy` - contiguous, like the p. 1341 `JAN2001`
     // example; separator variants (`MAR-2020`) are DOC-SILENT → character.
     if ((f.len == 5 or f.len == 7) and allDigits(f[3..])) {
         if (parseMonyy(f)) |day| return .{ .kind = .monyy, .value = @floatFromInt(day) };
@@ -1211,7 +1211,7 @@ fn allDigits(s: []const u8) bool {
 }
 
 /// Strict `hh:mm[:ss[.frac]]` (+ optional AM/PM) for import guessing: minutes
-/// REQUIRED (a bare `10` is a number, never a time), fields in range —
+/// REQUIRED (a bare `10` is a number, never a time), fields in range -
 /// parseTimeSecs itself accepts `10:99` and the period form `12.56`, both too
 /// lenient here. Returns parseTimeSecs' value (AM/PM/fraction semantics kept).
 fn strictTime(s0: []const u8) ?f64 {
@@ -1256,7 +1256,7 @@ pub fn parseTimeSecs(s0: []const u8) ?f64 {
         h = std.fmt.parseFloat(f64, t1) catch return null;
         m = std.fmt.parseFloat(f64, t2) catch return null;
         if (it.next()) |t3| sec = std.fmt.parseFloat(f64, t3) catch return null;
-    } else if (std.mem.indexOfScalar(u8, t1, '.')) |dot| { // `hh.mm` — period separator
+    } else if (std.mem.indexOfScalar(u8, t1, '.')) |dot| { // `hh.mm` - period separator
         h = std.fmt.parseFloat(f64, t1[0..dot]) catch return null;
         m = std.fmt.parseFloat(f64, t1[dot + 1 ..]) catch return null;
     } else {
@@ -1295,14 +1295,14 @@ pub fn parseHhmmss(field: []const u8) ?f64 {
 
 /// The time half of an ISO 8601 field (E8601TM/B8601TM, and the part after the
 /// `T` of E8601DT/B8601DT): the extended `hh:mm:ss[.f]` colon form reads via
-/// parseTimeSecs, and a digit-packed run reads via parseHhmmss — the ISO BASIC
+/// parseTimeSecs, and a digit-packed run reads via parseHhmmss - the ISO BASIC
 /// notation `hhmmss<ffffff>` (B8601TM p.623: `155300` → 57180; B8601DT p.619:
 /// `20180915T155300` → 1852645980). BUG-8601packtime: the packed run used to
 /// land in parseTimeSecs' no-separator branch and read as HOURS (155300×3600 =
-/// 559080000) — silent wrong numerics on the informats' own doc examples.
+/// 559080000) - silent wrong numerics on the informats' own doc examples.
 /// Digits past `hhmmss` are the fraction (p.555's table: `155300322348` =
 /// 15:53:00.322348); a short run is parseHhmmss' left-padded reduced form
-/// (`1553` → 15:53:00). TIMEw. deliberately does NOT come through here —
+/// (`1553` → 15:53:00). TIMEw. deliberately does NOT come through here -
 /// packed digits are not TIMEw. grammar (p.722 documents only separator
 /// forms), so its digit runs keep the whole-run-as-hours duration read.
 fn parseIsoTimeSecs(s0: []const u8) ?f64 {
@@ -1360,25 +1360,25 @@ pub fn nofmterr() bool {
 pub fn formatErrored() bool {
     return g_fmt_error;
 }
-/// D-009 §5f — the documented-name lists that SPLIT the unknown-format and
+/// D-009 §5f - the documented-name lists that SPLIT the unknown-format and
 /// unknown-informat catch-alls below (GAP-gapsexitingone, format slice). A name
 /// reaching reportUnknownFormat/informatNotFound is either a real SAS 9.4
 /// format opensas does not implement (gap → rc 2, "file an opensas issue") or
 /// not a SAS format at all (typo → rc 1, "fix your SAS"). The SAS 9.4 Formats
-/// and Informats: Reference closes the valid set in ONE place — the tick397j
-/// predictor's best case — so these lists are its dictionary RE-DERIVED IN
+/// and Informats: Reference closes the valid set in ONE place - the tick397j
+/// predictor's best case - so these lists are its dictionary RE-DERIVED IN
 /// FULL (D-018, never assembled from memory): every `^NAMEw[.d] Format$` /
 /// `^NAMEw[.d] Informat$` heading in the Formats and Informats reference,
 /// with the x-metavariable families expanded to each entry's OWN syntax-table
 /// letters (MMDDYYxw. p.243 / DDMMYYxw. p.182 / YYMMDDxw. p.514 take
 /// B/C/D/N/P/S; YYMMxw. p.516 / MMYYxw. p.249 / YYQxw. p.521 / YYQRxw. p.525
-/// take C/D/N/P/S — no B). doc_inf_num also carries the nine informats the
+/// take C/D/N/P/S - no B). doc_inf_num also carries the nine informats the
 /// volume names only by See-Also cross-reference into the NLS Reference Guide
 /// (EURO/EUROX pp.215/218, NENGO p.257, NLMNY/NLMNYI pp.408/410,
-/// NLNUM/NLNUMI pp.412/413, NLPCT/NLPCTI pp.415/417) — D-018's TEMP/DDE
+/// NLNUM/NLNUMI pp.412/413, NLPCT/NLPCTI pp.415/417) - D-018's TEMP/DDE
 /// shape: real, documented in a volume this repo does not carry. Char-ness is
 /// part of the name: real SAS scopes format lookup by type, so `$date9.` is
-/// "format $DATE not found" (user error) even though DATEw. exists — the char
+/// "format $DATE not found" (user error) even though DATEw. exists - the char
 /// and numeric sets are separate lists. Self-maintaining: reaching a
 /// catch-all already means unimplemented, so implementing a format later
 /// needs no list edit here.
@@ -1452,7 +1452,7 @@ pub fn isDocumentedFormat(name: []const u8, is_char: bool) bool {
     return inDocList(if (is_char) &doc_fmt_char else &doc_fmt_num, name);
 }
 
-/// Is `name` a SAS 9.4 INFORMAT the reference names (read side) — the local
+/// Is `name` a SAS 9.4 INFORMAT the reference names (read side) - the local
 /// dictionary plus the See-Also-named NLS-guide informats?
 pub fn isDocumentedInformat(name: []const u8, is_char: bool) bool {
     return inDocList(if (is_char) &doc_inf_char else &doc_inf_num, name);
@@ -1462,7 +1462,7 @@ pub fn isDocumentedInformat(name: []const u8, is_char: bool) bool {
 /// BUG-charfmtsink). Shared by the numeric tail and the `$`-char branch so both
 /// paths report identically; the caller still renders a plain fallback afterwards.
 /// D-009 §5f: a name the 9.4 dictionary NAMES is an opensas gap (markGap → rc 2);
-/// anything else is the user's typo and stays rc 1 — same message either way.
+/// anything else is the user's typo and stays rc 1 - same message either way.
 fn reportUnknownFormat(name: []const u8, is_char: bool) void {
     if (g_nofmterr) return;
     if (isDocumentedFormat(name, is_char)) diag.markGap();
@@ -1476,7 +1476,7 @@ fn reportUnknownFormat(name: []const u8, is_char: bool) void {
     }
 }
 
-/// BUG-charfmtonnum: a `$` (character) format applied to a NUMERIC value — SAS
+/// BUG-charfmtonnum: a `$` (character) format applied to a NUMERIC value - SAS
 /// 9.4 is a compile-time error (a character format cannot be used with a
 /// numeric variable); we silently coerced the number to text (D-002). Same
 /// loud-then-fallback shape (and TEST-quietnoise capture) as
@@ -1494,7 +1494,7 @@ fn reportCharFmtOnNumeric(spec_text: []const u8) void {
 /// Effective character-ness of a format spec for the STATEMENT-level type
 /// checks (NOTE-fmtnumoncharcoerce: exec.declareStmt, PROC PRINT/DATASETS,
 /// groupFormats): a leading `$`, or a char-typed user format referenced
-/// $-lessly — SAS resolves those by name + value type (QA-charfmtnodollar),
+/// $-lessly - SAS resolves those by name + value type (QA-charfmtnodollar),
 /// so on a char variable they are NOT a mismatch.
 pub fn specIsChar(spec_text: []const u8) bool {
     const spec = parseSpec(spec_text);
@@ -1504,15 +1504,15 @@ pub fn specIsChar(spec_text: []const u8) bool {
     return false;
 }
 
-/// NOTE-fmtnumoncharcoerce: the mirror of BUG-charfmtonnum — a numeric format
+/// NOTE-fmtnumoncharcoerce: the mirror of BUG-charfmtonnum - a numeric format
 /// applied to a CHARACTER value. SAS rejects the ASSOCIATION at compile time
 /// (Formats & Informats Ref printed p.7: the FORMAT statement associates char
 /// vars with char formats and numeric vars with numeric formats; p.5: an
 /// incompatible format falls back to an analogous format of the other type or
-/// ERRORs — never a silent coerce). The FORMAT/ATTRIB statement surfaces now
+/// ERRORs - never a silent coerce). The FORMAT/ATTRIB statement surfaces now
 /// check at compile time (exec.declareStmt, PROC PRINT/DATASETS, groupFormats);
 /// a value that still reaches here (a stale descriptor, a PUT/put() spec) used
-/// to be parsed as a number — 'abc' → missing → '.' — DESTROYING the cell with
+/// to be parsed as a number - 'abc' → missing → '.' - DESTROYING the cell with
 /// exit 0. Same loud-then-fallback shape as reportCharFmtOnNumeric: the caller
 /// renders the raw text afterwards.
 fn reportNumFmtOnChar(spec_text: []const u8) void {
@@ -1525,7 +1525,7 @@ fn reportNumFmtOnChar(spec_text: []const u8) void {
     }
 }
 
-/// A nested-format label chain (`=[fmtname]`) looped back on itself — SAS:
+/// A nested-format label chain (`=[fmtname]`) looped back on itself - SAS:
 /// "ERROR: Format reference is circular". Same loud-then-fallback pattern (and
 /// TEST-quietnoise capture) as reportUnknownFormat.
 fn reportCircularFormat(name: []const u8) void {
@@ -1538,7 +1538,7 @@ fn reportCircularFormat(name: []const u8) void {
     }
 }
 
-/// Numeric format names the plain renderer legitimately handles — everything else
+/// Numeric format names the plain renderer legitimately handles - everything else
 /// reaching the numeric fallback is a typo / unsupported name that must fail loud.
 fn isKnownNumFmt(name: []const u8) bool {
     if (name.len == 0) return true; // plain w.d / Fw.
@@ -1547,18 +1547,18 @@ fn isKnownNumFmt(name: []const u8) bool {
     return false;
 }
 
-/// Informat names the READ paths legitimately handle — plain numeric aliases,
+/// Informat names the READ paths legitimately handle - plain numeric aliases,
 /// COMMA/DOLLAR family, PERCENT, and the implemented date/time informats. Anything
 /// else reaching a numeric-read fallback is unimplemented/typo → fail loud
 /// (BUG-informatreadloud). Shared by readNumeric (INPUT stmt) and functions.zig
 /// readInformat (INPUT() function). Date-name informats are listed too so a caller
 /// that routes them here does not false-trip; `spec.name` is already lowercased-safe
 /// via eqi. `e` is the Ew.d w.d alias (NOTE-informatlow-tick245 #9), NOT a
-/// stand-in for the digit-bearing E8601 names — parseSpec preserves those whole
+/// stand-in for the digit-bearing E8601 names - parseSpec preserves those whole
 /// (it peels only the TRAILING width digits, QA-e8601put), so they are listed
 /// verbatim. There is deliberately NO `b`: B8601 names survive parseSpec too,
 /// and a bare `b` here would only silence the not-yet-implemented B8601DZ/DN/TZ
-/// reads at the functions.zig whitelist (GH#5a rider — the old comment claimed
+/// reads at the functions.zig whitelist (GH#5a rider - the old comment claimed
 /// `b` coverage this list never had).
 pub fn isKnownInformat(name: []const u8) bool {
     if (name.len == 0) return true; // plain w.d
@@ -1581,7 +1581,7 @@ pub fn isKnownInformat(name: []const u8) bool {
 /// `options nofmterr`. Message mirrors the write side, captured in a test build.
 /// SAS "Invalid numeric data" NOTE for a plain `w.d` field with an embedded blank
 /// (BUG-numembeddedblank): the value reads as missing, but this is a NOTE, not an
-/// ERROR — the run is NOT failed (unlike informatNotFound), matching the
+/// ERROR - the run is NOT failed (unlike informatNotFound), matching the
 /// diags.note path the implicit char→num conversion uses. Captured in a test
 /// build so a fail-loud test can assert it (TEST-quietnoise); the CLI prints it.
 var g_test_note_buf: [256]u8 = undefined;
@@ -1593,11 +1593,11 @@ pub var g_test_last_note: []const u8 = "";
 pub var read_noted: bool = false;
 fn invalidNumeric(field: []const u8) Value {
     read_noted = true;
-    // NOTE-invalidnumdataloc (GH#78): no "at line N column M" tail — the
+    // NOTE-invalidnumdataloc (GH#78): no "at line N column M" tail - the
     // informat layer sees only the field text; the record line/column lives up
     // in io.zig's noteInvalidNum (which already prints the REAL position for
     // every other invalid-read path). A frozen 0/0 was a lie, so the position
-    // is omitted — and the test capture is byte-identical to the CLI text.
+    // is omitted - and the test capture is byte-identical to the CLI text.
     const msg = "Invalid numeric data, '{s}'.";
     if (@import("builtin").is_test) {
         g_test_last_note = std.fmt.bufPrint(&g_test_note_buf, msg, .{field}) catch "invalid-numeric-data";
@@ -1610,7 +1610,7 @@ fn invalidNumeric(field: []const u8) Value {
 /// BUG-fmtwidthunbounded: reject a width beyond the SAS maximum (numeric 32 /
 /// $char 32767) with a loud ERROR (→ non-zero exit via formatErrored; captured
 /// in a test build, TEST-quietnoise) and clamp to the cap so any downstream
-/// w-fed alloc stays bounded — mirroring the unknown-format loud-then-fallback
+/// w-fed alloc stays bounded - mirroring the unknown-format loud-then-fallback
 /// pattern (BUG-unknownfmtsilent). `options nofmterr` suppresses it, like the
 /// other format errors.
 fn checkWidth(spec_text: []const u8, spec: Spec) usize {
@@ -1627,7 +1627,7 @@ fn checkWidth(spec_text: []const u8, spec: Spec) usize {
     return cap;
 }
 
-/// GH#2 ISS-e8601dt-width: the PER-FORMAT width range — a documented `w Range`
+/// GH#2 ISS-e8601dt-width: the PER-FORMAT width range - a documented `w Range`
 /// that the global checkWidth cap above can't express (it accepts 10/15/27
 /// silently). SAS rejects them (`ERROR 29-185: Width specified for format
 /// E8601DT is invalid.`), a user-program error → the rc 1 class via g_fmt_error,
@@ -1652,7 +1652,7 @@ fn checkWidthRange(spec_text: []const u8, w: usize, lo: usize, hi: usize) void {
 
 pub fn informatNotFound(name: []const u8, is_char: bool) void {
     if (g_nofmterr) return;
-    if (isDocumentedInformat(name, is_char)) diag.markGap(); // D-009 §5f — write-side twin above
+    if (isDocumentedInformat(name, is_char)) diag.markGap(); // D-009 §5f - write-side twin above
     g_fmt_error = true;
     if (@import("builtin").is_test) {
         g_test_last_err = std.fmt.bufPrint(&g_test_err_buf, "The informat {s} was not found or could not be loaded.", .{name}) catch "informat-not-found";
@@ -1667,14 +1667,14 @@ pub fn apply(arena: std.mem.Allocator, v: Value, spec_text: []const u8) Error![]
 
 /// `apply` + a nested-format depth counter: a VALUE entry whose label is a
 /// bracketed format spec (`range=[fmtname w.d]`, SAS directed formatting) renders
-/// the value under THAT spec — resolved by re-applying here (BUG-fmtnestlabel).
+/// the value under THAT spec - resolved by re-applying here (BUG-fmtnestlabel).
 fn applyNest(arena: std.mem.Allocator, v: Value, spec_text: []const u8, depth: u8) Error![]const u8 {
     var spec = parseSpec(spec_text);
     // BUG-charfmtonnum: a `$` (char) format on a NUMERIC value is a SAS
-    // compile-time error — flag it loud (D-002) before any renderer silently
+    // compile-time error - flag it loud (D-002) before any renderer silently
     // coerces the number to text, then fall through and render the raw value
     // so the rest of the output survives. The reverse direction (numeric
-    // format on a char value) is NOTE-fmtnumoncharcoerce — checked below, once
+    // format on a char value) is NOTE-fmtnumoncharcoerce - checked below, once
     // the char-spec renderers have been routed away. "$." is exempt: the
     // FORMAT-removal form `format x;` rides it as a deliberately TYPE-AGNOSTIC
     // default sentinel (BUG-formatremoval), not a real char format.
@@ -1687,7 +1687,7 @@ fn applyNest(arena: std.mem.Allocator, v: Value, spec_text: []const u8, depth: u
     // the decoded label (BUG-userformat).
     if (lookupUserFmt(v, spec)) |e| {
         if (e.nested) {
-            // `value a 1=[a.]` chains back to itself — unbounded recursion. SAS
+            // `value a 1=[a.]` chains back to itself - unbounded recursion. SAS
             // errors ("format reference is circular"); cap the chain and fail
             // loud, then render the raw value so the rest of the output lands.
             if (depth >= 16) {
@@ -1701,7 +1701,7 @@ fn applyNest(arena: std.mem.Allocator, v: Value, spec_text: []const u8, depth: u
         }
         // BUG-fmtlabelwidth: an explicit width on the format (`f4.`) truncates the
         // matched label to w chars (keeping the first w) and blank-pads a shorter
-        // one to w — SAS left-justifies a value label into its field. renderChar
+        // one to w - SAS left-justifies a value label into its field. renderChar
         // returns the label verbatim when w==0 (`f.` → format default width), so
         // the width-less path is unchanged.
         return renderChar(arena, e.label, spec.w);
@@ -1715,7 +1715,7 @@ fn applyNest(arena: std.mem.Allocator, v: Value, spec_text: []const u8, depth: u
     // GAP-fmtdefwidth-num: a named numeric format with NO explicit width renders
     // at its documented SAS DEFAULT width, right-justified into it (SAS 9.4
     // Formats Reference: COMMA/COMMAX/DOLLAR/DOLLARX/NEGPAREN/PERCENT all default
-    // to 6) — `put 0.5 percent.` is "   50%", not "50%". w==0 used to mean
+    // to 6) - `put 0.5 percent.` is "   50%", not "50%". w==0 used to mean
     // natural width / no padding here. BEST (12, below) and the date/time formats
     // carry their own defaults; NLNUM/Z keep prior behavior (unverified default).
     if (spec.w == 0 and (eqi(spec.name, "comma") or eqi(spec.name, "commax") or
@@ -1725,7 +1725,7 @@ fn applyNest(arena: std.mem.Allocator, v: Value, spec_text: []const u8, depth: u
         // locale-invariant NLPCTI/NLPCTN (pp.417/418, Default 6).
         eqi(spec.name, "euro") or eqi(spec.name, "eurox") or
         eqi(spec.name, "nlpcti") or eqi(spec.name, "nlpctn"))) spec.w = 6;
-    // BUG-fmtdefwidth-date: the width-less DATE formats do the same — render at
+    // BUG-fmtdefwidth-date: the width-less DATE formats do the same - render at
     // the documented DEFAULT width (MONYY/JULIAN 5 ⇒ 2-digit year: `put x monyy.`
     // is `JUL20`, not `JUL2020`; word/name formats pad into their field). w==0
     // used to mean "widest natural form" here. Explicit widths are untouched.
@@ -1738,16 +1738,16 @@ fn applyNest(arena: std.mem.Allocator, v: Value, spec_text: []const u8, depth: u
         return renderHexNum(arena, valToNum(v), spec.w);
     }
     if (spec.is_char or eqi(spec.name, "char")) {
-        // $UPCASEw./$LOWCASEw. FORMATS transform case before padding — the
+        // $UPCASEw./$LOWCASEw. FORMATS transform case before padding - the
         // write-side twin of the $UPCASE informat (BUG-upcaseinformat). They
         // used to fall into the plain char pad and leak the original case
         // (BUG-upcaseformat).
         const raw = try valToStr(arena, v);
-        // $QUOTEw. wraps the value in double quotes, DOUBLING an embedded `"` —
+        // $QUOTEw. wraps the value in double quotes, DOUBLING an embedded `"` -
         // the same CSV/DSD escape the QUOTE() function (charfns.zig), the FILE
         // DSD writer and PROC EXPORT already use, and the rule the INFILE DSD
         // reader collapses back (BUG-dsddoublequote). Without doubling, a value
-        // carrying a `"` quoted out as `"a"b"` — unreadable by any DSD reader,
+        // carrying a `"` quoted out as `"a"b"` - unreadable by any DSD reader,
         // opensas's own included (NOTE-fmtquotedouble: round-trip a"b ↔ "a""b").
         if (eqi(spec.name, "quote")) {
             var q: std.ArrayList(u8) = .empty;
@@ -1767,7 +1767,7 @@ fn applyNest(arena: std.mem.Allocator, v: Value, spec_text: []const u8, depth: u
             raw;
         // BUG-charfmtsink: an unknown `$NAME` (not a built-in `$.`/`$CHAR`/
         // `$UPCASE`/`$LOWCASE`/`$QUOTE`/`$HEX`, and not a defined user format)
-        // used to fall through to a plain pad — a silent sink. Fail loud like
+        // used to fall through to a plain pad - a silent sink. Fail loud like
         // the numeric tail, then still render the raw pad so output survives.
         const known = spec.name.len == 0 or eqi(spec.name, "char") or
             eqi(spec.name, "upcase") or eqi(spec.name, "lowcase");
@@ -1779,7 +1779,7 @@ fn applyNest(arena: std.mem.Allocator, v: Value, spec_text: []const u8, depth: u
         return renderChar(arena, cased, w);
     }
     // NOTE-fmtnumoncharcoerce: every spec below here is numeric, so a char
-    // value reaching this point is the destructive mismatch — report it loud
+    // value reaching this point is the destructive mismatch - report it loud
     // and render the raw text (the analogous-format fallback of Formats Ref
     // p.5), never the silent '.'. A DEFINED user format is exempt: its
     // value-type-aware lookup above resolves a match, and a range miss renders
@@ -1839,7 +1839,7 @@ fn applyNest(arena: std.mem.Allocator, v: Value, spec_text: []const u8, depth: u
     if (eqi(spec.name, "mmyys")) return renderYymm(arena, valToNum(v), spec.w, '/', true);
     if (eqi(spec.name, "time"))
         return renderTime(arena, valToNum(v), spec.w, spec.d, false);
-    // WRITE-side date/time cluster (BUG-dateformats) — all fell through to the
+    // WRITE-side date/time cluster (BUG-dateformats) - all fell through to the
     // numeric renderer and printed the raw SAS number.
     if (eqi(spec.name, "monyy")) return renderMonyy(arena, valToNum(v), spec.w);
     if (eqi(spec.name, "monname")) return renderMonName(arena, valToNum(v), spec.w);
@@ -1847,44 +1847,44 @@ fn applyNest(arena: std.mem.Allocator, v: Value, spec_text: []const u8, depth: u
     if (eqi(spec.name, "year")) return renderYear(arena, valToNum(v), spec.w);
     if (eqi(spec.name, "datetime")) return renderDatetime(arena, valToNum(v), spec.w, spec.d);
     // DT-prefixed formats write the DATE part of a SAS DATETIME value (seconds
-    // since 1960) — take datepart() then reuse the matching date renderer (SAS 9.4
+    // since 1960) - take datepart() then reuse the matching date renderer (SAS 9.4
     // "DTDATEw./DTMONYYw./DTYEARw./DTWKDATXw. write the date part of a datetime").
     if (eqi(spec.name, "dtdate")) return renderDate(arena, datePartOf(valToNum(v)), spec.w, .date);
     if (eqi(spec.name, "dtmonyy")) return renderMonyy(arena, datePartOf(valToNum(v)), spec.w);
     if (eqi(spec.name, "dtyear")) return renderYear(arena, datePartOf(valToNum(v)), spec.w);
     if (eqi(spec.name, "dtwkdatx")) return renderWeekDatx(arena, datePartOf(valToNum(v)), spec.w);
-    // ISO 8601 write side (QA-e8601put) — the informat side already reads these.
+    // ISO 8601 write side (QA-e8601put) - the informat side already reads these.
     if (eqi(spec.name, "e8601da")) return renderYymmddX(arena, valToNum(v), if (spec.w == 0) 10 else spec.w, '-');
     // GH#2 ISS-e8601dt-width: E8601DT's documented w Range 16-26 (Formats
-    // Reference pp.200-201) — loud outside it, before the width-less-default
+    // Reference pp.200-201) - loud outside it, before the width-less-default
     // render below (w 0 → 19).
     if (eqi(spec.name, "e8601dt")) {
         checkWidthRange(spec_text, spec.w, 16, 26);
         return renderE8601Dt(arena, valToNum(v), spec.w);
     }
     // GH#5a ISS-e8601dndz: E8601DZw. (Formats Reference p.204: Default 26,
-    // Range 20-35 — loud outside) writes the zero-meridian datetime; the doc's
+    // Range 20-35 - loud outside) writes the zero-meridian datetime; the doc's
     // two notations form a width ladder rendered by renderE8601Dz below.
     if (eqi(spec.name, "e8601dz")) {
         checkWidthRange(spec_text, spec.w, 20, 35);
         return renderE8601Dz(arena, valToNum(v), spec.w);
     }
-    // E8601TMw. — ISO time hh:mm:ss (a time value); same body as TIME. E8601DNw. —
+    // E8601TMw. - ISO time hh:mm:ss (a time value); same body as TIME. E8601DNw. -
     // the DATE part of an ISO DATETIME as yyyy-mm-dd (datepart then E8601DA). GAP-timeformats.
     if (eqi(spec.name, "e8601tm")) return renderTime(arena, valToNum(v), if (spec.w == 0) 8 else spec.w, 0, true); // ISO: zero-pad hh
     if (eqi(spec.name, "e8601dn")) return renderYymmddX(arena, datePartOf(valToNum(v)), if (spec.w == 0) 10 else spec.w, '-');
     // GAP-fmtwritebatch (doc-finder tick126): ISO 8601 BASIC forms (no
     // separators) + the date/time/special write formats that used to fail loud.
-    // Still loud: the LOCALE=-driven NL* writes — NLPCT/NLPCTP/NLMNYI and the
+    // Still loud: the LOCALE=-driven NL* writes - NLPCT/NLPCTP/NLMNYI and the
     // NLMNI<ccy> currency family render per the SESSION locale (every entry:
     // "The output value depends on the locale"), which opensas does not model,
-    // so any output would be a guess (GAP-fmtwrite-unimpl) — and PDJULG/PDJULI
+    // so any output would be a guess (GAP-fmtwrite-unimpl) - and PDJULG/PDJULI
     // (packed-byte forms).
     if (eqi(spec.name, "b8601da")) return renderYymmddX(arena, valToNum(v), if (spec.w == 0) 10 else spec.w, null);
     if (eqi(spec.name, "b8601dt")) return renderB8601Dt(arena, valToNum(v), spec.w);
     if (eqi(spec.name, "b8601tm")) return renderB8601Tm(arena, valToNum(v), spec.w);
     if (eqi(spec.name, "yymon")) return renderYymon(arena, valToNum(v), spec.w);
-    // NENGOw. — Japanese era date (p.257; GAP-fmtwrite-unimpl).
+    // NENGOw. - Japanese era date (p.257; GAP-fmtwrite-unimpl).
     if (eqi(spec.name, "nengo")) return renderNengo(arena, valToNum(v), spec.w);
     if (eqi(spec.name, "julday")) return renderJulday(arena, valToNum(v), spec.w);
     if (eqi(spec.name, "pdjulian")) return renderJulian(arena, valToNum(v), spec.w); // yyyyddd, JULIAN twin
@@ -1895,15 +1895,15 @@ fn applyNest(arena: std.mem.Allocator, v: Value, spec_text: []const u8, depth: u
     // NL* en_US approximations, same house pattern as NLDATE→WORDDATE above.
     if (eqi(spec.name, "nldatm")) return renderNldatm(arena, valToNum(v), spec.w);
     if (eqi(spec.name, "nltime")) return renderTime(arena, valToNum(v), spec.w, 0, false);
-    // ponytail: d==0 (unspecified or explicit .0 — indistinguishable) → 2
+    // ponytail: d==0 (unspecified or explicit .0 - indistinguishable) → 2
     // decimals, the en_US currency default; use DOLLARw.0 for 0 decimals.
     if (eqi(spec.name, "nlmny")) return renderNum(arena, valToNum(v), spec.w, if (spec.d == 0) 2 else spec.d, true, true, false);
-    // NLPCTIw.d (p.417) / NLPCTNw.d (p.418) — the two locale-INVARIANT percent
+    // NLPCTIw.d (p.417) / NLPCTNw.d (p.418) - the two locale-INVARIANT percent
     // formats of the NL family (GAP-fmtwrite-unimpl). NLPCTI: comma grouping +
     // period decimal ALWAYS (the Comparisons paragraph pins it; the NLPCT
     // entry's own example shows nlpcti identical under en_US and
     // German_Germany). NLPCTN: no separators, minus sign, trailing blank.
-    // NLPCT (p.415) / NLPCTP (p.419) stay loud — separators locale-specific.
+    // NLPCT (p.415) / NLPCTP (p.419) stay loud - separators locale-specific.
     if (eqi(spec.name, "nlpcti")) return renderNlpcti(arena, valToNum(v), spec.w, spec.d);
     if (eqi(spec.name, "nlpctn")) return renderNlpctn(arena, valToNum(v), spec.w, spec.d);
     // Time hour:minute + component formats (GAP-timeformats).
@@ -1944,11 +1944,11 @@ fn applyNest(arena: std.mem.Allocator, v: Value, spec_text: []const u8, depth: u
         };
         return m;
     }
-    // NEGPAREN — comma-grouped magnitude; negatives in parens, positives reserve
+    // NEGPAREN - comma-grouped magnitude; negatives in parens, positives reserve
     // the last column for the absent close-paren (BUG-fmtxnlneg).
     if (eqi(spec.name, "negparen"))
         return renderNegParen(arena, valToNum(v), spec.w, spec.d);
-    // EUROw.d/EUROXw.d (pp.215/218) — the DOLLAR/DOLLARX twins with a leading
+    // EUROw.d/EUROXw.d (pp.215/218) - the DOLLAR/DOLLARX twins with a leading
     // `E` for `$` ("similar to the DOLLARw.d format, except … euro symbol").
     // NOT locale-driven, unlike the NL* family: fixed comma/period (EURO) or
     // period/comma (EUROX) separators. GAP-fmtwrite-unimpl.
@@ -1961,18 +1961,18 @@ fn applyNest(arena: std.mem.Allocator, v: Value, spec_text: []const u8, depth: u
     if (isKnownNumFmt(spec.name)) // plain w.d, COMMA, DOLLAR, or a recognized numeric name
         return renderNum(arena, valToNum(v), spec.w, spec.d, dollar or eqi(spec.name, "comma"), dollar, false);
     // A DEFINED user VALUE format whose value matched no range (and had no OTHER=)
-    // is NOT unknown — SAS renders the raw value with no error (BUG-formatexclrange).
+    // is NOT unknown - SAS renders the raw value with no error (BUG-formatexclrange).
     if (isUserFmtName(v, spec)) return switch (v) {
         // QA-charfmtnomatch: a CHAR value under a defined char format with no
-        // matching key and no OTHER= renders the RAW VALUE (SAS) — the old
+        // matching key and no OTHER= renders the RAW VALUE (SAS) - the old
         // renderNum path printed "." and silently blanked gen2 AEOUT (67 rows).
         .str => |s| renderChar(arena, s, if (spec.w == 0) userFmtDefaultWidth(v, spec) else spec.w),
-        // NOTE-numfmtdefwidth: numeric twin of the CHAR path above — an unmatched
+        // NOTE-numfmtdefwidth: numeric twin of the CHAR path above - an unmatched
         // numeric value with no explicit width right-justifies in the format's
         // default (widest-label) width, the same source userFmtDefaultWidth feeds char.
         .num => renderNum(arena, valToNum(v), if (spec.w == 0) userFmtDefaultWidth(v, spec) else spec.w, spec.d, false, false, false),
     };
-    // An unrecognized/unsupported format name — fail loud (BUG-unknownfmtsilent),
+    // An unrecognized/unsupported format name - fail loud (BUG-unknownfmtsilent),
     // then render a plain fallback so the remaining output still lands.
     reportUnknownFormat(spec.name, false);
     return renderNum(arena, valToNum(v), spec.w, spec.d, false, false, false);
@@ -1981,7 +1981,7 @@ fn applyNest(arena: std.mem.Allocator, v: Value, spec_text: []const u8, depth: u
 // ── renderers ──────────────────────────────────────────────────────────────
 
 fn renderChar(arena: std.mem.Allocator, s: []const u8, w: usize) Error![]const u8 {
-    if (w == 0) return s; // `$.` — no width, value as-is
+    if (w == 0) return s; // `$.` - no width, value as-is
     const out = try arena.alloc(u8, w);
     const n = @min(s.len, w);
     @memcpy(out[0..n], s[0..n]);
@@ -1991,7 +1991,7 @@ fn renderChar(arena: std.mem.Allocator, s: []const u8, w: usize) Error![]const u
 
 const hexdigits = "0123456789ABCDEF";
 
-/// `$HEXw.` — each byte of a character value → two uppercase hex digits. `w` hex
+/// `$HEXw.` - each byte of a character value → two uppercase hex digits. `w` hex
 /// digits = ceil(w/2) bytes; a value shorter than that is blank-padded (0x20, so
 /// "20"), as SAS does. `w`==0 → the whole value. This is how a raw md5/sha/crc
 /// digest (a byte string) is printed as hex.
@@ -2006,14 +2006,14 @@ fn renderHexChar(arena: std.mem.Allocator, s: []const u8, w: usize) Error![]cons
     return if (w > 0 and w < out.len) out[0..w] else out; // trim if w is odd
 }
 
-/// `HEXw.` — a numeric value's integer part in uppercase hex, right-justified and
+/// `HEXw.` - a numeric value's integer part in uppercase hex, right-justified and
 /// zero-padded to `w` digits (low `w` digits kept if it overflows). Non-finite →
 /// blanks. Negatives render as their two's-complement bit pattern truncated to
 /// the field's `4*w` bits (SAS: -5 hex4. → FFFB).
 fn renderHexNum(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (!std.math.isFinite(x)) return renderChar(arena, "", w); // missing → blanks
     // HEXw. with w>=16 shows the raw 8-byte IEEE double, big-endian, as 16 hex
-    // digits (36.6 → 40424CCCCCCCCCCD) — not the integer magnitude (GH#46).
+    // digits (36.6 → 40424CCCCCCCCCCD) - not the integer magnitude (GH#46).
     if (w >= 16) {
         const bits: u64 = @bitCast(x);
         const out = try arena.alloc(u8, w);
@@ -2073,7 +2073,7 @@ fn renderNum(arena: std.mem.Allocator, x: f64, w: usize, d_in: usize, commas: bo
     // Fit to `w` (BUG-fmtwidth): SAS never overflows the field. Try the fixed w.d
     // form, reducing decimals until it fits; then drop grouping commas, then the
     // `$`; then BESTw/Ew; finally fill the field with `*`. `w == 0` means no width
-    // was specified, so nothing to fit — the first (full) form is taken.
+    // was specified, so nothing to fit - the first (full) form is taken.
     const fits = struct {
         fn f(len: usize, width: usize) bool {
             return width == 0 or len <= width;
@@ -2097,7 +2097,7 @@ fn renderNum(arena: std.mem.Allocator, x: f64, w: usize, d_in: usize, commas: bo
 }
 
 /// The fixed `w.d` body (sign, optional `$`, grouped/plain integer, `.` + `d`
-/// fraction) with NO width padding — the caller checks its length. Null when the
+/// fraction) with NO width padding - the caller checks its length. Null when the
 /// value is too large for the integer path (caller falls back to BEST/E).
 fn buildFixed(arena: std.mem.Allocator, x: f64, d: usize, commas: bool, dollar: bool) Error!?[]const u8 {
     var pow10: u64 = 1;
@@ -2130,7 +2130,7 @@ fn buildFixed(arena: std.mem.Allocator, x: f64, d: usize, commas: bool, dollar: 
 /// (BUG-wdroundtie). SAS's w.d renders the true stored double: an exact decimal
 /// tie (…5) rounds half away from zero, anything strictly below the tie rounds
 /// down. The old `@round(@abs(x) * 10^d)` let the f64 multiply snap a below-tie
-/// value onto a FALSE tie — put(2.675,8.2) gave "2.68" where SAS renders the
+/// value onto a FALSE tie - put(2.675,8.2) gave "2.68" where SAS renders the
 /// stored 2.67499999999999982… as "2.67". Null when too big for the integer
 /// path (caller falls back to BEST/E).
 fn scaledRoundExact(x: f64, d: usize) ?u64 {
@@ -2157,13 +2157,13 @@ fn scaledRoundExact(x: f64, d: usize) ?u64 {
     return @intCast(q);
 }
 
-/// Ew.[d] — scientific notation `[-]m.dddE±nn`. Fixed `d` mantissa decimals
+/// Ew.[d] - scientific notation `[-]m.dddE±nn`. Fixed `d` mantissa decimals
 /// (default: as many as fit in `w` after the sign, `d.`, and `E±nn`); a signed,
 /// ≥2-digit exponent; right-justified. Unlike BEST's E-notation it keeps trailing
 /// mantissa zeros and always shows the exponent sign (BUG-eformat).
 /// ax / 10^exp, i.e. ax scaled into the mantissa range [1,10). Direct division
 /// underflows to +inf for the tiniest denormals (|x| ~ 5e-324, exp ~ -324) when
-/// 10^exp itself underflows to 0 — the subsequent @intFromFloat then aborts
+/// 10^exp itself underflows to 0 - the subsequent @intFromFloat then aborts
 /// (BUG-fmtnumoverflow). Fall back to a stepwise scale that stays finite there.
 fn eMantissa(ax: f64, exp: i32) f64 {
     const p = std.math.pow(f64, 10, @floatFromInt(exp));
@@ -2199,16 +2199,16 @@ fn renderE(arena: std.mem.Allocator, x: f64, w: usize, d_in: usize) Error![]cons
     return stars(arena, w);
 }
 
-/// The E-body `[-]m.dddE±nn` at `d` mantissa decimals, with NO width padding —
+/// The E-body `[-]m.dddE±nn` at `d` mantissa decimals, with NO width padding -
 /// the caller checks its length. exp renormalizes +1 when rounding lifts the
 /// mantissa to 10.xxx.
 fn buildEBody(arena: std.mem.Allocator, ax: f64, exp_in: i32, exp_digits: usize, neg: bool, d: usize) Error![]const u8 {
     var exp = exp_in;
     // A double carries ~15-16 significant decimal digits; scaling by 10^d for
-    // d≥19 both overflows the u64 mantissa (@intFromFloat then panics — the
+    // d≥19 both overflows the u64 mantissa (@intFromFloat then panics - the
     // BUG-efmtcrash abort at wide Ew.d) and would only emit conversion noise past
     // double precision. Compute at most 15 decimals into the integer mantissa and
-    // pad the remaining positions with text zeros — SAS renders wide Ew.d the same
+    // pad the remaining positions with text zeros - SAS renders wide Ew.d the same
     // way (mantissa to representable precision, zero-filled to width).
     // ponytail: 15 is the IEEE-754 f64 decimal-precision ceiling; only revisit if
     // this ever renders from an f80/f128.
@@ -2247,7 +2247,7 @@ fn buildEBody(arena: std.mem.Allocator, ax: f64, exp_in: i32, exp_digits: usize,
     return body.items;
 }
 
-/// PERCENTw.d — scale by 100, render like `w.d`, append `%`; negatives are
+/// PERCENTw.d - scale by 100, render like `w.d`, append `%`; negatives are
 /// wrapped in parentheses (SAS convention), then right-justified in `w`.
 fn renderPercent(arena: std.mem.Allocator, x: f64, w: usize, d_in: usize) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
@@ -2278,7 +2278,7 @@ fn renderPercent(arena: std.mem.Allocator, x: f64, w: usize, d_in: usize) Error!
     return stars(arena, w);
 }
 
-/// NLPCTIw.d — percentage of the INTERNATIONAL expression (SAS 9.4 Formats
+/// NLPCTIw.d - percentage of the INTERNATIONAL expression (SAS 9.4 Formats
 /// Reference p.417). Locale-INVARIANT, unlike the parked NLPCTw.d (p.415): the
 /// Comparisons paragraph pins "a comma (,) as thousands separator and a period
 /// (.) as a decimal separator" always, and the NLPCT entry's own example shows
@@ -2303,13 +2303,13 @@ fn renderNlpcti(arena: std.mem.Allocator, x: f64, w: usize, d_in: usize) Error![
     return stars(arena, w);
 }
 
-/// NLPCTNw.d — percentages with a MINUS sign for negative values (SAS 9.4
+/// NLPCTNw.d - percentages with a MINUS sign for negative values (SAS 9.4
 /// Formats Reference p.418: "multiplies negative values by 100, adds a minus
 /// sign … and adds a percent sign (%) to the end"; example x=-0.02 → `-2%`).
-/// No thousands separator anywhere in the entry — locale-invariant, unlike the
+/// No thousands separator anywhere in the entry - locale-invariant, unlike the
 /// parked NLPCTPw.d (p.419). Alignment Right; the width Tip reserves "the
 /// minus sign, the percent sign, and a trailing blank, whether the number is
-/// negative or positive" — so the body always ends in one blank (`-2% `; the
+/// negative or positive" - so the body always ends in one blank (`-2% `; the
 /// Range floor 4 is exactly `-2% `). Default w 6, d 0 (GAP-fmtwrite-unimpl).
 fn renderNlpctn(arena: std.mem.Allocator, x: f64, w: usize, d_in: usize) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
@@ -2330,14 +2330,14 @@ fn renderNlpctn(arena: std.mem.Allocator, x: f64, w: usize, d_in: usize) Error![
     return stars(arena, w);
 }
 
-/// EUROw.d/EUROXw.d — numeric with a leading euro symbol `E` (SAS 9.4 Formats
+/// EUROw.d/EUROXw.d - numeric with a leading euro symbol `E` (SAS 9.4 Formats
 /// Reference p.215: "similar to the DOLLARw.d format, except that DOLLARw.d
 /// format writes a leading dollar sign instead of the euro symbol"; p.218:
 /// EUROX "reverses the roles of the decimal point and the comma" like
-/// DOLLARX). NOT locale-driven, unlike the NL* family — fixed separators.
+/// DOLLARX). NOT locale-driven, unlike the NL* family - fixed separators.
 /// Default w 6, Range 1–32, d Default 0. The w=6 default-length logs (p.217,
 /// p.220) pin the fit ladder: reduce d → drop the SYMBOL keeping grouping
-/// (`55,555`, not `E55555` — the opposite rung order to renderNum's DOLLAR
+/// (`55,555`, not `E55555` - the opposite rung order to renderNum's DOLLAR
 /// ladder) → drop grouping → BESTw (`7.78E6`, separators NOT swapped under
 /// EUROX) → asterisks (GAP-fmtwrite-unimpl).
 fn renderEuro(arena: std.mem.Allocator, x: f64, w: usize, d_in: usize, swap: bool) Error![]const u8 {
@@ -2372,7 +2372,7 @@ fn euroBody(arena: std.mem.Allocator, x: f64, d: usize, commas: bool, symbol: bo
     return m;
 }
 
-/// FRACTw. — the value as a reduced fraction `p/q`, right-justified in `w`
+/// FRACTw. - the value as a reduced fraction `p/q`, right-justified in `w`
 /// (SAS 9.4 Formats Reference, FRACTw. Format p.224: default w 10, range 4–32;
 /// "writes fractions in reduced form (for example, 1/2 instead of 50/100)").
 /// The most accurate rational whose `p/q` display fits the field, walked through
@@ -2380,13 +2380,13 @@ fn euroBody(arena: std.mem.Allocator, x: f64, d: usize, commas: bool, symbol: bo
 /// monotonically, so per CF step the widest-fitting one is champion and a later
 /// champion only replaces the incumbent when strictly closer in f64 (doc rows:
 /// 0.6666666667 fract8. → `     2/3`, 0.2784 fract8. → ` 174/625`). The strict
-/// rule keeps deep convergents of a decimal-typed input — which tie at f64
-/// noise — from displacing the simpler intended fraction. An exact hit
+/// rule keeps deep convergents of a decimal-typed input - which tie at f64
+/// noise - from displacing the simpler intended fraction. An exact hit
 /// (err == 0) stops the walk: nothing later is shorter. Integers render `n/1`
 /// (doc silent); the plain-integer rendering competes on error and wins when no
 /// exact `n/1` fits (123456 fract7. → ` 123456`); nothing fits → asterisks.
 /// ponytail: the CF runs on the f64 working value, so partial quotients past
-/// q ≈ 1e15 are noise — unreachable for w ≤ 32 except for irrationals, where
+/// q ≈ 1e15 are noise - unreachable for w ≤ 32 except for irrationals, where
 /// any display-fitting answer is unverifiable anyway.
 fn renderFract(arena: std.mem.Allocator, x: f64, w_in: usize) Error![]const u8 {
     const w = if (w_in == 0) 10 else w_in; // doc default 10
@@ -2406,7 +2406,7 @@ fn renderFract(arena: std.mem.Allocator, x: f64, w_in: usize) Error![]const u8 {
     var best_p: u128 = 0;
     var best_q: u128 = 1;
     var best_err: f64 = ax;
-    // `0/1` — the always-simplest candidate (skipped for huge |x|, where no
+    // `0/1` - the always-simplest candidate (skipped for huge |x|, where no
     // fraction can fit and showing 0/1 for 1e300 would be silently wrong).
     var have_best = ax < 1.0e30 and dispCap(0, 1, neg, w);
     if (ax < 1.0e30) {
@@ -2418,7 +2418,7 @@ fn renderFract(arena: std.mem.Allocator, x: f64, w_in: usize) Error![]const u8 {
         var iter: usize = 0;
         while (iter < 256 and std.math.isFinite(cf) and best_err > 0) : (iter += 1) {
             const a_f = @floor(cf);
-            if (a_f > 1.0e18) break; // quotient beyond f64 precision — noise
+            if (a_f > 1.0e18) break; // quotient beyond f64 precision - noise
             const a: u128 = @intFromFloat(a_f);
             // Largest semiconvergent index i ∈ [1,a] with p(i)/q(i) display-fitting.
             // p,q grow monotonically in i ⇒ binary search; caps keep u128 safe.
@@ -2475,16 +2475,16 @@ fn renderFract(arena: std.mem.Allocator, x: f64, w_in: usize) Error![]const u8 {
         return justRight(arena, body, w);
     }
     if (w > 0) return stars(arena, w); // nothing fits the field (SAS overflow)
-    return bestNumW(arena, x, 0); // `fract.` with w never set — unreachable (default 10)
+    return bestNumW(arena, x, 0); // `fract.` with w never set - unreachable (default 10)
 }
 
-/// Dw.p — fixed-point with decimal points aligned in magnitude groups (SAS 9.4
+/// Dw.p - fixed-point with decimal points aligned in magnitude groups (SAS 9.4
 /// Formats Reference, Dw.p Format p.170: default w 12, range 1–32; p default 3,
 /// range 0–16, "if p is omitted or is specified as 0, then p is set to 3").
 /// The doc's six d10.4 rows pin the rule: decimals d = w−1−p·(⌊m/p⌋+1) where
-/// m = integer digits of |x| (0 for |x| < 1) — 12345./1234.5 (m ≥ p) → 1 decimal,
+/// m = integer digits of |x| (0 for |x| < 1) - 12345./1234.5 (m ≥ p) → 1 decimal,
 /// everything smaller → 5, right-justified in w. d gone negative (huge m) clamps
-/// to 0 — undocumented; renderNum then shrinks to fit the field as usual.
+/// to 0 - undocumented; renderNum then shrinks to fit the field as usual.
 fn renderD(arena: std.mem.Allocator, x: f64, w_in: usize, p_in: usize) Error![]const u8 {
     const w = if (w_in == 0) 12 else w_in; // doc default 12
     const p = if (p_in == 0) 3 else p_in; // doc: omitted or 0 → 3
@@ -2511,7 +2511,7 @@ fn renderD(arena: std.mem.Allocator, x: f64, w_in: usize, p_in: usize) Error![]c
     return renderNum(arena, x, w, d, false, false, false);
 }
 
-/// NEGPARENw.d — comma-grouped magnitude; a negative value is wrapped in
+/// NEGPARENw.d - comma-grouped magnitude; a negative value is wrapped in
 /// parentheses `(1,234)`, a positive value reserves the last column (a trailing
 /// blank) for the close-paren it doesn't print, so a column of mixed-sign values
 /// lines up on the paren. Right-justified in `w` (BUG-fmtxnlneg).
@@ -2550,7 +2550,7 @@ fn renderDate(arena: std.mem.Allocator, x: f64, w: usize, style: DateStyle) Erro
     if (std.math.isNan(x)) return justRight(arena, ".", w);
     const xr = @round(x);
     // Outside the displayable date range (roughly years 1–9999) fall back to a
-    // plain number — guards both @intFromFloat below and the u32 year cast.
+    // plain number - guards both @intFromFloat below and the u32 year cast.
     if (!(xr >= sas_day_min and xr <= sas_day_max))
         return justRight(arena, try std.fmt.allocPrint(arena, "{d}", .{x}), w);
     const ymd = civilFromDays(@as(i64, @intFromFloat(xr)) - unix_epoch_sas_day);
@@ -2611,7 +2611,7 @@ fn renderDate(arena: std.mem.Allocator, x: f64, w: usize, style: DateStyle) Erro
     return justRight(arena, body.items, w);
 }
 
-/// YYMMDDxw. — year-month-day with a suffix-selected separator (`sep`); `null`
+/// YYMMDDxw. - year-month-day with a suffix-selected separator (`sep`); `null`
 /// sep is the N variant (no separators → `yyyymmdd` when it fits). The N variant
 /// takes a 4-digit year at w≥8 (default 8); the separated variants only at w≥10,
 /// matching base YYMMDD.
@@ -2632,7 +2632,7 @@ fn renderYymmddX(arena: std.mem.Allocator, x: f64, w: usize, sep: ?u8) Error![]c
     return justRight(arena, body.items, w);
 }
 
-/// WORDDATEw. — `Month d, yyyy` (full month name, no leading zero on the day).
+/// WORDDATEw. - `Month d, yyyy` (full month name, no leading zero on the day).
 fn renderWordDate(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
     const xr = @round(x);
@@ -2643,7 +2643,7 @@ fn renderWordDate(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, s, w);
 }
 
-/// WEEKDATEw. — the day of week and date, "Saturday, July 4, 2020" (default w=29).
+/// WEEKDATEw. - the day of week and date, "Saturday, July 4, 2020" (default w=29).
 /// ponytail: full form at w≥29/none, the 3-letter day at w 3–8; the middle widths
 /// use an abbreviated form truncated to fit rather than SAS's exact per-width ladder.
 fn renderWeekDate(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
@@ -2661,7 +2661,7 @@ fn renderWeekDate(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, abbr[0..@min(abbr.len, w)], w);
 }
 
-/// WEEKDATXw. — day-of-week then day-before-month: "Thursday, 16 January 2020".
+/// WEEKDATXw. - day-of-week then day-before-month: "Thursday, 16 January 2020".
 fn renderWeekDatx(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
     const xr = @round(x);
@@ -2674,14 +2674,14 @@ fn renderWeekDatx(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, full, w);
 }
 
-/// WORDDATXw. — day before month: "16 January 2020".
+/// WORDDATXw. - day before month: "16 January 2020".
 fn renderWordDatx(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
     const ymd = ymdFromSasDay(x) orelse return justRight(arena, try std.fmt.allocPrint(arena, "{d}", .{x}), w);
     return justRight(arena, try std.fmt.allocPrint(arena, "{d} {s} {d}", .{ ymd.d, full_months[ymd.m - 1], ymd.y }), w);
 }
 
-/// JULIANw. — `yyddd` (w≤5) or `yyyyddd` (w≥7): 16JAN2020 → 20016 / 2020016.
+/// JULIANw. - `yyddd` (w≤5) or `yyyyddd` (w≥7): 16JAN2020 → 20016 / 2020016.
 fn renderJulian(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
     const xr = @round(x);
@@ -2695,7 +2695,7 @@ fn renderJulian(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, body.items, w);
 }
 
-/// QTRw. — the quarter (1–4), or roman (I–IV) for QTRR.
+/// QTRw. - the quarter (1–4), or roman (I–IV) for QTRR.
 fn renderQtr(arena: std.mem.Allocator, x: f64, w: usize, roman: bool) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
     const ymd = ymdFromSasDay(x) orelse return justRight(arena, try std.fmt.allocPrint(arena, "{d}", .{x}), w);
@@ -2704,7 +2704,7 @@ fn renderQtr(arena: std.mem.Allocator, x: f64, w: usize, roman: bool) Error![]co
     return justRight(arena, try std.fmt.allocPrint(arena, "{d}", .{q}), w);
 }
 
-/// YYQw. / YYQCw. — `yyyy<sep>q` (w≥6) or `yy<sep>q`: 2020Q1 / 2020:1.
+/// YYQw. / YYQCw. - `yyyy<sep>q` (w≥6) or `yy<sep>q`: 2020Q1 / 2020:1.
 fn renderYyq(arena: std.mem.Allocator, x: f64, w: usize, sep: u8) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
     const ymd = ymdFromSasDay(x) orelse return justRight(arena, try std.fmt.allocPrint(arena, "{d}", .{x}), w);
@@ -2717,7 +2717,7 @@ fn renderYyq(arena: std.mem.Allocator, x: f64, w: usize, sep: u8) Error![]const 
     return justRight(arena, body.items, w);
 }
 
-/// YYMMNw. — `yyyymm` with no separator (16JAN2020 → 202001).
+/// YYMMNw. - `yyyymm` with no separator (16JAN2020 → 202001).
 fn renderYymmn(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
     const ymd = ymdFromSasDay(x) orelse return justRight(arena, try std.fmt.allocPrint(arena, "{d}", .{x}), w);
@@ -2728,10 +2728,10 @@ fn renderYymmn(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, body.items, w);
 }
 
-/// YYMMw. / MMYYw. and their separator variants (GAP-fmtyymm) — `<yyyy|yy><sep><mm>`
+/// YYMMw. / MMYYw. and their separator variants (GAP-fmtyymm) - `<yyyy|yy><sep><mm>`
 /// (YYMM) or `<mm><sep><yyyy|yy>` (MMYY). The base format's separator is the literal
 /// letter `M` (01MAR2020 → `2020M03` / `03M2020`); the xw. variants swap it: C=`:`,
-/// D=`-`, P=`.`, S=`/`, N=none. A 4-digit year needs the full-width field — w≥7 with
+/// D=`-`, P=`.`, S=`/`, N=none. A 4-digit year needs the full-width field - w≥7 with
 /// a 1-char separator, w≥6 for the separator-less N form (matching renderYymmn's rule;
 /// default w 7 ⇒ 4-digit). SAS 9.4 "YYMMw./MMYYw. Format".
 fn renderYymm(arena: std.mem.Allocator, x: f64, w: usize, sep: ?u8, month_first: bool) Error![]const u8 {
@@ -2754,7 +2754,7 @@ fn renderYymm(arena: std.mem.Allocator, x: f64, w: usize, sep: ?u8, month_first:
 
 const DatePart = enum { weekday, month, day };
 
-/// WEEKDAYw. (1=Sun..7=Sat) / MONTHw. (1–12) / DAYw. (1–31) — a right-justified number.
+/// WEEKDAYw. (1=Sun..7=Sat) / MONTHw. (1–12) / DAYw. (1–31) - a right-justified number.
 fn renderDatePart(arena: std.mem.Allocator, x: f64, w: usize, part: DatePart) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
     const xr = @round(x);
@@ -2768,17 +2768,17 @@ fn renderDatePart(arena: std.mem.Allocator, x: f64, w: usize, part: DatePart) Er
     return justRight(arena, try std.fmt.allocPrint(arena, "{d}", .{n}), w);
 }
 
-/// TIMEw.d — a SAS time (seconds since midnight) as hh:mm:ss<.ff>, right-justified.
+/// TIMEw.d - a SAS time (seconds since midnight) as hh:mm:ss<.ff>, right-justified.
 /// Hours are not capped at 24 (SAS time deltas can exceed a day). Width ladder
 /// (BUG-fmttimewidth): w 2–4 → hh, w 5–7 → hh:mm, w ≥ 8 → hh:mm:ss (a component
 /// is shown only whole, never truncated mid-field); d appends `.ff` fractional
 /// seconds when they fit (w ≥ 9+d). w=0 (no width given) = the full form.
 /// TIMEw.d and siblings. `zero_pad_hour` distinguishes the two hour conventions
 /// that share this body: SAS TIME/NLTIME BLANK-pad a single-digit leading hour
-/// (` 9:05:00`, matching TIMEAMPM/HHMM — justRight supplies the blank), while ISO
+/// (` 9:05:00`, matching TIMEAMPM/HHMM - justRight supplies the blank), while ISO
 /// E8601TM and TOD zero-pad to 2 digits (`09:05:00`). TOD used to be listed on the
 /// blank-pad side here; Language Reference: Concepts' format tables contradict that, printing `TIME. 19434
-/// -> 5:23:54` next to `TOD. 19434 -> 05:23:54` (printed p.147 and p.150) —
+/// -> 5:23:54` next to `TOD. 19434 -> 05:23:54` (printed p.147 and p.150) -
 /// NOTE-todhourpad. Minutes/seconds are always
 /// 2-digit zero-padded. Component inclusion is fit-based off the actual hour width:
 /// with a 1-digit hour, `h:mm:ss` (7 chars) fits TIME7 and its seconds render, where
@@ -2790,7 +2790,7 @@ fn renderTime(arena: std.mem.Allocator, x: f64, w: usize, d: usize, zero_pad_hou
         return justRight(arena, try std.fmt.allocPrint(arena, "{d}", .{x}), w);
     const ax = @abs(x);
     var total: i64 = @intFromFloat(@floor(ax));
-    // ponytail: fraction capped at 6 digits (µs) — keeps pow10 in exact-f64 range.
+    // ponytail: fraction capped at 6 digits (µs) - keeps pow10 in exact-f64 range.
     const dd: usize = @min(d, 6);
     const p10 = pow10f(@intCast(dd));
     var frac: i64 = @intFromFloat(@round((ax - @floor(ax)) * p10));
@@ -2836,7 +2836,7 @@ fn ymdFromSasDay(x: f64) ?Ymd {
     return civilFromDays(@as(i64, @intFromFloat(xr)) - unix_epoch_sas_day);
 }
 
-/// MONYYw. — `MONYYYY` (`DEC2024`) at w≥7, else `MONYY` (`DEC24`).
+/// MONYYw. - `MONYYYY` (`DEC2024`) at w≥7, else `MONYY` (`DEC24`).
 fn renderMonyy(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
     const ymd = ymdFromSasDay(x) orelse return justRight(arena, try std.fmt.allocPrint(arena, "{d}", .{x}), w);
@@ -2847,7 +2847,7 @@ fn renderMonyy(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, body.items, w);
 }
 
-/// MONNAMEw. — the full month name in a w-wide field (value left, blank-padded
+/// MONNAMEw. - the full month name in a w-wide field (value left, blank-padded
 /// right; truncated when longer). renderChar is exactly that pad/truncate.
 fn renderMonName(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
@@ -2855,7 +2855,7 @@ fn renderMonName(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return renderChar(arena, full_months[ymd.m - 1], w);
 }
 
-/// DOWNAMEw. — the weekday name (SAS day 0 = 1960-01-01 = Friday), same field rule.
+/// DOWNAMEw. - the weekday name (SAS day 0 = 1960-01-01 = Friday), same field rule.
 fn renderDowName(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
     const xr = @round(x);
@@ -2865,7 +2865,7 @@ fn renderDowName(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return renderChar(arena, day_names[dow], w);
 }
 
-/// YEARw. — the year, w digits (4-digit at w≥4, else 2-digit), right-justified.
+/// YEARw. - the year, w digits (4-digit at w≥4, else 2-digit), right-justified.
 fn renderYear(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
     const ymd = ymdFromSasDay(x) orelse return justRight(arena, try std.fmt.allocPrint(arena, "{d}", .{x}), w);
@@ -2875,7 +2875,7 @@ fn renderYear(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, body.items, w);
 }
 
-/// DATETIMEw.d — a SAS datetime (seconds since 1960-01-01) as
+/// DATETIMEw.d - a SAS datetime (seconds since 1960-01-01) as
 /// `ddMMMyy(yy):hh:mm:ss<.ff>` (4-digit year at w≥18). Width ladder
 /// (BUG-fmttimewidth): against the 2-digit-year form, :hh from w≥10, :mm from
 /// w≥13 (`datetime13.` → `17MAR13:14:45`), :ss from w≥16; a 4-digit year eats 2
@@ -2921,23 +2921,23 @@ fn renderDatetime(arena: std.mem.Allocator, x: f64, w: usize, d: usize) Error![]
     return justRight(arena, body.items, w);
 }
 
-/// E8601DTw.d — a SAS datetime (seconds since 1960-01-01) as ISO 8601 extended
+/// E8601DTw.d - a SAS datetime (seconds since 1960-01-01) as ISO 8601 extended
 /// `yyyy-mm-ddThh:mm:ss`. Width rules (GH#2 ISS-e8601dt-width; Formats and
 /// Informats Reference pp.200-201): w Default 19, Range 16-26 (checked loud at
 /// the dispatch site). The full form is 19 columns; at w=16 "SAS assumes that
 /// the value for seconds is 0 and omits them from the output" (p.200 note).
-/// Padding: EVERY padded width right-justifies (LEADING blanks) — GH#11
+/// Padding: EVERY padded width right-justifies (LEADING blanks) - GH#11
 /// ISS-e8601rightalign, runtime-verified on real SAS 9.4: `put(x, e8601dt26.)`
-/// stores 7 blanks BEFORE the text, provable two ways in one log line —
+/// stores 7 blanks BEFORE the text, provable two ways in one log line -
 /// `length()` pins 26 only with leading padding (trailing collapses to 19) and
 /// `$quote30.` shows the blanks INSIDE the opening quote. The entry's
 /// `Alignment: Left` header field says otherwise and is NOT oracle: catalog
 /// metadata fields are claims to verify, the Details prose and a runtime diff
-/// are the oracles (decisions.md D-025 — the GH#2 fix trusted the field and
+/// are the oracles (decisions.md D-025 - the GH#2 fix trusted the field and
 /// regressed). ponytail/needs-oracle: the doc pins only the w=16 rung, but a
 /// `:ss` (3 columns) can't partially render (the renderDatetime ladder's rule),
 /// so 17-18 interpolate the same seconds-less body, right-justified into the
-/// wider field (1-2 leading blanks) — real SAS unprobed for 17/18.
+/// wider field (1-2 leading blanks) - real SAS unprobed for 17/18.
 /// `.d` fractional seconds (Range 0-6) still not rendered; add with the p.201
 /// example (`e8601dt25.3` → `2018-09-15T14:52:22.000`).
 fn renderE8601Dt(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
@@ -2963,20 +2963,20 @@ fn renderE8601Dt(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
         try body.append(arena, ':');
         try appendPadded(arena, &body, @intCast(@mod(secs, 60)), 2);
     }
-    // right-justify in every padded width — GH#11 ISS-e8601rightalign (real-SAS
+    // right-justify in every padded width - GH#11 ISS-e8601rightalign (real-SAS
     // verified; the catalog `Alignment: Left` header field is not oracle, D-025)
     return justRight(arena, body.items, width);
 }
 
-/// E8601DZw. — a SAS datetime as ISO 8601 extended with the zero-meridian
-/// offset appended (Formats Reference p.204: Default 26, Range 20-35 — checked
+/// E8601DZw. - a SAS datetime as ISO 8601 extended with the zero-meridian
+/// offset appended (Formats Reference p.204: Default 26, Range 20-35 - checked
 /// loud at the dispatch site; Alignment: Left). The entry's two notations are a
 /// width LADDER: `yyyy-mm-ddThh:mm:ss+00:00` (25 columns) "when w is large
 /// enough to support this time zone notation", else `yyyy-mm-ddThh:mm:ssZ`
 /// (20 columns; "the shorter form +00 is not supported", p.204). The
 /// interpreter models one zero-meridian timeline, so the appended offset is
 /// always +00:00 (p.204: "The E8601DZ format always writes the datetime value
-/// by using the zero meridian offset value of +00:00"). ponytail: no `.d` —
+/// by using the zero meridian offset value of +00:00"). ponytail: no `.d` -
 /// the entry defines no d parameter (unlike E8601DTw.d).
 fn renderE8601Dz(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     const width = if (w == 0) 26 else w;
@@ -3003,7 +3003,7 @@ fn renderE8601Dz(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justLeft(arena, body.items, width);
 }
 
-/// B8601DTw. — a SAS datetime as ISO 8601 BASIC `yyyymmddThhmmss` (no
+/// B8601DTw. - a SAS datetime as ISO 8601 BASIC `yyyymmddThhmmss` (no
 /// separators, GAP-fmtwritebatch). Default w 15. ponytail: no fractional seconds
 /// (SAS's default w 26 includes `.ffffff`); add when a program needs sub-second.
 fn renderB8601Dt(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
@@ -3026,7 +3026,7 @@ fn renderB8601Dt(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, body.items, width);
 }
 
-/// B8601TMw. — a SAS time as ISO 8601 BASIC `hhmmss` (GAP-fmtwritebatch).
+/// B8601TMw. - a SAS time as ISO 8601 BASIC `hhmmss` (GAP-fmtwritebatch).
 /// Default w 8. Hours are not capped at 24 (same as TIMEw.). ponytail: no
 /// fractional seconds.
 fn renderB8601Tm(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
@@ -3043,7 +3043,7 @@ fn renderB8601Tm(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, body.items, width);
 }
 
-/// YYMONw. — `yyyyMON` (19434 → `2013MAR`, Language Reference: Concepts p.148) at w≥7 (default 7),
+/// YYMONw. - `yyyyMON` (19434 → `2013MAR`, Language Reference: Concepts p.148) at w≥7 (default 7),
 /// `yyMON` below.
 fn renderYymon(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
@@ -3055,7 +3055,7 @@ fn renderYymon(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, body.items, w);
 }
 
-/// JULDAYw. — the day-of-year as a number (19434 → 76, Language Reference: Concepts p.146).
+/// JULDAYw. - the day-of-year as a number (19434 → 76, Language Reference: Concepts p.146).
 fn renderJulday(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
     const xr = @round(x);
@@ -3079,15 +3079,15 @@ const nengo_eras = [_]NengoEra{
     .{ .start = daysFromCivil(2019, 5, 1) + sas_epoch_days, .base = 2019, .letter = 'R' }, // Reiwa
 };
 
-/// NENGOw. — a SAS date as a Japanese era date `e.yymmdd` (SAS 9.4 Formats and
+/// NENGOw. - a SAS date as a Japanese era date `e.yymmdd` (SAS 9.4 Formats and
 /// Informats Reference p.257: Default w 10, Range 2–10, Alignment Left; "If the
 /// width is too small, SAS omits the period"). `e` is the era name's first
 /// letter, `yy` the year OF THE ERA. The entry's own example (15342 = 02JAN2002
-/// = Heisei 14) pins the width ladder — w10 `H.14/01/02`, w9 `H14/01/02`, w8
-/// `H.140102`, w6 `H14/01`, w3 `H14` — reproduced below as an ordered candidate
+/// = Heisei 14) pins the width ladder - w10 `H.14/01/02`, w9 `H14/01/02`, w8
+/// `H.140102`, w6 `H14/01`, w3 `H14` - reproduced below as an ordered candidate
 /// list, longest fitting wins; the unexemplified w7/w5/w4/w2 rungs interpolate
 /// the same list (doc shows no output for them). A date before the Meiji era
-/// (doc silent) fills the field with `*`, the SAS cannot-represent idiom —
+/// (doc silent) fills the field with `*`, the SAS cannot-represent idiom -
 /// never a fabricated era letter.
 fn renderNengo(arena: std.mem.Allocator, x: f64, w_in: usize) Error![]const u8 {
     const w = if (w_in == 0) 10 else w_in;
@@ -3116,16 +3116,16 @@ fn renderNengo(arena: std.mem.Allocator, x: f64, w_in: usize) Error![]const u8 {
     // component dropped. First candidate that fits `w` wins.
     const Form = struct { dot: bool, mm: ?u8, dd: ?u8 };
     const forms = [_]Form{
-        .{ .dot = true, .mm = '/', .dd = '/' }, // e.yy/mm/dd — w10 (doc)
-        .{ .dot = false, .mm = '/', .dd = '/' }, // eyy/mm/dd  — w9  (doc)
-        .{ .dot = true, .mm = 0, .dd = 0 }, // e.yymmdd     — w8  (doc)
-        .{ .dot = false, .mm = 0, .dd = 0 }, // eyymmdd      — w7  (interp.)
+        .{ .dot = true, .mm = '/', .dd = '/' }, // e.yy/mm/dd - w10 (doc)
+        .{ .dot = false, .mm = '/', .dd = '/' }, // eyy/mm/dd  - w9  (doc)
+        .{ .dot = true, .mm = 0, .dd = 0 }, // e.yymmdd     - w8  (doc)
+        .{ .dot = false, .mm = 0, .dd = 0 }, // eyymmdd      - w7  (interp.)
         .{ .dot = true, .mm = '/', .dd = null }, // e.yy/mm
-        .{ .dot = false, .mm = '/', .dd = null }, // eyy/mm    — w6  (doc)
+        .{ .dot = false, .mm = '/', .dd = null }, // eyy/mm    - w6  (doc)
         .{ .dot = true, .mm = 0, .dd = null }, // e.yymm
-        .{ .dot = false, .mm = 0, .dd = null }, // eyymm       — w5  (interp.)
-        .{ .dot = true, .mm = null, .dd = null }, // e.yy      — w4  (interp.)
-        .{ .dot = false, .mm = null, .dd = null }, // eyy       — w3  (doc)
+        .{ .dot = false, .mm = 0, .dd = null }, // eyymm       - w5  (interp.)
+        .{ .dot = true, .mm = null, .dd = null }, // e.yy      - w4  (interp.)
+        .{ .dot = false, .mm = null, .dd = null }, // eyy       - w3  (doc)
     };
     for (forms) |f| {
         var body: std.ArrayList(u8) = .empty;
@@ -3145,7 +3145,7 @@ fn renderNengo(arena: std.mem.Allocator, x: f64, w_in: usize) Error![]const u8 {
     return stars(arena, w); // only w==1 reaches here (doc Range 2–10)
 }
 
-/// DATEAMPMw. — a SAS datetime as `ddMMMyy:hh:mm:ss AM/PM` (1679097600 →
+/// DATEAMPMw. - a SAS datetime as `ddMMMyy:hh:mm:ss AM/PM` (1679097600 →
 /// `17MAR13:12:00:00 AM`, Language Reference: Concepts p.150). Default w 19. ponytail: full form only;
 /// SAS's narrow-width component-drop ladder is not implemented (a small w shows
 /// the full form, like the other justRight overflow paths).
@@ -3176,7 +3176,7 @@ fn renderDateAmpm(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, body.items, width);
 }
 
-/// MMSSw. — a SAS time as `mm:ss`; minutes are the whole value's minute count
+/// MMSSw. - a SAS time as `mm:ss`; minutes are the whole value's minute count
 /// and may exceed 59. When `mm:ss` doesn't fit `w`, the minutes alone are
 /// written (19434 s → `323` at the default w 5, Language Reference: Concepts p.150).
 fn renderMmss(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
@@ -3202,7 +3202,7 @@ const roman_numerals = [_]RomanNumeral{
     .{ .v = 10, .s = "X" },   .{ .v = 9, .s = "IX" },   .{ .v = 5, .s = "V" },   .{ .v = 4, .s = "IV" }, .{ .v = 1, .s = "I" },
 };
 
-/// ROMANw. — a positive integer in Roman numerals (M repeated past 3999).
+/// ROMANw. - a positive integer in Roman numerals (M repeated past 3999).
 /// Non-integers are truncated toward zero; non-positive values render as plain
 /// Arabic numbers (SAS leaves those unconverted). Default w 6.
 fn renderRoman(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
@@ -3266,11 +3266,11 @@ fn spellWords(arena: std.mem.Allocator, body: *std.ArrayList(u8), n_in: u64) Err
     }
 }
 
-/// WORDSw. — a number in English words, LEFT-justified and truncated/padded to w
+/// WORDSw. - a number in English words, LEFT-justified and truncated/padded to w
 /// (a rare left-justified numeric format). Negatives get a leading "minus"; a
 /// decimal part renders as "point" + digit words (−2.5 → "minus two point
 /// five"). ponytail: |x| ≥ 1e15 → plain digits, and an E-notation-scale decimal
-/// part stops at the exponent — the oracle (sas-functions-ref p.680) verifies
+/// part stops at the exponent - the oracle (sas-functions-ref p.680) verifies
 /// the integer form only.
 fn renderWords(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (std.math.isNan(x)) return renderChar(arena, ".", w);
@@ -3284,7 +3284,7 @@ fn renderWords(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (std.mem.indexOfScalar(u8, bs, '.')) |dot| {
         try body.appendSlice(arena, " point");
         for (bs[dot + 1 ..]) |c| {
-            if (c < '0' or c > '9') break; // E-notation tail — stop at the exponent
+            if (c < '0' or c > '9') break; // E-notation tail - stop at the exponent
             try body.append(arena, ' ');
             try body.appendSlice(arena, word_ones[c - '0']);
         }
@@ -3292,7 +3292,7 @@ fn renderWords(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return renderChar(arena, body.items, w);
 }
 
-/// NLDATMw. (en_US approximation, same house pattern as NLDATE→WORDDATE) —
+/// NLDATMw. (en_US approximation, same house pattern as NLDATE→WORDDATE) -
 /// `ddMONyyyy:hh:mm:ss` with a Title-case month (`04Jul2020:14:05:06`,
 /// GAP-fmtwritebatch). Other locales are unimplemented; add when a program sets one.
 fn renderNldatm(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
@@ -3318,7 +3318,7 @@ fn renderNldatm(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, body.items, w);
 }
 
-/// TIMEAMPMw. — a SAS time as 12-hour `h:mm:ss AM/PM` (seconds dropped at w<11).
+/// TIMEAMPMw. - a SAS time as 12-hour `h:mm:ss AM/PM` (seconds dropped at w<11).
 fn renderTimeAmpm(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     if (std.math.isNan(x)) return justRight(arena, ".", w);
     if (!(x > -1.0e11 and x < 1.0e11))
@@ -3340,15 +3340,15 @@ fn renderTimeAmpm(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, body.items, w);
 }
 
-/// TODw.d — the time-of-day of a SAS datetime (its seconds-of-day) as `hh:mm:ss<.ff>`.
+/// TODw.d - the time-of-day of a SAS datetime (its seconds-of-day) as `hh:mm:ss<.ff>`.
 /// The hour is ZERO-padded to 2 digits, unlike TIME/TIMEAMPM/HHMM which blank-pad it
 /// (NOTE-todhourpad). Language Reference: Concepts' format tables list the two side by side on the SAME
-/// input — `TIME. 19434 -> 5:23:54` vs `TOD. 19434 -> 05:23:54` (printed p.147 "Time
+/// input - `TIME. 19434 -> 5:23:54` vs `TOD. 19434 -> 05:23:54` (printed p.147 "Time
 /// formats" and again p.150 "Write SAS time values as time values"); the sibling rows
 /// there (TIMEAMPM, HHMM, HOUR) all keep the bare single-digit hour, so TOD's leading
 /// zero is deliberate. We blank-padded both.
 /// `@mod` on the FLOAT (not `@floor` then integer `@mod`) keeps the sub-second part, so
-/// a `.d` renders its fractional seconds and TOD rounds the way TIMEw.d already does —
+/// a `.d` renders its fractional seconds and TOD rounds the way TIMEw.d already does -
 /// the pre-floor made TODw.d silently incapable of `.ff` and split the two on rounding
 /// (`5445.5` → TIME8. `1:30:46` but TOD8. `1:30:45`) (NOTE-todfloorfrac).
 fn renderTod(arena: std.mem.Allocator, x: f64, w: usize, d: usize) Error![]const u8 {
@@ -3358,10 +3358,10 @@ fn renderTod(arena: std.mem.Allocator, x: f64, w: usize, d: usize) Error![]const
     return renderTime(arena, @mod(x, 86400.0), w, d, true);
 }
 
-/// HHMMw.d — a SAS time (seconds since midnight) as `hh:mm` (no seconds). Hour is
+/// HHMMw.d - a SAS time (seconds since midnight) as `hh:mm` (no seconds). Hour is
 /// NOT zero-padded (SAS writes a leading blank for a single-digit hour); minute is
 /// zero-padded to 2. Rounds to the nearest minute on the seconds (SAS). Default w 5.
-/// ponytail: whole minutes only — the fractional-minute `.d` variant is not rendered;
+/// ponytail: whole minutes only - the fractional-minute `.d` variant is not rendered;
 /// add when a program needs sub-minute HHMM.
 fn renderHhmm(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     const width = if (w == 0) 5 else w;
@@ -3377,7 +3377,7 @@ fn renderHhmm(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, body.items, width);
 }
 
-/// HOURw.d — the hour of a SAS time. d=0 → the integer hour, ROUNDED on the
+/// HOURw.d - the hour of a SAS time. d=0 → the integer hour, ROUNDED on the
 /// fractional hour (minutes): `put 45000 hour.` (12h30m) → 13, `43200` (12h00m)
 /// → 12. SAS 9.4 Formats Reference (HOUR format Details): "SAS rounds hours based
 /// on the value of minutes in the SAS time value." d>0 → value/3600 with d
@@ -3393,7 +3393,7 @@ fn renderHour(arena: std.mem.Allocator, x: f64, w: usize, d: usize) Error![]cons
     return justRight(arena, try std.fmt.allocPrint(arena, "{d}", .{h}), width);
 }
 
-/// MINUTEw. — the minute component (0–59) of a SAS time. Default w 2, blank-padded
+/// MINUTEw. - the minute component (0–59) of a SAS time. Default w 2, blank-padded
 /// (a component number, not zero-padded).
 fn renderMinute(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     const width = if (w == 0) 2 else w;
@@ -3404,7 +3404,7 @@ fn renderMinute(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, try std.fmt.allocPrint(arena, "{d}", .{@divFloor(@mod(total, 3600), 60)}), width);
 }
 
-/// SECONDw. — the second component (0–59) of a SAS time. Default w 2, blank-padded.
+/// SECONDw. - the second component (0–59) of a SAS time. Default w 2, blank-padded.
 fn renderSecond(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     const width = if (w == 0) 2 else w;
     if (std.math.isNan(x)) return justRight(arena, ".", width);
@@ -3414,7 +3414,7 @@ fn renderSecond(arena: std.mem.Allocator, x: f64, w: usize) Error![]const u8 {
     return justRight(arena, try std.fmt.allocPrint(arena, "{d}", .{@mod(total, 60)}), width);
 }
 
-/// BINARYw. — a numeric value's integer part in base-2, right-justified and
+/// BINARYw. - a numeric value's integer part in base-2, right-justified and
 /// zero-padded to `w` bits (low `w` bits kept on overflow). Mirrors renderHexNum.
 /// Non-finite → blanks. Negatives render as their two's-complement bit pattern
 /// truncated to the field's `w` bits (SAS: -1 binary16. → sixteen 1s).
@@ -3469,7 +3469,7 @@ fn justRight(arena: std.mem.Allocator, s: []const u8, w: usize) Error![]const u8
     return out;
 }
 
-/// Left-justify `s` in `w` (blank-pad right) — the NENGO/NL* entries say
+/// Left-justify `s` in `w` (blank-pad right) - the NENGO/NL* entries say
 /// "Alignment: Left" (GAP-fmtwrite-unimpl).
 fn justLeft(arena: std.mem.Allocator, s: []const u8, w: usize) Error![]const u8 {
     if (w == 0 or s.len >= w) return s;
@@ -3527,7 +3527,7 @@ fn valToStr(arena: std.mem.Allocator, v: Value) Error![]const u8 {
     };
 }
 
-/// SAS's default numeric format, BEST12. — a **12-column** field (not 12
+/// SAS's default numeric format, BEST12. - a **12-column** field (not 12
 /// significant digits). SAS shows the value with the most significant digits that
 /// fit in w columns, choosing fixed or E-notation by whichever shows more (a tie
 /// prefers fixed); trailing zeros are dropped. So `1/3` → `0.3333333333` (exactly
@@ -3542,7 +3542,7 @@ pub fn bestNum(arena: std.mem.Allocator, x: f64) Error![]const u8 {
 /// E-notation), UNPADDED. Exposed so the `put(x, bestw.)` path reuses this instead
 /// of printing the raw f64 (BESTFMT-explicit).
 pub fn bestNumW(arena: std.mem.Allocator, x: f64, w_in: usize) Error![]const u8 {
-    // SAS: a width of 0 means the format's DEFAULT width (BEST12.) — resolve it
+    // SAS: a width of 0 means the format's DEFAULT width (BEST12.) - resolve it
     // BEFORE any width arithmetic, or `w - sign` underflows usize on a negative
     // value and aborts (BUG-bestnumwidth0). w ≥ 1 below, so `w - sign` ≥ 0.
     const w = if (w_in == 0) 12 else w_in;
@@ -3552,7 +3552,7 @@ pub fn bestNumW(arena: std.mem.Allocator, x: f64, w_in: usize) Error![]const u8 
     const sign: usize = if (x < 0) 1 else 0;
     const ax = @abs(x);
     // a whole number whose digits fit in the field → plain integer. Format the
-    // f64 directly ({d} prints a whole double as a plain integer) — casting to
+    // f64 directly ({d} prints a whole double as a plain integer) - casting to
     // i64 first panicked for magnitudes ≥ 2^63 that still fit the field at wide
     // w (e.g. `put(1e20, best32.)`) (BUG-bestint-i64-overflow).
     if (x == @trunc(x) and ax < pow10f(@intCast(w - sign)))
@@ -3632,7 +3632,7 @@ fn pow10f(e: i32) f64 {
     // exact through 10^22; 1.0/exact is a single correctly-rounded division. Past
     // ±22 naive `*= 10` drifts 1-2 ULP (pow10f(299)=1.0000000000000002e299),
     // which corrupts wide BEST/COMMA of extreme magnitudes (BUG-fmtextrememag).
-    // For that tail, parse the literal — std.fmt.parseFloat is correctly rounded,
+    // For that tail, parse the literal - std.fmt.parseFloat is correctly rounded,
     // yielding the same f64 the compiler would for `1e<e>` (and a finite subnormal
     // for very negative e, subsuming the old BUG-subnormalfmt hand-rolled path).
     if (e >= 0 and e <= 22) {
@@ -3694,7 +3694,7 @@ fn expectFmt(expected: []const u8, x: Value, spec: []const u8) !void {
 }
 
 test "Ew. scientific format + BEST rounding-overflow residual (BUG-eformat)" {
-    // Ew. — fixed mantissa decimals (as many as fit in w), signed >=2-digit
+    // Ew. - fixed mantissa decimals (as many as fit in w), signed >=2-digit
     // exponent, trailing mantissa zeros kept, right-justified.
     try expectFmt("1.2340E+03", .{ .num = 1234 }, "e10.");
     try expectFmt("1.2346E+04", .{ .num = 12345.678 }, "e10.");
@@ -3722,7 +3722,7 @@ test "BUG-fmtnumoverflow: HEX/BINARY/E guard huge + denormal doubles (no SIGABRT
     try expectFmt("000000FF", .{ .num = 255 }, "hex8.");
     // Ew. of the tiniest denormals: pow(10,exp) underflowed → mant=inf → OOB
     // cast. Finite-safe mantissa now renders without crashing (decimals reduced
-    // to fit the field — BUG-percentfit).
+    // to fit the field - BUG-percentfit).
     try expectFmt("4.9E-324", .{ .num = 5e-324 }, "e8.5");
 }
 
@@ -3761,7 +3761,7 @@ test "WRITE-side date/time cluster: MONYY/MONNAME/DOWNAME/YEAR/DATETIME/TIMEAMPM
 
 test "width-less DATETIME renders at its documented DEFAULT 16 (NOTE-datetimewidth)" {
     // SAS 9.4 Formats and Informats: Reference, printed p.176: `DATETIMEw.d`
-    // — w "Default 16", "Range 7–40" — and the entry's own worked example
+    // - w "Default 16", "Range 7–40" - and the entry's own worked example
     // prints `put x datetime.;` as `14MAR18:22:25:33` for a 2018 value, i.e.
     // the TWO-digit-year form. We rendered the 18-wide four-digit-year form on
     // every width-less datetime PUT. 21258 is the doc's own 15MAR2018 (p.173),
@@ -3773,14 +3773,14 @@ test "width-less DATETIME renders at its documented DEFAULT 16 (NOTE-datetimewid
     try expectFmt("15MAR2018:09:00:00", .{ .num = 1836723600 }, "datetime18.");
     try expectFmt(" 15MAR2018:09:00:00", .{ .num = 1836723600 }, "datetime19.");
 
-    // Sibling defaults, checked at the same time: DATEw. "Default 7" (p.172) —
+    // Sibling defaults, checked at the same time: DATEw. "Default 7" (p.172) -
     // already right, its width-less form IS date7.
     try expectFmt("15MAR18", .{ .num = 21258 }, "date.");
     try expectFmt("15MAR18", .{ .num = 21258 }, "date7.");
 }
 
 test "width-less TIME renders at its documented DEFAULT 8, blank-padding a 1-digit hour (NOTE-timedefwidth)" {
-    // TIMEw.d — `w Default 8` (Formats and Informats p.478). The 8-column field
+    // TIMEw.d - `w Default 8` (Formats and Informats p.478). The 8-column field
     // is what produces the leading blank the entry states normatively TWICE:
     // "If hh is a single digit, TIMEw.d places a leading blank before the digit"
     // and "The TIMEw.d format writes a leading blank for a single-hour digit"
@@ -3796,23 +3796,23 @@ test "width-less TIME renders at its documented DEFAULT 8, blank-padding a 1-dig
     try expectFmt("05:23:54", .{ .num = 19434 }, "tod.");
     try expectFmt("05:23:54", .{ .num = 19434 }, "tod8.");
     // justRight never truncates (`s.len >= w` returns s), so a value WIDER than
-    // the default field still prints in full — a 100-hour duration and its
+    // the default field still prints in full - a 100-hour duration and its
     // negative are unchanged by giving TIME a default width at all.
     try expectFmt("100:00:00", .{ .num = 360000 }, "time.");
     try expectFmt("-100:00:00", .{ .num = -360000 }, "time.");
 }
 
 test "HEXw. / $HEXw. formats encode to uppercase hex (BUG-hexformat)" {
-    // HEXw. — numeric integer part, right-justified, zero-padded
+    // HEXw. - numeric integer part, right-justified, zero-padded
     try expectFmt("000000FF", .{ .num = 255 }, "hex8.");
     try expectFmt("FF", .{ .num = 255 }, "hex2.");
     try expectFmt("00", .{ .num = 0 }, "hex2.");
     try expectFmt("00000100", .{ .num = 256 }, "hex8.");
-    // $HEXw. — each byte → two hex digits; a short value is blank-padded (0x20)
+    // $HEXw. - each byte → two hex digits; a short value is blank-padded (0x20)
     try expectFmt("414243", .{ .str = "ABC" }, "$hex6."); // A=41 B=42 C=43
     try expectFmt("4142", .{ .str = "AB" }, "$hex."); // no width → whole value
     try expectFmt("4120", .{ .str = "A" }, "$hex4."); // pad byte 0x20 → "20"
-    // HEX16. — raw 8-byte IEEE double, big-endian, 16 hex digits (GH#46)
+    // HEX16. - raw 8-byte IEEE double, big-endian, 16 hex digits (GH#46)
     try expectFmt("40424CCCCCCCCCCD", .{ .num = 36.6 }, "hex16.");
     try expectFmt("40424CCCCC000000", .{ .num = 36.59999990463257 }, "hex16."); // the len-5 stored value
     try expectFmt("0000000000000000", .{ .num = 0 }, "hex16.");
@@ -3868,7 +3868,7 @@ test "NOTE-todhourpad/NOTE-todfloorfrac: TOD zero-pads the hour and keeps the fr
     // zero-pads a single-digit hour; TIME (and TIMEAMPM/HHMM beside it) do not.
     try expectFmt("05:23:54", .{ .num = 19434 }, "tod8.");
     try expectFmt(" 5:23:54", .{ .num = 19434 }, "time8."); // justRight supplies the blank
-    try expectFmt("05:23:54", .{ .num = 19434 }, "tod."); // TOD. — default width 8
+    try expectFmt("05:23:54", .{ .num = 19434 }, "tod."); // TOD. - default width 8
     // a datetime input still reduces to its time-of-day first
     try expectFmt("10:30:00", .{ .num = 2050741800 }, "tod8.");
     // NOTE-todfloorfrac: the pre-floor made `.d` impossible and split TOD from TIME
@@ -3877,7 +3877,7 @@ test "NOTE-todhourpad/NOTE-todfloorfrac: TOD zero-pads the hour and keeps the fr
     try expectFmt(" 1:30:46", .{ .num = 5445.5 }, "time8.");
     try expectFmt("01:30:45.5", .{ .num = 5445.5 }, "tod10.1");
     try expectFmt("01:30:45.500", .{ .num = 5445.5 }, "tod12.3");
-    // negative / pre-epoch datetimes still land in [0,86400) — @mod, not @rem
+    // negative / pre-epoch datetimes still land in [0,86400) - @mod, not @rem
     try expectFmt("10:30:00", .{ .num = -86400 + 37800 }, "tod8.");
 }
 
@@ -3909,7 +3909,7 @@ test "BUG-8601packtime: ISO 8601 packed hhmmss reads as hh:mm:ss, not hours" {
     try t.expectEqual(@as(f64, 57180.5), readNumeric("e8601tm10.", "15:53:00.5").num);
     try t.expectEqual(@as(f64, 52215.5), readNumeric("e8601tm12.", "14:30:15.5").num);
     // TIMEw. keeps its documented separator-only grammar: the packed run is
-    // all HOURS (a duration — may exceed 24h), NOT hh:mm:ss
+    // all HOURS (a duration - may exceed 24h), NOT hh:mm:ss
     try t.expectEqual(@as(f64, 559080000), readNumeric("time8.", "155300").num);
     try t.expectEqual(@as(f64, 57180), readNumeric("time8.", "15:53:00").num);
     // unparseable stays missing, and no diagnostic fired (known informats)
@@ -3918,14 +3918,14 @@ test "BUG-8601packtime: ISO 8601 packed hhmmss reads as hh:mm:ss, not hours" {
 }
 
 test "readNumeric informat: w.d implied decimal and PERCENT (BUG-informatdec/percentinformat)" {
-    // implied decimal — a field with no explicit `.` is scaled by 10^-d
+    // implied decimal - a field with no explicit `.` is scaled by 10^-d
     try t.expectEqual(@as(f64, 123.45), readNumeric("5.2", "12345").num);
     try t.expectEqual(@as(f64, 123.456), readNumeric("6.3", "123456").num);
-    // an explicit `.` in the field wins — no scaling
+    // an explicit `.` in the field wins - no scaling
     try t.expectEqual(@as(f64, 1.5), readNumeric("5.2", "1.5").num);
     // d = 0 → plain integer
     try t.expectEqual(@as(f64, 12345), readNumeric("5.", "12345").num);
-    // PERCENTw. — drop `%`, divide by 100
+    // PERCENTw. - drop `%`, divide by 100
     try t.expectEqual(@as(f64, 0.45), readNumeric("percent8.", "45%").num);
     try t.expectEqual(@as(f64, 0.5), readNumeric("percent.", "50%").num);
     // parens → negative percentage; bare digits still divide by 100
@@ -3935,7 +3935,7 @@ test "readNumeric informat: w.d implied decimal and PERCENT (BUG-informatdec/per
     try t.expectEqual(@as(f64, 0.25), readNumeric("percent8.", "25").num);
     // COMMA grouping stripped, and the implied decimal still applies
     try t.expectEqual(@as(f64, 12.34), readNumeric("comma8.2", "1,234").num);
-    // BUG-numxinformat: NUMXw.d — comma is the DECIMAL, period the grouping.
+    // BUG-numxinformat: NUMXw.d - comma is the DECIMAL, period the grouping.
     try t.expectEqual(@as(f64, 12.5), readNumeric("numx8.2", "12,5").num);
     try t.expectEqual(@as(f64, 1234.56), readNumeric("numx8.2", "1.234,56").num);
     try t.expectEqual(@as(f64, 1000), readNumeric("numx8.", "1.000").num);
@@ -3947,13 +3947,13 @@ test "readNumeric informat: w.d implied decimal and PERCENT (BUG-informatdec/per
 }
 
 test "BUG-bzinformat/numembeddedblank: blank handling is informat-specific" {
-    // BZw.d — EVERY blank (leading, trailing, embedded) reads as a ZERO.
+    // BZw.d - EVERY blank (leading, trailing, embedded) reads as a ZERO.
     try t.expectEqual(@as(f64, 1000), readNumeric("bz4.", "1   ").num);
     try t.expectEqual(@as(f64, 100), readNumeric("bz5.", "  1  ").num);
     try t.expectEqual(@as(f64, 102), readNumeric("bz3.", "1 2").num);
     // BZ + implied decimal: zero-fill first, then scale.
     try t.expectEqual(@as(f64, 100), readNumeric("bz5.2", "1    ").num);
-    // plain w.d — leading/trailing blanks still trim fine…
+    // plain w.d - leading/trailing blanks still trim fine…
     try t.expectEqual(@as(f64, 42), readNumeric("4.", " 42 ").num);
     try t.expectEqual(@as(f64, 42), readNumeric("f4.", " 42").num);
     // …but an EMBEDDED blank is invalid numeric data → missing + the SAS NOTE.
@@ -3969,17 +3969,17 @@ test "BUG-bzinformat/numembeddedblank: blank handling is informat-specific" {
     try t.expect(readNumeric("4.", "2 3").isMissing());
     try t.expectEqualStrings("Invalid numeric data, '2 3'.", g_test_last_note);
     try t.expect(read_noted); // still dedupes io.zig's second note
-    // an all-blank field is a plain silent missing — no NOTE.
+    // an all-blank field is a plain silent missing - no NOTE.
     g_test_last_note = "";
     try t.expect(readNumeric("4.", "    ").isMissing());
     try t.expectEqual(@as(usize, 0), g_test_last_note.len);
     // SAS reads only the first w bytes (the INPUT() fn's numFromSpec did the same).
     try t.expectEqual(@as(f64, 123), readNumeric("3.", "12345").num);
     // no regression: COMMA/DOLLAR/PERCENT keep the DOCUMENTED blank-drop
-    // (COMMAw.d "removes embedded … blanks"). BEST does NOT — BESTw.d is a w.d
+    // (COMMAw.d "removes embedded … blanks"). BEST does NOT - BESTw.d is a w.d
     // ALIAS (the w.d informat page names BESTw.d/Dw.d/Ew.d/Fw.d as aliases), so
     // its embedded blank is invalid, same as plain w.d above. This line used to
-    // pin `best8.` on "2 3 " → 23 — that pinned the bug fixed in
+    // pin `best8.` on "2 3 " → 23 - that pinned the bug fixed in
     // NOTE-informatlow-tick245 #9 (SAS: missing + invalid-data NOTE).
     try t.expectEqual(@as(f64, 1234), readNumeric("comma8.", "1 234").num);
     try t.expectEqual(@as(f64, 0.45), readNumeric("percent8.", "45 %").num);
@@ -3990,7 +3990,7 @@ test "BUG-bzinformat/numembeddedblank: blank handling is informat-specific" {
 }
 
 test "NOTE-informatlow-tick245: Z/BEST/E/D embedded blank invalid; COMMA interior hyphen; NEGPAREN informat loud" {
-    // #9 zebestblank — Z/BEST/E/D are w.d aliases: an embedded blank is invalid
+    // #9 zebestblank - Z/BEST/E/D are w.d aliases: an embedded blank is invalid
     // numeric data → missing + the SAS NOTE, like plain w.d. Was: legacy
     // drop-all-blanks (`z3.` on "4 2" silently read 42).
     for ([_][]const u8{ "z3.", "best4.", "e4.", "d4." }) |spec| {
@@ -4001,13 +4001,13 @@ test "NOTE-informatlow-tick245: Z/BEST/E/D embedded blank invalid; COMMA interio
     // leading/trailing blanks still trim fine on the same informats.
     try t.expectEqual(@as(f64, 42), readNumeric("z4.", " 42 ").num);
     try t.expectEqual(@as(f64, 42), readNumeric("best5.", " 42 ").num);
-    // #13 commahyphen — COMMAw.d "removes embedded … hyphens": an INTERIOR '-'
+    // #13 commahyphen - COMMAw.d "removes embedded … hyphens": an INTERIOR '-'
     // drops; a LEADING minus and E-notation's exponent sign keep their meaning.
     try t.expectEqual(@as(f64, 1234), readNumeric("comma10.", "12-34").num);
     try t.expectEqual(@as(f64, -500), readNumeric("comma10.", "-500").num);
     try t.expectEqual(@as(f64, -23), readNumeric("comma4.", "- 23").num);
     try t.expectEqual(@as(f64, 0.001), readNumeric("comma10.", "1E-3").num);
-    // #14 negpareninformat — SAS 9.4 has NO NEGPAREN informat (the 108-entry
+    // #14 negpareninformat - SAS 9.4 has NO NEGPAREN informat (the 108-entry
     // informat dictionary; it is a FORMAT only): fail loud (D-002) naming the
     // informat, then the field reads missing on the fallback like any unknown
     // informat. The NEGPAREN write FORMAT is untouched (renderNegParen above).
@@ -4033,7 +4033,7 @@ test "bestNum: BEST12. is a 12-CHARACTER field, fixed-or-E by max digits (BUG-be
     var arena = std.heap.ArenaAllocator.init(t.allocator);
     defer arena.deinit();
     const a = arena.allocator();
-    // fixed notation — value fills 12 columns, trailing zeros dropped
+    // fixed notation - value fills 12 columns, trailing zeros dropped
     try t.expectEqualStrings("0.3", try bestNum(a, 0.1 + 0.2)); // not 0.30000000000000004
     try t.expectEqualStrings("0.3333333333", try bestNum(a, 1.0 / 3.0)); // 12 chars, 10 decimals
     try t.expectEqualStrings("-0.333333333", try bestNum(a, -1.0 / 3.0)); // sign eats a column (12 total)
@@ -4045,7 +4045,7 @@ test "bestNum: BEST12. is a 12-CHARACTER field, fixed-or-E by max digits (BUG-be
     try t.expectEqualStrings("42", try bestNum(a, 42));
     try t.expectEqualStrings("0", try bestNum(a, 0));
     try t.expectEqualStrings(".", try bestNum(a, std.math.nan(f64)));
-    // E-notation — magnitudes that don't fit 12 columns in fixed form
+    // E-notation - magnitudes that don't fit 12 columns in fixed form
     try t.expectEqualStrings("1E13", try bestNum(a, 1e13)); // 14-digit integer won't fit
     try t.expectEqualStrings("1E-11", try bestNum(a, 1e-11)); // rounds to 0 in fixed
     try t.expectEqualStrings("3.3333333E-9", try bestNum(a, 1.0 / 3.0e8)); // E shows more digits
@@ -4072,7 +4072,7 @@ test "bestNumW: wide-field whole numbers past 2^63 don't panic (BUG-bestint-i64-
     defer arena.deinit();
     const a = arena.allocator();
     // whole doubles whose digit count fits the field but whose magnitude exceeds
-    // i64 — the old @intFromFloat(i64) cast panicked ("integer part … out of bounds")
+    // i64 - the old @intFromFloat(i64) cast panicked ("integer part … out of bounds")
     try t.expectEqualStrings("100000000000000000000", try bestNumW(a, 1e20, 32));
     try t.expectEqualStrings("10000000000000000000", try bestNumW(a, 1e19, 20));
     try t.expectEqualStrings("-100000000000000000000", try bestNumW(a, -1e20, 32));
@@ -4085,7 +4085,7 @@ test "BESTFMT-enotation: high-precision doubles keep the full decimal, not E (GH
     // SAS 9.4 BESTw. uses E-notation ONLY when a plain decimal cannot show the
     // magnitude (integer part overflows w, or the value rounds away to 0). A
     // LENGTH-5-truncated 36.6 == 36.59999990463257 fits as a decimal, so it must
-    // print the full decimal to the field width — never `3.66E1`.
+    // print the full decimal to the field width - never `3.66E1`.
     const x: f64 = 36.59999990463257;
     try t.expectEqualStrings("36.599999905", try bestNumW(a, x, 12)); // BEST12 default
     try t.expectEqualStrings("36.6", try bestNumW(a, x, 6)); // narrow: decimal, not 3.66E1
@@ -4129,7 +4129,7 @@ test "numeric w.d: rounding, right-justify, sign, missing" {
     try expectFmt("    -3.5", .{ .num = -3.5 }, "8.1");
     try expectFmt("3", .{ .num = 2.6 }, "1."); // overflow-narrow → natural text
     try expectFmt("       .", .{ .num = std.math.nan(f64) }, "8.2"); // missing
-    // char under a numeric spec renders the raw text (loud now —
+    // char under a numeric spec renders the raw text (loud now -
     // NOTE-fmtnumoncharcoerce; the loud path is asserted in its own test below)
     {
         var arena = std.heap.ArenaAllocator.init(t.allocator);
@@ -4145,14 +4145,14 @@ test "NOTE-fmtnumoncharcoerce: a numeric format on a CHAR value fails loud, rend
     defer arena.deinit();
     const a = arena.allocator();
 
-    // Controls: numeric format on numeric, `$` format on char — no error.
+    // Controls: numeric format on numeric, `$` format on char - no error.
     g_nofmterr = false;
     g_fmt_error = false;
     _ = try apply(a, .{ .num = 42 }, "8.2");
     _ = try apply(a, .{ .str = "hi" }, "$5.");
     try t.expect(!formatErrored());
 
-    // 'abc' under 8.2 used to render `.` — the value DESTROYED with exit 0.
+    // 'abc' under 8.2 used to render `.` - the value DESTROYED with exit 0.
     // Now: loud error (captured in a test build, TEST-quietnoise) + raw text.
     g_test_last_err = "";
     const out = try apply(a, .{ .str = "abc" }, "8.2");
@@ -4268,7 +4268,7 @@ test "DDMMYY/YYMMDD/TIME/WORDDATE date pictures" {
     try expectFmt("2020-07-04", .{ .num = 22100 }, "yymmdd10.");
     try expectFmt("20-07-04", .{ .num = 22100 }, "yymmdd8.");
     try expectFmt("      July 4, 2020", .{ .num = 22100 }, "worddate."); // default 18, right-justified (BUG-fmtdefwidth-date)
-    // YYMMDDxw. family (BUG-sysfuncformat) — 22100 = 04JUL2020
+    // YYMMDDxw. family (BUG-sysfuncformat) - 22100 = 04JUL2020
     try expectFmt("20200704", .{ .num = 22100 }, "yymmddn8.");
     try expectFmt("20200704", .{ .num = 22100 }, "yymmddn."); // default 8, 4-digit year
     try expectFmt("200704", .{ .num = 22100 }, "yymmddn6."); // 2-digit year, no sep
@@ -4369,7 +4369,7 @@ test "parseSpec pieces" {
 }
 
 test "parseSpec: digit-carrying names split at the TRAILING digit run (QA-e8601put)" {
-    // E8601DT19. is name E8601DT + w 19 — the old letters-only scan yielded
+    // E8601DT19. is name E8601DT + w 19 - the old letters-only scan yielded
     // name "e" + w 8601 = the Ew. scientific format, silently wrong output.
     const iso = parseSpec("e8601dt19.");
     try t.expectEqualStrings("e8601dt", iso.name);
@@ -4405,23 +4405,23 @@ test "E8601DA/E8601DT write side renders ISO 8601 (QA-e8601put)" {
 test "E8601DTw. honors its width: w=16 omits the seconds, w>19 right-justifies (GH#2 + GH#11)" {
     // Formats and Informats Reference pp.200-201: w Default 19, Range 16-26.
     // Padding side is RUNTIME-verified, not doc metadata (GH#11
-    // ISS-e8601rightalign): every padded width right-justifies — LEADING
+    // ISS-e8601rightalign): every padded width right-justifies - LEADING
     // blanks; the entry's `Alignment: Left` header field is not oracle (D-025).
     // 16JAN2025:13:53:45 = SAS day 23757 × 86400 + 50025.
     const dt: f64 = 23757 * 86400 + 50025;
     // w=16: "SAS assumes that the value for seconds is 0 and omits them from
-    // the output" (p.200 note) — the field is exactly the 16-char form.
+    // the output" (p.200 note) - the field is exactly the 16-char form.
     try expectFmt("2025-01-16T13:53", .{ .num = dt }, "e8601dt16.");
     // 17-18 can't hold the whole `:ss` (3 columns) and a component never
     // renders partially, so they take the same seconds-less rung, right-
     // justified into the wider field (needs-oracle: real SAS unprobed for
-    // 17/18 — the body ladder interpolates the doc's w=16 note).
+    // 17/18 - the body ladder interpolates the doc's w=16 note).
     try expectFmt(" 2025-01-16T13:53", .{ .num = dt }, "e8601dt17.");
     try expectFmt("  2025-01-16T13:53", .{ .num = dt }, "e8601dt18.");
     // default 19 and explicit 19 are the full form, exactly filling the field
     try expectFmt("2025-01-16T13:53:45", .{ .num = dt }, "e8601dt19.");
     try expectFmt("2025-01-16T13:53:45", .{ .num = dt }, "e8601dt.");
-    // 20-26: real SAS right-justifies — blank-pad the LEFT (GH#11; the GH#2
+    // 20-26: real SAS right-justifies - blank-pad the LEFT (GH#11; the GH#2
     // fix had these trailing under the doc's Alignment: Left metadata)
     try expectFmt(" 2025-01-16T13:53:45", .{ .num = dt }, "e8601dt20.");
     try expectFmt("       2025-01-16T13:53:45", .{ .num = dt }, "e8601dt26.");
@@ -4432,8 +4432,8 @@ test "E8601DTw. honors its width: w=16 omits the seconds, w>19 right-justifies (
 
 test "E8601DTw. stored value: w>19 leading blanks keep length() at w (GH#11 ISS-e8601rightalign)" {
     // The issue's probe value: '16JAN2025:13:53:00'dt = day 23757 × 86400
-    // + 13:53:00. Real SAS 9.4 stores f26 = "       2025-01-16T13:53:00" —
-    // 7 LEADING blanks — because length() returns the position of the last
+    // + 13:53:00. Real SAS 9.4 stores f26 = "       2025-01-16T13:53:00" -
+    // 7 LEADING blanks - because length() returns the position of the last
     // non-blank: only leading padding pins length()=w; the GH#2 left-justify
     // collapsed every w>19 length() to 19 (the regression's fingerprint).
     const dt: f64 = 23757 * 86400 + 13 * 3600 + 53 * 60;
@@ -4449,17 +4449,17 @@ test "E8601DTw. stored value: w>19 leading blanks keep length() at w (GH#11 ISS-
         try t.expectEqualStrings("2025-01-16T13:53:00", std.mem.trim(u8, stored, " ")); // length() = w, not 19
         try t.expect(stored[0] == ' '); // blank INSIDE the $quote discriminator
     }
-    // w=16 behavior UNCHANGED from GH#2 — verified correct against real SAS
+    // w=16 behavior UNCHANGED from GH#2 - verified correct against real SAS
     // (seconds omitted, field exactly 16, alignment unobservable)
     try expectFmt("2025-01-16T13:53", .{ .num = dt }, "e8601dt16.");
 }
 
 test "E8601DTw. width outside 16-26 fails LOUD (GH#2, SAS 29-185)" {
     // Formats Reference pp.200-201 Range 16-26; SAS: `ERROR 29-185: Width
-    // specified for format E8601DT is invalid.` — a user-program error, so the
+    // specified for format E8601DT is invalid.` - a user-program error, so the
     // rc 1 class (g_fmt_error), never the unsupported-feature rc 2. The global
     // checkWidth cap (32) alone silently accepted 10/15/27. Asserted via the
-    // CAPTURED reporter (TEST-quietnoise) — no aborting process here.
+    // CAPTURED reporter (TEST-quietnoise) - no aborting process here.
     var arena = std.heap.ArenaAllocator.init(t.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -4495,7 +4495,7 @@ test "E8601DT informat honors w: e8601dt16. reads seconds as 00 (GH#2 ISS-e8601d
     try t.expectEqual(base + 50025, readNumericStmt("e8601dt16.", "2025-01-16T13:53:45").num);
     // out-of-range width is loud on the read side too (same Range 16-26).
     // Loud-then-continue: the read still yields whatever the sliced field
-    // parses to — the ERROR flag (rc 1) is the contract here, not the value.
+    // parses to - the ERROR flag (rc 1) is the contract here, not the value.
     g_fmt_error = false;
     g_nofmterr = false;
     g_test_last_err = "";
@@ -4516,7 +4516,7 @@ test "E8601DN informat: ISO date reads as a midnight DATETIME; width must be 10 
     try t.expect(readNumeric("e8601dn10.", "2025-01").isMissing());
     try t.expect(readNumeric("e8601dn10.", "2025").isMissing());
     try t.expect(!formatErrored());
-    // "Requirement: The width of the input field must be 10" (p.642) — loud
+    // "Requirement: The width of the input field must be 10" (p.642) - loud
     // outside it, via the captured reporter (TEST-quietnoise).
     g_fmt_error = false;
     g_nofmterr = false;
@@ -4536,7 +4536,7 @@ test "E8601DZ informat rebases the UTC offset to the zero meridian (GH#5a)" {
     // anchor: 2025-01-16T13:53:00+05:00 → 08:53:00Z = 2052636780.
     try t.expectEqual(@as(f64, 2052636780), readNumeric("e8601dz26.", "2025-01-16T13:53:00+05:00").num);
     try t.expectEqual(@as(f64, 2052672780), readNumeric("e8601dz26.", "2025-01-16T13:53:00-05:00").num);
-    // a trailing `Z` IS the zero meridian (p.645's second form) — offset 0
+    // a trailing `Z` IS the zero meridian (p.645's second form) - offset 0
     try t.expectEqual(@as(f64, 1852645980), readNumeric("e8601dz26.", "2018-09-15T15:53:00Z").num);
     // fractional seconds survive the rebase
     try t.expectEqual(@as(f64, 2052636825.5), readNumeric("e8601dz30.", "2025-01-16T13:53:45.5+05:00").num);
@@ -4544,7 +4544,7 @@ test "E8601DZ informat rebases the UTC offset to the zero meridian (GH#5a)" {
     try t.expect(readNumeric("e8601dz26.", "2025-01-16T13:53:00").isMissing());
     try t.expect(readNumeric("e8601dz26.", "2025-01-16").isMissing());
     try t.expect(!formatErrored()); // invalid DATA is a NOTE class, not a format error
-    // Range 20-35 (p.645), loud outside — and distinct from the DT range
+    // Range 20-35 (p.645), loud outside - and distinct from the DT range
     g_fmt_error = false;
     g_nofmterr = false;
     g_test_last_err = "";
@@ -4560,7 +4560,7 @@ test "E8601DZ informat rebases the UTC offset to the zero meridian (GH#5a)" {
 
 test "E8601DZw. format writes the zero-meridian offset; Z rung below w=25 (GH#5a)" {
     // Formats Reference p.204: Default 26, Range 20-35, Alignment Left, and a
-    // two-rung notation ladder — `+00:00` "when w is large enough to support
+    // two-rung notation ladder - `+00:00` "when w is large enough to support
     // this time zone notation", else `yyyy-mm-ddThh:mm:ssZ`. 15SEP2018:05:53:00
     // = 1852609980.
     try expectFmt("2018-09-15T05:53:00+00:00 ", .{ .num = 1852609980 }, "e8601dz."); // default 26, left
@@ -4585,7 +4585,7 @@ test "E8601DZw. format writes the zero-meridian offset; Z rung below w=25 (GH#5a
 test "isKnownInformat: dn/dz whitelisted; `e` is the Ew.d alias, there is no `b` (GH#5a rider)" {
     try t.expect(isKnownInformat("e8601dn"));
     try t.expect(isKnownInformat("e8601dz"));
-    try t.expect(isKnownInformat("e")); // Ew.d w.d alias — not a digit-name stand-in
+    try t.expect(isKnownInformat("e")); // Ew.d w.d alias - not a digit-name stand-in
     // deliberately absent: B8601 names survive parseSpec whole, so a bare `b`
     // would only silence the not-yet-implemented B8601DZ/DN/TZ reads
     try t.expect(!isKnownInformat("b"));
@@ -4704,13 +4704,13 @@ test "user-defined VALUE format decodes coded values (BUG-userformat)" {
     try std.testing.expectEqualStrings("Adult", try apply(a, .{ .num = 42 }, "agec."));
     try std.testing.expectEqualStrings("High", try apply(a, .{ .str = "H" }, "$grp."));
     try std.testing.expectEqualStrings("Low", try apply(a, .{ .str = "L " }, "$grp.")); // trailing blank
-    // a char VALUE resolves the char format WITHOUT the `$` too — the CNTLIN
+    // a char VALUE resolves the char format WITHOUT the `$` too - the CNTLIN
     // TYPE='C' codelist apply idiom `put(VISIT, VISNUM_ALL_PERIOD.)`
     // (QA-charfmtnodollar); a $-less name on a NUM value must NOT match it.
     try std.testing.expectEqualStrings("High", try apply(a, .{ .str = "H" }, "grp."));
     try std.testing.expect(!std.mem.eql(u8, "High", try apply(a, .{ .num = 1 }, "grp.")));
-    // a char value that matches NO key (and no OTHER=) renders the source value —
-    // not "." via the numeric fallback (QA-charfmtnomatch, gen2 AEOUT) — TRUNCATED
+    // a char value that matches NO key (and no OTHER=) renders the source value -
+    // not "." via the numeric fallback (QA-charfmtnomatch, gen2 AEOUT) - TRUNCATED
     // to the format's default width = its longest label (High/Low → 4), so
     // "NOT RECOVERED" → "NOT " (GH#63 ISS-fmtdefwidth; a value that fits is raw).
     try std.testing.expectEqualStrings("NOT ", try apply(a, .{ .str = "NOT RECOVERED" }, "grp."));
@@ -4741,7 +4741,7 @@ test "unknown format fails loud unless nofmterr (BUG-unknownfmtsilent)" {
     _ = try apply(a, .{ .num = 45.7 }, "undefinedfmt.");
     try t.expect(!formatErrored());
 
-    // default: an unknown/unsupported name fails loud — captured (not stderr) in a
+    // default: an unknown/unsupported name fails loud - captured (not stderr) in a
     // test build, so assert both the flag and the captured message (TEST-quietnoise).
     g_nofmterr = false;
     g_test_last_err = "";
@@ -4786,7 +4786,7 @@ test "D-009 §5f (write side): a documented-but-unimplemented format marks the g
     reset();
     _ = try apply(a, .{ .str = "ab" }, "$bogus8.");
     try t.expectEqual(@as(u8, 1), rc());
-    // Type scope: DATEw. is a NUMERIC format — real SAS reports $DATE "not
+    // Type scope: DATEw. is a NUMERIC format - real SAS reports $DATE "not
     // found" → user error, rc 1. Mirror: $CSTR is char-only → numeric rc 1.
     reset();
     _ = try apply(a, .{ .str = "ab" }, "$date9.");
@@ -4812,7 +4812,7 @@ test "D-009 §5f (write side): a documented-but-unimplemented format marks the g
     try t.expect(!isDocumentedFormat("cstr", false));
     // x-metavariable letter sets came from EACH entry's own syntax table:
     // MMDDYYxw./DDMMYYxw./YYMMDDxw. take B/C/D/N/P/S; YYMMxw./MMYYxw./YYQxw./
-    // YYQRxw. take C/D/N/P/S — no B. `x` itself is a placeholder, not a name.
+    // YYQRxw. take C/D/N/P/S - no B. `x` itself is a placeholder, not a name.
     try t.expect(isDocumentedFormat("mmddyyb", false));
     try t.expect(isDocumentedFormat("yymmddb", false));
     try t.expect(!isDocumentedFormat("yymmb", false));
@@ -4853,7 +4853,7 @@ test "D-009 §5f (read side): a documented-but-unimplemented informat marks the 
     reset();
     _ = readNumeric("yen8.", "1234");
     try t.expectEqual(@as(u8, 1), rc());
-    // Doc-EXCLUDED: NEGPAREN is a FORMAT only — the informat dictionary has
+    // Doc-EXCLUDED: NEGPAREN is a FORMAT only - the informat dictionary has
     // no entry (NOTE-informatlow-tick245 #14) → rc 1.
     reset();
     _ = readNumeric("negparen8.", "1234");
@@ -4879,7 +4879,7 @@ test "D-009 §5f (read side): a documented-but-unimplemented informat marks the 
     try t.expect(!isDocumentedInformat("nlpctn", false)); // FORMAT exists; the INFORMAT is named nowhere
     try t.expect(!isDocumentedInformat("negparen", false)); // format-only name (doc excludes it as an informat)
     try t.expect(!isDocumentedInformat("date", true)); // $DATE informat is "not found" in real SAS
-    try t.expect(!isDocumentedInformat("charzb", false)); // $CHARZB only (CB exists BOTH ways — not a probe)
+    try t.expect(!isDocumentedInformat("charzb", false)); // $CHARZB only (CB exists BOTH ways - not a probe)
 }
 
 test "GAP-fmtwrite-unimpl: P/ORDINAL/YEN + locale-driven NL* fail loud (no silent BEST/raw fallback)" {
@@ -4893,11 +4893,11 @@ test "GAP-fmtwrite-unimpl: P/ORDINAL/YEN + locale-driven NL* fail loud (no silen
     // / NLPCTNw.d (p.418) are now implemented (tests below). Still loud:
     //  - `p`, `ordinal`, `yen`: none exists in the SAS 9.4 Formats and
     //    Informats Reference (checked the dictionary, the category lists, and
-    //    all nine docs) — D-015: an absent name is never implemented.
+    //    all nine docs) - D-015: an absent name is never implemented.
     //  - `nlpct` (p.415), `nlpctp` (p.419), `nlmnyi` (p.410), `nlmnieur`
     //    (p.331): output depends on the SESSION locale ("The output value
     //    depends on the locale" / separators "locale-specific") and opensas
-    //    has no LOCALE= option — any rendering would be a guessed symbol.
+    //    has no LOCALE= option - any rendering would be a guessed symbol.
     const names = [_][]const u8{ "p", "ordinal", "yen", "nlpct", "nlpctp", "nlmnyi", "nlmnieur" };
     for (names) |n| {
         g_fmt_error = false;
@@ -4956,7 +4956,7 @@ test "GAP-fmtwrite-unimpl: EUROw.d/EUROXw.d write the euro symbol (pp.215/218)" 
     try expectFmt("E1.254,71", .{ .num = 1254.71 }, "eurox9.2");
     try expectFmt("     E1.254,710", .{ .num = 1254.71 }, "eurox15.3");
     // The w=6 default-length logs (p.217, p.220): the ladder drops the SYMBOL
-    // before the grouping (`55,555`, not `E55555`), then BESTw — whose
+    // before the grouping (`55,555`, not `E55555`), then BESTw - whose
     // separators are NOT swapped under EUROX (`7.78E6`).
     try expectFmt("E4,444", .{ .num = 4444 }, "euro.");
     try expectFmt("55,555", .{ .num = 55555 }, "euro.");
@@ -4971,7 +4971,7 @@ test "GAP-fmtwrite-unimpl: EUROw.d/EUROXw.d write the euro symbol (pp.215/218)" 
 }
 
 test "GAP-fmtwrite-unimpl: NLPCTIw.d/NLPCTNw.d locale-invariant percents (pp.417/418)" {
-    // NLPCTI: minus sign, comma/period ALWAYS, left-justified — the NLPCT
+    // NLPCTI: minus sign, comma/period ALWAYS, left-justified - the NLPCT
     // entry's example shows this exact value identical under en_US and
     // German_Germany (`-1,234.57%`).
     try expectFmt("-1,234.57%                      ", .{ .num = -12.3456789 }, "nlpcti32.2");
@@ -5042,7 +5042,7 @@ test "BUG-charfmtsink: $QUOTE wraps; unknown $format fails loud (not a silent pa
     try expectFmt("Hi  ", .{ .str = "Hi" }, "$char4.");
     try expectFmt("HI      ", .{ .str = "Hi" }, "$upcase8.");
     try t.expect(!formatErrored());
-    // An unknown $format is NO LONGER a silent sink — fail loud (captured, not
+    // An unknown $format is NO LONGER a silent sink - fail loud (captured, not
     // stderr, in a test build) then still render the raw pad so output survives.
     g_test_last_err = "";
     const out = try apply(a, .{ .str = "Hi" }, "$zzznotreal8.");
@@ -5059,7 +5059,7 @@ test "PICTURE truncates the scaled value by default; rounding is opt-in (BUG-pic
 
     // SAS 9.4 default is TRUNCATE (rounding needs the PICTURE `(round)` option):
     // 12.35 → `  12.3` and 99.99 → `  99.9`, NOT the rounded `  12.4` / ` 100.0`
-    // (leading `0` selectors blank-suppress — see BUG-picturedigitsel test below).
+    // (leading `0` selectors blank-suppress - see BUG-picturedigitsel test below).
     const entries = [_]UserFmtEntry{.{ .lo = -1e300, .hi = 1e300, .label = "0000.0" }};
     const cat = [_]UserFmt{.{ .name = "p", .is_char = false, .is_picture = true, .entries = &entries }};
     setUserFormats(&cat);
@@ -5097,7 +5097,7 @@ test "PICTURE digit selectors: `0` suppresses leading zeros, nonzero zero-fills 
     const a = arena.allocator();
 
     // SAS 9.4: "nines print zeros, zeros suppress". x=7 → pz='0000' gives `   7`,
-    // pn='9999' gives `0007` (opensas had this INVERTED — silent-wrong zero-padded IDs).
+    // pn='9999' gives `0007` (opensas had this INVERTED - silent-wrong zero-padded IDs).
     const z_entries = [_]UserFmtEntry{.{ .lo = -1e300, .hi = 1e300, .label = "0000" }};
     const n_entries = [_]UserFmtEntry{.{ .lo = -1e300, .hi = 1e300, .label = "9999" }};
     const cat = [_]UserFmt{
@@ -5123,7 +5123,7 @@ test "format/informat width beyond the SAS cap fails loud + clamps (BUG-fmtwidth
     try t.expectEqualStrings("                            1.50", try apply(a, .{ .num = 1.5 }, "32.2"));
     try t.expect(!formatErrored());
 
-    // an over-wide NUMERIC width (33 > 32) ERRORs and clamps — no over-wide field
+    // an over-wide NUMERIC width (33 > 32) ERRORs and clamps - no over-wide field
     g_test_last_err = "";
     const s33 = try apply(a, .{ .num = 1.5 }, "33.2");
     try t.expect(formatErrored());
@@ -5198,7 +5198,7 @@ test "unknown char informat fails loud (BUG-charinformatloud)" {
     g_nofmterr = false;
     g_fmt_error = false;
 
-    // recognized char informats read exactly as before — no false trip
+    // recognized char informats read exactly as before - no false trip
     try t.expectEqualStrings("HELLO", try charInformat(a, "upcase", "Hello"));
     try t.expectEqualStrings("abc", try charInformat(a, "", "abc")); // plain $w.
     try t.expectEqualStrings("abc", try charInformat(a, "char", "abc"));
@@ -5285,7 +5285,7 @@ test "ANYDTDTE/ANYDTDTM/ANYDTTME informats read any date form (GAP-anydtinformat
 
 test "BUG-datesingledigitday: DATEw. reads a 1-digit day (`1MAR90` → 11017)" {
     // Language Reference: Concepts Table 21.2 row 6's own example; the literal '1MAR1990'd gives
-    // 11017 and MMDDYY8. on 1/2/90 gives 10959 — three paths, one class.
+    // 11017 and MMDDYY8. on 1/2/90 gives 10959 - three paths, one class.
     try t.expectEqual(@as(?i64, 11017), parseDDMMMYYYY("1MAR90")); // dMMMyy
     try t.expectEqual(@as(?i64, 11017), parseDDMMMYYYY("01MAR90")); // ddMMMyy
     try t.expectEqual(@as(?i64, 11017), parseDDMMMYYYY("1MAR1990")); // dMMMyyyy

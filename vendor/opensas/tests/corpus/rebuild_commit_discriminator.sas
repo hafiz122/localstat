@@ -1,11 +1,11 @@
-/* docs/findings/rebuild-commit-scope.md — the CONTROL that makes
+/* docs/findings/rebuild-commit-scope.md - the CONTROL that makes
    BUG-modifystoptruncates a defect rather than a matter of taste, plus the
    two in-place commit paths that must not drift into the MODIFY shape.
 
    THE DISCRIMINATOR (D1/D2). `stop;` truncating the output is CORRECT for a
    CREATING step, even when the output happens to share the input's name:
    `data d; set d; … stop;` builds a new d and swaps it, so the observations
-   never reached were never written and there is nothing to preserve — the STOP
+   never reached were never written and there is nothing to preserve - the STOP
    entry (Statements Reference printed p.346, `=== pdf 358 ===`) says exactly
    this: "SAS writes a data set for the current DATA step. However, the
    observation being processed when STOP executes is not added."
@@ -26,20 +26,20 @@
    and PROC SORT with no OUT= sorts the live rows (every observation survives).
    expect-rc: 0 */
 
-/* D1 — CREATING step, output name == input name: truncation is CORRECT */
+/* D1 - CREATING step, output name == input name: truncation is CORRECT */
 data d1; do k = 1 to 5; x = k*10; output; end; run;
 data d1; set d1; if k = 3 then stop; x = x + 1; run;
 title "D1 same-name creating step + stop: 2 rows is CORRECT, not a bug";
 proc print data=d1; run;
 
-/* D2 — different output name: the SOURCE must be untouched */
+/* D2 - different output name: the SOURCE must be untouched */
 data d2; do k = 1 to 5; x = k*10; output; end; run;
 data d2out; set d2; if k = 3 then stop; x = x + 1; run;
 title "D2 source survives whole while the new data set is short";
 proc print data=d2; run;
 proc print data=d2out; run;
 
-/* S1 — PROC SQL UPDATE mutates in place: rows outside the WHERE keep values */
+/* S1 - PROC SQL UPDATE mutates in place: rows outside the WHERE keep values */
 data s1; do k = 1 to 5; x = k*10; output; end; run;
 proc sql;
   update s1 set x = x + 1 where k <= 3;
@@ -47,7 +47,7 @@ quit;
 title "S1 sql update in place: k=1..3 moved, k=4,5 keep 40 and 50";
 proc print data=s1; run;
 
-/* S2 — PROC SORT with no OUT= sorts the live rows; nothing is lost */
+/* S2 - PROC SORT with no OUT= sorts the live rows; nothing is lost */
 data s2; do k = 5 to 1 by -1; x = k*10; output; end; run;
 proc sort data=s2; by k; run;
 title "S2 in-place sort: all five observations survive, ascending";

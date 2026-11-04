@@ -1,5 +1,5 @@
 /* Read specific observations directly with POINT=. The point=/nobs= vars are
-   temporary — SAS drops them from the output schema (BUG-setpointtemp); an
+   temporary - SAS drops them from the output schema (BUG-setpointtemp); an
    explicit KEEP retains them (same override as keep-ing an end=/nobs= var). */
 data src;
   input USUBJID $ AVAL;

@@ -1,4 +1,4 @@
-/* BUG-sysfunctrim: %sysfunc must NOT trim whitespace off arguments —
+/* BUG-sysfunctrim: %sysfunc must NOT trim whitespace off arguments -
  * macro whitespace is significant. Brackets in put make blanks visible.
  * Expected values are the SAS 9.4 results. */
 %let r1 = %sysfunc(tranwrd(a b c,%str( ),_));

@@ -1,6 +1,6 @@
 /* BUG-procwherestmtorder: pins the Language Reference: Concepts p.229 rule
    that a PROC-level WHERE STATEMENT is a read-time filter applied BEFORE
-   firstobs=/obs= count positions WITHIN the WHERE-selected subset — identical
+   firstobs=/obs= count positions WITHIN the WHERE-selected subset - identical
    to the where= OPTION twin (BUG-whereobsorder) and the DATA-step statement
    twin (BUG-wherestmtobsorder). opensas sliced the physical firstobs=/obs=
    range first, THEN filtered, so a 100-row table with `where seq > 90` and

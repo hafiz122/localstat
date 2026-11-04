@@ -3,7 +3,7 @@
    integer) BEFORE folding to the row-major flat index. Without the per-dim check,
    an out-of-range subscript that happens to fold to an in-range flat slot silently
    reads/writes the WRONG element with no error (data corruption). The ERROR is on
-   stderr (asserted via captured diagnostics in exec.zig's test — the WRITE path);
+   stderr (asserted via captured diagnostics in exec.zig's test - the WRITE path);
    stdout here pins the runtime READ halt and that valid indexing + per-dimension
    truncation are unchanged.
    expect-rc: 1 */
@@ -20,7 +20,7 @@ data _null_;
   a1=11; a2=12; a3=21; a4=22;
   i = 3;
   x = a{i,1};               /* row 3 does NOT exist → ERROR: subscript out of range */
-  put "read-after=" x;      /* never reached — the step halted at the bad read */
+  put "read-after=" x;      /* never reached - the step halted at the bad read */
 run;
 
 data _null_;

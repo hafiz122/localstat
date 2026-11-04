@@ -1,5 +1,5 @@
 /* BUG-xportmeta: the .xpt (FDA transport) round-trip keeps variable LABEL,
-   FORMAT, INFORMAT and the DECLARED char length — a $20 var holding "Alice"
+   FORMAT, INFORMAT and the DECLARED char length - a $20 var holding "Alice"
    must come back Len 20, not the data max 5. Write srcm → xport_meta.xpt,
    read it back fresh through a second libname, then print the metadata.
    Cites docs/findings/qa-findings-tick113.md. */

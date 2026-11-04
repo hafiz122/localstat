@@ -1,4 +1,4 @@
-/* BUG-symputnoupdate — CALL SYMPUT UPDATES an existing macro variable; it only
+/* BUG-symputnoupdate - CALL SYMPUT UPDATES an existing macro variable; it only
    CREATES one when the name exists nowhere. SAS 9.4 Macro Language: Reference,
    Fifth Edition, printed p.301 ("CALL SYMPUT Routine"):
 
@@ -6,7 +6,7 @@
       updated. If macro-variable does not exist, SYMPUT creates it."
 
    The p.77 rule-1 placement pinned by macroedge_symput_scopelocal answers only
-   the SECOND sentence — where a NEW variable is created. Running it
+   the SECOND sentence - where a NEW variable is created. Running it
    unconditionally made every CALL SYMPUT inside a parameterized macro shadow the
    variable it was meant to write, which silently defeated the doc's own
    prescribed remedy for the scope trap (printed p.152: "you must use a %GLOBAL
@@ -17,7 +17,7 @@
 
 /* p.152's remedy, verbatim in shape: %GLOBAL inside a PARAMETERIZED macro (whose
    local table is therefore non-empty), then CALL SYMPUT. The global must be
-   UPDATED, not shadowed — this printed `[]` before the fix. */
+   UPDATED, not shadowed - this printed `[]` before the fix. */
 %macro remedy(p=);
    %global gv;
    data _null_;

@@ -1,4 +1,4 @@
-//! Macro preprocessor — source-to-source, run before the lexer (main.zig calls
+//! Macro preprocessor - source-to-source, run before the lexer (main.zig calls
 //! `expand` on the raw `.sas` text; the lexer/parser/exec then see the result).
 //!
 //! A single left-to-right scan over the source. Most characters pass through
@@ -13,10 +13,10 @@
 //!     `%if c %then A; %else B;`         evaluate `c`, expand the taken branch
 //!                                       (a branch may be `%do; … %end;`)
 //!
-//! ponytail — deliberately NOT the full SAS macro facility:
+//! ponytail - deliberately NOT the full SAS macro facility:
 //!   * one global symbol table (no `%local`/`%global`, no nested `%macro`)
 //!   * `&x`/`%x` inside SINGLE quotes resolve in macro-statement text only
-//!     (the SAS rule — see `sq_masks_triggers`); compiler-bound single-quoted
+//!     (the SAS rule - see `sq_masks_triggers`); compiler-bound single-quoted
 //!     strings stay inert, also the SAS rule (printed p.38).
 //!   * `%eval` is integer-only (`**` exponentiates); `%sysevalf` covers floats.
 //!     `%do i=… %to …` and `%do %while/%until` iterate; `%global`/`%local` share
@@ -37,7 +37,7 @@ const Error = std.mem.Allocator.Error;
 const SavedVar = struct { name: []const u8, prev: ?[]const u8 };
 /// One macro invocation's local symbol table. `owner` is the invoked macro's
 /// name, UPPERCASED, because `%PUT _USER_`/`_LOCAL_` print it as the scope column
-/// — SAS names the owning macro there, never the word LOCAL (NOTE-userscopename).
+/// - SAS names the owning macro there, never the word LOCAL (NOTE-userscopename).
 const Scope = struct {
     owner: []const u8,
     vars: std.ArrayList(SavedVar) = .empty,
@@ -53,13 +53,13 @@ const Macro = struct { params: []const Param, body: []const u8, pbuff: bool = fa
 /// overflows the stack (segfault). 400 is far beyond any real nesting yet well
 /// under the frame count that overflows an 8 MB stack.
 const max_macro_depth = 400;
-/// Backstop for `%do %while/%until` — a runaway condition (never falsified by the
+/// Backstop for `%do %while/%until` - a runaway condition (never falsified by the
 /// body) stops here instead of looping forever.
 const max_loop_iters = 100_000;
 
 /// Masked-ampersand sentinel (BUG-macronrstrmask). %nrstr/%nrbquote and the
 /// Q-functions emit `&` as this byte so resolveAmpRun (which fires only on a
-/// real '&') can never re-resolve it — the mask survives %let storage and any
+/// real '&') can never re-resolve it - the mask survives %let storage and any
 /// number of later &var references, exactly like SAS quoting. Text LEAVING the
 /// macro layer (expanded program text, %put log lines, the SYMGET mirror)
 /// passes through unmaskTriggers to render it back as '&'.
@@ -69,27 +69,27 @@ const max_loop_iters = 100_000;
 const mask_amp: u8 = 0x01;
 /// Masked-percent sentinel (BUG-macropctmask): a `%` folded by a quoting fn
 /// (`%str(50%%)`) or masked by %nrstr/%nrbquote/%nrquote must survive storage
-/// and rescan as a literal too — an unmasked stored `%` re-fires as a macro
+/// and rescan as a literal too - an unmasked stored `%` re-fires as a macro
 /// call the next time the value flows through resolveText (`%let b=&a;`).
 const mask_pct: u8 = 0x02;
 /// Masked-comma sentinel (BUG-sysfunccommamask): a comma quoted by %str/%quote/
-/// %nrstr & co. is NOT an argument delimiter — `%sysfunc(catx(%str(,),a,b,c))`
+/// %nrstr & co. is NOT an argument delimiter - `%sysfunc(catx(%str(,),a,b,c))`
 /// must join ON the comma, not split there. Masked by the quoting fns exactly
 /// like '&'/'%', unmasked by unmaskTriggers on text leaving the macro layer and
-/// at BOTH function-argument boundaries — %sysfunc's and the macro-function one
-/// (%scan/%index/%verify & co.) — so the consumer sees the literal ',', per SAS.
+/// at BOTH function-argument boundaries - %sysfunc's and the macro-function one
+/// (%scan/%index/%verify & co.) - so the consumer sees the literal ',', per SAS.
 /// That second boundary was missing and every byte-comparing macro fn searched
 /// for the sentinel instead of the comma (BUG-macroscandelim).
 /// Unquoted commas still split args normally.
 const mask_comma: u8 = 0x03;
 /// Masked-blank sentinel (BUG-macrogroupamasking): a blank quoted by %str & co.
-/// is DATA, not a token separator — `%bquote(&s)` with `Susan's Office Supplies`
+/// is DATA, not a token separator - `%bquote(&s)` with `Susan's Office Supplies`
 /// is ONE operand in the %IF condition (Macro Ref p.107-108's READIT example).
 const mask_blank: u8 = 0x04;
 /// The rest of Table 7.6 group A, one sentinel per masked character, so a quoted
 /// operator reaches %EVAL/%IF as character data (printed p.162: %STR quotes the
 /// comparison values AND and OR "so they are not ambiguous"). The bytes skip
-/// 0x09-0x0D — those are real '\t' '\n' '\v' '\f' '\r' in SAS source, and the
+/// 0x09-0x0D - those are real '\t' '\n' '\v' '\f' '\r' in SAS source, and the
 /// first draft's contiguous range rewrote every newline to '>' on the way out.
 const mask_plus: u8 = 0x05; // +
 const mask_minus: u8 = 0x06; // -
@@ -105,13 +105,13 @@ const mask_semi: u8 = 0x14; // ;
 const mask_hash: u8 = 0x15; // #
 const mask_notsign: u8 = 0x16; // ¬ (the two bytes 0xC2 0xAC, masked as one)
 /// Prefix marking the WHOLE FOLLOWING WORD as a masked mnemonic operator (AND
-/// OR NOT EQ NE LE LT GE GT IN — group A's word half). The word's letters stay
+/// OR NOT EQ NE LE LT GE GT IN - group A's word half). The word's letters stay
 /// verbatim after the prefix, so unmasking just drops the byte. NOT stays a
-/// legal prefix operator and IN stays MINOPERATOR-conditional — masking only
+/// legal prefix operator and IN stays MINOPERATOR-conditional - masking only
 /// ever touches QUOTED text; bare mnemonics are never rewritten.
 const mask_word: u8 = 0x17;
 
-/// True for any quoting-sentinel byte — the 0x01-0x17 range MINUS the real
+/// True for any quoting-sentinel byte - the 0x01-0x17 range MINUS the real
 /// whitespace control chars 0x09-0x0D, which appear verbatim in every program.
 fn isSentinel(c: u8) bool {
     return c >= mask_amp and c <= mask_word and (c < '\t' or c > '\r');
@@ -125,11 +125,11 @@ fn isMnemonic(w: []const u8) bool {
 }
 
 /// The one masking pass behind every quoting function (BUG-macrogroupamasking):
-/// Table 7.6 group A — the specials `+ - * / < > = ¬ ^ | ~ ; , #` and blank,
-/// plus the mnemonic operators as WHOLE words (`candy` keeps its `and`) — each
+/// Table 7.6 group A - the specials `+ - * / < > = ¬ ^ | ~ ; , #` and blank,
+/// plus the mnemonic operators as WHOLE words (`candy` keeps its `and`) - each
 /// masked char REPLACED by its sentinel (a prefix would leave the real char to
 /// act as an operator), each masked word prefixed by mask_word. `triggers`
-/// additionally masks `&`/`%` (group B — the NR fns, %superq, and the Q-form
+/// additionally masks `&`/`%` (group B - the NR fns, %superq, and the Q-form
 /// result quoting; %QSCAN's documented result list, printed p.338, is group A
 /// plus `& % ' " ( )`). Existing sentinel bytes pass through untouched (nested
 /// %str inside %str), so masking is idempotent. Borrowed slice back if nothing
@@ -165,7 +165,7 @@ fn maskQuoted(a: std.mem.Allocator, s: []const u8, comptime triggers: bool) Erro
             i += 1;
             continue;
         }
-        // `¬` is the two bytes 0xC2 0xAC (BUG-macroevalnotsign) — masked as one.
+        // `¬` is the two bytes 0xC2 0xAC (BUG-macroevalnotsign) - masked as one.
         if (c == 0xC2 and i + 1 < s.len and s[i + 1] == 0xAC) {
             try out.append(a, mask_notsign);
             changed = true;
@@ -190,24 +190,24 @@ fn maskQuoted(a: std.mem.Allocator, s: []const u8, comptime triggers: bool) Erro
 }
 
 /// Replace every real '&'/'%' plus all of group A with sentinels (borrowed
-/// slice back if none) — the NR-fn / %superq / Q-form-result rule.
+/// slice back if none) - the NR-fn / %superq / Q-form-result rule.
 fn maskTriggers(a: std.mem.Allocator, s: []const u8) Error![]const u8 {
     return maskQuoted(a, s, true);
 }
 
 /// Group A only (BUG-macrogroupamasking): the .resolve quoting fns
-/// (%str/%quote/%bquote) leave `&`/`%` resolved/live but mask group A — the
+/// (%str/%quote/%bquote) leave `&`/`%` resolved/live but mask group A - the
 /// quoted comma/blank/operator/mnemonic is data, never syntax.
 fn maskGroupA(a: std.mem.Allocator, s: []const u8) Error![]const u8 {
     return maskQuoted(a, s, false);
 }
 
 /// Render every quoting sentinel back to its literal character(s) for text
-/// leaving the macro layer — expanded program text, %put lines, the SYMGET
-/// mirror — and at BOTH function-argument boundaries (%sysfunc's and the
+/// leaving the macro layer - expanded program text, %put lines, the SYMGET
+/// mirror - and at BOTH function-argument boundaries (%sysfunc's and the
 /// macro-function one). SAS unquotes an item as it leaves the word scanner
 /// (Macro Ref printed p.113-114) and when %SCAN/%SUBSTR/%UPCASE return it
-/// (p.114 + the %SCAN entry, printed p.338) — those boundaries are why
+/// (p.114 + the %SCAN entry, printed p.338) - those boundaries are why
 /// `%scan(%str(a b),1)` still sees the blank as a delimiter and returns `a`.
 fn unmaskTriggers(a: std.mem.Allocator, s: []const u8) Error![]const u8 {
     var any = false;
@@ -244,14 +244,14 @@ fn unmaskTriggers(a: std.mem.Allocator, s: []const u8) Error![]const u8 {
 const State = struct {
     a: std.mem.Allocator,
     /// Values are OWNED malloc'd buffers (functions.VarVal), reused across
-    /// overwrites — arena dupes here orphaned O(M²) RAM on `%let s=&s tok;`
+    /// overwrites - arena dupes here orphaned O(M²) RAM on `%let s=&s tok;`
     /// accumulation loops (PERF-macroaccum).
     vars: std.StringHashMapUnmanaged(functions.VarVal) = .empty,
     macros: std.StringHashMapUnmanaged(Macro) = .empty,
     diags: *diag.Diagnostics,
     call_depth: usize = 0,
     scopes: std.ArrayList(Scope) = .empty,
-    /// Names already tried via autocall (SASAUTOS) this run — load each file at
+    /// Names already tried via autocall (SASAUTOS) this run - load each file at
     /// most once, matching SAS, and avoid re-reading on every unresolved call.
     autoload_attempted: std.StringHashMapUnmanaged(void) = .empty,
     /// Active `%goto LABEL` target (lowercased): while set, process() drops all
@@ -262,43 +262,43 @@ const State = struct {
     /// Set by `%return`: unwind the CURRENT macro's body immediately (nothing after
     /// the `%return` in the body runs). process() stops its scan at the next loop
     /// check and every enclosing %do/%if bails; handleCall clears it at the macro
-    /// invocation boundary — a `%return` never escapes its macro (like goto_target).
+    /// invocation boundary - a `%return` never escapes its macro (like goto_target).
     returning: bool = false,
     /// %ABORT halts the whole program. Set (alongside `returning`, to reuse every
-    /// bail point) when %ABORT runs, and — unlike `returning` — NEVER cleared at
+    /// bail point) when %ABORT runs, and - unlike `returning` - NEVER cleared at
     /// the macro boundary, so the halt propagates all the way to the top-level
     /// scan: every statement after %ABORT is dropped from the expanded text and
     /// thus never lexed/executed (NOTE-macroloudlabels).
     aborting: bool = false,
     /// How many macro invocations are currently on the stack. Unlike call_depth
-    /// (bumped by EVERY process() re-entry — nested %if branches, arg/%let text),
+    /// (bumped by EVERY process() re-entry - nested %if branches, arg/%let text),
     /// this counts only handleCall bodies, so `%return` can tell whether it is
     /// inside a macro. `%return` in open code (depth 0) is invalid: it must warn
     /// visibly and NOT set `returning` (else it would silently swallow the rest of
-    /// the program at exit 0 — the worst failure class). GH#4 open-code guard.
+    /// the program at exit 0 - the worst failure class). GH#4 open-code guard.
     macro_call_depth: usize = 0,
     /// MINOPERATOR gate for the `in`/`#` macro operator, and MINDELIMITER= for
     /// its list delimiter (BUG-macroinoperator). Sources: the system option
     /// (`OPTIONS MINOPERATOR [MINDELIMITER='c'];`, intercepted by process() at
-    /// scan time — BUG-minoperatoropt) OR-ed per-invocation with the enclosing
+    /// scan time - BUG-minoperatoropt) OR-ed per-invocation with the enclosing
     /// %MACRO definition's `/ minoperator` (and its MINDELIMITER= when given),
-    /// restored on exit. SAS 9.4 default: NOMINOPERATOR — `in` is ordinary
+    /// restored on exit. SAS 9.4 default: NOMINOPERATOR - `in` is ordinary
     /// text (and thus a loud %EVAL parse error in %if/%eval). Blank delimiter.
     minoperator: bool = false,
     mindelimiter: u8 = ' ',
-    /// True once seedAutomatics ran (GAP-macroautovars) — process() re-enters,
+    /// True once seedAutomatics ran (GAP-macroautovars) - process() re-enters,
     /// the automatics are seeded exactly once per State.
     auto_seeded: bool = false,
     /// TRUE while scanning COMPILER-BOUND text (program source, macro bodies,
     /// %if/%do branch text): a single-quoted string there is a SAS string
     /// literal, and the word scanner does not pass &/% inside it to the macro
-    /// processor — Macro Language Ref printed p.38 ("Macro Variable
+    /// processor - Macro Language Ref printed p.38 ("Macro Variable
     /// Reference": "Macro variable references that are enclosed in single
-    /// quotation marks are not resolved", the TITLE-statement example) — so
+    /// quotation marks are not resolved", the TITLE-statement example) - so
     /// process() copies the quoted span verbatim. FALSE while scanning MACRO
     /// statement text via resolveText (%LET values, %PUT text, macro function
     /// arguments, %IF conditions): to the macro processor quotation marks are
-    /// ordinary characters, and ONLY the NR quoting functions mask & and % —
+    /// ordinary characters, and ONLY the NR quoting functions mask & and % -
     /// printed p.7 ("You must use a macro quoting function to mask the special
     /// characters", about assigning a value containing ampersands to a macro
     /// variable), Table 7.2 printed p.100 (`%name &name`: "%NRSTR, %NRBQUOTE,
@@ -316,7 +316,7 @@ const State = struct {
     /// Pooled expansion scratch for resolveText (PERF-resolvetextscratch).
     /// process() re-enters resolveText mid-scan (a %sysfunc/macro-fn arg
     /// resolving while an outer resolveText is still appending), so one shared
-    /// buffer would be clobbered — each entry pops its OWN scratch and returns
+    /// buffer would be clobbered - each entry pops its OWN scratch and returns
     /// it after the result is copied out. Only the final arena dupe persists;
     /// scratch capacity is reused across calls instead of orphaning a fresh
     /// arena ArrayList per call (the other half of PERF-macroaccum's RSS).
@@ -349,7 +349,7 @@ const State = struct {
         const prev: ?[]const u8 = if (st.vars.get(lname)) |v| try st.a.dupe(u8, v.get()) else null;
         try fr.append(st.a, .{ .name = lname, .prev = prev });
     }
-    /// BUG-symputscope — where CALL SYMPUT puts its variable, per SAS 9.4 Macro
+    /// BUG-symputscope - where CALL SYMPUT puts its variable, per SAS 9.4 Macro
     /// Language: Reference, Fifth Edition, printed p.77 ("Special Cases of Scope
     /// with the CALL SYMPUT Routine"), rule 1:
     ///
@@ -362,10 +362,10 @@ const State = struct {
     /// Returns the frame index that owns the variable, or null for "no nonempty
     /// local table" → GLOBAL. Emptiness is per-FRAME, so a parameterized macro
     /// (params are declareLocal'd) keeps its symput vars private while a
-    /// parameter-less one (empty frame) leaks them to the global table — the
+    /// parameter-less one (empty frame) leaks them to the global table - the
     /// doc's ENV1-vs-ENV3 contrast, and the whole subtlety of the rule.
     /// A frame also counts as nonempty when the macro CONTAINS a computed %GOTO
-    /// (rule 2 case 3, `computed_goto`) — SYSPBUFF (case 2) needs no flag here
+    /// (rule 2 case 3, `computed_goto`) - SYSPBUFF (case 2) needs no flag here
     /// because it is declareLocal'd at invocation, so it sits in `vars`.
     fn symputFrame(st: *State) ?usize {
         var i = st.scopes.items.len;
@@ -376,13 +376,13 @@ const State = struct {
         }
         return null;
     }
-    /// BUG-symputxsymtab — replace the OUTER value that the outermost frame
+    /// BUG-symputxsymtab - replace the OUTER value that the outermost frame
     /// owning `name` saved, so `popScope` restores THIS value once the last
     /// shadow dies. That is how `CALL SYMPUTX(…,'G')` writes the global while a
     /// live local keeps shadowing it (printed p.307: "even if a local symbol
     /// table exists"). Outermost, not innermost: an inner frame's saved value is
     /// the enclosing LOCAL, which must still be restored on its own pop.
-    /// Returns false when no frame owns the name — then it IS the global and the
+    /// Returns false when no frame owns the name - then it IS the global and the
     /// ordinary global write applies.
     fn setSavedOutermost(st: *State, name: []const u8, val: []const u8) bool {
         var kbuf: [256]u8 = undefined;
@@ -416,7 +416,7 @@ const State = struct {
 
     fn setVar(st: *State, name: []const u8, val: []const u8) Error!void {
         try st.putOwned(name, val);
-        // mirror to SYMGET/SYMEXIST (BUG-symgetlet) — unmasked: the DATA step
+        // mirror to SYMGET/SYMEXIST (BUG-symgetlet) - unmasked: the DATA step
         // must see '&a', never the sentinel byte.
         try functions.setLetVar(name, try unmaskTriggers(st.a, val));
     }
@@ -424,7 +424,7 @@ const State = struct {
     /// reused/grown in place and the map key duped only on first insert, so a
     /// hot `%let s=&s tok;` loop orphans nothing in the arena (PERF-macroaccum).
     /// `bytes` must not alias the var's current buffer (getVar slices are
-    /// consumed or snapshotted by callers before any setVar — see syscallSort).
+    /// consumed or snapshotted by callers before any setVar - see syscallSort).
     fn putOwned(st: *State, name: []const u8, bytes: []const u8) Error!void {
         var kbuf: [256]u8 = undefined;
         const lower: ?[]const u8 = if (name.len <= kbuf.len) std.ascii.lowerString(&kbuf, name) else null;
@@ -448,7 +448,7 @@ const State = struct {
         if (name.len == 0 or name.len > buf.len) return null;
         for (name, 0..) |c, i| buf[i] = std.ascii.toLower(c);
         const lname = buf[0..name.len];
-        // GAP-sysparm-opt: &SYSPARM reads the SHARED session value live —
+        // GAP-sysparm-opt: &SYSPARM reads the SHARED session value live -
         // `options sysparm=…;` writes functions.sysparm_text, and a reference
         // after that statement must see the new text without any re-seeding.
         // (A chunk's macro expansion runs before its statements execute, so a
@@ -462,13 +462,13 @@ const State = struct {
     }
     /// The SavedVar for `name` if it was declared %local in any ACTIVE scope
     /// (innermost declaration wins), else null. `prev != null` means the local
-    /// shadows a pre-existing outer (global) value — SAS %SYMGLOBL still sees
+    /// shadows a pre-existing outer (global) value - SAS %SYMGLOBL still sees
     /// that global (BUG-macrosymglobl).
     fn findLocal(st: *State, name: []const u8) ?SavedVar {
         return (st.findLocalIn(name) orelse return null).sv;
     }
     /// `findLocal` plus WHICH frame owns the variable. `%PUT _USER_` needs the
-    /// index for both halves of its scope column — the owning macro's name, and
+    /// index for both halves of its scope column - the owning macro's name, and
     /// the innermost-outward ordering (NOTE-userscopename). Single loop; findLocal
     /// is the value-only view of it.
     fn findLocalIn(st: *State, name: []const u8) ?struct { idx: usize, sv: SavedVar } {
@@ -494,7 +494,7 @@ const State = struct {
 };
 
 /// Autocall (SASAUTOS) directory: when an invoked macro is undefined, look for
-/// `<dir>/<name>.sas` (case-insensitively — real autocall libraries are mixed case),
+/// `<dir>/<name>.sas` (case-insensitively - real autocall libraries are mixed case),
 /// compile it (which defines the macro), and retry. Set once by the CLI from
 /// `--sasautos`/`$SASAUTOS`; null disables autocall (the warn-and-skip path).
 var g_sasautos: ?[]const u8 = null;
@@ -518,12 +518,12 @@ pub fn expand(a: std.mem.Allocator, src: []const u8, diags: *diag.Diagnostics) E
 /// path); the date/time stamps are the session-start wall clock, per SAS.
 /// ponytail: a %let can still overwrite these (SAS makes them read-only), and
 /// there is no env override for the clock (0.16's env API needs a process Init
-/// the macro layer doesn't carry) — add one if reproducible stamps are needed.
+/// the macro layer doesn't carry) - add one if reproducible stamps are needed.
 fn seedAutomatics(st: *State) Error!void {
     try st.setVar("syserr", "0");
     try st.setVar("sysindex", "0");
     try st.setVar("sysmacroname", "");
-    try st.setVar("sysparm", functions.sysparm_text); // GAP-sysparm-opt: the shared session value (reads are live — getVar)
+    try st.setVar("sysparm", functions.sysparm_text); // GAP-sysparm-opt: the shared session value (reads are live - getVar)
     try st.setVar("sysver", "9.4");
     try st.setVar("sysscp", switch (@import("builtin").os.tag) {
         .windows => "WIN X64",
@@ -544,16 +544,16 @@ fn seedAutomatics(st: *State) Error!void {
     try st.setVar("sysrc", "0");
     // &SYSLAST/&SYSNOBS: SAS's session-start values. The live refresh (name +
     // obs of the last CREATED dataset) lives in exec.zig's Library, out of the
-    // macro layer's reach — plumb it through the step-flush callback if needed.
+    // macro layer's reach - plumb it through the step-flush callback if needed.
     // &SYSPROCESSNAME is likewise deferred (needs argv / the process Init);
     // a reference to it still warns loudly via the undefined-&SYS* path.
     try st.setVar("syslast", "_NULL_");
     try st.setVar("sysnobs", "0");
     // &SYSDATE/&SYSDATE9/&SYSTIME/&SYSDAY, rendered through the real formats.
-    // (currentSasDate/currentSecondOfDay are UTC — the same ceiling DATE()/TIME()
+    // (currentSasDate/currentSecondOfDay are UTC - the same ceiling DATE()/TIME()
     // already carry; no local timezone in the eval path.)
     // F12: &SYSDAY trims DOWNAME.'s blank pad (an artefact of the format's
-    // default width 9, not SAS's value) — SAS gives the trimmed day name.
+    // default width 9, not SAS's value) - SAS gives the trimmed day name.
     const dtxt = try std.fmt.allocPrint(st.a, "{d}", .{functions.currentSasDate()});
     try st.setVar("sysdate9", try computeSysfunc(st.a, "putn", &.{ dtxt, "date9." }, st.diags));
     try st.setVar("sysdate", try computeSysfunc(st.a, "putn", &.{ dtxt, "date7." }, st.diags));
@@ -562,11 +562,11 @@ fn seedAutomatics(st: *State) Error!void {
     const ttxt = try std.fmt.allocPrint(st.a, "{d}", .{functions.currentSecondOfDay()});
     try st.setVar("systime", try computeSysfunc(st.a, "putn", &.{ ttxt, "time5." }, st.diags));
     // F12: the remaining documented automatics the macro layer can source
-    // HONESTLY — CPU count and the OS env's user/host names. When the host
+    // HONESTLY - CPU count and the OS env's user/host names. When the host
     // can't supply one it stays UNSEEDED so a reference warns loudly: a
     // plausible-but-wrong constant is worse than no value (the seeded-stale
     // &SYSLAST/&SYSNOBS lesson, BUG-syslastrefresh). Still loud by design:
-    // &SYSVLONG/&SYSVLONG4 (maintenance+patch stamp — unsourceable), &SYSJOBID/
+    // &SYSVLONG/&SYSVLONG4 (maintenance+patch stamp - unsourceable), &SYSJOBID/
     // &SYSPROCESSNAME/&SYSSTARTID (pid/argv semantics we don't model),
     // &SYSCHARWIDTH (session encoding), &SYSMAXLONG (2^53 vs 2^63 guess),
     // &SYSSITE (license number), &SYSTIMEZONE (no local tz in the eval path),
@@ -608,7 +608,7 @@ pub const Session = struct {
     /// the accumulated step is flushed to `cb` (which runs it + feeds CALL SYMPUT
     /// vars back via `seedVar`), so a `%do &n` later in the SAME body sees them
     /// (BUG-macrointerleave). Returns the trailing remainder (text after the last
-    /// flush — an unterminated final step / pure-macro output) for the caller to run.
+    /// flush - an unterminated final step / pure-macro output) for the caller to run.
     pub fn expandExec(
         self: *Session,
         src: []const u8,
@@ -620,7 +620,7 @@ pub const Session = struct {
         // BUG-symputscope: a DATA step can only execute INSIDE a macro body via
         // this interleaved path, so this is the exact window in which exec.zig's
         // CALL SYMPUT may need a macro scope. Publishing the live State here (and
-        // only here) keeps the hook self-contained in macro.zig — no main.zig
+        // only here) keeps the hook self-contained in macro.zig - no main.zig
         // wiring, and null everywhere it must be (setup pass, unit tests).
         g_live = &self.st;
         defer {
@@ -642,12 +642,12 @@ pub const Session = struct {
 /// concurrent Session would need this threaded through Library instead.
 var g_live: ?*State = null;
 
-/// GH#13 GAP-callexecutemacro — the Session driving the current run, live for
+/// GH#13 GAP-callexecutemacro - the Session driving the current run, live for
 /// the WHOLE run rather than only the `expandExec` window `g_live` covers.
 ///
 /// Why a SECOND hook and not a wider `g_live`: `g_live` means "a step is
 /// running INSIDE a macro body", and `symputLocal` keys its scope rule on
-/// exactly that window (printed p.77 rule 1) — widening it would start routing
+/// exactly that window (printed p.77 rule 1) - widening it would start routing
 /// open-code CALL SYMPUTs through the scoped table instead of the exec→macro
 /// queue. CALL EXECUTE needs the opposite: the macro processor, from ANY step,
 /// including the trailing remainder main.zig runs after `expandExec` returns.
@@ -658,7 +658,7 @@ pub fn setLiveSession(s: ?*Session) void {
     g_session = s;
 }
 
-/// GH#13 GAP-callexecutemacro — macro-process CALL EXECUTE's argument text AT
+/// GH#13 GAP-callexecutemacro - macro-process CALL EXECUTE's argument text AT
 /// CALL TIME and return the SAS language statements it generated (empty text
 /// when the argument was pure macro language). Null when no Session is live
 /// (the CLI setup pass, unit tests) so the caller can fail LOUD instead of
@@ -669,7 +669,7 @@ pub fn setLiveSession(s: ?*Session) void {
 /// elements, those elements execute immediately. If CALL EXECUTE produces SAS
 /// language statements, or if the macro language elements generate SAS language
 /// statements, those statements execute after the end of the DATA step's
-/// execution." Running `process` HERE is the "immediately" half — a %LET/%PUT
+/// execution." Running `process` HERE is the "immediately" half - a %LET/%PUT
 /// inside the argument takes effect while the calling step is still executing,
 /// observable mid-step through SYMGET/RESOLVE. Handing the RETURNED text to
 /// exec.zig's execute queue is the "after the end of the DATA step" half.
@@ -678,12 +678,12 @@ pub fn expandForExecute(text: []const u8) Error!?[]const u8 {
     const st = &sess.st;
     // Suppress the interleaved step flush (D-004) for the duration: with
     // `exec_fn` set, `process` would run a generated `data …; run;`
-    // RE-ENTRANTLY, mid-step — precisely the timing p.123 forbids. Null it and
+    // RE-ENTRANTLY, mid-step - precisely the timing p.123 forbids. Null it and
     // `process` accumulates the whole generated program for us to queue.
     const saved_ctx = st.exec_ctx;
     const saved_fn = st.exec_fn;
     // A stray top-level `%return`/`%goto` in the argument must not unwind the
-    // macro body we were CALLED FROM — that would silently drop the rest of an
+    // macro body we were CALLED FROM - that would silently drop the rest of an
     // enclosing body (the GH#4 open-code-%return shape). Save the control flags
     // too. `aborting` is deliberately NOT saved: it is sticky program-halt
     // state and must escape (see State.aborting).
@@ -704,14 +704,14 @@ pub fn expandForExecute(text: []const u8) Error!?[]const u8 {
     return try unmaskTriggers(st.a, out.items);
 }
 
-/// GH#13 GAP-callexecutemacro — the first macro TRIGGER still present in text
+/// GH#13 GAP-callexecutemacro - the first macro TRIGGER still present in text
 /// that `expandForExecute` has already processed, or null when it is clean SAS.
 ///
 /// Reached only when `process` deliberately left a `%` behind: `%nrstr` masks
 /// its argument's triggers and `unmaskTriggers` restores them, so a macro that
 /// GENERATES `%nrstr(%tally(1))` hands us text our queue drain cannot run (it
 /// lexes, it does not macro-process). Without this check that text reaches the
-/// lexer as `unexpected character '%'` — a USER-error rc 1 for what is in fact
+/// lexer as `unexpected character '%'` - a USER-error rc 1 for what is in fact
 /// an opensas gap, which D-009/D-009b(i) says must be rc 2.
 ///
 /// Quote handling mirrors `process`: `/* … */` and `'…'` spans are skipped
@@ -744,7 +744,7 @@ pub fn residualTrigger(text: []const u8) ?[]const u8 {
     return null;
 }
 
-/// CLIN-macrounresolvedsilent — macro-trigger names the scanner could NOT
+/// CLIN-macrounresolvedsilent - macro-trigger names the scanner could NOT
 /// resolve (lowercased keys, arena-owned), pending a deferred warning.
 ///
 /// WHY A RECORD-AND-DISCHARGE PAIR RATHER THAN A WARNING AT FIRST SIGHT. The two
@@ -752,10 +752,10 @@ pub fn residualTrigger(text: []const u8) ?[]const u8 {
 /// job alone:
 ///
 ///   * only the SCANNER knows which `&` is a genuine macro trigger. Post-lex the
-///     evidence is gone: `a & b` (logical AND) and `a&b` (a reference — SAS
+///     evidence is gone: `a & b` (logical AND) and `a&b` (a reference - SAS
 ///     warns for it, printed p.484's `if x&y then do;`) both become `.amp`+
 ///     `.name`; the lexer strips quotes, so a single-quoted `'AT&T'` (never
-///     resolved, never warned — printed p.38) is indistinguishable from a
+///     resolved, never warned - printed p.38) is indistinguishable from a
 ///     double-quoted one; and a `%nrstr`-masked `&` (explicitly warning-free,
 ///     printed p.106) is unmasked back to a plain `&` before the lexer sees it.
 ///     process() gets all three right already, so IT records.
@@ -765,7 +765,7 @@ pub fn residualTrigger(text: []const u8) ?[]const u8 {
 ///
 /// `bindStepVars` discharges: it is the last instruction executed before a step
 /// is compiled, and it is where the exec→macro queue gets its final chance to
-/// bind. That is SAS's own warning point, not an approximation of it — Macro
+/// bind. That is SAS's own warning point, not an approximation of it - Macro
 /// Language Reference printed p.158: "As this DATA step is tokenized and
 /// compiled, the & causes the word scanner to trigger the macro processor, which
 /// looks for a MACVAR entry in a symbol table. Because such an entry does not
@@ -773,7 +773,7 @@ pub fn residualTrigger(text: []const u8) ?[]const u8 {
 /// SYMPUT written in the SAME step does NOT discharge the record (p.531: "A step
 /// boundary such as a RUN statement must be reached before resolving the macro
 /// variable created with CALL SYMPUT"), while one written in an EARLIER step
-/// does — because that one is already in the queue `bindStepVars` reads.
+/// does - because that one is already in the queue `bindStepVars` reads.
 ///
 /// Entries are never removed: an entry means "the scanner genuinely could not
 /// resolve this name", and if a later step CAN bind it, `bindStepVars` binds it
@@ -783,14 +783,14 @@ pub fn residualTrigger(text: []const u8) ?[]const u8 {
 /// a second concurrent Session would need this threaded through bindStepVars.
 var g_unresolved: std.StringHashMapUnmanaged(void) = .empty;
 
-/// BUG-symputscope — CALL SYMPUT's scope decision, asked by exec.zig before it
+/// BUG-symputscope - CALL SYMPUT's scope decision, asked by exec.zig before it
 /// writes. Returns true when the variable BELONGS TO A LOCAL symbol table (per
 /// `symputFrame`, printed p.77 rule 1) and has been stored there; the caller then
 /// must NOT also write the flat `Library.macro_vars` store.
 ///
 /// WHY THE TWO STORES STAY SEPARATE (deliberate, and the smaller of the two fixes
 /// on offer): `Library.macro_vars` is not a symbol table, it is the exec→macro
-/// handoff QUEUE — main.zig drains it into the session after every step, and
+/// handoff QUEUE - main.zig drains it into the session after every step, and
 /// `bindStepVars` late-binds `&var` out of it for steps the up-front pass could
 /// not resolve. It has no scope concept and needs none, because everything in it
 /// is global by construction once this function has skimmed off the local cases.
@@ -800,18 +800,18 @@ var g_unresolved: std.StringHashMapUnmanaged(void) = .empty;
 /// later step by `bindStepVars` or the re-seed loop); global symput → the queue,
 /// exactly as before. Merging the two stores outright would mean moving the queue
 /// and its late-bind into macro.zig for no conformance gain.
-/// BUG-symputnoupdate — UPDATE BEATS CREATE, and it is checked FIRST. Macro
+/// BUG-symputnoupdate - UPDATE BEATS CREATE, and it is checked FIRST. Macro
 /// Language Reference printed p.301, "CALL SYMPUT Routine": "If macro-variable
 /// exists in any enclosing scope, macro-variable is updated. If macro-variable
 /// does not exist, SYMPUT creates it." The p.77 rule-1 placement above answers
-/// only the second sentence — WHERE a NEW variable is created. Running it
+/// only the second sentence - WHERE a NEW variable is created. Running it
 /// unconditionally made every CALL SYMPUT inside a parameterized macro shadow
 /// the enclosing/global variable it was supposed to write, so the doc's own
 /// prescribed remedy for the scope trap (p.152: "you must use a %GLOBAL
 /// statement to declare the macro variable") silently did nothing.
 ///
 /// Three outcomes, in the order SAS decides them:
-///   1. the name is owned by an ACTIVE local frame (findLocalIn — innermost
+///   1. the name is owned by an ACTIVE local frame (findLocalIn - innermost
 ///      declaration wins, i.e. "the most local symbol table in which it
 ///      exists") → update it there, and keep it OUT of the queue;
 ///   2. the name exists in `vars` but no frame owns it → it is GLOBAL → return
@@ -819,7 +819,7 @@ var g_unresolved: std.StringHashMapUnmanaged(void) = .empty;
 ///   3. the name exists nowhere → CREATE, placed by p.77 rule 1.
 ///
 /// `tab` is CALL SYMPUTX's third argument (BUG-symputxsymtab), which overrides
-/// all of that — see `SymTab`. CALL SYMPUT has no such argument and always
+/// all of that - see `SymTab`. CALL SYMPUT has no such argument and always
 /// passes `.default`.
 pub fn symputLocal(name: []const u8, val: []const u8, tab: SymTab) Error!bool {
     const st = g_live orelse return false;
@@ -827,7 +827,7 @@ pub fn symputLocal(name: []const u8, val: []const u8, tab: SymTab) Error!bool {
         // "G: stored in the global symbol table, even if a local symbol table
         // exists" (printed p.307). A LIVE local of the same name must keep
         // shadowing it for the rest of that macro, so the new global value goes
-        // into the OUTERMOST owning frame's SAVED outer value — popScope then
+        // into the OUTERMOST owning frame's SAVED outer value - popScope then
         // publishes it at exactly the moment the last shadow dies, and every
         // inner frame still restores the shadow it saved.
         // ponytail: that route lands in `State.vars` and NOT in the exec→macro
@@ -839,7 +839,7 @@ pub fn symputLocal(name: []const u8, val: []const u8, tab: SymTab) Error!bool {
             if (st.setSavedOutermost(name, val)) return true;
             return false;
         },
-        // "L: … the most local symbol table that exists" (printed p.307) — the
+        // "L: … the most local symbol table that exists" (printed p.307) - the
         // INNERMOST frame, empty or not. That is deliberately not `symputFrame`'s
         // "closest NONEMPTY table": L is the explicit override, so it does not
         // skip an empty frame the way the default placement rule does. "If a
@@ -867,7 +867,7 @@ pub fn symputLocal(name: []const u8, val: []const u8, tab: SymTab) Error!bool {
 /// Fifth Edition, printed p.307. `default` is the routine's documented default
 /// `F` ("uses the version in the most local symbol table in which it exists…
 /// otherwise stores it in the most local symbol table that it finds"), which is
-/// the same create/update rule CALL SYMPUT follows — so both routines share the
+/// the same create/update rule CALL SYMPUT follows - so both routines share the
 /// one code path and cannot drift apart.
 pub const SymTab = enum { default, global, local };
 
@@ -920,14 +920,14 @@ fn varLookup(vars: *const std.StringHashMapUnmanaged([]const u8), name: []const 
 /// fresh slice. Two forms of a `&var` that the up-front pass couldn't resolve (it
 /// runs before any step executes) are bound here, once a *prior* step's symput
 /// has populated `vars`:
-///   * inside a string literal — `x = "&a"` — resolved in place (BUG-symput);
-///   * bare — `n = &cnt + 1` — the lexer split it into `.amp` + a name token, so
+///   * inside a string literal - `x = "&a"` - resolved in place (BUG-symput);
+///   * bare - `n = &cnt + 1` - the lexer split it into `.amp` + a name token, so
 ///     when that name is a macro var we drop the pair and splice in the value,
 ///     re-lexed to tokens (a trailing `.` delimiter is consumed) (BUG-symputbare).
 /// The CLI calls this on each step's token slice right before compiling it.
 /// ponytail: post-lex, the whitespace that told `a&b` (concat/macro) from `a & b`
 /// (logical AND) is gone, so a bare `&name` binds only when `name` is actually a
-/// macro var — a false hit needs a real variable to share a symput var's name.
+/// macro var - a false hit needs a real variable to share a symput var's name.
 pub fn bindStepVars(a: std.mem.Allocator, toks: []const lex.Token, vars: *const std.StringHashMapUnmanaged([]const u8), diags: *diag.Diagnostics) diag.Error![]const lex.Token {
     if (vars.count() == 0) {
         try warnUnresolvedIn(toks, diags);
@@ -961,31 +961,31 @@ pub fn bindStepVars(a: std.mem.Allocator, toks: []const lex.Token, vars: *const 
     return out.items;
 }
 
-/// CLIN-macrounresolvedsilent — the DISCHARGE half of `g_unresolved`, run on a
+/// CLIN-macrounresolvedsilent - the DISCHARGE half of `g_unresolved`, run on a
 /// step's tokens after `bindStepVars` has had its last chance to bind them. A
 /// `&name` still standing here is definitively unresolved: SAS warns at exactly
 /// this moment (printed p.158) and so do we.
 ///
 /// The `g_unresolved` gate is what makes this sound. It fires ONLY for names the
 /// scanner itself classified as genuine macro triggers, so `a & b`, `'AT&T'` and
-/// `%nrstr(&x)` — all indistinguishable from a real reference in the token
-/// stream — cannot reach the warning, because they were never recorded.
+/// `%nrstr(&x)` - all indistinguishable from a real reference in the token
+/// stream - cannot reach the warning, because they were never recorded.
 ///
 /// STEP text is discharged here; `%PUT` text is discharged by `handlePut`
 /// through `warnUnresolvedRaw` (NOTE-putunresolvedwarn); top-level GLOBAL
 /// statements (TITLE/FOOTNOTE/OPTIONS/…) are discharged by main.zig's
-/// runExpanded through THIS function — main.zig routes those around
+/// runExpanded through THIS function - main.zig routes those around
 /// `bindStepVars`, so the call is one main.zig owns, not one macro.zig can
 /// place (NOTE-globalstmtunresolved). Late binding provably cannot apply to a
-/// global statement either — no step runs before it in its chunk — which is
+/// global statement either - no step runs before it in its chunk - which is
 /// what makes it warnable.
 pub fn warnUnresolvedIn(toks: []const lex.Token, diags: *diag.Diagnostics) diag.Error!void {
     if (g_unresolved.count() == 0) return;
     for (toks, 0..) |t, i| switch (t.tag) {
-        // bare `&name` — the lexer split the reference into `.amp` + `.name`
+        // bare `&name` - the lexer split the reference into `.amp` + `.name`
         .amp => if (i + 1 < toks.len and toks[i + 1].tag == .name)
             try warnIfPending(toks[i + 1].text, t.line, diags),
-        // `"… &name …"` — the reference rides inside the literal's text
+        // `"… &name …"` - the reference rides inside the literal's text
         .string => try warnUnresolvedRaw(t.text, t.line, diags),
         else => {},
     };
@@ -1022,17 +1022,17 @@ fn warnIfPending(name: []const u8, line: usize, diags: *diag.Diagnostics) Error!
 // ── the scanner ─────────────────────────────────────────────────────────────
 
 fn process(st: *State, src: []const u8, out: *std.ArrayList(u8)) Error!void {
-    // Seed the automatic macro variables once per State (GAP-macroautovars) —
+    // Seed the automatic macro variables once per State (GAP-macroautovars) -
     // process() re-enters constantly, so this is the single choke point.
     if (!st.auto_seeded) {
         st.auto_seeded = true;
         try seedAutomatics(st);
     }
-    // Every recursion route — macro calls, nested %if branches, arg/%let text
-    // resolution — re-enters process, so one depth guard here stops all of them
+    // Every recursion route - macro calls, nested %if branches, arg/%let text
+    // resolution - re-enters process, so one depth guard here stops all of them
     // (a recursive %macro or thousands of nested %if would else overflow the stack).
     if (st.call_depth >= max_macro_depth) {
-        try st.diags.note(0, "macro expansion nested past {d} levels — stopped (recursion?)", .{max_macro_depth});
+        try st.diags.note(0, "macro expansion nested past {d} levels - stopped (recursion?)", .{max_macro_depth});
         return;
     }
     st.call_depth += 1;
@@ -1046,7 +1046,7 @@ fn process(st: *State, src: []const u8, out: *std.ArrayList(u8)) Error!void {
     // (BUG-barepct). `/* */` and `%*` are also inert inside "...".
     var in_dq = false;
     while (i < src.len) {
-        // %return in effect: stop scanning this body at once — nothing after the
+        // %return in effect: stop scanning this body at once - nothing after the
         // %return is emitted. handleCall clears the flag at the macro boundary, so
         // this only unwinds up to the enclosing invocation (ISS-macroreturn).
         if (st.returning) break;
@@ -1086,7 +1086,7 @@ fn process(st: *State, src: []const u8, out: *std.ArrayList(u8)) Error!void {
             i = end;
         } else if (!in_dq and st.sq_masks_triggers and c == '\'') {
             // '...' single-quoted string in COMPILER-BOUND text: SAS masks & and
-            // % inside single quotes there (double quotes still expand — printed
+            // % inside single quotes there (double quotes still expand - printed
             // p.38). A doubled '' is an embedded quote. Macro-STATEMENT text
             // takes the other branch (sq_masks_triggers is false inside
             // resolveText): quotes are ordinary characters to the macro
@@ -1113,7 +1113,7 @@ fn process(st: *State, src: []const u8, out: *std.ArrayList(u8)) Error!void {
             try out.appendSlice(st.a, try resolveAmpRun(st, src[i..j]));
             i = j;
         } else if (!in_dq and c == '%' and i + 1 < src.len and src[i + 1] == '*') {
-            // `%* … ;` macro comment — skip to the terminating ';', emit nothing.
+            // `%* … ;` macro comment - skip to the terminating ';', emit nothing.
             // `%*` isn't a name-start so it would otherwise leak the `%` to the
             // lexer (BUG-barepct: a real utility macro's `%** … ** ;` → LexError).
             var e = i + 2;
@@ -1139,24 +1139,24 @@ fn process(st: *State, src: []const u8, out: *std.ArrayList(u8)) Error!void {
             i = e;
             try st.exec_fn.?(st.exec_ctx.?, try unmaskTriggers(st.a, out.items));
             out.clearRetainingCapacity();
-            // GAP-macroautovars: a step just RAN — refresh &SYSERR. The callback
+            // GAP-macroautovars: a step just RAN - refresh &SYSERR. The callback
             // records step failures in diags and swallows them, so a sticky
             // 4-once-any-step-errored is all that's observable from here; clean
             // steps keep the seeded 0. (SAS resets SYSERR per step; sticky
-            // matches our syntax-check halt — after a step error later steps
+            // matches our syntax-check halt - after a step error later steps
             // are skipped, so a following %if &syserr must still fire.)
             if (st.diags.hasStepErrors()) {
                 try st.setVar("syserr", "4");
                 try st.setVar("syscc", "4"); // F5: session condition code mirrors &SYSERR
             }
         } else if (!in_dq and (c == 'o' or c == 'O') and stmtBoundary(out.items) and stmtKw(src, i, "options")) {
-            // `OPTIONS MINOPERATOR [MINDELIMITER='c'];` — the SYSTEM-option form
+            // `OPTIONS MINOPERATOR [MINDELIMITER='c'];` - the SYSTEM-option form
             // of the `in`/`#` gate (BUG-minoperatoropt). It takes effect when
             // READ, before any later macro invocation, so process() intercepts
             // it at scan time into st.minoperator/.mindelimiter; the statement
             // text itself is the executor's business (it owns every other
             // option). ponytail: word scan also fires on a DATA-step
-            // `options = 1;` assignment — harmless, it holds no option words.
+            // `options = 1;` assignment - harmless, it holds no option words.
             var e = i;
             while (e < src.len) : (e += 1) {
                 if (src[e] == ';') break;
@@ -1168,13 +1168,13 @@ fn process(st: *State, src: []const u8, out: *std.ArrayList(u8)) Error!void {
             }
             applyOptionsStmt(st, src[i..e]);
             // Do NOT consume the statement: it used to be copied to `out`
-            // verbatim, which bypassed the ordinary scan — so an `&ref` in an
+            // verbatim, which bypassed the ordinary scan - so an `&ref` in an
             // OPTIONS statement was never resolved (`%let v=nodate; options
             // &v;` errored where SAS runs clean) and never recorded, which is
             // what let OPTIONS swallow the unresolved-reference warning
             // (NOTE-globalstmtunresolved). Emit just the 'o'; the ordinary
-            // loop scans the rest — resolving/recording `&` and honouring
-            // quotes — exactly as it does for any other statement.
+            // loop scans the rest - resolving/recording `&` and honouring
+            // quotes - exactly as it does for any other statement.
             try out.append(st.a, c);
             i += 1;
         } else {
@@ -1185,7 +1185,7 @@ fn process(st: *State, src: []const u8, out: *std.ArrayList(u8)) Error!void {
 }
 
 /// True when nothing (or only whitespace/comments) has been emitted since the
-/// last `;` — i.e. the next word starts a statement (for run;/quit; boundary
+/// last `;` - i.e. the next word starts a statement (for run;/quit; boundary
 /// detection). Comments pass through expansion verbatim (BUG-macrocomment), so
 /// a trailing `/* … */` must not hide the boundary: `%m(); /* note */ run;`
 /// deferred the step past expansion-time %sysfunc(exist()) checks and silently
@@ -1198,7 +1198,7 @@ fn stmtBoundary(emitted: []const u8) bool {
             '/' => {
                 if (k >= 2 and emitted[k - 2] == '*') {
                     // Walk back over a `/* … */` block. ponytail: lastIndexOf can
-                    // land on a `/*` inside a string literal — a miss here only
+                    // land on a `/*` inside a string literal - a miss here only
                     // defers the flush (old behavior), never corrupts.
                     const open = std.mem.lastIndexOf(u8, emitted[0 .. k - 2], "/*") orelse return false;
                     k = open;
@@ -1212,7 +1212,7 @@ fn stmtBoundary(emitted: []const u8) bool {
 }
 
 /// `src[i..]` begins with keyword `word` (case-insensitive) not followed by a
-/// name char — a whole-word match at a statement position.
+/// name char - a whole-word match at a statement position.
 fn stmtKw(src: []const u8, i: usize, word: []const u8) bool {
     if (i + word.len > src.len) return false;
     if (!std.ascii.eqlIgnoreCase(src[i .. i + word.len], word)) return false;
@@ -1223,7 +1223,7 @@ fn stmtKw(src: []const u8, i: usize, word: []const u8) bool {
 /// Scan an `OPTIONS …` statement body (sans `;`) for the macro-expression
 /// system options (BUG-minoperatoropt): MINOPERATOR/NOMINOPERATOR toggle the
 /// `in`/`#` gate; MINDELIMITER='c' sets its list delimiter. Every other option
-/// is the executor's business — the statement text passes through untouched.
+/// is the executor's business - the statement text passes through untouched.
 fn applyOptionsStmt(st: *State, stmt: []const u8) void {
     var i: usize = 0;
     while (i < stmt.len) {
@@ -1247,7 +1247,7 @@ fn applyOptionsStmt(st: *State, stmt: []const u8) void {
 /// starts at `from` (just past the keyword): spaces/`=`, then either a quoted
 /// char (`'c'`/`"c"`) or a bare run up to whitespace/`;`. Anything that isn't
 /// exactly one character (`'ab'`, `''`, `=xyz`) used to keep the first byte
-/// and drop the rest SILENTLY — fail loud and leave the delimiter unchanged.
+/// and drop the rest SILENTLY - fail loud and leave the delimiter unchanged.
 /// `end` gets the index just past the value (past the closing quote when
 /// quoted) so the %MACRO option chain can step over it (GAP-macroopts).
 fn parseMindelim(st: *State, text: []const u8, from: usize, end: *usize) ?u8 {
@@ -1273,7 +1273,7 @@ fn parseMindelim(st: *State, text: []const u8, from: usize, end: *usize) ?u8 {
     return val[0];
 }
 
-// CLIN-macrounresolvedsilent: `emitVar` lived here — a single-`&` resolver that
+// CLIN-macrounresolvedsilent: `emitVar` lived here - a single-`&` resolver that
 // NOTEd "macro variable &x is not resolved". It had no callers (resolveAmpRun
 // superseded it long ago) and no test, so that note never reached a log; it was
 // removed rather than left as a second, contradictory answer to the question
@@ -1305,14 +1305,14 @@ fn resolveAmpRun(st: *State, run: []const u8) Error![]const u8 {
                     changed = true;
                 } else {
                     // GAP-macroautovars: an undefined &SYSxxx must not pass
-                    // through silently — SAS warns. Scoped to pass 0 and the
+                    // through silently - SAS warns. Scoped to pass 0 and the
                     // SYS prefix, because an automatic variable is never a CALL
                     // SYMPUT target, so warning EAGERLY is safe for it alone.
                     if (pass == 0 and j - (i + 1) > 3 and eqi(cur[i + 1 .. i + 4], "sys")) {
                         try st.diags.warn(0, "Apparent symbolic reference {s} not resolved.", .{try upperDup(st.a, cur[i + 1 .. j])});
                     } else {
                         // CLIN-macrounresolvedsilent: every OTHER unresolved
-                        // trigger is RECORDED, never warned here — the CALL
+                        // trigger is RECORDED, never warned here - the CALL
                         // SYMPUT late-bind idiom needs it to survive verbatim
                         // (D-004). bindStepVars warns for whatever never bound.
                         try st.noteUnresolved(cur[i + 1 .. j]);
@@ -1337,13 +1337,13 @@ fn handlePercent(st: *State, src: []const u8, at: usize, out: *std.ArrayList(u8)
     while (j < src.len and isNameChar(src[j])) j += 1;
     const word = src[start..j];
 
-    // Macro label `%NAME:` (a %goto target, e.g. a date macro's `%EXIT:`) — consume
+    // Macro label `%NAME:` (a %goto target, e.g. a date macro's `%EXIT:`) - consume
     // it, emit nothing. On fall-through it is inert; the %goto skip loop in
     // process() handles the jump target itself.
     if (word.len > 0 and j < src.len and src[j] == ':') return j + 1;
     if (eqi(word, "goto")) return handleGoto(st, src, j);
 
-    // `%return;` — early exit from the current macro. Set the unwind flag; process()
+    // `%return;` - early exit from the current macro. Set the unwind flag; process()
     // and the enclosing %do/%if bail immediately, and handleCall clears it at the
     // macro boundary (ISS-macroreturn). Swallow the optional trailing `;`.
     if (eqi(word, "return")) {
@@ -1351,15 +1351,15 @@ fn handlePercent(st: *State, src: []const u8, at: usize, out: *std.ArrayList(u8)
         while (e < src.len and src[e] != ';') e += 1;
         const after = if (e < src.len) e + 1 else e;
         // `%return` outside any macro is invalid. SAS reports an error and CONTINUES;
-        // we must NOT set `returning` here — an open-code unwind would silently drop
+        // we must NOT set `returning` here - an open-code unwind would silently drop
         // every following statement (GH#4). macroErr + keep scanning gives exactly
         // SAS's shape: loud ERROR, non-zero exit, later independent steps still run
-        // (macro_scoped — no syntax-check step-skipping).
+        // (macro_scoped - no syntax-check step-skipping).
         // Severity is doc-grounded (SEV-returnopencode): Macro Language Ref App.2
         // lists this family in its ERROR Messages section (printed p.500: "Error:
-        // The %RETURN statement is not valid in open code." — SAS really prints a
+        // The %RETURN statement is not valid in open code." - SAS really prints a
         // mixed-case "Error:" here; ours carries the renderer's severity tag), and
-        // the Cause is "executed outside a macro definition" — the user's code is
+        // the Cause is "executed outside a macro definition" - the user's code is
         // invalid SAS, so D-009 exit 1. The handled siblings (%GOTO / iterative
         // %DO open-code guards) were already macroErr; %RETURN was the family
         // outlier at WARNING/exit 0 (left behind by NOTE-macroerrwordingfamily).
@@ -1371,23 +1371,23 @@ fn handlePercent(st: *State, src: []const u8, at: usize, out: *std.ArrayList(u8)
         return after;
     }
 
-    // %ABORT (inside a macro) — SAS terminates the step/session. We don't
+    // %ABORT (inside a macro) - SAS terminates the step/session. We don't
     // implement the ABEND/RETURN/n variants, but the halt itself must be honored:
     // emit a loud error and set `aborting` (+ `returning` to reuse the bail
     // points). process() then stops emitting, so every statement after %ABORT is
     // dropped from the expanded text and never lexed/executed. Previously %ABORT
     // fell through to the generic "apparent invocation of macro ABORT not
-    // resolved" WARNING and execution CONTINUED — a mislabeled statement + a
-    // behavioral divergence (F4). In OPEN code %ABORT is not a halt at all —
+    // resolved" WARNING and execution CONTINUED - a mislabeled statement + a
+    // behavioral divergence (F4). In OPEN code %ABORT is not a halt at all -
     // see the guard below.
     if (eqi(word, "abort")) {
         var e = j;
         while (e < src.len and src[e] != ';') e += 1;
         const after = if (e < src.len) e + 1 else e;
-        // `%ABORT` outside any macro is invalid — NOT a halt. Same App.2 family
+        // `%ABORT` outside any macro is invalid - NOT a halt. Same App.2 family
         // (Macro Language Ref ERROR Messages section, printed p.500: "Error: The
         // %ABORT statement is not valid in open code."): SAS ERRORS and CONTINUES,
-        // where we used to set `aborting` and drop the rest of the program — too
+        // where we used to set `aborting` and drop the rest of the program - too
         // strict, the opposite direction from the family's report-and-continue.
         // Only the OPEN-CODE case relaxes; the in-macro halt below is unchanged
         // (pinned by NOTE-macroloudlabels) and `aborting` is still set nowhere
@@ -1397,18 +1397,18 @@ fn handlePercent(st: *State, src: []const u8, at: usize, out: *std.ArrayList(u8)
             try st.diags.macroErr(0, "The %ABORT statement is not valid in open code.", .{});
             return after;
         }
-        try st.diags.macroErr(0, "%ABORT is not supported — halting execution", .{});
+        try st.diags.macroErr(0, "%ABORT is not supported - halting execution", .{});
         st.returning = true;
         st.aborting = true;
         return after;
     }
-    // `%end` outside any macro is invalid — same App.2 open-code family (Macro
+    // `%end` outside any macro is invalid - same App.2 open-code family (Macro
     // Language Ref ERROR Messages section, printed p.500: "Error: The %END
     // statement is not valid in open code."). In-macro `%do;…%end;` blocks never
     // reach here (handleDo/matchingEnd consume the `%end`), so an `%end` that
-    // reaches handlePercent with no enclosing macro is open-code junk — exactly
+    // reaches handlePercent with no enclosing macro is open-code junk - exactly
     // what a missing/misspelled %MEND dumps into the stream. Was the generic
-    // "Apparent invocation of macro END not resolved." WARNING at exit 0 — wrong
+    // "Apparent invocation of macro END not resolved." WARNING at exit 0 - wrong
     // message AND wrong severity for this family. macroErr + drop the statement:
     // loud ERROR, D-009 exit 1, open code keeps running (SEV-opencodefamilyrest).
     if (eqi(word, "end") and st.macro_call_depth == 0) {
@@ -1417,10 +1417,10 @@ fn handlePercent(st: *State, src: []const u8, at: usize, out: *std.ArrayList(u8)
         try st.diags.macroErr(0, "The %END statement is not valid in open code.", .{});
         return if (e < src.len) e + 1 else e;
     }
-    // %SYSEXEC / %WINDOW / %DISPLAY — real macro statements opensas does not
+    // %SYSEXEC / %WINDOW / %DISPLAY - real macro statements opensas does not
     // implement. Fail loud NAMING the statement (not the generic "apparent
     // invocation of macro X not resolved", which mislabels a known statement as an
-    // undefined macro call — F4) and drop the statement text up to its `;`.
+    // undefined macro call - F4) and drop the statement text up to its `;`.
     if (eqi(word, "sysexec") or eqi(word, "window") or eqi(word, "display")) {
         var e = j;
         while (e < src.len and src[e] != ';') e += 1;
@@ -1452,7 +1452,7 @@ fn handlePercent(st: *State, src: []const u8, at: usize, out: *std.ArrayList(u8)
     if (eqi(word, "global")) return handleScope(st, src, j, false);
     if (eqi(word, "local")) return handleScope(st, src, j, true);
     // masking: %str/%quote/%bquote resolve &/%; %nrstr masks verbatim;
-    // %nrbquote/%nrquote are execution-time — resolve first, THEN mask.
+    // %nrbquote/%nrquote are execution-time - resolve first, THEN mask.
     if (eqi(word, "str") or eqi(word, "quote") or eqi(word, "bquote")) return handleMask(st, src, j, out, .resolve, word);
     if (eqi(word, "nrstr")) return handleMask(st, src, j, out, .mask_only, word);
     if (eqi(word, "nrbquote") or eqi(word, "nrquote")) return handleMask(st, src, j, out, .resolve_mask, word);
@@ -1477,12 +1477,12 @@ fn handlePercent(st: *State, src: []const u8, at: usize, out: *std.ArrayList(u8)
         return handleCall(st, src, j, word, out);
     }
 
-    // Unknown `%word` — an apparent macro invocation with no matching definition.
+    // Unknown `%word` - an apparent macro invocation with no matching definition.
     // SAS emits `WARNING: Apparent invocation of macro X not resolved.` and drops
     // the call so execution continues; emitting the raw `%X` text would instead
     // hit the lexer as a stray `%` and HALT the program (BUG-undefmacro for the
     // `(...)` form, BUG-barepctundef for the bare form). Warn and DROP either way
-    // — swallowing a balanced arg list when present. Keyword statements/functions
+    // - swallowing a balanced arg list when present. Keyword statements/functions
     // (%put/%if/%str/…) were all handled above, so this only fires for a real
     // unresolved macro name.
     try st.diags.warn(0, "Apparent invocation of macro {s} not resolved.", .{try upperDup(st.a, word)});
@@ -1495,7 +1495,7 @@ fn handlePercent(st: *State, src: []const u8, at: usize, out: *std.ArrayList(u8)
 /// compile it so its `%macro` registers, and report whether `word` is now
 /// defined. Each name is attempted at most once per run. A missing dir/file is
 /// silent (caller falls back to warn-and-skip); a file that fails to compile is
-/// surfaced as a diagnostic naming the autocall file — never a crash.
+/// surfaced as a diagnostic naming the autocall file - never a crash.
 fn tryAutocall(st: *State, word: []const u8) Error!bool {
     const dir_path = g_sasautos orelse return false;
     const key = try lowerDup(st.a, word);
@@ -1503,7 +1503,7 @@ fn tryAutocall(st: *State, word: []const u8) Error!bool {
     try st.autoload_attempted.put(st.a, key, {});
 
     // The macro layer carries no `Io`, so a true case-insensitive dir scan isn't
-    // available here — try the three casings the real files use instead.
+    // available here - try the three casings the real files use instead.
     // ponytail: real autocall files are uniform-case (all-lower or all-upper
     // filenames); if a mixed-case filename ever needs matching on a
     // case-sensitive FS, thread an `Io` down and iterate the dir.
@@ -1522,7 +1522,7 @@ fn tryAutocall(st: *State, word: []const u8) Error!bool {
     if (text == null) return false; // no file in any casing → caller warn-skips
     // Compile into a scratch buffer (discarded): the side effect is the macro
     // definition landing in st.macros. process() only surfaces allocator errors,
-    // so a malformed macro file cannot crash here — it just leaves the macro
+    // so a malformed macro file cannot crash here - it just leaves the macro
     // undefined, which we report so the caller warns naming the file.
     var scratch: std.ArrayList(u8) = .empty;
     process(st, text.?, &scratch) catch |e| {
@@ -1541,11 +1541,11 @@ fn upperDup(a: std.mem.Allocator, s: []const u8) Error![]const u8 {
     return out;
 }
 
-/// `%include "file" [/options];` — splice the included file's source at this site
+/// `%include "file" [/options];` - splice the included file's source at this site
 /// (recursively processed, so its own `%include`/macros/`&vars` resolve in the
 /// same scope). Options such as `/nosource` are accepted and ignored. A path is a
 /// quoted "file"/'file' or a bare token; a missing file is a loud ERROR (SAS 9.4
-/// treats a missing include as a hard failure — dropping the code it was meant to
+/// treats a missing include as a hard failure - dropping the code it was meant to
 /// contribute is silent-wrong). The include path resolves against the CWD.
 fn handleInclude(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) Error!usize {
     var k = skipWs(src, from);
@@ -1579,7 +1579,7 @@ fn handleInclude(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u
 
 /// Read a whole file (the macro preprocessor carries no `Io`, and threading one
 /// down just for `%include`/autocall isn't worth it). Uses the hardcoded
-/// single-threaded blocking Io via the portable std.Io.Dir API — CWD-relative and
+/// single-threaded blocking Io via the portable std.Io.Dir API - CWD-relative and
 /// cross-platform (posix.openat's AT.FDCWD is absent on Windows: BUILD-windows).
 /// Returns null on any open/read error so the caller can degrade to a NOTE.
 fn readFileText(a: std.mem.Allocator, path: []const u8) ?[]const u8 {
@@ -1587,10 +1587,10 @@ fn readFileText(a: std.mem.Allocator, path: []const u8) ?[]const u8 {
     return std.Io.Dir.cwd().readFileAlloc(io, path, a, .limited(1 << 31)) catch null;
 }
 
-/// `%let name = value ;` — value is macro-expanded then blank-trimmed.
+/// `%let name = value ;` - value is macro-expanded then blank-trimmed.
 /// Skip a balanced `(...)` span starting at `lp` (which must be `(`), returning the
 /// index just past the matching `)`. A `%`-escaped paren is literal text and
-/// doesn't count (BUG-macropctmask — `%str(a%(b)` still balances).
+/// doesn't count (BUG-macropctmask - `%str(a%(b)` still balances).
 fn skipBalancedParen(src: []const u8, lp: usize) usize {
     var depth: usize = 0;
     var k = lp;
@@ -1614,13 +1614,13 @@ fn skipBalancedParen(src: []const u8, lp: usize) usize {
 /// macro-function spans (`%str`, `%quote`, `%sysfunc`, …) whose argument may hold a
 /// masked `;` that must not end the statement (macro-quoting).
 /// `quote_eof`, when non-null, is set true if a quoted span was opened but ran
-/// to EOF with no closing quote — the malformed `%let x="oops;` case, which
+/// to EOF with no closing quote - the malformed `%let x="oops;` case, which
 /// otherwise silently swallows every following statement (LETQUOTE-eof).
 fn macroValueEnd(src: []const u8, from: usize, quote_eof: ?*bool) usize {
     var k = from;
     while (k < src.len and src[k] != ';') {
         // A quoted string: a `;` INSIDE quotes is literal value text, not the
-        // statement terminator — `%let SEP=";";` must read the whole `";"`
+        // statement terminator - `%let SEP=";";` must read the whole `";"`
         // (ISS-letquotedsemi). Skip to the matching close quote, treating a doubled
         // quote (`''`/`""`) as an embedded quote, matching the lexer's string rule.
         if (src[k] == '\'' or src[k] == '"') {
@@ -1654,7 +1654,7 @@ fn macroValueEnd(src: []const u8, from: usize, quote_eof: ?*bool) usize {
     return k;
 }
 
-/// True if `text` holds a TOP-LEVEL `%let` keyword — a nested %let statement,
+/// True if `text` holds a TOP-LEVEL `%let` keyword - a nested %let statement,
 /// not value text: quoted `'%let'` and masked `%str(%let)` spans don't count
 /// (BUG-macrodowhilehang).
 fn nestedLet(text: []const u8) bool {
@@ -1662,7 +1662,7 @@ fn nestedLet(text: []const u8) bool {
     while (k < text.len) {
         // Quotation marks do NOT mask a `%` in macro statement text (the
         // sq_masks_triggers rule), so a quoted '%let' is a live nested %LET,
-        // not inert text — no quote skip here.
+        // not inert text - no quote skip here.
         if (text[k] == '%' and k + 1 < text.len and isNameStart(text[k + 1])) {
             var w = k + 1;
             while (w < text.len and isNameChar(text[w])) w += 1;
@@ -1681,19 +1681,19 @@ fn nestedLet(text: []const u8) bool {
 fn handleLet(st: *State, src: []const u8, from: usize) Error!usize {
     var k = skipWs(src, from);
     const ns = k;
-    // The target NAME may itself carry macro references — `%let vart_&i. = …`,
+    // The target NAME may itself carry macro references - `%let vart_&i. = …`,
     // the %do-loop indexed-variable idiom (real SDTM split macros build tables of
     // these; the old name-chars-only scan assigned to the literal "vart_" and
-    // every &&vart_&i read came back unresolved/empty — QA-letindexed). Scan
-    // name chars PLUS `&` refs and their terminating dots, then resolve — the
+    // every &&vart_&i read came back unresolved/empty - QA-letindexed). Scan
+    // name chars PLUS `&` refs and their terminating dots, then resolve - the
     // same rule handleScope applies to `%global &dataset.KEEPSTRING`.
     while (k < src.len and (isNameChar(src[k]) or src[k] == '&' or src[k] == '.')) k += 1;
     const name = std.mem.trim(u8, try resolveText(st, src[ns..k]), " \t\r\n");
     // SAS macro variable names are 1–32 chars, letter/underscore start (F10).
-    // An invalid name was silently ACCEPTED — stored yet unreferenceable (`&1bad`
-    // doesn't even scan as a reference) — corrupting every later read. Fail loud
+    // An invalid name was silently ACCEPTED - stored yet unreferenceable (`&1bad`
+    // doesn't even scan as a reference) - corrupting every later read. Fail loud
     // and skip the assignment.
-    // ponytail: an EMPTY name stays the old silent skip — it's how the
+    // ponytail: an EMPTY name stays the old silent skip - it's how the
     // %str(%let) masking route re-enters handleLet (handleMask .resolve runs
     // the arg through process()), a path pinned error-free by BUG-macrodowhilehang.
     var name_ok = true;
@@ -1721,10 +1721,10 @@ fn handleLet(st: *State, src: []const u8, from: usize) Error!usize {
     // A nested `%let` STATEMENT inside a %let value is malformed (SAS: statement
     // "used out of proper order") and hang-prone: the inner %let EXECUTES while
     // the value resolves, then the outer %let overwrites the same var with the
-    // (empty) expansion — a `%do %while` guard var never advances and the loop
+    // (empty) expansion - a `%do %while` guard var never advances and the loop
     // spins forever (BUG-macrodowhilehang, qa tick158 fuzz). Fail loud and
     // unwind the macro (the %return machinery, confined to the macro by
-    // handleCall) instead of assigning garbage. GH#4: never unwind OPEN code —
+    // handleCall) instead of assigning garbage. GH#4: never unwind OPEN code -
     // there the loud error alone stands and processing continues.
     if (nestedLet(src[vs..k])) {
         try st.diags.macroErr(0, "%LET is not valid inside a %LET value (statement used out of proper order)", .{});
@@ -1734,9 +1734,9 @@ fn handleLet(st: *State, src: []const u8, from: usize) Error!usize {
     const val = try resolveText(st, std.mem.trim(u8, src[vs..k], " \t\r\n"));
     // BUG-macrobareletscope: a bare %let of a BRAND-NEW name inside a macro is
     // LOCAL to that invocation in SAS 9.4 (was leaking to global). A name any
-    // active scope already owns (findLocal — %local/param/earlier auto-local,
+    // active scope already owns (findLocal - %local/param/earlier auto-local,
     // innermost wins) or that already exists in the flat table (a global, or an
-    // enclosing macro's local) updates in place — SAS updates the nearest
+    // enclosing macro's local) updates in place - SAS updates the nearest
     // EXISTING scope, never shadows. Only the brand-new case declares, riding
     // the same SavedVar scope %local uses, so popScope discards it at %mend.
     if (st.scopes.items.len > 0 and st.findLocal(name) == null and st.getVar(name) == null)
@@ -1745,14 +1745,14 @@ fn handleLet(st: *State, src: []const u8, from: usize) Error!usize {
     return if (k < src.len) k + 1 else k; // past ';'
 }
 
-/// `%put <text> ;` — resolve macro references in the text and write it to the
-/// log. SAS writes a %PUT line PLAIN — no `NOTE:` prefix (GAP-macroputnote) —
+/// `%put <text> ;` - resolve macro references in the text and write it to the
+/// log. SAS writes a %PUT line PLAIN - no `NOTE:` prefix (GAP-macroputnote) -
 /// so a real run (Session, plain_put) prints it straight to stderr; the
 /// free-expand setup pass and unit tests stay on the captured-diagnostics
 /// channel (the setup pass's junk diags swallow the line as before, and a test
-/// must not spam stderr — TEST-quietnoise). G-macroput regression guard: %put
+/// must not spam stderr - TEST-quietnoise). G-macroput regression guard: %put
 /// was falling through as an unknown `%word` and the raw `%put …` text hit the
-/// lexer → "unexpected character '%'" — either way it is consumed here.
+/// lexer → "unexpected character '%'" - either way it is consumed here.
 fn handlePut(st: *State, src: []const u8, from: usize) Error!usize {
     const k = macroValueEnd(src, from, null);
     const raw = std.mem.trim(u8, src[from..k], " \t\r\n");
@@ -1770,12 +1770,12 @@ fn handlePut(st: *State, src: []const u8, from: usize) Error!usize {
     // NOTE-puttevalpartial: diagnostics render once at end-of-run (main.zig),
     // so a %put line whose OWN resolution just recorded an ERROR would print
     // its partially-substituted text (`A=0` from a failed %eval) AHEAD of that
-    // ERROR — in SAS the diagnostic precedes the line it came from. Emitting
+    // ERROR - in SAS the diagnostic precedes the line it came from. Emitting
     // the line after the ERROR from here would need the deferred-render drain
     // main owns; within the macro layer the honest move is to suppress the
     // line and let the ERROR stand alone, loud at rc 1. The 0-substitution
     // itself is pinned SAS-model behavior (NOTE-macroevalnonint) and is NOT
-    // changed — only the misleadingly-ordered line is dropped. Keyed on errors
+    // changed - only the misleadingly-ordered line is dropped. Keyed on errors
     // recorded by THIS resolution, so a %put after an earlier statement's
     // error still prints.
     const diags_before = st.diags.list.items.len;
@@ -1783,16 +1783,16 @@ fn handlePut(st: *State, src: []const u8, from: usize) Error!usize {
     for (st.diags.list.items[diags_before..]) |d| {
         if (d.severity == .err) return if (k < src.len) k + 1 else k; // past ';'
     }
-    // NOTE-putunresolvedwarn — %PUT is a CONSUMPTION POINT, and the last one:
+    // NOTE-putunresolvedwarn - %PUT is a CONSUMPTION POINT, and the last one:
     // whatever `&name` is still standing in the resolved text goes to the log
     // verbatim, and no CALL SYMPUT can rescue it afterwards (the line is already
-    // written). Macro Language Reference printed p.152 prints BOTH halves — the
+    // written). Macro Language Reference printed p.152 prints BOTH halves - the
     // literal text AND "WARNING: Apparent symbolic reference MACVAR not
-    // resolved." — while we printed only the text, which is what made the whole
+    // resolved." - while we printed only the text, which is what made the whole
     // scope trap read as silent to a reporter.
     //
-    // Scanned BEFORE `unmaskTriggers`, so a `%nrstr`-masked `&` — still a
-    // sentinel byte at this point, a plain `&` one line later — can never reach
+    // Scanned BEFORE `unmaskTriggers`, so a `%nrstr`-masked `&` - still a
+    // sentinel byte at this point, a plain `&` one line later - can never reach
     // the warning. The `g_unresolved` gate independently requires the scanner to
     // have classified the name as a genuine trigger (see `warnUnresolvedIn`), so
     // `&SYS*` (warned EAGERLY in resolveAmpRun, never recorded) cannot double-warn.
@@ -1800,7 +1800,7 @@ fn handlePut(st: *State, src: []const u8, from: usize) Error!usize {
     // Emitted BEFORE the line: SAS's word scanner warns when the resolution
     // fails, i.e. before the text is written. In a real run the line goes
     // straight to stderr while diagnostics render at end-of-run (main.zig), so
-    // the ordering only holds on the captured channel — same as every other
+    // the ordering only holds on the captured channel - same as every other
     // diagnostic in the interpreter.
     try warnUnresolvedRaw(text, 0, st.diags);
     const line = try unmaskTriggers(st.a, text);
@@ -1812,10 +1812,10 @@ fn handlePut(st: *State, src: []const u8, from: usize) Error!usize {
     return if (k < src.len) k + 1 else k; // past the ';'
 }
 
-/// F12: `%put &=name;` — the SAS 9.4 name-and-value debugging form — prints
+/// F12: `%put &=name;` - the SAS 9.4 name-and-value debugging form - prints
 /// `NAME=value`. Rewrite each `&=name` in the %PUT text to `NAME=&name` and
 /// let normal resolution fill the value (an unresolved name keeps `&name`
-/// verbatim with its usual diagnostic — loud, never a blank). A trailing dot
+/// verbatim with its usual diagnostic - loud, never a blank). A trailing dot
 /// is the reference delimiter. Borrowed-slice return when no `&=` is present.
 fn rewritePutAmpEq(st: *State, raw: []const u8) Error![]const u8 {
     if (std.mem.indexOf(u8, raw, "&=") == null) return raw;
@@ -1841,13 +1841,13 @@ fn rewritePutAmpEq(st: *State, raw: []const u8) Error![]const u8 {
     return out.items;
 }
 
-/// `%put _all_|_user_|_global_|_local_|_automatic_;` — one `SCOPE NAME value`
+/// `%put _all_|_user_|_global_|_local_|_automatic_;` - one `SCOPE NAME value`
 /// line per matching macro variable (SAS format). SYS* names are the
-/// automatics (ponytail: a user-%let `sysfoo` would also classify AUTOMATIC —
+/// automatics (ponytail: a user-%let `sysfoo` would also classify AUTOMATIC -
 /// SAS reserves the prefix, so no real program does); a name an active scope
-/// owns (%local / param / auto-local — findLocalIn) is local; the rest GLOBAL.
+/// owns (%local / param / auto-local - findLocalIn) is local; the rest GLOBAL.
 ///
-/// NOTE-userscopename — THE SCOPE COLUMN IS THE OWNING MACRO'S NAME, not the
+/// NOTE-userscopename - THE SCOPE COLUMN IS THE OWNING MACRO'S NAME, not the
 /// word LOCAL. SAS 9.4 Macro Language: Reference, Fifth Edition, printed p.419
 /// ("%PUT Macro Statement"), verified against the "%PUT Macro Statement 419"
 /// footer above the `=== pdf 435 ===` marker (offset printed + 15):
@@ -1860,14 +1860,14 @@ fn rewritePutAmpEq(st: *State, raw: []const u8) Error![]const u8 {
 ///   _AUTOMATIC_ "The scope is identified as AUTOMATIC."
 /// Worked examples agree: printed p.79 `ENV1 MYVAR1 a token` / `ENV1 PARAM1 10`,
 /// p.84 `ENV4 MYVAR4 a token`, p.421 `MYPRINT NAME consumer`, p.170 `TOTINV VAR
-/// price`. This is PRESENTATION ONLY — which frame owns which variable is
+/// price`. This is PRESENTATION ONLY - which frame owns which variable is
 /// unchanged (BUG-symputscope owns that, and its fixture still pins it).
 ///
 /// ORDER, from the same page's Details: "Macro variables are listed in order
 /// from the current local macro variables outward to the global macro
 /// variables", with the 9.4 note that "the variables are always listed
 /// alphabetically" within a scope. So locals sort innermost-frame-first and
-/// globals/automatics last — printed p.421 shows exactly that (`MYPRINT NAME`
+/// globals/automatics last - printed p.421 shows exactly that (`MYPRINT NAME`
 /// before `GLOBAL FOOT`), and a flat sort of the rendered lines got it backwards
 /// (GLOBAL < LOCAL) and, once the column became a macro name, would have
 /// reshuffled by whatever the macro happened to be called. Non-locals keep the
@@ -1892,7 +1892,7 @@ fn dumpPutVars(st: *State, kw: []const u8) Error!void {
             // _LOCAL_ is "the currently executing macro" only (printed p.420,
             // Figure 19.1 labels it "(current macro only)"); _USER_/_ALL_ take
             // every active frame. Without this an ENCLOSING macro's variable
-            // would be listed under _LOCAL_ carrying that macro's name — a
+            // would be listed under _LOCAL_ carrying that macro's name - a
             // diagnostic naming a scope the reader did not ask about.
             want_local and (user or idx == st.scopes.items.len - 1)
         else
@@ -1925,7 +1925,7 @@ fn dumpPutVars(st: *State, kw: []const u8) Error!void {
     }
 }
 
-/// `%macro name(p1,p2); body %mend [name];` — body kept raw until expansion.
+/// `%macro name(p1,p2); body %mend [name];` - body kept raw until expansion.
 fn handleMacro(st: *State, src: []const u8, from: usize) Error!usize {
     var k = skipWs(src, from);
     const ns = k;
@@ -1939,7 +1939,7 @@ fn handleMacro(st: *State, src: []const u8, from: usize) Error!usize {
         // The param list must be comment-aware: SAS strips `/* … */` before macro
         // processing, so a `)`/`,` inside a comment (real macro headers annotate each
         // default, e.g. `DATEC= /*Entry date (Char)*/`) must NOT terminate the list
-        // or a default — that truncated the param list at the first `)` and
+        // or a default - that truncated the param list at the first `)` and
         // corrupted the whole macro (BUG-makedateparams).
         while (true) {
             k = skipWsc(src, k);
@@ -1975,27 +1975,27 @@ fn handleMacro(st: *State, src: []const u8, from: usize) Error!usize {
         if (k < src.len and src[k] == ')') k += 1;
     }
     // The header ends at the first `;`; an optional `/ options` list sits
-    // between the param list and that `;` — it must not leak into the body
+    // between the param list and that `;` - it must not leak into the body
     // (G-ebnf-sweep: macro_opt). Options can't hold an unquoted `;`.
     // GAP-macroopts: the list is now a REAL chain with a final else (the
     // BUG-optionsstmtswallow OPTIONS-statement model, f93bba23):
-    //   honoured — PARMBUFF/NOPARMBUFF (raw arg list into &SYSPBUFF),
+    //   honoured - PARMBUFF/NOPARMBUFF (raw arg list into &SYSPBUFF),
     //     MINOPERATOR/NOMINOPERATOR + MINDELIMITER= (the `in`/`#` gate);
-    //   inert — NOSECURE (the SAS default; enumerated so the chain's final
+    //   inert - NOSECURE (the SAS default; enumerated so the chain's final
     //     else stays honest);
-    //   UNSUPPORTED, loud, GAP (rc 2 — D-009) — STORE/SECURE/DES=/SOURCE/SRC
+    //   UNSUPPORTED, loud, GAP (rc 2 - D-009) - STORE/SECURE/DES=/SOURCE/SRC
     //     (opensas keeps macros for the session only: no stored-macro catalog)
     //     and CMD/STMT (command-/statement-style invocation; opensas invokes
     //     via %name only). Every one is in the %MACRO statement's documented
     //     option list (Macro Reference printed pp.408-411, re-derived IN FULL
-    //     per D-018 — that is how SOURCE/SRC joined; the catch-all had been
+    //     per D-018 - that is how SOURCE/SRC joined; the catch-all had been
     //     calling a documented option "Unrecognized" at rc 1), so each is valid
     //     SAS 9.4 opensas cannot run: an opensas gap, exit 2, "file an opensas
     //     issue" (GAP-ebnfrcwrongclass). An unsupported option ERRORs, naming
-    //     itself, and the macro is NOT defined (D-002) — a call then warns
+    //     itself, and the macro is NOT defined (D-002) - a call then warns
     //     "apparent invocation … not resolved", like SAS after a failed compile;
-    //   anything else — a typo or an unfiled option: ERROR naming it at rc 1
-    //     (a genuine typo like STROE is the user's own SAS — D-009), so the
+    //   anything else - a typo or an unfiled option: ERROR naming it at rc 1
+    //     (a genuine typo like STROE is the user's own SAS - D-009), so the
     //     next unknown word can't be swallowed like these five were.
     const opt_start = k;
     while (k < src.len and src[k] != ';') k += 1;
@@ -2035,15 +2035,15 @@ fn handleMacro(st: *State, src: []const u8, from: usize) Error!usize {
                 }
                 oi = vend;
             } else if (eqi(w, "nosecure")) {
-                // the SAS default — nothing to secure in, nothing to do
+                // the SAS default - nothing to secure in, nothing to do
             } else if (eqi(w, "store") or eqi(w, "secure") or eqi(w, "des") or eqi(w, "source") or eqi(w, "src")) {
-                try st.diags.macroErr(0, "The %MACRO option {s} is not supported (opensas keeps macros for the session only — no stored-macro catalog)", .{try upperDup(st.a, w)});
-                diag.markGap(); // documented option, valid SAS 9.4 — gap, rc 2 (D-009)
+                try st.diags.macroErr(0, "The %MACRO option {s} is not supported (opensas keeps macros for the session only - no stored-macro catalog)", .{try upperDup(st.a, w)});
+                diag.markGap(); // documented option, valid SAS 9.4 - gap, rc 2 (D-009)
                 bad_opt = true;
                 break;
             } else if (eqi(w, "cmd") or eqi(w, "stmt")) {
                 try st.diags.macroErr(0, "The %MACRO option {s} is not supported (command-/statement-style invocation; opensas invokes macros via %name only)", .{try upperDup(st.a, w)});
-                diag.markGap(); // documented option, valid SAS 9.4 — gap, rc 2 (D-009)
+                diag.markGap(); // documented option, valid SAS 9.4 - gap, rc 2 (D-009)
                 bad_opt = true;
                 break;
             } else {
@@ -2061,11 +2061,11 @@ fn handleMacro(st: *State, src: []const u8, from: usize) Error!usize {
     // (inner) `%mend` (BUG-nestedmacro). The inner def stays in the body text and
     // registers when the outer macro runs (process() → handleMacro), per SAS
     // scoping. ponytail: like findKeyword, doesn't skip `%macro`/`%mend` that
-    // appear inside comments/strings — no real macro file does that.
+    // appear inside comments/strings - no real macro file does that.
     const mend = findBalancedMend(src, k);
     const be = mend orelse src.len;
     // A rejected option list (bad_opt) leaves the macro UNDEFINED, like SAS
-    // after a failed %MACRO compile — the ERROR above already failed the run's
+    // after a failed %MACRO compile - the ERROR above already failed the run's
     // exit code, and calls warn "apparent invocation … not resolved" instead
     // of running a macro whose options we could not honour (D-002).
     if (!bad_opt)
@@ -2073,7 +2073,7 @@ fn handleMacro(st: *State, src: []const u8, from: usize) Error!usize {
 
     if (mend) |m| {
         var e = m + "%mend".len;
-        // `%mend name;` — SAS checks the name against the %MACRO name (F11);
+        // `%mend name;` - SAS checks the name against the %MACRO name (F11);
         // a mismatch means the author closed the wrong macro. Blank `%mend;`
         // is always fine.
         const mns = skipWs(src, e);
@@ -2088,7 +2088,7 @@ fn handleMacro(st: *State, src: []const u8, from: usize) Error!usize {
     return src.len;
 }
 
-/// `%m(a,b)` — bind params to (macro-expanded) args, expand the body into `out`.
+/// `%m(a,b)` - bind params to (macro-expanded) args, expand the body into `out`.
 fn handleCall(st: *State, src: []const u8, from: usize, name: []const u8, out: *std.ArrayList(u8)) Error!usize {
     var k = skipWs(src, from);
     const m = st.getMacro(name).?;
@@ -2120,11 +2120,11 @@ fn handleCall(st: *State, src: []const u8, from: usize, name: []const u8, out: *
                         handled = true;
                     };
                     // A clean `name=value` arg whose name is not a declared keyword
-                    // param is a keyword-parameter error in SAS — NOT a positional
+                    // param is a keyword-parameter error in SAS - NOT a positional
                     // value. Rebinding it as positional (a="zzz=99") is silent-wrong;
                     // fail loud and drop the arg (macroErr = loud + non-zero exit).
                     // Exception: /PARMBUFF with NO parameter list puts the whole
-                    // invocation in &SYSPBUFF — there is nothing to validate and a
+                    // invocation in &SYSPBUFF - there is nothing to validate and a
                     // keyword-looking arg is legal text (BUG-parmbuffkeyword).
                     if (!handled) {
                         if (!(m.pbuff and m.params.len == 0))
@@ -2165,7 +2165,7 @@ fn handleCall(st: *State, src: []const u8, from: usize, name: []const u8, out: *
         }
     }
     // Surplus positional args (more than declared positional params) are a SAS
-    // error — silently dropping them is silent-wrong. Fail loud (too-FEW args is
+    // error - silently dropping them is silent-wrong. Fail loud (too-FEW args is
     // fine: missing params default to blank, handled by the else branch above).
     // Exception: a /parmbuff macro legally takes any number of args (they land in
     // &SYSPBUFF), so surplus positionals are NOT an error there.
@@ -2182,7 +2182,7 @@ fn handleCall(st: *State, src: []const u8, from: usize, name: []const u8, out: *
     const prev_macroname = try st.a.dupe(u8, st.getVar("sysmacroname") orelse "");
     try st.setVar("sysmacroname", try upperDup(st.a, name));
     // MINOPERATOR/MINDELIMITER: the gate is ON when EITHER the system option
-    // (OPTIONS MINOPERATOR — BUG-minoperatoropt) or this definition's /
+    // (OPTIONS MINOPERATOR - BUG-minoperatoropt) or this definition's /
     // minoperator says so; the definition's MINDELIMITER= overrides only when
     // given (else the current/system delimiter stands). Restored on exit so a
     // caller with a different setting is unaffected (BUG-macroinoperator).
@@ -2198,7 +2198,7 @@ fn handleCall(st: *State, src: []const u8, from: usize, name: []const u8, out: *
     try st.setVar("sysmacroname", prev_macroname);
     // A `%return` unwinds only to HERE (the invocation boundary): clear it so the
     // caller's code after `%m(...)` resumes normally (ISS-macroreturn). A `%ABORT`
-    // also set `returning`, but with the sticky `aborting` flag — a program halt
+    // also set `returning`, but with the sticky `aborting` flag - a program halt
     // must NOT be cleared here (later steps stay dropped, propagating to the top).
     if (!st.aborting) st.returning = false;
     // A %goto that never found its label must not leak past the macro (it would
@@ -2212,13 +2212,13 @@ fn handleCall(st: *State, src: []const u8, from: usize, name: []const u8, out: *
 
 const MacroFn = enum { scan, substr, upcase, lowcase, index, length, left, trim, cmpres, datatyp, verify };
 
-/// `%SYSRC(mnemonic)` — the _IORC_ return-code autocall macro (GAP-sysrcmacro).
+/// `%SYSRC(mnemonic)` - the _IORC_ return-code autocall macro (GAP-sysrcmacro).
 /// Only DOC-SOURCED values are emitted: Language Reference: Concepts Table 23.4 (p.599) names the
 /// mnemonics; the worked logs give _SOK=0 (a match, PDF p.623 `_IORC_=0`) and
 /// _DSENMR=1230015 (MODIFY+BY no-match, PDF p.619); _DSENOM=1230011 is the
 /// value every worked SELECT program (pp.601/604/605) compares _IORC_ against.
-/// Any other mnemonic — including _DSEMTR/_SENOCHN, named in Table 23.4 but
-/// never given a value in the doc — FAILS LOUD instead of guessing: a wrong
+/// Any other mnemonic - including _DSEMTR/_SENOCHN, named in Table 23.4 but
+/// never given a value in the doc - FAILS LOUD instead of guessing: a wrong
 /// code compared against _IORC_ silently takes the wrong branch.
 fn handleSysrc(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) Error!usize {
     const pa = parenArg(src, from) orelse {
@@ -2238,7 +2238,7 @@ fn handleSysrc(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)
     return pa.end;
 }
 
-/// True for the Q-form of a macro-function name (`qscan`, `qlowcase`, …) —
+/// True for the Q-form of a macro-function name (`qscan`, `qlowcase`, …) -
 /// the Q-forms mask `&` in their RESULT (BUG-macronrstrmask).
 fn isQForm(word: []const u8) bool {
     return word.len > 0 and (word[0] == 'q' or word[0] == 'Q');
@@ -2265,14 +2265,14 @@ fn macroFn(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8), ki
     }
     // BUG-macroscandelim: a &/%/',' quoted by %str/%quote/%nrstr & co. survived
     // the arg split as its SENTINEL byte, and the consumers below BYTE-COMPARE
-    // their args — so `%qscan(&s,2,%str(,))` searched for 0x03, never found it,
+    // their args - so `%qscan(&s,2,%str(,))` searched for 0x03, never found it,
     // and returned "" where SAS gives the 2nd comma-separated word. `%str(,)` is
     // THE idiom for a comma delimiter (an unmasked one would split the arg list),
     // so this broke the normal way of doing a common thing, silently.
     // Unmask at the ARGUMENT BOUNDARY, not per call site: the same fix handles
     // %index's needle, %verify's excerpt, and the mirror direction (a MASKED
     // SUBJECT never split on an unmasked delimiter either). This is verbatim what
-    // handleSysfunc already does one function over — the mask_comma doc calls that
+    // handleSysfunc already does one function over - the mask_comma doc calls that
     // "the %sysfunc argument boundary", and its Q-result comment already claims to
     // "mirror the Q-form macro fns (%qscan/…)"; macroFn is the half that drifted.
     for (args.items) |*arg| arg.* = try unmaskTriggers(st.a, arg.*);
@@ -2289,11 +2289,11 @@ fn macroFn(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8), ki
             args.items[ni] = std.fmt.allocPrint(st.a, "{d}", .{evalInt(st, args.items[ni]) catch continue}) catch continue;
     }
     const res = try computeMacroFn(st.a, kind, args.items);
-    // The Q-form quotes its RESULT — mask every &/% AND comma, the same rule
+    // The Q-form quotes its RESULT - mask every &/% AND comma, the same rule
     // %QSYSFUNC uses (maskTriggers, not the old maskAmps): now that the args are
     // unmasked above, re-masking only '&' would let a quoted comma escape the Q
     // form as a live argument delimiter. Plain %scan/%substr return unmasked, as
-    // plain %sysfunc does — SAS's non-Q functions do not quote their result.
+    // plain %sysfunc does - SAS's non-Q functions do not quote their result.
     try out.appendSlice(st.a, if (quote) try maskTriggers(st.a, res) else res);
     return k;
 }
@@ -2387,7 +2387,7 @@ const Paren = struct { text: []const u8, end: usize, closed: bool }; // end = in
 
 /// The balanced-parenthesis argument starting at/after `from`. Null if there is
 /// no `(`. Handles nested parens (so `%sysfunc(upcase(x))` reads `upcase(x)`).
-/// A `%`-escaped char is literal text, never a paren — `%str(a%(b)` must not
+/// A `%`-escaped char is literal text, never a paren - `%str(a%(b)` must not
 /// treat the escaped `(` as nesting (BUG-macropctmask).
 fn parenArg(src: []const u8, from: usize) ?Paren {
     const k = skipWs(src, from);
@@ -2397,7 +2397,7 @@ fn parenArg(src: []const u8, from: usize) ?Paren {
     const cs = i;
     while (i < src.len and depth > 0) {
         if (src[i] == '%' and i + 1 < src.len and isPctEscapable(src[i + 1])) {
-            i += 2; // `%(` `%)` `%%` `%…` — escaped literal, skip both bytes
+            i += 2; // `%(` `%)` `%%` `%…` - escaped literal, skip both bytes
             continue;
         }
         if (src[i] == '(') {
@@ -2411,10 +2411,10 @@ fn parenArg(src: []const u8, from: usize) ?Paren {
     return .{ .text = src[cs..i], .end = if (i < src.len) i + 1 else i, .closed = depth == 0 };
 }
 
-/// `%global v1 v2 …;` / `%local v1 v2 …;` — one global symbol table here, so this
+/// `%global v1 v2 …;` / `%local v1 v2 …;` - one global symbol table here, so this
 /// just ensures each name exists (empty) so a later `&v` resolves. ponytail: no
 /// real scoping; %local does not shadow.
-/// `%syscall routine(name1, name2, …);` — invoke a CALL routine whose arguments are
+/// `%syscall routine(name1, name2, …);` - invoke a CALL routine whose arguments are
 /// macro-variable NAMES; the routine mutates their values in place. SORTN (numeric)
 /// and SORTC (character) are supported (the common macro-array sort); other routines
 /// are a NOTE and no-op so the statement never leaks to the lexer.
@@ -2474,19 +2474,19 @@ fn syscallSort(st: *State, names: []const []const u8, char: bool) Error!void {
     }
 }
 
-/// GAP-macrooracle-tick284 (F9) — printed p.77 rule 2 case 3: "If the executing
+/// GAP-macrooracle-tick284 (F9) - printed p.77 rule 2 case 3: "If the executing
 /// macro contains a computed %GOTO statement, the variable will be created in
 /// the local symbol table", i.e. CALL SYMPUT "behaves as if the local symbol
 /// table was not empty" (p.77, continuing onto printed p.78). CONTAINS, not
-/// executes — the doc's condition is presence in the macro (parallel to
+/// executes - the doc's condition is presence in the macro (parallel to
 /// SYSPBUFF "created at macro invocation time"), so a never-taken
 /// `%if 1=0 %then %goto &x;` still counts. A computed %GOTO is one "that uses a
 /// label that contains an & or a % in it" (p.77; same definition as the p.396
 /// footnote GAP-macrogotocomputed cites). Lexical scan for `%goto` whose operand
-/// (up to ';') holds & or % — matches handlePercent, which dispatches only the
+/// (up to ';') holds & or % - matches handlePercent, which dispatches only the
 /// one-word form, so `%go to` is not looked for either.
 /// ponytail: `/* */` comments are skipped (a commented-out computed %goto does
-/// not count); `%*` macro comments and a nested %macro's body text are not —
+/// not count); `%*` macro comments and a nested %macro's body text are not -
 /// both false-positive paths are contrived, and the failure is a symput var
 /// landing local instead of global, never a crash. Tighten if a real program
 /// trips either.
@@ -2521,11 +2521,11 @@ test "containsComputedGoto: only a label holding & or % counts, comments do not"
     try std.testing.expect(!containsComputedGoto("%put nothing here;"));
 }
 
-/// `%goto LABEL;` — set the unwind target; process() drops output until it hits
+/// `%goto LABEL;` - set the unwind target; process() drops output until it hits
 /// `%LABEL:`. Used for macro early-return (`%if err %then %goto exit;` … `%exit:`).
 ///
-/// GAP-macrogotocomputed — the operand is a TEXT EXPRESSION, not a bare name.
-/// SAS 9.4 Macro Language: Reference, Fifth Edition, printed p.396 (pdf 411 —
+/// GAP-macrogotocomputed - the operand is a TEXT EXPRESSION, not a bare name.
+/// SAS 9.4 Macro Language: Reference, Fifth Edition, printed p.396 (pdf 411 -
 /// offset printed+15, verified here against the "396 Chapter 19 / Macro
 /// Statements" footer immediately preceding the `=== pdf 412 ===` marker),
 /// "%GOTO Macro Statement", Required Argument `label`:
@@ -2538,22 +2538,22 @@ test "containsComputedGoto: only a label holding & or % counts, comments do not"
 ///   footnote: "A computed %GOTO contains % or & and resolves to a label."
 ///
 /// So the operand is resolved through the SHARED resolveText (the same expander
-/// every other macro-expanding site here uses — handleScope resolves `%global
+/// every other macro-expanding site here uses - handleScope resolves `%global
 /// &dataset.KEEP;` the same way), and only the RESULT is the label. Reading it
-/// with isNameChar stopped dead at the `&`, producing an EMPTY target — which
+/// with isNameChar stopped dead at the `&`, producing an EMPTY target - which
 /// process() then never matches, so the empty target swallowed the whole rest of
 /// the macro body and the run still exited 0 with a warning naming no label at
 /// all. Two DATA steps silently vanished; the worst failure class.
 ///
 /// WHAT THE DOC CONSTRAINS THE RESULT TO, and both cases are errors it names by
 /// text (printed pp.500-501, "SAS Macro Error Messages"):
-///   * null — "A macro variable was used as the label in a %GOTO statement but
+///   * null - "A macro variable was used as the label in a %GOTO statement but
 ///     has a null value. The label for the %GOTO statement must be a valid SAS
 ///     name." → "Error: The %GOTO statement has no target. The statement will be
 ///     ignored." IGNORED is load-bearing: we must not set a target, or the body
 ///     after it disappears.
 ///   * not a SAS name (`%goto a-1;`, or a stray `&`/`%` left by an unresolved
-///     reference) — "Error: In macro value, the target of the statement %GOTO
+///     reference) - "Error: In macro value, the target of the statement %GOTO
 ///     value, resolved into the label value, which is not a valid statement
 ///     label." Same ignore-and-report treatment.
 /// A resolved-but-absent label is NOT diagnosable here (the label may appear
@@ -2565,15 +2565,15 @@ fn handleGoto(st: *State, src: []const u8, from: usize) Error!usize {
     const operand = std.mem.trim(u8, src[from..k], " \t\r\n");
     const after = if (k < src.len) k + 1 else k;
     // `%GOTO` outside any macro is invalid. SAS reports an error and CONTINUES;
-    // we must NOT set `goto_target` — an open-code target would make process()
+    // we must NOT set `goto_target` - an open-code target would make process()
     // drop every following statement and exit 0 with no diagnostic (silent-wrong).
     // Mirrors the `%RETURN` open-code guard in handlePercent (macroErr = loud +
     // non-zero exit, later independent steps still run). Checked BEFORE resolving:
     // an invalid statement must not run its operand's macro calls for side effects.
     // Wording is SAS's exact text (Macro Language Ref, App.2 printed p.500, the
     // nine-statement open-code family: "Error: The %GOTO statement is not valid
-    // in open code." — "Error:" is SAS's severity PREFIX, the renderer adds its
-    // own tag, so the body carries the sentence only — NOTE-gotodoopencode).
+    // in open code." - "Error:" is SAS's severity PREFIX, the renderer adds its
+    // own tag, so the body carries the sentence only - NOTE-gotodoopencode).
     if (st.macro_call_depth == 0) {
         try st.diags.macroErr(0, "The %GOTO statement is not valid in open code.", .{});
         return after;
@@ -2584,7 +2584,7 @@ fn handleGoto(st: *State, src: []const u8, from: usize) Error!usize {
         return after;
     }
     // "The label must be a valid SAS name that contains no special characters"
-    // (printed p.500) — the same V7 rule NVALID enforces, so reuse it rather than
+    // (printed p.500) - the same V7 rule NVALID enforces, so reuse it rather than
     // spell the character set out a second time.
     if (!functions.isValidName(label)) {
         try st.diags.macroErr(0, "The target of the statement %GOTO {s} resolved into the label {s}, which is not a valid statement label", .{ operand, label });
@@ -2599,21 +2599,21 @@ fn handleScope(st: *State, src: []const u8, from: usize, is_local: bool) Error!u
     // variable, e.g. `%global &dataset.KEEPSTRING;` → declares `<dataset>KEEPSTRING`
     // (BUG-makeemptyhang: the old char-by-char loop never advanced past the `&`/`.`
     // and never resolved it → infinite spin). One pass to the `;`, then split on
-    // whitespace/commas — no inner cursor to stall.
+    // whitespace/commas - no inner cursor to stall.
     var e = from;
     while (e < src.len and src[e] != ';') e += 1;
     // `%LOCAL` outside any macro is invalid. Was a SILENT declare-and-continue
-    // (exit 0, no diagnostic) — silent wrong output on invalid SAS, the failure
+    // (exit 0, no diagnostic) - silent wrong output on invalid SAS, the failure
     // class house rules put first. SAS reports an error and CONTINUES (Macro
     // Language Ref App.2 ERROR Messages section, printed p.500: "Error: The
-    // %LOCAL statement is not valid in open code." — "Error:" is SAS's severity
+    // %LOCAL statement is not valid in open code." - "Error:" is SAS's severity
     // PREFIX, the renderer adds its own tag). Cause there: "executed outside a
     // macro definition" → the user's code is invalid SAS → D-009 exit 1 via
-    // macroErr (macro_scoped — no step-skip, later steps still run), same shape
+    // macroErr (macro_scoped - no step-skip, later steps still run), same shape
     // as the %RETURN/%GOTO/%DO open-code guards (SEV-opencodefamilyrest).
     // Checked BEFORE resolving: an invalid statement must not run its operand's
     // macro calls for side effects (same call as the %GOTO guard). %GLOBAL is
-    // NOT in the family — valid in open code — so only the is_local arm guards.
+    // NOT in the family - valid in open code - so only the is_local arm guards.
     if (is_local and st.macro_call_depth == 0) {
         try st.diags.macroErr(0, "The %LOCAL statement is not valid in open code.", .{});
         return if (e < src.len) e + 1 else e;
@@ -2638,9 +2638,9 @@ fn handleScope(st: *State, src: []const u8, from: usize, is_local: bool) Error!u
 
 /// How a quoting fn treats its argument (SAS 9.4 quoting taxonomy).
 const MaskMode = enum {
-    resolve, // %str/%quote/%bquote — resolve `&`/`%`, no post-mask
-    mask_only, // %nrstr — verbatim, triggers masked (never resolve)
-    resolve_mask, // %nrbquote/%nrquote — resolve FIRST, then mask what survives
+    resolve, // %str/%quote/%bquote - resolve `&`/`%`, no post-mask
+    mask_only, // %nrstr - verbatim, triggers masked (never resolve)
+    resolve_mask, // %nrbquote/%nrquote - resolve FIRST, then mask what survives
 };
 
 /// `%str`/`%quote`/`%bquote` resolve `&`/`%` in the argument; `%nrstr` emits it
@@ -2655,12 +2655,12 @@ fn handleMask(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8),
     const pa = parenArg(src, from) orelse return from;
     // An unclosed argument ran to EOF: the `)` was never found (`%str(%)` escapes
     // its own paren, a bare trailing `%str(a`, …). Silently returning the swallowed
-    // remainder drops the assignment and every following statement at exit 0 — the
+    // remainder drops the assignment and every following statement at exit 0 - the
     // worst failure class. Fail LOUD like the %GOTO open-code / %LET quote-eof
     // guards (BUG-macrounclosedparen). The rest is consumed (the boundary is
     // unrecoverable) but the loss is now announced, not silent.
     if (!pa.closed) {
-        try st.diags.macroErr(0, "unclosed %{s}( argument — ')' not found before end of file", .{try upperDup(st.a, fname)});
+        try st.diags.macroErr(0, "unclosed %{s}( argument - ')' not found before end of file", .{try upperDup(st.a, fname)});
         return pa.end;
     }
     const folded = try foldPctEscapes(st.a, pa.text);
@@ -2683,7 +2683,7 @@ fn isPctEscapable(c: u8) bool {
 
 /// Fold `%`-escaped specials in quoting-fn argument text (BUG-macropctmask):
 /// `%x` → literal `x` for x ∈ {%, &, (, ), ', "}. A folded `&` or `%` comes out
-/// SENTINEL-masked so no later rescan re-fires it — `%str(a%%b)` stored and
+/// SENTINEL-masked so no later rescan re-fires it - `%str(a%%b)` stored and
 /// referenced must yield `a%b`, never warn about an apparent macro B.
 fn foldPctEscapes(a: std.mem.Allocator, s: []const u8) Error![]const u8 {
     var found = false;
@@ -2710,14 +2710,14 @@ fn foldPctEscapes(a: std.mem.Allocator, s: []const u8) Error![]const u8 {
     return out.items;
 }
 
-/// `%superq(name)` — the *unresolved* value of the macro variable named by the
+/// `%superq(name)` - the *unresolved* value of the macro variable named by the
 /// argument, with all & and % in the value left masked (not rescanned). The name
 /// itself is resolved (so `%superq(&x)` works); an undefined variable yields empty.
 /// This is the standard defensive quote for values that may contain & or %.
 fn handleSuperq(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) Error!usize {
     const pa = parenArg(src, from) orelse return from;
-    if (!pa.closed) { // ran to EOF unclosed — fail loud, never swallow (BUG-macrounclosedparen)
-        try st.diags.macroErr(0, "unclosed %SUPERQ( argument — ')' not found before end of file", .{});
+    if (!pa.closed) { // ran to EOF unclosed - fail loud, never swallow (BUG-macrounclosedparen)
+        try st.diags.macroErr(0, "unclosed %SUPERQ( argument - ')' not found before end of file", .{});
         return pa.end;
     }
     var name = std.mem.trim(u8, try resolveText(st, pa.text), " \t");
@@ -2736,11 +2736,11 @@ fn handleSuperq(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8
 
 const SymScope = enum { exist, global, local };
 
-/// `%symexist(name)` — "1" if the macro variable exists at all. `%symglobl(name)`
-/// — "1" only if it exists in the GLOBAL table: a %local var does NOT count
+/// `%symexist(name)` - "1" if the macro variable exists at all. `%symglobl(name)`
+/// - "1" only if it exists in the GLOBAL table: a %local var does NOT count
 /// (BUG-macrosymglobl) unless it shadows a pre-existing outer value (findLocal's
 /// saved prev), matching SAS where that global still exists. `%symlocal(name)`
-/// — "1" only if declared %local in an ACTIVE macro scope (BUG-macrosymlocal).
+/// - "1" only if declared %local in an ACTIVE macro scope (BUG-macrosymlocal).
 /// The name argument is resolved first (so `%symexist(&x)` works).
 fn handleSymExist(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8), mode: SymScope) Error!usize {
     const pa = parenArg(src, from) orelse return from;
@@ -2756,10 +2756,10 @@ fn handleSymExist(st: *State, src: []const u8, from: usize, out: *std.ArrayList(
     return pa.end;
 }
 
-/// `%symdel v1 <v2 …> </ nowarn>;` — delete macro variables (GAP-macrosymdel).
+/// `%symdel v1 <v2 …> </ nowarn>;` - delete macro variables (GAP-macrosymdel).
 /// The name list is resolved first (a `&ref` may name the var); everything
 /// after a `/` is options. SAS warns when a named variable does not exist
-/// unless NOWARN is given. ponytail: one shared table — a %symdel inside a
+/// unless NOWARN is given. ponytail: one shared table - a %symdel inside a
 /// macro can drop a var a scope would have restored (SAS restricts it to
 /// globals); nobody hits that without real scoping.
 fn handleSymdel(st: *State, src: []const u8, from: usize) Error!usize {
@@ -2782,7 +2782,7 @@ fn handleSymdel(st: *State, src: []const u8, from: usize) Error!usize {
         const lname = buf[0..nm.len];
         // AUTOMATIC macro variables cannot be deleted (F10): the sys* prefix is
         // this codebase's automatic classifier (dumpPutVars) and SAS reserves
-        // it. Deleting &SYSDATE9 &co silently corrupts every later reference —
+        // it. Deleting &SYSDATE9 &co silently corrupts every later reference -
         // a wrong-answer generator, not a diagnostics nit. /nowarn only
         // suppresses the not-found warning, never this.
         if (std.mem.startsWith(u8, lname, "sys")) {
@@ -2794,13 +2794,13 @@ fn handleSymdel(st: *State, src: []const u8, from: usize) Error!usize {
             v.deinit();
             functions.setLetVar(lname, "") catch {}; // drop the SYMGET mirror too
         } else if (!nowarn) {
-            try st.diags.warn(0, "apparent attempt to delete macro variable {s} failed — variable not found", .{try upperDup(st.a, nm)});
+            try st.diags.warn(0, "apparent attempt to delete macro variable {s} failed - variable not found", .{try upperDup(st.a, nm)});
         }
     }
     return if (e < src.len) e + 1 else e; // past ';'
 }
 
-/// `%sysmacexist(name)` — "1" if a macro named `name` is defined, else "0".
+/// `%sysmacexist(name)` - "1" if a macro named `name` is defined, else "0".
 fn handleSysmacexist(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) Error!usize {
     const pa = parenArg(src, from) orelse return from;
     const name = std.mem.trim(u8, try resolveText(st, pa.text), " \t");
@@ -2808,7 +2808,7 @@ fn handleSysmacexist(st: *State, src: []const u8, from: usize, out: *std.ArrayLi
     return pa.end;
 }
 
-/// `%unquote(text)` — remove masking so any & / % in the (already resolved) value
+/// `%unquote(text)` - remove masking so any & / % in the (already resolved) value
 /// resolve now: resolve the argument, drop any &/% sentinel mask, then resolve
 /// the result once more.
 fn handleUnquote(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) Error!usize {
@@ -2818,14 +2818,14 @@ fn handleUnquote(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u
     return pa.end;
 }
 
-/// `%sysget(VAR)` — the value of host environment variable VAR
+/// `%sysget(VAR)` - the value of host environment variable VAR
 /// (GAP-macroautofeatures F6). An unset variable yields an empty result + a
 /// WARNING (SAS warns). The value is returned unquoted, like plain %sysfunc;
 /// the name is case-sensitive on Unix, matching SAS.
 fn handleSysget(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) Error!usize {
     const pa = parenArg(src, from) orelse return from;
-    if (!pa.closed) { // fail LOUD like the %str unclosed-paren guard — never drop silently
-        try st.diags.macroErr(0, "unclosed %SYSGET( argument — ')' not found before end of file", .{});
+    if (!pa.closed) { // fail LOUD like the %str unclosed-paren guard - never drop silently
+        try st.diags.macroErr(0, "unclosed %SYSGET( argument - ')' not found before end of file", .{});
         return pa.end;
     }
     const name = std.mem.trim(u8, try resolveText(st, pa.text), " \t\r\n");
@@ -2854,8 +2854,8 @@ fn envValue(a: std.mem.Allocator, name: []const u8) ?[]const u8 {
     const io = std.Io.Threaded.global_single_threaded.io();
     const file = std.Io.Dir.cwd().openFile(io, "/proc/self/environ", .{}) catch return null;
     defer file.close(io);
-    // /proc reports st_size 0 — both readFileAlloc and the streaming reader
-    // trust the size and return "" — so pread chunks until a short read.
+    // /proc reports st_size 0 - both readFileAlloc and the streaming reader
+    // trust the size and return "" - so pread chunks until a short read.
     var buf: std.ArrayList(u8) = .empty;
     var chunk: [16384]u8 = undefined;
     while (buf.items.len < (1 << 20)) { // environ can't exceed the kernel arg max
@@ -2877,7 +2877,7 @@ fn envScan(buf: []const u8, name: []const u8) ?[]const u8 {
     return null;
 }
 
-/// `%sysfunc(fn(args) [, fmt])` — call a DATA-step function on the (resolved)
+/// `%sysfunc(fn(args) [, fmt])` - call a DATA-step function on the (resolved)
 /// arguments. ponytail: a common subset of the string/edit functions; the
 /// optional output format is ignored.
 fn handleSysfunc(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8), quote: bool) Error!usize {
@@ -2888,18 +2888,18 @@ fn handleSysfunc(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u
         return pa.end;
     };
     const fname = std.mem.trim(u8, inner[0..lp], " \t");
-    // The function's own arguments end at the ')' MATCHING its '(' (balanced) — the
+    // The function's own arguments end at the ')' MATCHING its '(' (balanced) - the
     // old lastIndexOf grabbed a trailing format's own text and dropped it.
     const mrp = matchParen(inner, lp);
     var fargs: std.ArrayList([]const u8) = .empty;
     try splitTopArgs(st.a, inner[lp + 1 .. mrp], &fargs);
     // A masked &/%/',' (from %nrstr/%superq/%str) survived the split as its
-    // sentinel; hand the function layer the LITERAL character (F2 — SAS unmasks
+    // sentinel; hand the function layer the LITERAL character (F2 - SAS unmasks
     // every quoted trigger before the call, so the real function sees true chars).
     for (fargs.items) |*arg| arg.* = try unmaskTriggers(st.a, arg.*);
     // Whitespace-significant functions get args VERBATIM (BUG-sysfunctrim);
     // every other function gets blanks stripped per arg (SAS strips unquoted
-    // argument blanks — and keyword args like attrn's attr-name need it).
+    // argument blanks - and keyword args like attrn's attr-name need it).
     if (!wsSignificant(fname)) for (fargs.items) |*arg| {
         arg.* = std.mem.trim(u8, arg.*, " \t");
     };
@@ -2914,13 +2914,13 @@ fn handleSysfunc(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u
         const put_fn: []const u8 = if (fmt[0] == '$') "putc" else "putn";
         const raw = result;
         // BUG-sysfuncformat(a): an unsupported %sysfunc output format must not
-        // fail the run (or panic) — SAS macro code like `%let d=%sysfunc(today(),
+        // fail the run (or panic) - SAS macro code like `%let d=%sysfunc(today(),
         // yymmddn.)` should degrade to the raw value. Suppress format.zig's
         // fatal "format not found" (which else sets the non-zero-exit flag), fall
         // back to the raw value, and emit a clean macro WARNING instead.
         // BUG-sysfuncnofmterrclobber: RESTORE THE PRIOR VALUE, not the constant
         // `false`. `OPTIONS NOFMTERR;` sets this same global, so restoring to a
-        // constant silently switched the user's option back ON — after any
+        // constant silently switched the user's option back ON - after any
         // %sysfunc that carried a format, a later genuine "format not found" was
         // reported and the run exited 1, for an option the program had asked to
         // be off. The suppression here is a LOCAL borrow of a GLOBAL the user also
@@ -2932,16 +2932,16 @@ fn handleSysfunc(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u
         // A NAMED format that left the value unchanged fell back = unsupported.
         // ponytail: may also fire for a supported named numeric format (best8.)
         // whose output matches the raw digits; exact support-detection belongs to
-        // part (b) in format.zig — this is a non-fatal log line, not behavior.
+        // part (b) in format.zig - this is a non-fatal log line, not behavior.
         const spec = format.parseSpec(fmt);
         if (spec.name.len > 0 and
             std.mem.eql(u8, std.mem.trim(u8, result, " "), std.mem.trim(u8, raw, " ")))
         {
-            try st.diags.warn(0, "%sysfunc: format {s} not supported — using unformatted value", .{fmt});
+            try st.diags.warn(0, "%sysfunc: format {s} not supported - using unformatted value", .{fmt});
         }
     }
     // %QSYSFUNC quotes its RESULT (F2): mask every &/% (and comma) so a later
-    // reference can't re-resolve them — mirrors the Q-form macro fns (%qscan/…).
+    // reference can't re-resolve them - mirrors the Q-form macro fns (%qscan/…).
     // Plain %sysfunc returns the result unmasked (SAS does not quote it).
     try out.appendSlice(st.a, if (quote) try maskTriggers(st.a, result) else result);
     return pa.end;
@@ -2962,7 +2962,7 @@ fn matchParen(s: []const u8, lp: usize) usize {
 
 /// `%sysfunc` functions whose string arguments are DATA in which leading/
 /// trailing blanks are observable (a blank separator, a space from/to string,
-/// padding to reverse) — these receive their args verbatim (BUG-sysfunctrim).
+/// padding to reverse) - these receive their args verbatim (BUG-sysfunctrim).
 /// Their DATA-step implementations carry the SAS blank semantics themselves
 /// (catx strips item values, keeps the separator; numeric args re-trim in
 /// sysfuncDispatch). Everything else %sysfunc calls gets per-arg blanks
@@ -2976,7 +2976,7 @@ fn wsSignificant(fname: []const u8) bool {
 /// Split a function-argument list on top-level commas (nested parens are kept
 /// intact); empty/blank input yields zero arguments (a zero-arg call). A comma
 /// quoted by %str & co. arrives as the mask_comma sentinel and never splits
-/// (BUG-sysfunccommamask) — callers unmask per arg afterwards.
+/// (BUG-sysfunccommamask) - callers unmask per arg afterwards.
 fn splitTopArgs(a: std.mem.Allocator, s: []const u8, list: *std.ArrayList([]const u8)) Error!void {
     if (std.mem.trim(u8, s, " \t").len == 0) return;
     var depth: usize = 0;
@@ -2988,7 +2988,7 @@ fn splitTopArgs(a: std.mem.Allocator, s: []const u8, list: *std.ArrayList([]cons
         } else if (s[k] == ')') {
             if (depth > 0) depth -= 1;
         } else if (s[k] == ',' and depth == 0) {
-            // ponytail: NO trim — macro whitespace is significant
+            // ponytail: NO trim - macro whitespace is significant
             // (%sysfunc(catx(%str( ),a,b)) must keep the blank separator;
             // BUG-sysfunctrim). Numeric paths re-trim on their own.
             try list.append(a, s[start..k]);
@@ -3063,8 +3063,8 @@ fn sysfuncDispatch(a: std.mem.Allocator, fname: []const u8, args: []const []cons
             sm // .A–.Z, ._
         else if (std.fmt.parseFloat(f64, trimmed)) |x| .{ .num = x } else |_| .{ .str = arg };
     }
-    // NOTE-sysfuncattrnname: the SCL dataset family takes a DSID — a number handed
-    // back by OPEN() — as argument 1. Passing the dataset NAME is the natural
+    // NOTE-sysfuncattrnname: the SCL dataset family takes a DSID - a number handed
+    // back by OPEN() - as argument 1. Passing the dataset NAME is the natural
     // mistake, and it used to char→num coerce to missing, so
     // `%sysfunc(attrn(work.d1,NOBS))` quietly yielded `.` at exit 0 with only a
     // conversion NOTE. Macro Language Reference printed p.518 documents the
@@ -3072,10 +3072,10 @@ fn sysfuncDispatch(a: std.mem.Allocator, fname: []const u8, args: []const []cons
     // %SYSFUNC or %QSYSFUNC macro function is not a number", cause "A nonnumeric
     // argument value is used instead of the expected numeric value."
     // A numeric MISSING stays legal here (it is a number): scl_baddsid pins
-    // `attrn(., "NOBS")`, and that is the DATA-step path anyway — this guard is at
+    // `attrn(., "NOBS")`, and that is the DATA-step path anyway - this guard is at
     // the %SYSFUNC boundary the doc's message explicitly names.
     // ponytail: argument 1 of THIS family only. A complete numeric-argument table
-    // for every function is itself oracle-blocked — the doc's own remedy is "refer
+    // for every function is itself oracle-blocked - the doc's own remedy is "refer
     // to the documentation for the function", i.e. the Functions and CALL Routines
     // Reference, which is not in docs/. Widen when that volume lands.
     const dsid_fns = [_][]const u8{ "attrn", "attrc", "varnum", "varname", "vartype", "varlen", "varfmt", "varlabel", "fetch", "fetchobs", "curobs", "getvarn", "getvarc", "close" };
@@ -3098,10 +3098,10 @@ fn sysfuncDispatch(a: std.mem.Allocator, fname: []const u8, args: []const []cons
     };
 }
 
-/// `%sysevalf(expr [, type])` — floating-point evaluation. `type` is
+/// `%sysevalf(expr [, type])` - floating-point evaluation. `type` is
 /// INTEGER/CEIL/FLOOR/BOOLEAN (default: the plain value). ponytail: `+ - * /`,
 /// `**`, unary sign, parentheses, and ONE comparison (the doc's reason the
-/// function exists — printed p.352/p.91); no AND/OR/NOT/IN — those are LOUD.
+/// function exists - printed p.352/p.91); no AND/OR/NOT/IN - those are LOUD.
 fn handleSysevalf(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) Error!usize {
     const pa = parenArg(src, from) orelse return from;
     // split off an optional top-level `, type`
@@ -3117,12 +3117,12 @@ fn handleSysevalf(st: *State, src: []const u8, from: usize, out: *std.ArrayList(
     }
     const resolved = try resolveText(st, expr_text);
     // NOTE-sysevalfempty: a null or all-blank expression is an ERROR, never a
-    // silent 0 — printed p.354 quotes the message VERBATIM (used verbatim):
+    // silent 0 - printed p.354 quotes the message VERBATIM (used verbatim):
     //     ERROR: %SYSEVALF function has no expression to evaluate.
     // ("If expression evaluates to a null value or one or more blank spaces")
     // Nothing is emitted for the call. Report-only, no stopMacro: the entry
     // quotes only this one line and documents no termination (DOC-SILENT on
-    // stopping — same read as the p.506 div-by-zero precedent in
+    // stopping - same read as the p.506 div-by-zero precedent in
     // reportEvalParse), and in open code there is no macro to stop anyway.
     if (std.mem.trim(u8, resolved, " \t\r\n").len == 0) {
         try st.diags.macroErr(0, "%SYSEVALF function has no expression to evaluate.", .{});
@@ -3131,13 +3131,13 @@ fn handleSysevalf(st: *State, src: []const u8, from: usize, out: *std.ArrayList(
     var fp = FloatParser{ .s = resolved };
     const v = fp.cmpr();
     // QA tick377 F3: anything the float grammar left unconsumed used to be
-    // SILENTLY DROPPED — `%sysevalf(1.5 ^= 2.5)` returned 1.5, the left
+    // SILENTLY DROPPED - `%sysevalf(1.5 ^= 2.5)` returned 1.5, the left
     // operand, exit 0 (D-002's worst class: `%if %sysevalf(&x > &lim)` was
     // true whenever &x was non-zero). Loud now, in two D-009 classes: a
     // LOGICAL operator SAS supports in %SYSEVALF but the float grammar lacks
     // (and/or/not words, & | and bare ^ ~ \xC2\xAC) is an opensas GAP → rc 2;
-    // anything else — including `in`, which SAS ITSELF rejects in %SYSEVALF
-    // (Restriction, printed p.353) — is the user's own invalid expression →
+    // anything else - including `in`, which SAS ITSELF rejects in %SYSEVALF
+    // (Restriction, printed p.353) - is the user's own invalid expression →
     // rc 1. The value is still emitted (as %EVAL does on its parse errors),
     // with the same stop-the-macro pair (p.162, BUG-macroerrnostop).
     fp.ws();
@@ -3160,12 +3160,12 @@ fn handleSysevalf(st: *State, src: []const u8, from: usize, out: *std.ArrayList(
     // BUG-sysevalfmissingzero: a missing operand is NaN inside FloatParser and
     // PROPAGATES through arithmetic (Macro Language Reference printed pp.353-354:
     // `%sysevalf(10+.)` returns `.`; CEIL/FLOOR/INTEGER "an expression with a
-    // missing value produces a missing value") — never coerced to 0. BOOLEAN is
+    // missing value produces a missing value") - never coerced to 0. BOOLEAN is
     // the one conversion that maps missing to 0 (p.353: "0 if the result of the
     // expression is 0 or missing", `%sysevalf(10+.,boolean)` returns 0). SAS's
-    // float model has no NaN distinct from missing, so any NaN — missing operand
-    // or invalid op like (-1)**0.5 — renders as `.`. p.353 says CEIL also emits
-    // "a message noting that fact" but never quotes it — DOC-SILENT, not invented.
+    // float model has no NaN distinct from missing, so any NaN - missing operand
+    // or invalid op like (-1)**0.5 - renders as `.`. p.353 says CEIL also emits
+    // "a message noting that fact" but never quotes it - DOC-SILENT, not invented.
     const r: f64 = if (eqi(type_text, "integer") or eqi(type_text, "int")) @trunc(v) else if (eqi(type_text, "ceil")) @ceil(v) else if (eqi(type_text, "floor")) @floor(v) else if (eqi(type_text, "boolean")) (if (v != 0 and !std.math.isNan(v)) 1 else 0) else v;
     if (std.math.isNan(r))
         try out.append(st.a, '.')
@@ -3187,14 +3187,14 @@ const FloatParser = struct {
     /// QA tick377 F3: ONE optional comparison above the additive level (the
     /// same single-comparison level %EVAL's cmp() has), yielding 1/0. The
     /// layer was ABSENT, so every comparison operator was silently dropped
-    /// and the left operand came back — while the dictionary entry's own
+    /// and the left operand came back - while the dictionary entry's own
     /// summary says %SYSEVALF "Evaluates arithmetic AND LOGICAL expressions
     /// using floating-point arithmetic" (Macro Language Reference printed
     /// p.352), and printed p.91: "You must use the %SYSEVALF function to
     /// evaluate logical expressions containing floating-point or missing
-    /// values" — comparisons are this function's documented reason to exist.
+    /// values" - comparisons are this function's documented reason to exist.
     /// Shares %EVAL's Cmp enum and Table 6.3 spelling set (matchCmpOp); the
-    /// compare ACTION is f64 here, deliberately — cmpVals' int-exact /
+    /// compare ACTION is f64 here, deliberately - cmpVals' int-exact /
     /// text-fallback semantics are %EVAL's, not floating-point.
     fn cmpr(self: *FloatParser) f64 {
         const l = self.expr();
@@ -3203,8 +3203,8 @@ const FloatParser = struct {
         self.i += m.n;
         const r = self.expr();
         // Missing in a COMPARISON does not propagate: printed pp.91-92 (the
-        // COMPFLT macro) pin it as the SMALLEST value — "-.1 is greater than .",
-        // "0 is greater than ." — so compare as -inf and yield 1/0, never `.`.
+        // COMPFLT macro) pin it as the SMALLEST value - "-.1 is greater than .",
+        // "0 is greater than ." - so compare as -inf and yield 1/0, never `.`.
         // `. = .` itself is DOC-SILENT; -inf = -inf holds, matching SAS's
         // missing-equals-missing DATA-step semantics.
         const lm = if (std.math.isNan(l)) -std.math.inf(f64) else l;
@@ -3268,7 +3268,7 @@ const FloatParser = struct {
         }
         return self.powP();
     }
-    /// `**` exponentiation (BUG-macropow — used to parse as `* <garbage>` → 0).
+    /// `**` exponentiation (BUG-macropow - used to parse as `* <garbage>` → 0).
     /// Right-associative; the exponent may itself be signed (2**-1 = 0.5).
     fn powP(self: *FloatParser) f64 {
         var v = self.primary();
@@ -3290,7 +3290,7 @@ const FloatParser = struct {
             if (self.i < self.s.len and self.s[self.i] == ')') self.i += 1;
             return v;
         }
-        // A quoted date/time literal, e.g. %sysevalf('15JAN2020'd) — convert to its
+        // A quoted date/time literal, e.g. %sysevalf('15JAN2020'd) - convert to its
         // SAS numeric before the digit scan (BUG-macrodateliteral).
         if (c == '\'' or c == '"') {
             if (std.mem.indexOfScalarPos(u8, self.s, self.i + 1, c)) |close| {
@@ -3304,7 +3304,7 @@ const FloatParser = struct {
         }
         const start = self.i;
         while (self.i < self.s.len and (std.ascii.isDigit(self.s[self.i]) or self.s[self.i] == '.')) self.i += 1;
-        // scientific notation `e`/`E`[+/-]digits — consumed only when a valid
+        // scientific notation `e`/`E`[+/-]digits - consumed only when a valid
         // exponent actually follows, so a trailing identifier isn't swallowed
         // (BUG-sysevalfsci: the scan used to stop at `e`, reading 1e10 as 1).
         if (self.i < self.s.len and (self.s[self.i] == 'e' or self.s[self.i] == 'E')) {
@@ -3316,7 +3316,7 @@ const FloatParser = struct {
             }
         }
         const tok = self.s[start..self.i];
-        // A bare `.` is a SAS MISSING value (printed pp.353-354), NOT 0 — carried
+        // A bare `.` is a SAS MISSING value (printed pp.353-354), NOT 0 - carried
         // as NaN so IEEE propagates it through every arithmetic op. `.5`/`1.`
         // still parse as numbers (the token isn't exactly ".").
         if (std.mem.eql(u8, tok, ".")) return std.math.nan(f64);
@@ -3324,7 +3324,7 @@ const FloatParser = struct {
     }
 };
 
-/// `%if cond %then A; [%else B;]` — expand the taken branch only.
+/// `%if cond %then A; [%else B;]` - expand the taken branch only.
 fn handleIf(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) Error!usize {
     const then_at = findKeyword(src, from, "then") orelse {
         try st.diags.note(0, "%if without %then", .{});
@@ -3346,13 +3346,13 @@ fn handleIf(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) E
     return k;
 }
 
-/// `%do i = start %to stop [%by step]; BODY %end;` — iterate at macro time,
+/// `%do i = start %to stop [%by step]; BODY %end;` - iterate at macro time,
 /// expanding BODY once per value with `i` bound. Also handles the block form
 /// `%do; BODY %end;` (expand once). `from` is just past `%do`.
 fn handleDo(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) Error!usize {
     var k = skipWs(src, from);
 
-    // block form `%do;` — no iteration variable
+    // block form `%do;` - no iteration variable
     if (k < src.len and src[k] == ';') {
         const body_start = k + 1;
         const end_at = matchingEnd(src, body_start) orelse src.len;
@@ -3379,7 +3379,7 @@ fn handleDo(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) E
         // like %return (NOTE-gotodowhilespin): the flag stays set and the outer
         // process() resumes at the label. Without the break %until SPINS to the
         // convergence cap (the goto-suppressed resolveText renders the condition
-        // empty/false, so the bottom-test never breaks) — %while only escaped by
+        // empty/false, so the bottom-test never breaks) - %while only escaped by
         // that same side effect. A label inside the body clears the flag before
         // process() returns, so an in-body jump iterates normally.
         if (is_until) {
@@ -3396,25 +3396,25 @@ fn handleDo(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) E
                 if (st.goto_target != null) break;
             }
         }
-        // Backstop tripped: the condition never falsified. Stop LOUD — a silent
+        // Backstop tripped: the condition never falsified. Stop LOUD - a silent
         // cap hides a non-converging loop (BUG-macrodowhilehang). A %goto break
         // leaves guard below the cap, so it can never trip this.
         if (guard >= max_loop_iters and !st.returning)
-            try st.diags.macroErr(0, "%do %while/%until did not converge in {d} iterations — stopped", .{max_loop_iters});
+            try st.diags.macroErr(0, "%do %while/%until did not converge in {d} iterations - stopped", .{max_loop_iters});
         return pastEnd(src, end_at);
     }
 
-    // iterative: `var = start %to stop [%by step] ;` — valid only INSIDE a
+    // iterative: `var = start %to stop [%by step] ;` - valid only INSIDE a
     // macro (F11). In open code SAS rejects it, and an open-code iterative %DO
-    // is exactly what a MISSING/misspelled %MEND dumps into the stream —
+    // is exactly what a MISSING/misspelled %MEND dumps into the stream -
     // accepting it silently swallows the rest of the program with no
     // diagnostic. Error loud and skip the loop. (The block `%do;` /
-    // `%do %while` forms under an open-code %if stay accepted — pinned by
+    // `%do %while` forms under an open-code %if stay accepted - pinned by
     // macro_autovars / macro_runtimescope.)
     // Wording is SAS's exact text (Macro Language Ref, App.2 printed p.500:
     // "Error: The %DO statement is not valid in open code."). The old
-    // "iterative … — a missing %MEND?" locator is dropped: exact SAS text
-    // outranks the locator (same call as 1a83f0fa's "in %do bound" drop) —
+    // "iterative … - a missing %MEND?" locator is dropped: exact SAS text
+    // outranks the locator (same call as 1a83f0fa's "in %do bound" drop) -
     // the missing-%MEND tell stays documented here (NOTE-gotodoopencode).
     if (st.macro_call_depth == 0) {
         try st.diags.macroErr(0, "The %DO statement is not valid in open code.", .{});
@@ -3467,12 +3467,12 @@ fn handleDo(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) E
         (if (step_r) |s| unresolvedRef(s) else null)) |name|
     {
         // macroErr, not report: real SAS confines this to "the macro will stop
-        // executing" — later independent steps still run (exit stays non-zero).
+        // executing" - later independent steps still run (exit stays non-zero).
         // Text is SAS's exact unresolved-reference message (Macro Language Ref,
         // App.2 printed p.531). Real SAS emits it as a WARNING, then errors
         // separately ("Error: The value &X of the %DO I loop is invalid.", App.2
         // printed p.502); we deliberately merge both into this ONE macroErr at
-        // the %do (firing point pinned by 5d662c9f) — no opensas-specific
+        // the %do (firing point pinned by 5d662c9f) - no opensas-specific
         // "in %do bound" suffix; exact SAS text outranks the locator
         // (NOTE-macroerrwordingfamily).
         st.diags.macroErr(0, "Apparent symbolic reference {s} not resolved.", .{try upperDup(st.a, name)}) catch {};
@@ -3485,7 +3485,7 @@ fn handleDo(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) E
 
     if (step != 0) {
         // BUG-macrodoscope (a): the %do index rides the %let scoping path
-        // (BUG-macrobareletscope) — raw setVar leaked a BRAND-NEW index to
+        // (BUG-macrobareletscope) - raw setVar leaked a BRAND-NEW index to
         // global. A name an active scope or the flat table already owns
         // updates in place (nearest existing scope, never a shadow); only a
         // brand-new name becomes LOCAL to this macro invocation (SAS 9.4).
@@ -3494,12 +3494,12 @@ fn handleDo(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) E
         var v = start;
         var jumped = false; // %goto fired: the index keeps its jump-time value
         while (if (step > 0) v <= stop else v >= stop) {
-            const top = v; // value the body saw this pass — the advancement reference
+            const top = v; // value the body saw this pass - the advancement reference
             var buf: [24]u8 = undefined;
             try st.setVar(var_name, std.fmt.bufPrint(&buf, "{d}", .{v}) catch unreachable);
             try process(st, body, out);
             if (st.returning) break; // %return: stop iterating and unwind the macro
-            // %goto whose label is NOT in this body leaves the loop NOW — the
+            // %goto whose label is NOT in this body leaves the loop NOW - the
             // search-then-report idiom reads &i at the jump, not the terminal
             // value (BUG-dogotoindex). A label inside the body clears the flag
             // before process() returns, so an in-body jump iterates normally.
@@ -3514,14 +3514,14 @@ fn handleDo(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) E
             // of the index variable during processing. For example, using
             // conditional processing to set the value of the index variable beyond
             // the stop value when a certain condition is met ends processing of the
-            // loop." The SAME page makes the contrast explicit for %BY — "Increment
+            // loop." The SAME page makes the contrast explicit for %BY - "Increment
             // is evaluated before the first iteration of the loop. Therefore, you
-            // cannot change it as the loop iterates" — so `step` stays evaluated
+            // cannot change it as the loop iterates" - so `step` stays evaluated
             // once above and only the INDEX is re-read.
             // The `ponytail:` corner left here when the re-read landed is now
             // settled by the reference (printed p.509): "Error: The index variable
             // in the %DO value loop has taken on an invalid or missing value. The
-            // macro will stop executing." — cause, "The index variable of a macro
+            // macro will stop executing." - cause, "The index variable of a macro
             // %DO statement has been set to missing or given a non-numeric" value.
             // So a body that leaves the index non-integer is a LOUD STOP, not the
             // silent fall-back-to-the-internal-counter this used to do.
@@ -3541,22 +3541,22 @@ fn handleDo(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) E
             // %DO entry's own re-read/early-exit text, printed p.388-389, has
             // none). The re-read above makes advancement observable instead: an
             // index that did not move TOWARD `stop` this pass (unchanged, or moved
-            // away) can never reach the bound — trip NOW, on the first stuck pass.
+            // away) can never reach the bound - trip NOW, on the first stuck pass.
             // An ordinary long loop advances every pass and never trips. Real SAS
             // spins forever here, so stopping is an opensas LIMIT, not a user
-            // error — D-009 class 2 (markGap), not 1.
+            // error - D-009 class 2 (markGap), not 1.
             if ((step > 0 and v <= top) or (step < 0 and v >= top)) {
-                try st.diags.macroErr(0, "iterative %DO did not converge — the index is not advancing toward the stop value (does the loop body reset its index?)", .{});
+                try st.diags.macroErr(0, "iterative %DO did not converge - the index is not advancing toward the stop value (does the loop body reset its index?)", .{});
                 diag.markGap();
                 break;
             }
         }
         // BUG-macrodoscope (b): SAS leaves the index at the FIRST value that
         // failed the bound (start + k*step past stop), not the last in-range
-        // value — store the post-increment v. On %return v is the current
+        // value - store the post-increment v. On %return v is the current
         // value and the local scope unwinds anyway, so the store is harmless.
         // On %goto out of the loop the jump-time value (already stored at the
-        // top of the firing iteration) must survive — skip the terminal store.
+        // top of the firing iteration) must survive - skip the terminal store.
         if (!jumped) {
             var buf: [24]u8 = undefined;
             try st.setVar(var_name, std.fmt.bufPrint(&buf, "{d}", .{v}) catch unreachable);
@@ -3605,7 +3605,7 @@ fn evalResolvedInt(st: *State, resolved: []const u8) Error!i64 {
     const v = p.expr();
     // GAP-macroevalfloat: SAS %EVAL is integer-only. A non-integer/character
     // operand in ARITHMETIC, or a token the grammar leaves unconsumed (an
-    // unknown "operator" like `mod` or `foo`), is an ERROR in SAS — the old
+    // unknown "operator" like `mod` or `foo`), is an ERROR in SAS - the old
     // silent coerce-to-0 / keep-first-operand was the worst failure class.
     // macroErr: loud + non-zero exit, but later independent steps still run.
     try reportEvalParse(st, &p, resolved);
@@ -3613,11 +3613,11 @@ fn evalResolvedInt(st: *State, resolved: []const u8) Error!i64 {
     return std.fmt.parseInt(i64, s, 10) catch {
         // NOTE-macroevalnonint: a bare non-integer leaf (`%eval(3.5)`) is the
         // SAME invalid %EVAL operand as one reached via arithmetic (p.bad
-        // above) — SAS raises the identical ERROR for both. The old lowercase
+        // above) - SAS raises the identical ERROR for both. The old lowercase
         // NOTE here made the two paths inconsistent. Still yields 0.
         if (s.len != 0) {
             try st.diags.macroErr(0, "A character operand was found in the %EVAL function or %IF condition where a numeric operand is required: '{s}'", .{s});
-            try stopMacro(st); // p.162 — same error, same termination
+            try stopMacro(st); // p.162 - same error, same termination
         }
         return 0;
     };
@@ -3660,7 +3660,7 @@ fn branchUnit(src: []const u8, start: usize) Branch {
         return .{ .cs = k, .ce = end_at, .after = after };
     }
     // BUG-macroelseifchain: an `%if`-headed branch is itself a full conditional
-    // unit — `%if c %then <unit> [%else <unit>]` — not a single statement. Recurse
+    // unit - `%if c %then <unit> [%else <unit>]` - not a single statement. Recurse
     // so the else-if idiom (`%else %if … %then …; %else …;`) binds each inner
     // %else to its own %if. The old single-`;` cut truncated the else-branch at
     // the first `;` and orphaned the inner %else into the outer stream, where it
@@ -3673,7 +3673,7 @@ fn branchUnit(src: []const u8, start: usize) Branch {
             if (matchKeyword(src, p, "else"))
                 after = branchUnit(src, skipWs(src, p + "%else".len)).after;
             // Whole span is fed back through process(), which re-parses it via
-            // handleIf — so the nested %if/%then/%else resolves recursively.
+            // handleIf - so the nested %if/%then/%else resolves recursively.
             return .{ .cs = start, .ce = after, .after = after };
         }
     }
@@ -3689,11 +3689,11 @@ fn branchUnit(src: []const u8, start: usize) Branch {
 const Cmp = enum { eq, ne, lt, le, gt, ge };
 
 /// `%if` / `%do %while` condition: resolve, then run the ONE macro expression
-/// evaluator (tokenizeEval + EvalParser — same grammar as %eval) and take the
+/// evaluator (tokenizeEval + EvalParser - same grammar as %eval) and take the
 /// result's truthiness. QL-C unified the parser; BUG-minoperatoropt unified the
 /// VERDICT: %if surfaces the same loud parse errors %eval does on the same text.
 /// The old last line, `truthy(p.expr())`, dropped every parse error and treated
-/// any leftover/non-blank text as TRUE — so an un-gated `in` (`%if q in a b c`,
+/// any leftover/non-blank text as TRUE - so an un-gated `in` (`%if q in a b c`,
 /// NOMINOPERATOR) was ALWAYS true at exit 0, and a bare `%if abc` was silently
 /// TRUE where %eval(abc) errors (BUG-ifbaretruthy). Manager call: fail loud.
 fn evalCond(st: *State, text: []const u8) Error!bool {
@@ -3704,7 +3704,7 @@ fn evalCond(st: *State, text: []const u8) Error!bool {
     try reportEvalParse(st, &p, resolved);
     if (v.str) |s| {
         // Bare leaf: an integer decides by nonzero; an EMPTY leaf (unresolved
-        // &ref / empty var — the `%if &flag` guard idiom) stays silently false;
+        // &ref / empty var - the `%if &flag` guard idiom) stays silently false;
         // anything else is the character-operand ERROR %eval raises on it.
         if (s.len == 0) return false;
         return std.fmt.parseInt(i64, s, 10) catch {
@@ -3716,7 +3716,7 @@ fn evalCond(st: *State, text: []const u8) Error!bool {
     return v.int != 0;
 }
 
-/// BUG-macroerrnostop: a %EVAL/%IF expression error does not merely report — it
+/// BUG-macroerrnostop: a %EVAL/%IF expression error does not merely report - it
 /// STOPS THE ENCLOSING MACRO. Macro Language Reference printed p.162 shows both
 /// lines SAS emits for the ambiguous-token case:
 ///     ERROR: A character operand was found in the %EVAL function or %IF
@@ -3730,7 +3730,7 @@ fn evalCond(st: *State, text: []const u8) Error!bool {
 /// macro-call boundary) rather than a parallel termination path.
 /// Open code is deliberately excluded: SAS's sentence is about "the macro", there
 /// is no macro to stop, and handlePercent's %RETURN guard documents why setting
-/// `returning` at depth 0 is harmful — it would silently drop every following
+/// `returning` at depth 0 is harmful - it would silently drop every following
 /// statement at exit 0 (GH#4). At depth 0 the caller's error still stands alone.
 fn stopMacro(st: *State) Error!void {
     if (st.macro_call_depth == 0) return; // open code: nothing to unwind (GH#4)
@@ -3741,7 +3741,7 @@ fn stopMacro(st: *State) Error!void {
 /// The loud parse-error checks %EVAL and %IF share (BUG-minoperatoropt): a
 /// character operand arithmetic tried to coerce, a zero divisor, or a token the
 /// grammar left unconsumed (an unknown "operator" like `mod`/`foo`, or an `in`
-/// with MINOPERATOR off) are all ERRORs — never a silent 0 / silent branch.
+/// with MINOPERATOR off) are all ERRORs - never a silent 0 / silent branch.
 fn reportEvalParse(st: *State, p: *const EvalParser, resolved: []const u8) Error!void {
     if (p.bad) |s| {
         try st.diags.macroErr(0, "A character operand was found in the %EVAL function or %IF condition where a numeric operand is required: '{s}'", .{s});
@@ -3751,14 +3751,14 @@ fn reportEvalParse(st: *State, p: *const EvalParser, resolved: []const u8) Error
         // the worst failure class (DATA step div-by-zero already fails loud).
         // NOT a stopMacro site: the reference's entry for this one (printed p.506,
         // "Error: Division by zero in %EVAL is invalid.") carries only Cause and
-        // Solution — no "The macro will stop executing." Unlike its neighbours it
+        // Solution - no "The macro will stop executing." Unlike its neighbours it
         // is not documented as terminating, so it keeps reporting only.
         try st.diags.macroErr(0, "Division by zero in %EVAL", .{});
     } else if (p.pos < p.toks.len) {
         // p.162's own words for this class: the common expression errors are "the
         // presence of character operands where numeric operands are required OR
         // ambiguity about whether a token is a numeric operator or a character
-        // value" — a token the grammar could not consume is that second half.
+        // value" - a token the grammar could not consume is that second half.
         try st.diags.macroErr(0, "%EVAL: invalid operator or operand in '{s}'", .{std.mem.trim(u8, try unmaskTriggers(st.a, resolved), " \t\r\n")});
         try stopMacro(st);
     }
@@ -3789,9 +3789,9 @@ fn parseNum(s: []const u8) ?f64 {
     return std.fmt.parseFloat(f64, s) catch null;
 }
 
-// ── %eval — integer expression evaluation ────────────────────────────────────
+// ── %eval - integer expression evaluation ────────────────────────────────────
 
-/// `%eval(expr)` — resolve `&vars` in `expr`, evaluate it as an integer
+/// `%eval(expr)` - resolve `&vars` in `expr`, evaluate it as an integer
 /// arithmetic/comparison/logical expression, and emit the result as text.
 fn handleEval(st: *State, src: []const u8, from: usize, out: *std.ArrayList(u8)) Error!usize {
     const k = skipWs(src, from);
@@ -3817,7 +3817,7 @@ const ETok = struct { op: EOp, val: i64 = 0, text: []const u8 = "" };
 
 /// True for any char that continues an operand run: everything that is not
 /// whitespace and not one of the operator/grouping chars. Keeps `abc1`, `1.5`,
-/// `"quoted"` and 20-digit ids intact as single operands (QL-C — the old
+/// `"quoted"` and 20-digit ids intact as single operands (QL-C - the old
 /// tokenizer dropped non-numeric words, so %eval couldn't compare strings).
 fn isOperandChar(c: u8) bool {
     return switch (c) {
@@ -3832,18 +3832,18 @@ fn tokenizeEval(a: std.mem.Allocator, s: []const u8, minop: bool) Error![]const 
     while (i < s.len) {
         const c = s[i];
         // BUG-macroevalnotsign: `¬` is the two bytes 0xC2 0xAC, and isOperandChar
-        // calls every non-ASCII-operator byte an OPERAND char — so the operand scan
+        // calls every non-ASCII-operator byte an OPERAND char - so the operand scan
         // below swallowed the glyph as a word and the operator switch never saw it.
         // `%if 1 ¬= 2` then lexed as `1` `¬` `=` `2`, whose leftover token made
         // reportEvalParse fire while the leaf `1` still tested truthy: the RIGHT
         // branch and a hard error at once. `¬(1=2)` was plainly WRONG (false).
         // Table 6.3 "Macro Language Operators" (Macro Language Reference printed
-        // p.87-88) lists the glyph on BOTH rows it belongs to — `¬^~ NOT` and
-        // `¬= ^= ~= NE` — so unlike `<>` (absent, hence loud: NOTE-macroevalops)
+        // p.87-88) lists the glyph on BOTH rows it belongs to - `¬^~ NOT` and
+        // `¬= ^= ~= NE` - so unlike `<>` (absent, hence loud: NOTE-macroevalops)
         // this one must WORK. Same table, both edges.
         // Maximal munch, matched BEFORE the operand scan, claiming only the exact
         // two-byte NOT SIGN: `¦` (0xC2 0xA6) and `¢` keep their current handling,
-        // and `¦` in particular must stay loud — Table 6.3's OR row is `|` alone.
+        // and `¦` in particular must stay loud - Table 6.3's OR row is `|` alone.
         // The two halves are COUPLED and must not be separated: the operand scan
         // below stops at these bytes, so if this branch stopped consuming them the
         // scan would return an empty word, `i` would never advance, and tokenizeEval
@@ -3859,7 +3859,7 @@ fn tokenizeEval(a: std.mem.Allocator, s: []const u8, minop: bool) Error![]const 
         } else if (isOperandChar(c)) {
             var j = i;
             // …and the operand scan must STOP at the glyph too, or a glued
-            // `%eval(1¬=2)` (no blanks — ordinary SAS) swallows 0xC2 0xAC into the
+            // `%eval(1¬=2)` (no blanks - ordinary SAS) swallows 0xC2 0xAC into the
             // operand "1¬" and compares it to 2: silently 0, with no error at all,
             // because the grammar then consumes everything. Same two bytes, same
             // maximal-munch rule, the other side of the scan.
@@ -3869,12 +3869,12 @@ fn tokenizeEval(a: std.mem.Allocator, s: []const u8, minop: bool) Error![]const 
             // `in`/`#` are the membership operator only under MINOPERATOR; when
             // off they fall through and stay ordinary text (SAS 9.4 default).
             // ponytail: `#` must be blank-delimited here (`&x # a`); a glued
-            // `&x#a` stays one operand — no real clinical macro writes it glued.
+            // `&x#a` stays one operand - no real clinical macro writes it glued.
             const wop: ?EOp = if (minop and (eqi(w, "in") or std.mem.eql(u8, w, "#"))) .in_ else wordOp(w);
             if (wop) |op| {
                 // GAP-macrocharoperanddetect (Macro Ref printed p.162): a BARE
-                // mnemonic where an OPERAND belongs is ambiguous — "whether a
-                // token is a numeric operator or a character value" — and SAS
+                // mnemonic where an OPERAND belongs is ambiguous - "whether a
+                // token is a numeric operator or a character value" - and SAS
                 // raises the character-operand ERROR and stops the macro. Mark
                 // it .amb: the parser records it in `bad`, so the EXISTING
                 // reportEvalParse/stopMacro path emits the verbatim pair naming
@@ -3882,19 +3882,19 @@ fn tokenizeEval(a: std.mem.Allocator, s: []const u8, minop: bool) Error![]const 
                 // exemptions match the masked-word checks, not re-decided: a
                 // QUOTED mnemonic never gets here (its mask_word prefix fails
                 // wop, so %str(and) stays the str_ operand below), and `not` is
-                // a prefix-ONLY operator — unambiguous exactly where an operand
+                // a prefix-ONLY operator - unambiguous exactly where an operand
                 // belongs. Operand position = start, or after any operator/`(`
-                // — the previous token is not an operand or `)`.
+                // - the previous token is not an operand or `)`.
                 const operand_pos = out.items.len == 0 or switch (out.items[out.items.len - 1].op) {
                     .num, .str_, .rp, .amb => false,
                     else => true,
                 };
                 // …but a mnemonic that is the ONLY token is NOT the ambiguous
                 // case: it is the implicit empty-operand compare the scan-loop
-                // idiom relies on — `%do %while(&word ne);` collapses to ` ne `
+                // idiom relies on - `%do %while(&word ne);` collapses to ` ne `
                 // when &word runs out (the %QSCAN entry's own Example 2,
                 // printed p.343) and "" ne "" is false, no ERROR (the settled
-                // QL-C contract). Anything around it — `not eq`, `(and)` — is
+                // QL-C contract). Anything around it - `not eq`, `(and)` - is
                 // the ambiguous class again.
                 const lone = out.items.len == 0 and std.mem.trim(u8, s[j..], " \t\r\n").len == 0;
                 if (op != .not_ and operand_pos and !lone)
@@ -3958,17 +3958,17 @@ fn tokenizeEval(a: std.mem.Allocator, s: []const u8, minop: bool) Error![]const 
                 // `<=` → le; bare `<` → lt. There is NO `<>` operator in the macro
                 // language: Table 6.3 "Macro Language Operators" (Macro Language
                 // Reference, printed p.87-88) enumerates the full precedence ladder
-                // 1-8 and spells NE as `¬=` `^=` `~=` / NE — footnote 1 exists purely
+                // 1-8 and spells NE as `¬=` `^=` `~=` / NE - footnote 1 exists purely
                 // to list the keyboard variants, so a fourth spelling would be there.
                 // `<>` appears nowhere as an operator in the volume; %EVAL's own entry
                 // (p.328) names Chapter 6 as "a complete discussion". We used to map it
-                // to NE from a since-deleted evalBool's behaviour, not from the doc —
+                // to NE from a since-deleted evalBool's behaviour, not from the doc -
                 // a silent superset (D-015): `%if &a <> &b` computed a plausible
                 // boolean here where SAS 9.4 errors (NOTE-macroevalops).
                 // Lexing `<` and `>` separately is what a tokenizer without the
                 // operator does; the stray `>` is then left unconsumed and
                 // reportEvalParse raises the existing loud unknown-operator ERROR.
-                // NB this is the MACRO surface only — `<>` stays MAX in the DATA step
+                // NB this is the MACRO surface only - `<>` stays MAX in the DATA step
                 // (minmax_operators) and NE in WHERE/SQL (sql_ne_diamond, Language Reference: Concepts p.219).
                 const le = i + 1 < s.len and s[i + 1] == '=';
                 try out.append(a, .{ .op = if (le) .le else .lt });
@@ -4006,11 +4006,11 @@ fn wordOp(w: []const u8) ?EOp {
 /// One comparison operator of Table 6.3 at `s[i]`, the same spelling set
 /// %EVAL's tokenizeEval munches: `=` `<` `>` `<=` `>=` `^=` `~=` `\xC2\xAC=`
 /// and the word forms EQ/NE/LT/LE/GT/GE (the word scan is alphanumeric, so a
-/// glued `ne2` is an operand, never an operator — tokenizeEval agrees). Bare
+/// glued `ne2` is an operand, never an operator - tokenizeEval agrees). Bare
 /// `^`/`~`/`\xC2\xAC` are prefix NOT, not comparisons: null. %SYSEVALF's
 /// FloatParser is the caller; tokenizeEval keeps its own switch because it
 /// also owns `in`/MINOPERATOR and the int-vs-text token split, which the
-/// float grammar deliberately lacks — the SHARE LINE is spellings + the Cmp
+/// float grammar deliberately lacks - the SHARE LINE is spellings + the Cmp
 /// enum, not the tokenizer and not the compare action.
 fn matchCmpOp(s: []const u8, i: usize) ?struct { c: Cmp, n: usize } {
     if (i >= s.len) return null;
@@ -4052,7 +4052,7 @@ fn truthy(v: EVal) bool {
     return s.len != 0;
 }
 
-/// int/int compares exactly (i64 — floats would round 2^53+); anything textual
+/// int/int compares exactly (i64 - floats would round 2^53+); anything textual
 /// routes through `compare`, rendering an int side into a stack buffer.
 fn cmpVals(l: EVal, r: EVal, c: Cmp) bool {
     if (l.str == null and r.str == null) return switch (c) {
@@ -4075,14 +4075,14 @@ fn cmpVals(l: EVal, r: EVal, c: Cmp) bool {
 /// Comparisons/logicals yield 0/1; arithmetic is integer-only (`/` truncates;
 /// div-by-zero flags `divzero` (loud in %eval, 0 in %if)); `**` exponentiates (saturating); string leaves survive
 /// to the comparison level so `abc = abc` and `1.5 lt 2` compare as SAS does.
-/// ponytail: no float arithmetic — SAS uses %sysevalf for those;
+/// ponytail: no float arithmetic - SAS uses %sysevalf for those;
 /// malformed input degrades to 0 rather than erroring.
 const EvalParser = struct {
     toks: []const ETok,
     pos: usize = 0,
     /// First non-integer text operand arithmetic tried to coerce (GAP-macroevalfloat).
     /// %eval reports it as an ERROR; %if/%while ignore it (bare text leaves are
-    /// legitimate conditions) — same coerce-to-0 value as before either way.
+    /// legitimate conditions) - same coerce-to-0 value as before either way.
     bad: ?[]const u8 = null,
     /// Set on a zero divisor in `/` (BUG-macroevaldivzero): %eval errors loud;
     /// %if/%while ignore it like `bad` and keep the coerce-to-0 value.
@@ -4135,7 +4135,7 @@ const EvalParser = struct {
                     .num => .{ .int = self.toks[self.pos].val },
                     .str_ => .{ .str = self.toks[self.pos].text },
                     // The same ambiguous-mnemonic ERROR inside an `in` list:
-                    // record the word and end the list — `bad` wins in
+                    // record the word and end the list - `bad` wins in
                     // reportEvalParse over the leftover token.
                     .amb => {
                         if (self.bad == null) self.bad = self.toks[self.pos].text;
@@ -4218,7 +4218,7 @@ const EvalParser = struct {
     }
     /// `**` exponentiation: binds tighter than unary minus and is right-
     /// associative, so -2**2 = -(2**2) = -4 and 2**3**2 = 2**9 = 512 (SAS 9.4
-    /// %EVAL supports `**`; BUG-macropow — it used to degrade to 0).
+    /// %EVAL supports `**`; BUG-macropow - it used to degrade to 0).
     fn powE(self: *EvalParser) EVal {
         const l = self.primary(); // stays .str so string compares still work
         if (self.peek() == .pow) {
@@ -4241,7 +4241,7 @@ const EvalParser = struct {
         }
         if (op == .amb) {
             // A bare mnemonic sat in operand position (GAP-macrocharoperanddetect)
-            // — it IS the character operand the ERROR names (p.162); record the
+            // - it IS the character operand the ERROR names (p.162); record the
             // first and carry it as text so the rest of the expression parses.
             const t = self.toks[self.pos].text;
             self.pos += 1;
@@ -4266,7 +4266,7 @@ fn b2i(b: bool) i64 {
 
 /// Integer exponentiation for %eval, saturating like the rest of the evaluator
 /// (never panics on overflow). A negative exponent yields a fraction, which
-/// %eval truncates toward 0 — except ±1 bases: 1**-n = 1, (-1)**-n = ±1.
+/// %eval truncates toward 0 - except ±1 bases: 1**-n = 1, (-1)**-n = ±1.
 fn ipow(b: i64, e_in: i64) i64 {
     if (e_in < 0) {
         if (b == 1) return 1;
@@ -4298,7 +4298,7 @@ fn resolveText(st: *State, text: []const u8) Error![]const u8 {
     defer st.scratch_pool.append(st.a, tmp) catch {};
     // Every resolveText caller hands over MACRO statement text (see
     // sq_masks_triggers): single quotes must NOT mask &/% in this scan.
-    // Save/restore — an enclosing compiler-bound process() scan owns the
+    // Save/restore - an enclosing compiler-bound process() scan owns the
     // true value and needs it back when this resolution returns.
     const saved_mask = st.sq_masks_triggers;
     st.sq_masks_triggers = false;
@@ -4393,7 +4393,7 @@ fn scanMacroArg(src: []const u8, from: usize) usize {
     return k;
 }
 
-/// Skip whitespace AND `/* … */` comments — used only in the macro header, where
+/// Skip whitespace AND `/* … */` comments - used only in the macro header, where
 /// SAS strips comments before parsing the parameter list (BUG-makedateparams).
 fn skipWsc(src: []const u8, i: usize) usize {
     var k = i;
@@ -4461,7 +4461,7 @@ test "PERF-macroaccum: %let accumulation in a %do loop yields the right value" {
     var sess = Session.init(a, &diags);
     // %global: post BUG-macrobareletscope a bare %let in a macro is LOCAL, but
     // this test pins the accumulation/buffer-reuse behavior on a var that
-    // outlives the macro — declare it global, exactly what SAS needs too.
+    // outlives the macro - declare it global, exactly what SAS needs too.
     const src = try std.fmt.allocPrint(a, "%macro m;\n%global s;\n%let s=;\n%do i=1 %to {d};\n%let s=&s.ab;\n%end;\n%mend;\n%m\n", .{M});
     _ = try sess.expand(src);
     const v = sess.st.getVar("s").?;
@@ -4478,7 +4478,7 @@ test "PERF-resolvetextscratch: repeated + nested resolution stays correct" {
     const a = arena.allocator();
     var diags = diag.Diagnostics.init(a);
     // The perf win (pooled scratch reused across calls → no per-call orphaned
-    // ArrayList; only the final dupe persists) is by construction — the pool
+    // ArrayList; only the final dupe persists) is by construction - the pool
     // assertions below pin that construction. The rest pins BEHAVIOR: same
     // resolved text under repetition, an earlier returned slice survives later
     // calls (callers persist them), and nesting (resolveText → process →
@@ -4505,16 +4505,16 @@ test "%let and &var (in text and expressions, with trailing dot)" {
 }
 
 test "ISS-letquotedsemi: a quoted ; in a %let value is literal, not the terminator" {
-    // `%let SEP=";";` — the `;` inside the quotes is part of the value; only the
+    // `%let SEP=";";` - the `;` inside the quotes is part of the value; only the
     // trailing `;` ends the statement. &SEP resolves to the two-quote-plus text.
     try expectExpand("%let SEP=\";\";x=&SEP;", "x=\";\";");
-    // single quotes too (the terminator rule is the same — quote BALANCING is
+    // single quotes too (the terminator rule is the same - quote BALANCING is
     // quote-kind-blind; what single quotes no longer do is mask &/% in macro
     // statement text, sq_masks_triggers); and a longer value with an interior ;
     try expectExpand("%let a=';';[&a]", "[';']");
     try expectExpand("%let m=\"a;b\";[&m]", "[\"a;b\"]");
     // a doubled quote inside the value is not the close, so the ; after it is still
-    // interior text — the whole quoted run is the value.
+    // interior text - the whole quoted run is the value.
     try expectExpand("%let d=\"x\"\";y\";[&d]", "[\"x\"\";y\"]");
 }
 
@@ -4523,7 +4523,7 @@ test "LETQUOTE-eof: an unclosed quote in a %let value warns instead of silently 
     defer arena.deinit();
     const a = arena.allocator();
     var diags = diag.Diagnostics.init(a);
-    // `"oops;` opens a quote that never closes — macroValueEnd scans to EOF and
+    // `"oops;` opens a quote that never closes - macroValueEnd scans to EOF and
     // eats the following statement. We can't recover the boundary, but we MUST
     // fail loud rather than silently drop `data x; run;`.
     _ = try expand(a, "%let x=\"oops; data x; run;", &diags);
@@ -4543,7 +4543,7 @@ test "BUG-letsinglequoteampunresolved: %LET resolves & inside single quotes at S
     // example). In a MACRO statement the macro processor resolves triggers
     // inside both quote kinds; masking requires an NR quoting function
     // (printed p.7: "You must use a macro quoting function to mask the special
-    // characters" — about assigning a value containing ampersands to a macro
+    // characters" - about assigning a value containing ampersands to a macro
     // variable; Table 7.2 printed p.100, `%name &name`: "%NRSTR, %NRBQUOTE,
     // and %NRQUOTE mask these patterns"; printed p.342: "In addition, %NRSTR
     // also masks the following characters: & %").
@@ -4551,22 +4551,22 @@ test "BUG-letsinglequoteampunresolved: %LET resolves & inside single quotes at S
     // %LET therefore resolves at ASSIGNMENT time and stores the RESOLVED text
     // (the %LET entry's own examples resolve the RHS "before assignment",
     // printed p.403-404). We stored the raw text and resolved at reference
-    // time — invisible to `&q` (it renders right either way, which is why QA
+    // time - invisible to `&q` (it renders right either way, which is why QA
     // F2 survived) but wrong three ways: SYMGET handed a DATA step the literal
     // 'AT&t' at rc 0 (silent wrong value crossing into stored data), %SUPERQ
     // read the unresolved text, and a later `%let t=…` retroactively changed
-    // `&q` — late binding SAS never does. The double-quoted form was already
+    // `&q` - late binding SAS never does. The double-quoted form was already
     // correct; arm one pins both quote kinds to the SAME snapshot semantics.
     try expectExpand(
         "%let t=RESOLVED;%let q='AT&t';[&q][%superq(q)]%let t=CHANGED;[&q]",
         "['ATRESOLVED']['ATRESOLVED']['ATRESOLVED']",
     );
-    // Double quotes: unchanged — already storage-time, same result.
+    // Double quotes: unchanged - already storage-time, same result.
     try expectExpand(
         "%let t=RESOLVED;%let q=\"AT&t\";[&q][%superq(q)]%let t=CHANGED;[&q]",
         "[\"ATRESOLVED\"][\"ATRESOLVED\"][\"ATRESOLVED\"]",
     );
-    // Masking still works — through %NRSTR, the doc's route, not the quotes.
+    // Masking still works - through %NRSTR, the doc's route, not the quotes.
     try expectExpand("%let t=RESOLVED;%let q=%nrstr('AT&t');[&q]", "['AT&t']");
     // A quoted nested %LET is a LIVE nested %LET under the same rule (quotes
     // don't mask `%` either): the nestedLet guard must see through them.
@@ -4586,23 +4586,23 @@ test "BUG-macrounclosedparen: a quoting-fn arg unclosed at EOF fails loud, never
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
-    // `%nrstr(a%)` — the `%)` is an ESCAPED ')', so the nrstr paren never closes
+    // `%nrstr(a%)` - the `%)` is an ESCAPED ')', so the nrstr paren never closes
     // and the scan runs to EOF. It used to silently return the swallowed remainder
     // (assignment + `data after` dropped, exit 0). Now it errors loud like the
     // %GOTO open-code / %LET quote-eof guards.
     var d1 = diag.Diagnostics.init(a);
     _ = try expand(a, "%let x = %nrstr(a%); data after; y=1; run;", &d1);
-    try std.testing.expectEqualStrings("ERROR: unclosed %NRSTR( argument — ')' not found before end of file\n", try d1.render());
+    try std.testing.expectEqualStrings("ERROR: unclosed %NRSTR( argument - ')' not found before end of file\n", try d1.render());
     try std.testing.expect(d1.hasErrors());
 
     // A bare trailing quoting call with no close also fails loud.
     var d2 = diag.Diagnostics.init(a);
     _ = try expand(a, "%str(hello", &d2);
-    try std.testing.expectEqualStrings("ERROR: unclosed %STR( argument — ')' not found before end of file\n", try d2.render());
+    try std.testing.expectEqualStrings("ERROR: unclosed %STR( argument - ')' not found before end of file\n", try d2.render());
 
     var d3 = diag.Diagnostics.init(a);
     _ = try expand(a, "%superq(x", &d3);
-    try std.testing.expectEqualStrings("ERROR: unclosed %SUPERQ( argument — ')' not found before end of file\n", try d3.render());
+    try std.testing.expectEqualStrings("ERROR: unclosed %SUPERQ( argument - ')' not found before end of file\n", try d3.render());
 
     // PRESERVE: properly-closed calls are unchanged and never warn/error.
     try expectExpand("%let x=%str(hello);&x", "hello");
@@ -4626,7 +4626,7 @@ test "BUG-macrogotoopen: %GOTO in open code fails loud and does NOT drop later s
     try std.testing.expectEqualStrings("ERROR: The %GOTO statement is not valid in open code.\n", try diags.render());
     try std.testing.expect(diags.hasErrors());
 
-    // `%goto` INSIDE a macro is normal control flow — unchanged, no error.
+    // `%goto` INSIDE a macro is normal control flow - unchanged, no error.
     var clean = diag.Diagnostics.init(a);
     const ok = try expand(a, "%macro m;a%goto skip;b%skip:c%mend;%m", &clean);
     try std.testing.expectEqualStrings("ac", ok);
@@ -4651,7 +4651,7 @@ test "F11 definition diagnostics: duplicate param / %mend name mismatch / open-c
     _ = try expand(a, "%macro mm(x);[&x]%mend mm;%mm(5)%macro n;[n]%mend;", &c2);
     try std.testing.expectEqualStrings("", try c2.render());
 
-    // 3. Iterative %do in OPEN CODE errors and is skipped — the missing-%MEND
+    // 3. Iterative %do in OPEN CODE errors and is skipped - the missing-%MEND
     // tell (a macro that forgot %mend used to dump its body into open code and
     // RUN it silently). The block `%do;` under an open-code %if stays legal.
     var d3 = diag.Diagnostics.init(a);
@@ -4668,7 +4668,7 @@ test "BUG-dogotoindex: %goto out of an iterative %do leaves the index at the jum
     // The search-then-report idiom: was I=6 (terminal), SAS keeps I=3.
     try expectExpand("%macro l;%do i=1 %to 5;%if &i = 3 %then %goto found;%end;NONE%return;%found:AT&i;%mend;%l", "AT3;");
     // Loop running to completion still leaves the index at the first value
-    // past the bound (BUG-macrodoscope (b)) — unchanged.
+    // past the bound (BUG-macrodoscope (b)) - unchanged.
     try expectExpand("%macro l;%do i=1 %to 3;%end;DONE&i;%mend;%l", "DONE4;");
 }
 
@@ -4712,12 +4712,12 @@ test "NOTE-macroloudlabels: %ABORT fails loud AND halts (drops later text)" {
     defer arena.deinit();
     const a = arena.allocator();
     // Was: WARNING "apparent invocation of macro ABORT not resolved" + CONTINUE.
-    // Now: loud ERROR and a hard halt — text after the %abort never expands, so a
+    // Now: loud ERROR and a hard halt - text after the %abort never expands, so a
     // later DATA step never reaches the lexer/exec.
     var d = diag.Diagnostics.init(a);
     const out = try expand(a, "%macro m;%abort;%mend;before %m after-abort", &d);
     try std.testing.expectEqualStrings("before ", out);
-    try std.testing.expectEqualStrings("ERROR: %ABORT is not supported — halting execution\n", try d.render());
+    try std.testing.expectEqualStrings("ERROR: %ABORT is not supported - halting execution\n", try d.render());
     try std.testing.expect(d.hasErrors());
 }
 
@@ -4789,7 +4789,7 @@ test "BUG-undefmacro: unresolved %FOO(args) warns + drops instead of LexError" {
     const a = arena.allocator();
     var diags = diag.Diagnostics.init(a);
     // The undefined call is swallowed (parens balanced) so no stray `%` reaches
-    // the lexer; a defined macro next to it still runs. The name is arbitrary —
+    // the lexer; a defined macro next to it still runs. The name is arbitrary -
     // what matters is a POSITIONAL + KEYWORD arg list on an UNDEFINED macro,
     // which is where the parens-balancing swallow used to give up.
     const out = try expand(a, "%macro ok;Z%mend;a %MAKE_TABLE(dm, keep=x) %ok b", &diags);
@@ -4831,7 +4831,7 @@ test "BUG-sysfuncformat(a): unsupported %sysfunc format warns + falls back to ra
     try std.testing.expectEqualStrings("24293", out);
     try std.testing.expect(!format.formatErrored()); // suppressed → run not killed
     try std.testing.expectEqualStrings(
-        "WARNING: %sysfunc: format notarealfmt. not supported — using unformatted value\n",
+        "WARNING: %sysfunc: format notarealfmt. not supported - using unformatted value\n",
         try d1.render(),
     );
     // A supported format still applies and does NOT warn.
@@ -4840,7 +4840,7 @@ test "BUG-sysfuncformat(a): unsupported %sysfunc format warns + falls back to ra
     try std.testing.expectEqualStrings("  24,293", out2); // comma8. right-justifies to width 8
     try std.testing.expectEqualStrings("", try d2.render());
 
-    // BUG-sysfuncnofmterrclobber — the suppression above BORROWS the same global
+    // BUG-sysfuncnofmterrclobber - the suppression above BORROWS the same global
     // that `OPTIONS NOFMTERR;` sets, so it must hand it back exactly as found. It
     // used to restore the constant `false`, silently switching a user's NOFMTERR
     // back ON; the end-to-end consequence (a later step's genuine "format not
@@ -4861,7 +4861,7 @@ test "BUG-sysfuncformat(a): unsupported %sysfunc format warns + falls back to ra
 }
 
 test "BUG-makeemptyhang: %global/%local resolve &var in the name list, no spin" {
-    // `%global &dataset.KEEPSTRING;` names the var via a &ref — the old char loop
+    // `%global &dataset.KEEPSTRING;` names the var via a &ref - the old char loop
     // stalled on the unresolved `&` (infinite loop). It now resolves to DMKEEPSTRING
     // and declares it; the reference then expands to its (empty) value.
     try expectExpand(
@@ -4872,13 +4872,13 @@ test "BUG-makeemptyhang: %global/%local resolve &var in the name list, no spin" 
     try expectExpand("%global a b,c;%let a=1;%let b=2;%let c=3;&a&b&c", "123");
 }
 
-test "G-ebnf-sweep: macro header /options chain — honoured, inert, loud (GAP-macroopts)" {
+test "G-ebnf-sweep: macro header /options chain - honoured, inert, loud (GAP-macroopts)" {
     // The `/ options` between the param list and `;` must not leak into the body.
     // HONOURED options define and run the macro; the NO- forms are the defaults.
     try expectExpand("%macro m(a) / parmbuff minoperator mindelimiter=',';B&a.E%mend;%m(hi)", "BhiE");
     try expectExpand("%macro q / noparmbuff nominoperator nosecure;Z%mend;%q", "Z");
     // STORE/SECURE/DES=/CMD/STMT and any unknown word ERROR, naming the option,
-    // and leave the macro UNDEFINED (D-002: they were silently accepted before —
+    // and leave the macro UNDEFINED (D-002: they were silently accepted before -
     // the invocation then warns "apparent invocation … not resolved", like SAS
     // after a failed compile). Captured diagnostics, never a real abort (D-003).
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -4886,7 +4886,7 @@ test "G-ebnf-sweep: macro header /options chain — honoured, inert, loud (GAP-m
     const a = arena.allocator();
     var d1 = diag.Diagnostics.init(a);
     try std.testing.expectEqualStrings("", try expand(a, "%macro m(a) / store des=\"x\";B&a.E%mend;%m(hi)", &d1));
-    try std.testing.expectEqualStrings("ERROR: The %MACRO option STORE is not supported (opensas keeps macros for the session only — no stored-macro catalog)\n" ++
+    try std.testing.expectEqualStrings("ERROR: The %MACRO option STORE is not supported (opensas keeps macros for the session only - no stored-macro catalog)\n" ++
         "WARNING: Apparent invocation of macro M not resolved.\n", try d1.render());
     var d2 = diag.Diagnostics.init(a);
     _ = try expand(a, "%macro n / stmt;Z%mend;%n", &d2);
@@ -4901,12 +4901,12 @@ test "G-ebnf-sweep: macro header /options chain — honoured, inert, loud (GAP-m
 test "GAP-ebnfrcwrongclass: documented-but-unimplemented %MACRO options exit 2; a typo stays 1" {
     // D-009: an opensas gap is rc 2 ("file an opensas issue"), the user's own
     // error rc 1 ("fix your SAS"). The %MACRO statement's documented option
-    // list — Macro Reference printed pp.408-411 (pdf 423-426, offset +15,
-    // confirmed against the printed footers) — re-derived IN FULL (D-018):
+    // list - Macro Reference printed pp.408-411 (pdf 423-426, offset +15,
+    // confirmed against the printed footers) - re-derived IN FULL (D-018):
     // CMD, DES=, MINDELIMITER=, MINOPERATOR/NOMINOPERATOR, PARMBUFF,
     // SECURE/NOSECURE, STMT, SOURCE/SRC, STORE. Every documented-but-
     // unimplemented one is a gap (the re-derivation is how SOURCE/SRC joined
-    // STORE/SECURE/DES=/CMD/STMT — the catch-all had called SOURCE
+    // STORE/SECURE/DES=/CMD/STMT - the catch-all had called SOURCE
     // "Unrecognized" at rc 1, both wrong). The catch-all stays rc 1 so a
     // genuine typo (STROE) still says "fix your SAS". Captured reporter,
     // nothing spawned (D-003); the two signals main.zig reads, as in diag.zig's
@@ -4930,7 +4930,7 @@ test "GAP-ebnfrcwrongclass: documented-but-unimplemented %MACRO options exit 2; 
     try std.testing.expect(d1.hasErrors());
     try std.testing.expectEqual(@as(u8, 1), diag.exitCode(diag.gapHit(), d1.hasErrors()));
     // Honoured-option control: clean define+run, rc 0 (the gap flag must not
-    // leak across cases — resetGap each time, per diag.zig's test pattern).
+    // leak across cases - resetGap each time, per diag.zig's test pattern).
     diag.resetGap();
     var d2 = diag.Diagnostics.init(a);
     try std.testing.expectEqualStrings("Z", try expand(a, "%macro m / parmbuff;Z%mend;%m", &d2));
@@ -4939,18 +4939,18 @@ test "GAP-ebnfrcwrongclass: documented-but-unimplemented %MACRO options exit 2; 
 }
 
 test "BUG-barepct: %* macro comment skipped; bare %name invokes; undefined bare passes through" {
-    // %* … ; macro comment (incl. the `%**` form) emits nothing — the % must not
+    // %* … ; macro comment (incl. the `%**` form) emits nothing - the % must not
     // leak to the lexer. Text after the ';' is kept.
     try expectExpand("A%* a comment with %if and &x ;B", "AB");
     try expectExpand("X%** MBO001 note ** ;Y", "XY");
     // A bare %name (no parens) invokes a DEFINED macro with empty/default args.
     try expectExpand("%macro g;GG%mend;a%g;b", "aGG;b");
     try expectExpand("%macro k(x=Z);[&x]%mend;%k;", "[Z];");
-    // An UNDEFINED bare %word warns + DROPS (BUG-barepctundef) — the % must never
+    // An UNDEFINED bare %word warns + DROPS (BUG-barepctundef) - the % must never
     // reach the lexer. (Was pass-through; that leaked in the full pipeline.)
     try expectExpand("pre %nope post", "pre  post");
     // An apostrophe inside a "double-quoted" string is a literal char, NOT a
-    // single-quote delimiter — it must not desync the scanner and leak a later
+    // single-quote delimiter - it must not desync the scanner and leak a later
     // %if to the lexer (a real log-scanning macro tripped this).
     try expectExpand(
         "%macro t;if find(x,\"l'a\",'i');%if 1 %then Y;%mend;%t",
@@ -4961,7 +4961,7 @@ test "BUG-barepct: %* macro comment skipped; bare %name invokes; undefined bare 
 }
 
 test "BUG-makedateparams: param defaults ignore /* */ comments (incl. inner parens)" {
-    // A `)` inside a default's comment must not truncate the param list — this
+    // A `)` inside a default's comment must not truncate the param list - this
     // corrupted a real date macro (every `DATEC= /*…(Char)*/` param) → misfiring checks.
     try expectExpand("%macro m(a= /*Entry (Char)*/, b= /*x*/);[&a][&b]%mend;%m(a=1,b=2)", "[1][2]");
     try expectExpand("%macro m(a= /*d (Char)*/, b=);[&a][&b]%mend;%m()", "[][]");
@@ -5003,7 +5003,7 @@ test "GAP-macrogotocomputed: a computed %GOTO destination resolves before the br
         }
     };
     // NULL destination (printed p.500): "Error: The %GOTO statement has no target.
-    // The statement will be ignored." IGNORED is the load-bearing word — the body
+    // The statement will be ignored." IGNORED is the load-bearing word - the body
     // after it SURVIVES ("BODY" is emitted). Before the fix an unreadable operand
     // set an EMPTY target, which process() can never match, so the rest of the
     // body was deleted and the run still exited 0.
@@ -5024,7 +5024,7 @@ test "GAP-macrogotocomputed: a computed %GOTO destination resolves before the br
     );
     // A resolved-but-absent label is not diagnosable at the %GOTO (the label may
     // still appear later in the body), so handleCall reports it at the macro
-    // boundary — and now prints the RESOLVED text. It used to print nothing at
+    // boundary - and now prints the RESOLVED text. It used to print nothing at
     // all there ("%goto label : not found"), naming the wrong thing.
     try E.check(
         "%macro t;%let h=nowhere;%goto &h;BODY%mend;[%t]",
@@ -5056,7 +5056,7 @@ test "comments and single quotes mask macro triggers (BUG-macrocomment)" {
 }
 
 test "%do iteration: to, by (negative), block form, and inside a macro" {
-    // Iterative %do is macro-only (F11) — these run inside a macro; the block
+    // Iterative %do is macro-only (F11) - these run inside a macro; the block
     // form stays legal in open code (macro_autovars idiom).
     try expectExpand("%macro m;%do i=1 %to 3;[&i]%end;%mend;%m", "[1][2][3]");
     try expectExpand("%macro m;%do i=10 %to 6 %by -2;[&i]%end;%mend;%m", "[10][8][6]");
@@ -5079,7 +5079,7 @@ test "%do with an unresolved bound fails loud, no silent iteration (BUG-macrodou
     try std.testing.expect(std.mem.indexOf(u8, out, "[1]") == null); // body never ran
     try std.testing.expect(std.mem.indexOf(u8, out, "X") != null); // control flows past %end
     // exact SAS wording (NOTE-macroerrwordingfamily): stderr-only, so no fixture
-    // can pin it — a corpus .txt would pass vacuously.
+    // can pin it - a corpus .txt would pass vacuously.
     try std.testing.expectEqualStrings("ERROR: Apparent symbolic reference MAXID not resolved.\n", try d1.render());
 
     // an unresolved START bound is caught too (lowercase source: SAS uppercases
@@ -5089,7 +5089,7 @@ test "%do with an unresolved bound fails loud, no silent iteration (BUG-macrodou
     try std.testing.expect(d2.hasErrors());
     try std.testing.expectEqualStrings("ERROR: Apparent symbolic reference LO not resolved.\n", try d2.render());
 
-    // control: a defined bound (even 0) does NOT error — only unresolved does
+    // control: a defined bound (even 0) does NOT error - only unresolved does
     var d3 = diag.Diagnostics.init(a);
     _ = try expand(a, "%macro m;%let z=0;%do i=1 %to &z;[&i]%end;%mend;%m", &d3);
     try std.testing.expect(!d3.hasErrors());
@@ -5123,7 +5123,7 @@ test "ISS-macroreturn: %return stops the current macro immediately, resumes the 
     try std.testing.expect(std.mem.indexOf(u8, log, "leaving") != null);
     try std.testing.expect(std.mem.indexOf(u8, log, "should not print") == null);
 
-    // GH#4 (qa gate): `%return` in OPEN CODE (no enclosing macro) must NOT unwind —
+    // GH#4 (qa gate): `%return` in OPEN CODE (no enclosing macro) must NOT unwind -
     // that would silently swallow the rest of the program. It errors visibly and
     // open code keeps running (AFTER is still emitted).
     var arena2 = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -5133,11 +5133,11 @@ test "ISS-macroreturn: %return stops the current macro immediately, resumes the 
     const got = try expand(a2, "START%return;AFTER", &diags2);
     try std.testing.expectEqualStrings("STARTAFTER", got);
     // SEV-returnopencode: exact SAS wording (App.2 printed p.500) at SAS's own
-    // severity — ERROR, not WARNING. stderr-only, so no corpus fixture can pin it
+    // severity - ERROR, not WARNING. stderr-only, so no corpus fixture can pin it
     // (a stdout diff passes vacuously); pinned via the captured reporter (D-003).
     try std.testing.expectEqualStrings("ERROR: The %RETURN statement is not valid in open code.\n", try diags2.render());
     // The observable halves of the severity change: exit code 1 (D-009
-    // user-program error — the hasErrors→exitCode mapping is pinned in diag.zig's
+    // user-program error - the hasErrors→exitCode mapping is pinned in diag.zig's
     // D-009 test)…
     try std.testing.expect(diags2.hasErrors());
     try std.testing.expectEqual(@as(u8, 1), diag.exitCode(false, diags2.hasErrors()));
@@ -5152,10 +5152,10 @@ test "SEV-opencodefamilyrest: open-code %LOCAL ERRORS (was a silent declare)" {
     defer arena.deinit();
     const a = arena.allocator();
     // `%local` in open code used to silently declare at exit 0 with NO diagnostic
-    // — a silent no-op on invalid SAS, the failure class house rules put first.
+    // - a silent no-op on invalid SAS, the failure class house rules put first.
     // App.2 ERROR Messages section, printed p.500 (pdf 515, +15 offset): "Error:
     // The %LOCAL statement is not valid in open code." stderr-only, so no corpus
-    // fixture can pin it (a stdout diff passes vacuously) — pinned via the
+    // fixture can pin it (a stdout diff passes vacuously) - pinned via the
     // captured reporter (D-003), exactly as SEV-returnopencode's test.
     var d = diag.Diagnostics.init(a);
     const got = try expand(a, "%local x;AFTER", &d);
@@ -5170,7 +5170,7 @@ test "SEV-opencodefamilyrest: open-code %LOCAL ERRORS (was a silent declare)" {
     try std.testing.expect(!d.hasStepErrors());
     // Inside a macro %local still declares (the guard is open-code-only).
     try expectExpand("%macro m;%local x;%let x=hi;[&x]%mend;%m", "[hi]");
-    // %GLOBAL is NOT in the family — still valid in open code.
+    // %GLOBAL is NOT in the family - still valid in open code.
     try expectExpand("%global g;%let g=ok;&g", "ok");
 }
 
@@ -5180,9 +5180,9 @@ test "SEV-opencodefamilyrest: open-code %END ERRORS (was unresolved-macro WARNIN
     const a = arena.allocator();
     // A stray open-code `%end` (the classic missing/misspelled %MEND tell) fell
     // through to "WARNING: Apparent invocation of macro END not resolved." at
-    // exit 0 — wrong message and wrong severity. App.2 ERROR Messages section,
+    // exit 0 - wrong message and wrong severity. App.2 ERROR Messages section,
     // printed p.500 (pdf 515, +15 offset): "Error: The %END statement is not
-    // valid in open code." Captured reporter (D-003) — stderr-only, a corpus
+    // valid in open code." Captured reporter (D-003) - stderr-only, a corpus
     // fixture would pass vacuously.
     var d = diag.Diagnostics.init(a);
     const got = try expand(a, "START%end;AFTER", &d);
@@ -5191,7 +5191,7 @@ test "SEV-opencodefamilyrest: open-code %END ERRORS (was unresolved-macro WARNIN
     try std.testing.expectEqualStrings("ERROR: The %END statement is not valid in open code.\n", try d.render());
     try std.testing.expect(d.hasErrors());
     try std.testing.expectEqual(@as(u8, 1), diag.exitCode(false, d.hasErrors()));
-    try std.testing.expect(!d.hasStepErrors()); // macro_scoped — no step-skip
+    try std.testing.expect(!d.hasStepErrors()); // macro_scoped - no step-skip
     // Open-code %if … %then %do;…%end; blocks stay accepted (M5+, pinned by
     // macro_autovars/macro_runtimescope): their %end never reaches handlePercent.
     try expectExpand("%if 1 %then %do;yes%end;after", "yesafter");
@@ -5201,7 +5201,7 @@ test "SEV-opencodefamilyrest: open-code %ABORT ERRORS and CONTINUES (was a halt)
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
-    // Open-code %ABORT used to set `aborting` and drop the rest of the program —
+    // Open-code %ABORT used to set `aborting` and drop the rest of the program -
     // too strict: App.2 lists it in the same ERROR Messages family (printed
     // p.500, pdf 515 +15 offset: "Error: The %ABORT statement is not valid in
     // open code."), and SAS reports the error and CONTINUES. The RELAXATION only
@@ -5209,18 +5209,18 @@ test "SEV-opencodefamilyrest: open-code %ABORT ERRORS and CONTINUES (was a halt)
     var d = diag.Diagnostics.init(a);
     const got = try expand(a, "before %abort; after-abort", &d);
     // The real content: text after the open-code %abort STILL EXPANDS (a later
-    // step still runs) — pre-fix this came back "before ".
+    // step still runs) - pre-fix this came back "before ".
     try std.testing.expectEqualStrings("before  after-abort", got);
     try std.testing.expectEqualStrings("ERROR: The %ABORT statement is not valid in open code.\n", try d.render());
     try std.testing.expect(d.hasErrors());
     try std.testing.expectEqual(@as(u8, 1), diag.exitCode(false, d.hasErrors()));
-    try std.testing.expect(!d.hasStepErrors()); // macro_scoped — no step-skip
+    try std.testing.expect(!d.hasStepErrors()); // macro_scoped - no step-skip
     // The in-macro halt is NOT relaxed: still loud, still drops later text
     // (same assertions as NOTE-macroloudlabels, pinned against this change).
     var d2 = diag.Diagnostics.init(a);
     const out2 = try expand(a, "%macro m;%abort;%mend;before %m after-abort", &d2);
     try std.testing.expectEqualStrings("before ", out2);
-    try std.testing.expectEqualStrings("ERROR: %ABORT is not supported — halting execution\n", try d2.render());
+    try std.testing.expectEqualStrings("ERROR: %ABORT is not supported - halting execution\n", try d2.render());
 }
 
 test "%if / %then / %else, numeric and default-truthy" {
@@ -5261,7 +5261,7 @@ test "%eval saturates on i64 overflow (BUG-evaloverflow), never crashes" {
     try expectExpand("[%eval(9999999999 * 9999999999)]", "[9223372036854775807]"); // product → MAX
     try expectExpand("[%eval(-9223372036854775807 - 2)]", "[-9223372036854775808]"); // → MIN
     try expectExpand("[%eval(-9999999999 * 9999999999)]", "[-9223372036854775808]"); // → MIN
-    // BUG-macropow: `**` exponentiates (used to degrade to 0) — binds tighter
+    // BUG-macropow: `**` exponentiates (used to degrade to 0) - binds tighter
     // than unary minus, right-associative, saturating on overflow.
     try expectExpand("[%eval(2**10)][%eval(3**3)][%eval(2**0)]", "[1024][27][1]");
     try expectExpand("[%eval(-2**2)][%eval(2**3**2)][%eval(2*3**2)]", "[-4][512][18]");
@@ -5314,12 +5314,12 @@ test "BUG-macrodowhilehang: nested %let in a %let value errors loud, never hangs
     // Well-formed loops are untouched: run to normal completion, no error.
     try expectExpand("%macro w;%let i=1;%do %while(&i <= 3);[&i]%let i=%eval(&i+1);%end;%mend;%w", "[1][2][3]");
     try expectExpand("%macro u;%let k=0;%do %until(&k >= 3);[&k]%let k=%eval(&k+1);%end;%mend;%u", "[0][1][2]");
-    // NR-quoted `%let` TEXT is a value, not a statement — must NOT error.
+    // NR-quoted `%let` TEXT is a value, not a statement - must NOT error.
     // %nrstr is the ONLY in-value route that masks `%` (printed p.342: "In
     // addition, %NRSTR also masks the following characters: & %"); %str and
     // quotation marks do not (%str(%let) expanding to empty is pre-existing
     // %str semantics, untouched here; a quoted '%let' is a LIVE nested %LET
-    // under the sq_masks_triggers rule and errors — pinned by the ticket test).
+    // under the sq_masks_triggers rule and errors - pinned by the ticket test).
     var arena2 = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena2.deinit();
     var diags2 = diag.Diagnostics.init(arena2.allocator());
@@ -5347,14 +5347,14 @@ test "%global/%local, %do %while/%until, %str/%nrstr, %sysfunc/%sysevalf, %index
     // %global/%local just ensure the name exists in the one global table
     try expectExpand("%global g;%let g=7;&g", "7");
     try expectExpand("%local x;%let x=hi;&x", "hi");
-    // %do %while — tested at the top; body must move the guard var
+    // %do %while - tested at the top; body must move the guard var
     try expectExpand("%let i=1;%do %while(&i < 3);[&i]%let i=%eval(&i+1);%end;", "[1][2]");
-    // %do %until — tested at the bottom, runs at least once
+    // %do %until - tested at the bottom, runs at least once
     try expectExpand("%let k=0;%do %until(&k >= 2);%let k=%eval(&k+1);%end;&k", "2");
     // %length / %index (1-based; 0 when absent)
     try expectExpand("%length(hello)|%index(abcdef,cd)|%index(abc,z)", "5|3|0");
     // %str/%quote/%bquote resolve &/%; %nrstr emits verbatim; %nrbquote/%nrquote
-    // are execution-time — resolve THEN mask (BUG-macronrbquoteresolve).
+    // are execution-time - resolve THEN mask (BUG-macronrbquoteresolve).
     try expectExpand("%let x=9;%str(&x-a)|%nrstr(&x-a)", "9-a|&x-a");
     try expectExpand("%let x=9;%quote(&x-a)|%bquote(&x-a)|%nrbquote(&x-a)|%nrquote(&x-a)", "9-a|9-a|9-a|9-a");
     // %superq yields the unresolved value of the NAMED var; %qupcase masks+uppercases
@@ -5369,7 +5369,7 @@ test "%global/%local, %do %while/%until, %str/%nrstr, %sysfunc/%sysevalf, %index
 
 test "BUG-sysfuncbest: numeric %sysfunc result uses BEST12., not raw f64 precision" {
     // Real SAS renders a numeric %sysfunc result through its default BEST12.
-    // format — 12 columns of significant digits — not full double precision.
+    // format - 12 columns of significant digits - not full double precision.
     try expectExpand("%sysfunc(constant(pi))", "3.1415926536");
     try expectExpand("%sysfunc(sqrt(2))", "1.4142135624");
     try expectExpand("%sysfunc(exp(1))", "2.7182818285");
@@ -5384,24 +5384,24 @@ test "BUG-sysevalfsci: %sysevalf reads scientific-notation exponents" {
     try expectExpand("%sysevalf(1e-2)|%sysevalf(2 + 1e3)|%sysevalf(2.5e2 + 1)", "0.01|1002|251");
 }
 
-test "QA-tick377-F3: %sysevalf evaluates comparisons — its documented reason to exist" {
+test "QA-tick377-F3: %sysevalf evaluates comparisons - its documented reason to exist" {
     // Macro Language Reference printed p.352 (footer-verified): %SYSEVALF
     // "Evaluates arithmetic AND LOGICAL expressions using floating-point
     // arithmetic"; printed p.91: "You must use the %SYSEVALF function to
     // evaluate logical expressions containing floating-point or missing
-    // values." The comparison layer was ABSENT — every operator was silently
+    // values." The comparison layer was ABSENT - every operator was silently
     // dropped and the LEFT OPERAND came back, exit 0.
     try expectExpand("%sysevalf(1.5 ^= 2.5)|%sysevalf(1.5 ne 2.5)", "1|1"); // the F3 repro, A and B
     try expectExpand("%sysevalf(1.5 < 2.5)|%sysevalf(1.5 = 2.5)", "1|0"); // the F3 repro, C and D
     try expectExpand("%sysevalf(2.5 > 1.5)|%sysevalf(2.5 >= 2.5)|%sysevalf(1.5 <= 1.5)", "1|1|1");
     try expectExpand("%sysevalf(1.5 eq 1.5)|%sysevalf(1.5 gt 2.5)|%sysevalf(1.5 lt 2.5)", "1|0|1");
-    // the \xC2\xAC glyph — %EVAL's b2e55324 spelling, the two tokenizers agree
+    // the \xC2\xAC glyph - %EVAL's b2e55324 spelling, the two tokenizers agree
     try expectExpand("%sysevalf(2.5 ¬= 2.5)|%sysevalf(2.5 ¬= 3.5)", "0|1");
     // comparisons bind LOOSER than arithmetic; parens carry a full expression;
     // a conversion type applies to the 1/0 result
     try expectExpand("%sysevalf(1 + 2 = 3)|%sysevalf((1.5 < 2.5) + 1)", "1|2");
     try expectExpand("%sysevalf(1.5 < 2.5, boolean)|%sysevalf(1.5 > 2.5, boolean)", "1|0");
-    // a glued `ne2` is an OPERAND, not the NE operator (tokenizeEval agrees) —
+    // a glued `ne2` is an OPERAND, not the NE operator (tokenizeEval agrees) -
     // here simply a leftover, kept out of the silent-drop class by the F3 loud
     // check below; arithmetic is byte-identical to before (regression guard)
     try expectExpand("%sysevalf(1.5 + 2.5)|%sysevalf(7 / 2)|%sysevalf(2**0.5)", "4|3.5|1.4142135623730951");
@@ -5410,8 +5410,8 @@ test "QA-tick377-F3: %sysevalf evaluates comparisons — its documented reason t
 test "QA-tick377-F3: an operator %sysevalf cannot evaluate is LOUD, never silently dropped" {
     // The F3 root class: unconsumed input came back as the left operand with
     // exit 0. Now: a documented logical operator the float grammar lacks
-    // (and/or/not) is an opensas GAP (D-009 rc 2); garbage — and `in`, which
-    // SAS itself rejects in %SYSEVALF (Restriction, printed p.353) — is the
+    // (and/or/not) is an opensas GAP (D-009 rc 2); garbage - and `in`, which
+    // SAS itself rejects in %SYSEVALF (Restriction, printed p.353) - is the
     // user's own error (rc 1). Captured reporter (D-003), no aborting child.
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -5446,7 +5446,7 @@ test "NOTE-sysevalfempty: an empty %sysevalf() is the verbatim p.354 ERROR, not 
         "%sysevalf()", // null
         "%sysevalf(   )", // one or more blank spaces
         "%let e=;%sysevalf(&e)", // "evaluates to a null value"
-        "%sysevalf(,boolean)", // a conversion type rescues nothing — no EXPRESSION
+        "%sysevalf(,boolean)", // a conversion type rescues nothing - no EXPRESSION
     }) |prog| {
         var d = diag.Diagnostics.init(a);
         const out = try expand(a, prog, &d);
@@ -5454,7 +5454,7 @@ test "NOTE-sysevalfempty: an empty %sysevalf() is the verbatim p.354 ERROR, not 
         try std.testing.expect(std.mem.indexOf(u8, try d.render(), verbatim) != null);
         try std.testing.expect(std.mem.indexOf(u8, out, "0") == null); // never the old silent 0
     }
-    // controls: a real expression does not error — and neither does a PRESENT
+    // controls: a real expression does not error - and neither does a PRESENT
     // missing literal (`%sysevalf(.)` has an expression; it evaluates to `.`).
     for ([_][]const u8{ "%sysevalf(1/3)", "%sysevalf(.)", "%sysevalf(0)" }) |prog| {
         var d = diag.Diagnostics.init(a);
@@ -5492,7 +5492,7 @@ test "macro-indirect &&var&i / &&& ; %superq raw value" {
 test "macro-sysfuncfmt: optional format arg, 2-arg putn, nested %sysfunc" {
     // 2-arg putn applies its own format
     try expectExpand("%sysfunc(putn(21915,date9.))", "01JAN2020");
-    // the optional %sysfunc output format (after the call) — BUG-sysfuncfmt
+    // the optional %sysfunc output format (after the call) - BUG-sysfuncfmt
     try expectExpand("%sysfunc(mdy(1,1,2020),date9.)", "01JAN2020");
     // nested %sysfunc: inner value formatted by the outer putn
     try expectExpand("%sysfunc(putn(%sysfunc(mdy(1,1,2020)),date9.))", "01JAN2020");
@@ -5535,7 +5535,7 @@ test "macro-syscall: %syscall sortn/sortc mutate macro vars" {
 
 test "QA-letindexed: %let resolves macro refs in the TARGET name (vart_&i idiom)" {
     // `%let v_&i=…` assigns v_1, not a literal "v_" (the %do-loop indexed-table
-    // idiom — real SDTM split macros build VART_1..VART_n this way; the broken form lost
+    // idiom - real SDTM split macros build VART_1..VART_n this way; the broken form lost
     // the split rows of every double-coded AE).
     try expectExpand("%let i=1;%let v_&i=HELLO;<&v_1>", "<HELLO>");
     // dotted-terminator form, and && indirection reading it back
@@ -5567,7 +5567,7 @@ test "BUG-macrobareletscope: bare %let of a new name inside a macro is auto-loca
 test "macro-localscope: %local shadows+restores; params are local; %global persists" {
     // %local x shadows the outer x and is restored when the macro returns
     try expectExpand("%macro m;%local x;%let x=in;<&x>%mend;%let x=out;%m<&x>", "<in><out>");
-    // macro parameters are local — do not clobber a same-named global
+    // macro parameters are local - do not clobber a same-named global
     try expectExpand("%macro u(p);<&p>%mend;%let p=G;%u(L)<&p>", "<L><G>");
     // %global persists past the macro
     try expectExpand("%macro g;%global gv;%let gv=keep;%mend;%g<&gv>", "<keep>");
@@ -5612,7 +5612,7 @@ test "BUG-symgetlet: %let vars are visible to SYMGET/SYMEXIST" {
     functions.clearLetVars();
 }
 
-test "QL-C: one evaluator — %if keeps evalBool semantics, %eval gains string compares" {
+test "QL-C: one evaluator - %if keeps evalBool semantics, %eval gains string compares" {
     // %eval string compares (the gap the consolidation fixes): lexical when a
     // side doesn't parse as an integer, numeric otherwise.
     try expectExpand("%eval(abc = abc)", "1");
@@ -5625,7 +5625,7 @@ test "QL-C: one evaluator — %if keeps evalBool semantics, %eval gains string c
     // macro_eval_cond pins the full matrix; these are the sharp edges):
     try expectExpand("%macro m;%if ABC = abc %then y;%else n;%mend;%m", "n"); // case-sensitive lexical
     // BUG-ifbaretruthy (manager call): bare NON-numeric leaves are no longer
-    // truthy — `%if abc` / `%if 0.0` raise the same character-operand ERROR
+    // truthy - `%if abc` / `%if 0.0` raise the same character-operand ERROR
     // %eval does (loud half pinned by the BUG-minoperatoropt test below).
     // Integer leaves keep the nonzero-true reading.
     try expectExpand("%macro m;%if 7 %then y;%else n;%mend;%m", "y");
@@ -5635,7 +5635,7 @@ test "QL-C: one evaluator — %if keeps evalBool semantics, %eval gains string c
     // `¬=` / `^=` / `~=` / NE and lists no fourth form; %EVAL's own entry (p.328)
     // points at that chapter as "a complete discussion". We used to read it as NE,
     // which made `%if &a <> &b` a silent superset. Now it is the same loud
-    // unknown-operator %EVAL error `mod`/`foo` already raise — captured reporter (D-003).
+    // unknown-operator %EVAL error `mod`/`foo` already raise - captured reporter (D-003).
     {
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
         defer arena.deinit();
@@ -5669,7 +5669,7 @@ test "GAP-macrodoindex: the iterative %DO index is re-read, so the body can end 
     try expectExpand("%macro m;%do i=1 %to 5;x&i.%if &i = 2 %then %let i = 99;%end;%mend;%m", "x1x2");
     try expectExpand("%macro m;%do i=5 %to 1 %by -1;d&i.%if &i = 4 %then %let i = -7;%end;%mend;%m", "d5d4");
     // untouched loops are unchanged, and %BY stays evaluated ONCE (same page:
-    // "you cannot change it as the loop iterates") — only the INDEX is re-read.
+    // "you cannot change it as the loop iterates") - only the INDEX is re-read.
     try expectExpand("%macro m;%do i=1 %to 3;y&i.%end;%mend;%m", "y1y2y3");
     try expectExpand("%macro m;%do i=1 %to 6 %by 2;z&i.%end;%mend;%m", "z1z3z5");
     // the terminal value stays the first one that failed the bound (BUG-macrodoscope b)
@@ -5681,7 +5681,7 @@ test "GAP-macrodoindex: the iterative %DO index is re-read, so the body can end 
 
 test "BUG-macroerrnostop: a %EVAL/%IF expression error STOPS the enclosing macro" {
     // Macro Language Reference printed p.162 prints both lines for this class, and
-    // we emitted only the first — so a macro ran on past a condition it could not
+    // we emitted only the first - so a macro ran on past a condition it could not
     // evaluate. Everything after the failing %if must now disappear.
     try expectExpand("%macro m;BEFORE %if abc %then A;AFTER%mend;%m", "BEFORE ");
     try expectExpand("%macro m;BEFORE %if 1 %then A;AFTER%mend;%m", "BEFORE AAFTER"); // clean macro untouched
@@ -5713,7 +5713,7 @@ test "BUG-macroerrnostop: a %EVAL/%IF expression error STOPS the enclosing macro
             try std.testing.expect(std.mem.indexOf(u8, it.message, "macro will stop executing") == null);
     }
     // Division by zero is NOT a documented stop (printed p.506 carries only Cause
-    // and Solution) — it reports and the macro continues. Doc-supported sites only.
+    // and Solution) - it reports and the macro continues. Doc-supported sites only.
     try expectExpand("%macro m;BEFORE %eval(1/0) AFTER%mend;%m", "BEFORE 0 AFTER");
     // printed p.509: an index left non-integer by the body is a loud STOP, which
     // replaces the internal-counter fallback the %DO re-read shipped with.
@@ -5722,7 +5722,7 @@ test "BUG-macroerrnostop: a %EVAL/%IF expression error STOPS the enclosing macro
 
 test "BUG-macroevalnotsign: the two-byte `¬` lexes as NOT / NE in %EVAL's own tokenizer" {
     // Table 6.3 (Macro Language Reference printed p.87-88) lists the glyph on both
-    // the `¬^~ NOT` row and the `¬= ^= ~= NE` row, so it must WORK — the same table
+    // the `¬^~ NOT` row and the `¬= ^= ~= NE` row, so it must WORK - the same table
     // that made `<>` loud by omitting it.
     try expectExpand("%eval(1 ¬= 2)|%eval(5 ¬= 5)", "1|0");
     try expectExpand("%eval(¬0)|%eval(¬1)", "1|0");
@@ -5760,7 +5760,7 @@ test "BUG-macroevalnotsign: `¦` is NOT a macro OR operator and stays loud" {
 
 test "NOTE-sysfuncattrnname: a dataset NAME where %sysfunc wants a DSID fails loud" {
     // Macro Language Reference printed p.518: "Argument value to function value
-    // referenced by the %SYSFUNC or %QSYSFUNC macro function is not a number" —
+    // referenced by the %SYSFUNC or %QSYSFUNC macro function is not a number" -
     // cause "A nonnumeric argument value is used instead of the expected numeric
     // value." It used to char→num coerce to missing, so the run "succeeded" with
     // `.`. Captured reporter (D-003). The positive control (a real DSID from OPEN)
@@ -5784,9 +5784,9 @@ test "NOTE-sysfuncattrnname: a dataset NAME where %sysfunc wants a DSID fails lo
 test "GAP-macrodoindex: a non-advancing %DO index trips the loud guard (QA tick377 F1)" {
     // Re-reading the index makes a non-advancing loop possible, which it was not
     // before (the internal counter always moved). Real SAS spins here; we stop on
-    // the FIRST pass whose index fails to move toward `stop` — never on a raw trip
+    // the FIRST pass whose index fails to move toward `stop` - never on a raw trip
     // count, which truncated legal long loops (F1). Stopping where SAS spins is an
-    // opensas limit: D-009 class 2 (gap), not 1. Captured reporter (D-003) — no
+    // opensas limit: D-009 class 2 (gap), not 1. Captured reporter (D-003) - no
     // aborting child process.
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -5831,13 +5831,13 @@ test "BUG-macroscandelim: a %str-quoted delimiter/needle is unmasked at the macr
     // either (',' is in scan_delims but the subject carried the sentinel).
     try expectExpand("%let m=%str(a,b);[%scan(&m,2)]", "[b]"); // was ""
     try expectExpand("%let m=%str(a,b);[%scan(&m,2,%str(,))]", "[b]");
-    // Unmasked delimiters were always fine — pin that the fix left them alone.
+    // Unmasked delimiters were always fine - pin that the fix left them alone.
     try expectExpand("[%scan(a-b-c,2,-)]", "[b]");
     try expectExpand("%let s=a,b c,d;[%scan(&s,2,%str(-))]", "[]"); // no '-' → one word
 }
 
 test "BUG-macrogroupamasking: Table 7.6 group A masked by the quoting fns (p.162 + NOTE-bquoteblank)" {
-    // p.162's CORRECTED program must produce the documented log lines — before
+    // p.162's CORRECTED program must produce the documented log lines - before
     // this fix %str(and) did not mask the mnemonic, so %conjunct(word=and) said
     // NOT a conjunction and %eval(%str(and) = %str(and)) was 0: the doc's own
     // remedy, silently wrong. %put lands on the captured reporter in tests.
@@ -5854,7 +5854,7 @@ test "BUG-macrogroupamasking: Table 7.6 group A masked by the quoting fns (p.162
     try expectExpand("%let x=%str(and);%if &x = %str(and) %then T;%else F;", "T");
     // The %SCAN dictionary entry (printed p.338) settles the design question:
     // "%SCAN does not mask special characters or mnemonic operators in its
-    // result, even when the argument was previously masked" — the blank still
+    // result, even when the argument was previously masked" - the blank still
     // DELIMITS (the boundary unmask), so this is `a`, never `a b`.
     try expectExpand("[%scan(%str(a b),1)]", "[a]");
     try expectExpand("[%scan(%str(a b),2)]", "[b]");
@@ -5869,7 +5869,7 @@ test "BUG-macrogroupamasking: Table 7.6 group A masked by the quoting fns (p.162
     try std.testing.expect(diags2.hasErrors()); // captured, never a real abort (D-003)
     // A masked special char is character data in %EVAL.
     try expectExpand("[%eval(%str(=) = %str(=))]", "[1]");
-    // NOT stays a live PREFIX operator and AND/OR stay live when BARE — only
+    // NOT stays a live PREFIX operator and AND/OR stay live when BARE - only
     // quoted text is masked (the ticket's two subtleties, kept explicit).
     try expectExpand("[%eval(not 0)][%eval(1 and 0 or 1)]", "[1][1]");
     // A mnemonic inside a larger word is NOT a word token: no masking.
@@ -5879,7 +5879,7 @@ test "BUG-macrogroupamasking: Table 7.6 group A masked by the quoting fns (p.162
     try expectExpand("%if %qscan(a and b,2) = %str(and) %then T;%else F;", "T");
     // The tokenizer unmask is pinned through DIAGNOSTICS: masked-vs-masked
     // comparisons pass with or without it, but the character-operand ERROR must
-    // name the operand 'and' — never the raw sentinel byte in a clinical log.
+    // name the operand 'and' - never the raw sentinel byte in a clinical log.
     var arena3 = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena3.deinit();
     var diags3 = diag.Diagnostics.init(arena3.allocator());
@@ -5894,15 +5894,15 @@ test "GAP-macrocharoperanddetect: a BARE mnemonic in operand position is the p.1
     // p.162's UNCORRECTED program: the bare `and`/`or` being compared "could
     // also be interpreted as the numeric operators AND and OR", so SAS emits
     // the character-operand ERROR pair for ANY argument and the macro prints
-    // neither branch line — it is the PROGRAM that is wrong, not the call.
+    // neither branch line - it is the PROGRAM that is wrong, not the call.
     // Captured reporter, never a real aborting process (D-003).
     var diags = diag.Diagnostics.init(a);
     _ = try expand(a, "%macro conjunct(word= );%if &word = and or &word = but or &word = or %then %put *** &word is a conjunction. ***;%else %put *** &word is not a conjunction. ***;%mend conjunct;%conjunct(word=and)%conjunct(word=but)", &diags);
     const pair = "ERROR: A character operand was found in the %EVAL function or %IF condition where a numeric operand is required: 'and'\n" ++
         "ERROR: The macro will stop executing.\n";
     try std.testing.expectEqualStrings(pair ++ pair, try diags.render());
-    // The same ERROR in open code (%eval) carries no stop line — nothing to
-    // unwind — and names the word AS WRITTEN, case preserved (never a
+    // The same ERROR in open code (%eval) carries no stop line - nothing to
+    // unwind - and names the word AS WRITTEN, case preserved (never a
     // sentinel byte: a bare word carries no mask).
     var d2 = diag.Diagnostics.init(a);
     _ = try expand(a, "%eval(OR = or)", &d2);
@@ -5913,7 +5913,7 @@ test "GAP-macrocharoperanddetect: a BARE mnemonic in operand position is the p.1
     const r3 = try d3.render();
     try std.testing.expect(std.mem.indexOf(u8, r3, "'and'") != null);
     try std.testing.expect(std.mem.indexOf(u8, r3, "'eq'") != null);
-    // CONTROLS — quoted mnemonics stay legal (BUG-macrogroupamasking made them
+    // CONTROLS - quoted mnemonics stay legal (BUG-macrogroupamasking made them
     // arrive masked; unmasking them here would re-break the doc's own remedy).
     try expectExpand("[%eval(%str(and) = %str(and))][%eval(%bquote(and) = %str(and))][%eval(%nrstr(and) = %str(and))]", "[1][1][1]");
     // …and the corrected p.162 program keeps printing the documented lines.
@@ -5932,16 +5932,16 @@ test "GAP-macrocharoperanddetect: a BARE mnemonic in operand position is the p.1
     try std.testing.expect(std.mem.indexOf(u8, r4, "'in'") != null);
     try std.testing.expect(std.mem.indexOf(u8, r4, "'and'") != null);
     // The lone-mnemonic collapse is NOT this ERROR: the scan-loop idiom's
-    // ` ne ` (empty &word) stays the implicit empty-operand compare — false.
+    // ` ne ` (empty &word) stays the implicit empty-operand compare - false.
     try expectExpand("%let l=DM AE;%let i=1;%let d=%scan(&l,&i);%do %while(&d ne );[&d]%let i=%eval(&i+1);%let d=%scan(&l,&i);%end;", "[DM][AE]");
 }
 
 test "BUG-macronrstrmask: %nrstr &-mask survives storage + re-resolution; Q-results mask &" {
-    // The headline repro: %nrstr(&a) stored, then referenced — must stay &a.
+    // The headline repro: %nrstr(&a) stored, then referenced - must stay &a.
     try expectExpand("%let a=one;%let b=%nrstr(&a);[&b]", "[&a]");
     // …referenced twice, and through a second %let hop.
     try expectExpand("%let a=one;%let b=%nrstr(&a);%let c=&b;[&b][&c]", "[&a][&a]");
-    // % masking already survived (no sentinel needed) — pin the asymmetry.
+    // % masking already survived (no sentinel needed) - pin the asymmetry.
     try expectExpand("%macro pct;P%mend;%let e=%nrstr(%pct);[&e]", "[%pct]");
     // Q-function RESULTS mask &: a masked & through %qsubstr/%qupcase stays masked.
     try expectExpand("%let b=one;%let q=%qsubstr(%nrstr(a&b),2,2);[&q]", "[&b]");
@@ -5987,7 +5987,7 @@ test "GAP-macroautocall: %left/%trim/%cmpres + Q-forms" {
 test "GAP-sysrcmacro: %SYSRC expands doc-sourced _IORC_ codes; unsourced mnemonics fail loud" {
     // Language Reference: Concepts-sourced values (Table 23.4 p.599 + worked logs pp.600/603).
     try expectExpand("[%sysrc(_sok)][%sysrc(_DSENOM)][%sysrc( _dsenmr )]", "[0][1230011][1230015]");
-    // _DSEMTR/_SENOCHN are named in Table 23.4 but never valued in the doc —
+    // _DSEMTR/_SENOCHN are named in Table 23.4 but never valued in the doc -
     // fail loud, never guess a return code. Asserted via CAPTURED diagnostics.
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -6034,7 +6034,7 @@ test "GAP-macroevalfloat: %eval errors loud on non-integer operand / invalid tok
     var d4 = diag.Diagnostics.init(a);
     try std.testing.expectEqualStrings("3", try expand(a, "%eval(10 / 3)", &d4));
     try std.testing.expectEqualStrings("", try d4.render());
-    // String COMPARES are not arithmetic — no error (QL-C behavior preserved).
+    // String COMPARES are not arithmetic - no error (QL-C behavior preserved).
     var d5 = diag.Diagnostics.init(a);
     try std.testing.expectEqualStrings("1", try expand(a, "%eval(abc = abc)", &d5));
     try std.testing.expectEqualStrings("", try d5.render());
@@ -6068,7 +6068,7 @@ test "NOTE-macroevalnonint: bare non-integer %eval leaf takes the SAME error pat
 test "NOTE-puttevalpartial: a %put whose own resolution ERRORs does not print the partial line" {
     // Diagnostics render once at end-of-run, so `%put A=%eval(3.5);` printed
     // `A=0` AHEAD of the non-integer ERROR its own resolution recorded. The
-    // 0-substitution is pinned above and stays; the LINE is suppressed — the
+    // 0-substitution is pinned above and stays; the LINE is suppressed - the
     // ERROR stands alone. Captured reporter (D-003): in this channel the line
     // would render as a trailing `NOTE: A=0`, so its absence pins the fix.
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -6156,7 +6156,7 @@ test "BUG-ifbaretruthy: a bare non-numeric %if leaf errors like %eval (no silent
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
-    // `%if abc` — was silently TRUE at exit 0; now the %eval(abc) ERROR.
+    // `%if abc` - was silently TRUE at exit 0; now the %eval(abc) ERROR.
     var d1 = diag.Diagnostics.init(a);
     _ = try expand(a, "%macro z;%if abc %then T;%else F;%mend;%z", &d1);
     // BUG-macroerrnostop: inside a macro the error now carries its p.162 twin.
@@ -6165,7 +6165,7 @@ test "BUG-ifbaretruthy: a bare non-numeric %if leaf errors like %eval (no silent
             "ERROR: The macro will stop executing.\n",
         try d1.render(),
     );
-    // `%if 0.0` — float leaf: %eval(0.0) errors, so %if must too (agreement).
+    // `%if 0.0` - float leaf: %eval(0.0) errors, so %if must too (agreement).
     var d2 = diag.Diagnostics.init(a);
     _ = try expand(a, "%macro z;%if 0.0 %then T;%else F;%mend;%z", &d2);
     try std.testing.expectEqualStrings(
@@ -6206,7 +6206,7 @@ test "BUG-macroevaldivzero: %eval(5/0) errors loud, no silent 0" {
 
 test "BUG-macronrbquoteresolve/BUG-macronrquotemissing: %nrbquote/%nrquote resolve THEN mask" {
     // The headline repro (doc-finder tick138): &x resolves, the RESULT is then
-    // masked — 9-a, not &x-a. %nrquote is the same execution-time group.
+    // masked - 9-a, not &x-a. %nrquote is the same execution-time group.
     try expectExpand("%let x=9;[%nrbquote(&x-a)][%nrquote(&x-a)]", "[9-a][9-a]");
     // the resolved-then-masked value survives storage and re-reference
     try expectExpand("%let x=9;%let q=%nrbquote(&x-a);[&q]", "[9-a]");
@@ -6227,7 +6227,7 @@ test "BUG-macropctmask: %-escaped specials fold to literals inside quoting fns" 
     try expectExpand("%let x=%str(50%%);[&x]", "[50%]");
     try expectExpand("%let x=%nrstr(50%%);[&x]", "[50%]");
     try expectExpand("%let x=%str(a%&b);[&x]", "[a&b]");
-    // an escaped paren is literal text — the %str still balances, no lexer error
+    // an escaped paren is literal text - the %str still balances, no lexer error
     try expectExpand("%let x=%str(a%(b);[&x]", "[a(b]");
     try expectExpand("%let x=%str(a%)b);[&x]", "[a)b]");
     // the 95% CI title idiom
@@ -6256,7 +6256,7 @@ test "GAP-macroautovars: automatic macro variables are seeded" {
     try expectExpand("%length(&sysdate9)|%length(&sysdate)|%length(&systime)", "9|7|5");
     try expectExpand("%if &sysday ne %then D;%else N;", "D");
     // %length form: &SYSSCP is multi-word ("LIN X64"), so a bare `%if &sysscp ne`
-    // is not a valid macro condition (errors, like %eval — BUG-minoperatoropt).
+    // is not a valid macro condition (errors, like %eval - BUG-minoperatoropt).
     try expectExpand("%if %length(&sysscp) %then S;%else N;", "S");
     // an UNKNOWN &SYSxxx warns instead of passing through silently
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -6271,7 +6271,7 @@ test "GAP-macroautovars: automatic macro variables are seeded" {
     // An undefined ORDINARY &var stays quiet HERE, and that is not an oversight:
     // the free `expand` has no execution callback, so no step ever consumes this
     // text and late binding is still possible for all it knows. It is RECORDED
-    // instead, and warned at the step that consumes it — see the
+    // instead, and warned at the step that consumes it - see the
     // CLIN-macrounresolvedsilent test below for both directions.
     var d2 = diag.Diagnostics.init(a);
     _ = try expand(a, "&ordinary", &d2);
@@ -6283,7 +6283,7 @@ test "GAP-sysparm-opt: &SYSPARM reads the shared session value live" {
     try expectExpand("[&sysparm]", "[]");
     // `options sysparm="PROBE123";` (main.zig handleGlobal) wrote the shared
     // value; getVar returns it LIVE, so a reference after the statement sees
-    // it — no re-seed, no table write.
+    // it - no re-seed, no table write.
     functions.sysparm_text = "PROBE123";
     defer functions.sysparm_text = "";
     try expectExpand("[&sysparm]", "[PROBE123]");
@@ -6292,7 +6292,7 @@ test "GAP-sysparm-opt: &SYSPARM reads the shared session value live" {
 test "CLIN-macrounresolvedsilent: an unresolved &name warns at the step that CONSUMES it, never before" {
     // Timing is the whole ticket, so the harness reproduces the production
     // handoff rather than approximating it: expandExec flushes each `run;` step,
-    // and the callback does what main.zig's interleaveStep -> runExpanded does —
+    // and the callback does what main.zig's interleaveStep -> runExpanded does -
     // tokenize, give the exec->macro queue its LAST chance via `bindStepVars`,
     // and only THEN let this step's CALL SYMPUT publish. That ordering is the
     // reason a same-step reference cannot be rescued (Macro Language Reference
@@ -6312,7 +6312,7 @@ test "CLIN-macrounresolvedsilent: an unresolved &name warns at the step that CON
             // step, after the previous step has executed and published. Emulating
             // that split matters: it is the route that saves the third arm below,
             // and collapsing it into a single bind call is what an unfaithful
-            // harness does — it invents a false positive the real CLI never has.
+            // harness does - it invents a false positive the real CLI never has.
             var start: usize = 0;
             var i: usize = 1;
             while (i <= toks.len) : (i += 1) {
@@ -6350,7 +6350,7 @@ test "CLIN-macrounresolvedsilent: an unresolved &name warns at the step that CON
         try H.log(a, "data _null_; y = \"&nosuchvar\"; run;"),
     );
 
-    // D-004 / BUG-macrointerleave — THE REGRESSION THIS MUST NOT CAUSE. A prior
+    // D-004 / BUG-macrointerleave - THE REGRESSION THIS MUST NOT CAUSE. A prior
     // step's CALL SYMPUT binds the reference, so it must stay SILENT. This is the
     // idiom that took the study meter 0/27 -> 26/27; warning here would be the false
     // positive that makes the whole diagnostic worse than the silence it replaces.
@@ -6359,13 +6359,13 @@ test "CLIN-macrounresolvedsilent: an unresolved &name warns at the step that CON
 
     // The same idiom through the OTHER late-bind route: two steps, ONE `run;`, so
     // the reference is scanned while `v` is still unknown and only `bindStepVars`
-    // can save it. Also silent — this is the case that rules out discharging at
+    // can save it. Also silent - this is the case that rules out discharging at
     // the flush instead of inside bindStepVars.
     try std.testing.expectEqualStrings("", try H.log(a,
         "data a; call symput(\"v\",\"bound\"); data b; x = \"&v\"; run;"));
 
     // Printed p.158, the doc's own flagship: CALL SYMPUT in the SAME step is too
-    // late — "As this DATA step is tokenized and compiled, the & causes the word
+    // late - "As this DATA step is tokenized and compiled, the & causes the word
     // scanner to trigger the macro processor ... Because such an entry does not
     // exist, the macro processor generates the warning message."
     try std.testing.expectEqualStrings(
@@ -6375,10 +6375,10 @@ test "CLIN-macrounresolvedsilent: an unresolved &name warns at the step that CON
 
     // FALSE-POSITIVE CONTROLS. Post-lex these are indistinguishable from a real
     // reference, which is why the warning is gated on what the SCANNER recorded:
-    //   * `a & b` is logical AND — printed p.21 makes a trigger an ampersand
+    //   * `a & b` is logical AND - printed p.21 makes a trigger an ampersand
     //     "followed by a nonblank character", so the blank disqualifies it;
-    //   * `'AT&T'` is single-quoted — never resolved, never warned (printed p.38);
-    //   * `%nrstr(&Stacy)` is masked — printed p.106 says in as many words that
+    //   * `'AT&T'` is single-quoted - never resolved, never warned (printed p.38);
+    //   * `%nrstr(&Stacy)` is masked - printed p.106 says in as many words that
     //     %NRSTR means "the macro processor does not issue warning messages for
     //     unresolvable macro variable references". Doc's own example, verbatim.
     try std.testing.expectEqualStrings("", try H.log(a,
@@ -6397,12 +6397,12 @@ test "CLIN-macrounresolvedsilent: an unresolved &name warns at the step that CON
 
 test "NOTE-putunresolvedwarn: %PUT warns for a reference it prints unresolved (p.152)" {
     // SAS 9.4 Macro Language: Reference, Fifth Edition, printed p.152 shows the
-    // log of exactly this case carrying BOTH halves — the %PUT line with the
+    // log of exactly this case carrying BOTH halves - the %PUT line with the
     // reference standing verbatim, AND "WARNING: Apparent symbolic reference
     // MACVAR not resolved." We printed only the line, which is what made the
     // whole CALL SYMPUT scope trap read as silent to a reporter: the same
-    // program in a DATA step warned correctly, and %PUT — the debugging
-    // statement you reach for to find out what went wrong — did not.
+    // program in a DATA step warned correctly, and %PUT - the debugging
+    // statement you reach for to find out what went wrong - did not.
     //
     // NO CORPUS FIXTURE: both the %PUT line and the WARNING travel on stderr,
     // and the corpus diffs stdout, so a fixture would be the vacuous 0-byte
@@ -6424,33 +6424,33 @@ test "NOTE-putunresolvedwarn: %PUT warns for a reference it prints unresolved (p
     try S.log("%put A[&zzz];", "WARNING: Apparent symbolic reference ZZZ not resolved.\n" ++
         "NOTE: A[&zzz]\n");
 
-    // A resolved reference stays quiet — the warning is about failure, not about
+    // A resolved reference stays quiet - the warning is about failure, not about
     // the presence of an `&`.
     try S.log("%let known=ok;%put R[&known];", "NOTE: R[ok]\n");
 
     // THE SAME FALSE-POSITIVE CONTROLS as the step path, because they run
-    // through the SAME `g_unresolved` gate — but every arm here rests on the
+    // through the SAME `g_unresolved` gate - but every arm here rests on the
     // rule that actually governs MACRO statements (NOTE-putsinglequoteamp):
     //
-    //   * `a & b` is not a trigger — Macro Ref printed p.21 defines a macro
+    //   * `a & b` is not a trigger - Macro Ref printed p.21 defines a macro
     //     trigger as "an ampersand (&) or percent sign (%) followed by a
     //     nonblank character", so the blank disqualifies it;
-    //   * `'AT&T'` WARNS — quotation marks are ordinary characters to the
+    //   * `'AT&T'` WARNS - quotation marks are ordinary characters to the
     //     macro processor; masking `&` requires an NR quoting function
     //     (printed p.7: "You must use a macro quoting function to mask the
     //     special characters", about assigning a value containing ampersands
     //     to a macro variable; Table 7.2 printed p.100, `%name &name`:
     //     "%NRSTR, %NRBQUOTE, and %NRQUOTE mask these patterns"; printed
     //     p.342: "In addition, %NRSTR also masks the following characters:
-    //     & %"). 85087c38 asserted SILENCE here citing printed p.38 — but
+    //     & %"). 85087c38 asserted SILENCE here citing printed p.38 - but
     //     p.38 ("Macro Variable Reference") is the SAS-STATEMENT rule: its
     //     own example is a TITLE statement, i.e. quoted string literals in
     //     compiler-bound text. It does not govern %PUT, and the old arm
-    //     passed only because T was never recorded as a trigger — a control
+    //     passed only because T was never recorded as a trigger - a control
     //     passing by accident (QA F3);
     //   * `%nrstr(&hidden)` is the masking route the rule names, and is
     //     explicitly warning-free (printed p.106). This arm also proves the
-    //     scan happens BEFORE unmaskTriggers — one line later the sentinel
+    //     scan happens BEFORE unmaskTriggers - one line later the sentinel
     //     is a plain `&` and would have matched.
     try S.log("%put R[a & b];", "NOTE: R[a & b]\n");
     try S.log("%put R['AT&T'];", "WARNING: Apparent symbolic reference T not resolved.\n" ++
@@ -6506,7 +6506,7 @@ test "GAP-macroautovars: &SYSERR is 0 clean and flips sticky after a step error"
         Fake.run,
     );
     try std.testing.expectEqualStrings("\nCLEAN", clean);
-    // after a step error the branch flips (and stays flipped — sticky)
+    // after a step error the branch flips (and stays flipped - sticky)
     var d2 = diag.Diagnostics.init(a);
     var s2 = Session.init(a, &d2);
     const errored = try s2.expandExec(
@@ -6580,7 +6580,7 @@ test "GAP-macroautofeatures: %put _user_/_local_/_automatic_/_all_ dump the tabl
     _ = try expand(a, "%global g;%let g=1;%put _user_;", &d1);
     try std.testing.expectEqualStrings("NOTE: GLOBAL G 1\n", try d1.render());
     // _local_ inside a macro lists params and auto-locals with their values.
-    // Scope column is the OWNING MACRO'S NAME, not the word LOCAL — printed p.419,
+    // Scope column is the OWNING MACRO'S NAME, not the word LOCAL - printed p.419,
     // _LOCAL_: "The scope is the name of the currently executing macro"
     // (NOTE-userscopename).
     var d2 = diag.Diagnostics.init(a);
@@ -6660,7 +6660,7 @@ test "BUG-symputscope: CALL SYMPUT lands in the closest NONEMPTY symbol table (p
     try std.testing.expectEqualStrings("NOTE: GLOBAL MYVAR a token\n", r0);
 
     // "the CLOSEST nonempty symbol table": INNER's frame is empty, so the
-    // variable belongs to OUTER's and dies with OUTER, not with INNER — and the
+    // variable belongs to OUTER's and dies with OUTER, not with INNER - and the
     // scope column now SAYS OUTER, so this pins the frame identity rather than
     // just "it is local to something".
     var dn = diag.Diagnostics.init(a);
@@ -6675,11 +6675,11 @@ test "BUG-symputnoupdate: CALL SYMPUT UPDATES an existing enclosing variable (p.
     // exist, SYMPUT creates it." The corpus fixture (macroedge_symput_update)
     // pins the VALUES a program can observe; WHICH SCOPE the value landed in is
     // only ever visible through `%put _user_`, i.e. stderr, which the corpus does
-    // not diff — so the classification is asserted here, on the captured reporter.
+    // not diff - so the classification is asserted here, on the captured reporter.
     const H = struct {
         // Same faithful pair as the p.77 test above: exec.zig asks `symputLocal`
         // first and, on false, writes Library.macro_vars, which main.zig's drain
-        // pushes back through `seedVar` — so the false branch is a real GLOBAL.
+        // pushes back through `seedVar` - so the false branch is a real GLOBAL.
         fn step(ctx: *anyopaque, _: []const u8) Error!void {
             const s: *Session = @ptrCast(@alignCast(ctx));
             if (!try symputLocal("gv", "a token", .default)) try s.seedVar("gv", "a token");
@@ -6697,7 +6697,7 @@ test "BUG-symputnoupdate: CALL SYMPUT UPDATES an existing enclosing variable (p.
 
     // THE TICKET, and printed p.152's prescribed remedy: %GLOBAL inside a
     // PARAMETERIZED macro (non-empty local table). GV exists in an enclosing
-    // scope, so it is UPDATED there — it must survive as GLOBAL, not as the dead
+    // scope, so it is UPDATED there - it must survive as GLOBAL, not as the dead
     // local shadow rule 1 alone would have created.
     var d1 = diag.Diagnostics.init(a);
     try std.testing.expectEqualStrings(
@@ -6733,7 +6733,7 @@ test "BUG-symputnoupdate: CALL SYMPUT UPDATES an existing enclosing variable (p.
 
 test "NOTE-userscopename: %put _user_ names the OWNING MACRO as the scope, not LOCAL" {
     // NO CORPUS FIXTURE, deliberately: this divergence has no DATA-step-visible
-    // consequence at all — the scope column exists only in `%put _user_`/`_local_`
+    // consequence at all - the scope column exists only in `%put _user_`/`_local_`
     // output, which goes to stderr, and the corpus diffs stdout. A fixture would
     // be the exact 0-byte-golden vacuous pass the house rules warn about. The
     // captured diagnostics reporter is the only honest place to assert it, and
@@ -6743,7 +6743,7 @@ test "NOTE-userscopename: %put _user_ names the OWNING MACRO as the scope, not L
     // Macro Statement": _USER_ "lists user-generated global and local macro
     // variables. The scope is identified either as GLOBAL, or as the name of the
     // macro in which the macro variable is defined." Placement is untouched here
-    // — BUG-symputscope owns that and its own test/fixture still pin it.
+    // - BUG-symputscope owns that and its own test/fixture still pin it.
     const S = struct {
         fn log(src: []const u8, want: []const u8) !void {
             var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -6755,7 +6755,7 @@ test "NOTE-userscopename: %put _user_ names the OWNING MACRO as the scope, not L
         }
     };
 
-    // printed p.421, Example 3 — reproduced verbatim, values and ORDER. Details on
+    // printed p.421, Example 3 - reproduced verbatim, values and ORDER. Details on
     // p.419: "listed in order from the current local macro variables outward to
     // the global macro variables". A flat sort of the rendered lines put GLOBAL
     // first (G < L), i.e. backwards.
@@ -6769,26 +6769,26 @@ test "NOTE-userscopename: %put _user_ names the OWNING MACRO as the scope, not L
         "%let foot=Preliminary Data;%macro myprint(name);%mend;%myprint(consumer)%put _user_;",
         "NOTE: GLOBAL FOOT Preliminary Data\n",
     );
-    // printed p.170: TOTINV — a %GLOBAL declared inside the macro still reports
+    // printed p.170: TOTINV - a %GLOBAL declared inside the macro still reports
     // GLOBAL, so the column tracks the OWNING TABLE and not "was I in a macro".
     try S.log(
         "%macro totinv(var);%global macvar;%let macvar=1240800;%put _USER_;%mend;%let trace=ON;%totinv(price)",
         "NOTE: TOTINV VAR price\nNOTE: GLOBAL MACVAR 1240800\nNOTE: GLOBAL TRACE ON\n",
     );
     // Nested frames: innermost first, then outward, then global. Each carries its
-    // OWN macro's name — one shared "LOCAL" could not have distinguished them.
+    // OWN macro's name - one shared "LOCAL" could not have distinguished them.
     try S.log(
         "%let g=0;%macro inner(q);%put _user_;%mend;%macro outer(p);%inner(9)%mend;%outer(1)",
         "NOTE: INNER Q 9\nNOTE: OUTER P 1\nNOTE: GLOBAL G 0\n",
     );
     // _LOCAL_ is "the currently executing macro" only (printed p.419-420, and
-    // Figure 19.1 labels _LOCAL_ "(current macro only)") — the enclosing OUTER's P
+    // Figure 19.1 labels _LOCAL_ "(current macro only)") - the enclosing OUTER's P
     // is NOT listed, though _USER_ above lists it.
     try S.log(
         "%let g=0;%macro inner(q);%put _local_;%mend;%macro outer(p);%inner(9)%mend;%outer(1)",
         "NOTE: INNER Q 9\n",
     );
-    // _GLOBAL_ and _AUTOMATIC_ say GLOBAL/AUTOMATIC as before — printed p.419
+    // _GLOBAL_ and _AUTOMATIC_ say GLOBAL/AUTOMATIC as before - printed p.419
     // fixes those two words, and only the local column ever named a macro.
     try S.log("%macro m(p);%global g;%let g=1;%put _global_;%mend;%m(2)", "NOTE: GLOBAL G 1\n");
     // A macro variable %LOCAL'd but never assigned still belongs to the frame:
@@ -6815,7 +6815,7 @@ test "GAP-macrosymdel: %symdel deletes macro vars (warn unless NOWARN)" {
     var d1 = diag.Diagnostics.init(a);
     _ = try expand(a, "%symdel nosuch;", &d1);
     try std.testing.expectEqualStrings(
-        "WARNING: apparent attempt to delete macro variable NOSUCH failed — variable not found\n",
+        "WARNING: apparent attempt to delete macro variable NOSUCH failed - variable not found\n",
         try d1.render(),
     );
     // … unless NOWARN
@@ -6828,7 +6828,7 @@ test "F10 symbol-table diagnostics: symdel-automatic / %global-of-local / %let n
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
-    // 1. %SYMDEL of an AUTOMATIC: SAS protects automatics — &SYSDATE9 must
+    // 1. %SYMDEL of an AUTOMATIC: SAS protects automatics - &SYSDATE9 must
     // survive (was really deleted; every later reference silently unresolved).
     var d1 = diag.Diagnostics.init(a);
     const o1 = try expand(a, "%symdel sysdate9;[&sysdate9]", &d1);
@@ -6838,7 +6838,7 @@ test "F10 symbol-table diagnostics: symdel-automatic / %global-of-local / %let n
     try std.testing.expect(std.mem.indexOf(u8, o1, "&sysdate9") == null); // still resolves
     // a USER variable still deletes cleanly (no false protection). The sys*
     // prefix is the automatic classifier (dumpPutVars precedent: SAS reserves
-    // the prefix), so a user-created sys* name is protected too — no real
+    // the prefix), so a user-created sys* name is protected too - no real
     // program names one.
     try expectExpand("%let mine=1;%symdel mine;[%symexist(mine)]", "[0]");
 
@@ -6846,7 +6846,7 @@ test "F10 symbol-table diagnostics: symdel-automatic / %global-of-local / %let n
     var d2 = diag.Diagnostics.init(a);
     _ = try expand(a, "%macro m;%local x;%let x=1;%global x;%mend;%m", &d2);
     try std.testing.expectEqualStrings("ERROR: Attempt to %GLOBAL a name (X) which exists in a local environment\n", try d2.render());
-    // PRESERVE: the %global-first result-var idiom and idempotent %global — clean.
+    // PRESERVE: the %global-first result-var idiom and idempotent %global - clean.
     var c2 = diag.Diagnostics.init(a);
     _ = try expand(a, "%macro m;%global y;%let y=1;%mend;%m%global g;%global g;", &c2);
     try std.testing.expectEqualStrings("", try c2.render());
@@ -6860,10 +6860,10 @@ test "F10 symbol-table diagnostics: symdel-automatic / %global-of-local / %let n
     _ = try expand(a, "%let 1bad=2;", &d4);
     try std.testing.expectEqualStrings("ERROR: %LET: '1bad' is not a valid macro variable name (1–32 chars, letter/underscore start)\n", try d4.render());
     // PRESERVE: the indexed-name idiom resolves and assigns (auto-locals, so
-    // referenced INSIDE the macro — BUG-macrobareletscope).
+    // referenced INSIDE the macro - BUG-macrobareletscope).
     try expectExpand("%macro m;%do i=1 %to 2;%let vart_&i. = v&i;%end;[&vart_1][&vart_2]%mend;%m", "[v1][v2]");
 
-    // 4. MINDELIMITER= takes ONE character — both the OPTIONS-statement and the
+    // 4. MINDELIMITER= takes ONE character - both the OPTIONS-statement and the
     // %macro-option sites error on multi-char (was: first byte kept silently).
     var d5 = diag.Diagnostics.init(a);
     _ = try expand(a, "options mindelimiter='xyz';", &d5);
@@ -6880,11 +6880,11 @@ test "F12 automatics fidelity: trimmed &SYSDAY, %put &=name, honest SYSNCPU/SYSU
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
-    // &SYSDAY is the trimmed day name — DOWNAME.'s blank pad to width 9 was an
+    // &SYSDAY is the trimmed day name - DOWNAME.'s blank pad to width 9 was an
     // artefact of the format route and leaked into text uses. Date-independent:
     // a trimmed value equals its own %trim.
     try expectExpand("%if %length(&sysday) = %length(%trim(&sysday)) %then T;%else F;", "T");
-    // `%put &=name;` — the name-and-value form (was literal passthrough).
+    // `%put &=name;` - the name-and-value form (was literal passthrough).
     var d1 = diag.Diagnostics.init(a);
     _ = try expand(a, "%let x=5;%put &=x;", &d1);
     try std.testing.expectEqualStrings("NOTE: X=5\n", try d1.render());
@@ -6896,7 +6896,7 @@ test "F12 automatics fidelity: trimmed &SYSDAY, %put &=name, honest SYSNCPU/SYSU
     _ = try expand(a, "%put &=sysnosuch;", &d3);
     try std.testing.expect(std.mem.indexOf(u8, try d3.render(), "not resolved") != null);
     // SYSNCPU/SYSUSERID/SYSHOSTNAME are seeded ONLY when the host honestly
-    // supplies the fact — the assertion mirrors the seed condition, and the
+    // supplies the fact - the assertion mirrors the seed condition, and the
     // value must BE the host's value (never a constant).
     if (std.Thread.getCpuCount()) |_| {
         try expectExpand("%if &sysncpu >= 1 %then C;%else N;", "C");
@@ -6911,7 +6911,7 @@ test "F12 automatics fidelity: trimmed &SYSDAY, %put &=name, honest SYSNCPU/SYSU
         const got = try expand(a, "[&syshostname]", &d5);
         try std.testing.expectEqualStrings(try std.fmt.allocPrint(a, "[{s}]", .{h}), got);
     }
-    // Unsourceable automatics stay loud — a guessed constant is the
+    // Unsourceable automatics stay loud - a guessed constant is the
     // BUG-syslastrefresh trap, worse than no value.
     var d6 = diag.Diagnostics.init(a);
     _ = try expand(a, "&sysvlong", &d6);

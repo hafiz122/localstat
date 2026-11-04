@@ -1,7 +1,7 @@
-/* doc-finder tick214: INTCK/INTNX interval audit — verified-correct values only.
+/* doc-finder tick214: INTCK/INTNX interval audit - verified-correct values only.
    Boundary counting, multipliers, shift-index, alignment, DT/time, WEEKDAY,
    ISO WEEKV. Each value hand-checked against SAS 9.4 documented behavior.
-   (DT-month-family CONTINUOUS and invalid-alignment cases are NOT here —
+   (DT-month-family CONTINUOUS and invalid-alignment cases are NOT here -
    they are open findings in docs/findings/doc-finder-tick214.md.) */
 data _null_;
   /* INTCK boundary crossings */

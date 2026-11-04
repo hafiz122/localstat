@@ -1,6 +1,6 @@
 /* BUG-macrodoscope: the iterative %do index (a) is LOCAL to the macro that
    owns the loop when the name is brand-new (raw setVar leaked it to global),
-   and (b) ends at the FIRST value past the bound — start + k*step (SAS 9.4),
+   and (b) ends at the FIRST value past the bound - start + k*step (SAS 9.4),
    not the last in-range value. */
 %macro loop;
   %do i = 1 %to 3;
@@ -22,7 +22,7 @@ data _null_; put "I-SURVIVES=%symexist(i)"; run;
 data _null_; put "J-SURVIVES=%symexist(j)"; run;
 
 /* a pre-existing GLOBAL name updates in place (nearest existing scope,
-   never a shadow) — same rule %let follows (BUG-macrobareletscope) */
+   never a shadow) - same rule %let follows (BUG-macrobareletscope) */
 %let g=OLD;
 %macro upd;
   %do g = 1 %to 2;

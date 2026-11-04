@@ -1,4 +1,4 @@
-/* V-attribute functions read a variable's FORMAT by reference (non-X forms) —
+/* V-attribute functions read a variable's FORMAT by reference (non-X forms) -
    unblocked by EXEC-varattr. corpus-vfuncs. */
 data _null_;
   amt = 1234.5;

@@ -1,4 +1,4 @@
-/* BUG-scanmmod: SCAN's 'm' modifier (4th arg) was ignored — the function always
+/* BUG-scanmmod: SCAN's 'm' modifier (4th arg) was ignored - the function always
    merged runs of delimiters (tokenizeAny) and never read the modifier arg. With
    'm', consecutive and edge delimiters each yield a NULL token, so token indexing
    shifts. Guard: default (no 'm') still merges delimiter runs. */

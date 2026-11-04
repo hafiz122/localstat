@@ -37,12 +37,12 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const n = toNum(args[3]);
         if (isMiss(r)) return domErr(ev, name); // solving for the rate is unsupported
         // GAP-mortnonote (doc p.1215): out-of-range args must log an invalid-
-        // argument NOTE and return missing — was silent NaN→missing. Per the
+        // argument NOTE and return missing - was silent NaN→missing. Per the
         // doc's five bullets, applied per solve direction: r≤−1 (r=−1 also
         // 0-divides), n<0; solve-p: a≤0 or n≤0; solve-a: p≤0; solve-n: a≤0,
         // p≤0, or a·r≥p (payment must cover the per-period interest; equality
         // → n=∞). ponytail: SAS also sets _ERROR_=1; we emit only the NOTE
-        // (the MISC-fnseterror infra gap — plumb _ERROR_ through the PDV later).
+        // (the MISC-fnseterror infra gap - plumb _ERROR_ through the PDV later).
         if ((r <= -1 or n < 0) or
             (isMiss(p) and (a <= 0 or n <= 0)) or
             (isMiss(a) and p <= 0) or
@@ -65,7 +65,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const n = toNum(args[3]);
         if (isMiss(r)) return domErr(ev, name);
         // BUG-savingdomain: out-of-range args must log an invalid-argument NOTE
-        // and return missing — was silent nonsense (e.g. negative period count).
+        // and return missing - was silent nonsense (e.g. negative period count).
         // Mechanical mirror of MORT's guard above, f↔a positional (a,f,r,n≥0);
         // the solve-for `.` arg is exempt (isMiss → comparison is false on NaN).
         if ((r <= -1 or n < 0) or
@@ -124,7 +124,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         //     unmodified. DEPDB/DACCDB print "Range y > 0" (p.604).
         if (isMiss(p) or isMiss(v) or isMiss(y) or (want_r and isMiss(r))) return Value.missing;
         // p.604 prints TWO ranges for the DB forms: "Range y > 0" and "Range
-        // r >= 0". y was already a (silent) missing — that half is additive; r
+        // r >= 0". y was already a (silent) missing - that half is additive; r
         // was not checked at all, so depdb(10,1000,15,-2) silently computed
         // -411.30. p and v carry no printed range, so they stay unchecked.
         if (y <= 0 or (want_r and r < 0)) return domErr(ev, name);
@@ -165,11 +165,11 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const endf = toNum(args[4]);
         const kind = toNum(args[5]);
         // cap nper: a loan with >1e6 payments is absurd, and it bounds the per-period
-        // summation loop below (no DoS — 30yr monthly = 360 payments).
+        // summation loop below (no DoS - 30yr monthly = 360 payments).
         if (isMiss(r) or isMiss(n) or isMiss(startf) or isMiss(endf) or n > 1_000_000) return Value.missing;
         const s = toInt(startf) orelse return Value.missing;
         const en = toInt(endf) orelse return Value.missing;
-        // compare end vs nper in float space — `n` may be huge; @intFromFloat(n) would trap
+        // compare end vs nper in float space - `n` may be huge; @intFromFloat(n) would trap
         if (s < 1 or @as(f64, @floatFromInt(en)) > n or s > en) return Value.missing;
         const pmt = pmtOf(r, n, pv, 0, kind);
         var sum: f64 = 0;
@@ -234,7 +234,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const v = toNum(args[1]);
         const y = toNum(args[2]);
         const r = toNum(args[3]);
-        // y > 1e6 is not a real depreciation lifetime; reject it — this also bounds
+        // y > 1e6 is not a real depreciation lifetime; reject it - this also bounds
         // daccDbsl's per-period loop and its @intFromFloat (p is clamped to ≤ y there).
         if (isMiss(p) or isMiss(v) or isMiss(y) or isMiss(r) or y <= 0 or y > 1e6) return Value.missing;
         const acc = daccDbsl(p, v, y, r);
@@ -244,7 +244,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     // ── bond / cash-flow analytics: price, duration, convexity, yield
     // GAP-bondrangenote (2/2, the VALUE half): the four periodic-cash-flow
     // functions take the SAME six arguments and the reference prints the SAME
-    // range table for each — PVP p.1385, YIELDP p.1688, DURP p.659, CONVXP
+    // range table for each - PVP p.1385, YIELDP p.1688, DURP p.659, CONVXP
     // p.561. One predicate for all four beats twenty-four inline comparisons.
     // These were not checked at all, so an out-of-range argument SILENTLY
     // COMPUTED a plausible number; p.5 makes it note + _ERROR_=1 + missing,
@@ -252,7 +252,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     // additive first half.
     // Note k0's bound is 1/n, not 1: the entries print "0 < k0 <= 1/n" (DURP
     // p.659 extracts it cleanly; PVP/CONVXP break the fraction across lines).
-    // Both doc examples satisfy it — k0=.33/2=.165 with n=4 gives 1/n=.25.
+    // Both doc examples satisfy it - k0=.33/2=.165 with n=4 gives 1/n=.25.
     const bondOutOfRange = struct {
         fn f(a: f64, c: f64, n: f64, k0: f64, last: f64) bool {
             return a <= 0 or // "Range: A > 0" (par/face value)
@@ -271,7 +271,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const k0 = toNum(args[4]);
         const y = toNum(args[5]);
         if (isMiss(a) or isMiss(c) or isMiss(n) or isMiss(k0) or isMiss(y)) return Value.missing; // p.7: financial fns are the missing-value exception
-        if (bigK > 1_000_000) return Value.missing; // ponytail: OUR cap (not a doc range) to bound the coupon loop — no DoS; stays silent
+        if (bigK > 1_000_000) return Value.missing; // ponytail: OUR cap (not a doc range) to bound the coupon loop - no DoS; stays silent
         if (bigK < 1 or bondOutOfRange(a, c, n, k0, y)) return domErr(ev, name); // p.1385 ranges
         return numVal(bondPv(a, c, n, @intCast(bigK), k0, y));
     }
@@ -282,7 +282,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         if (isMiss(y) or isMiss(f)) return Value.missing; // p.7 missing-value exception
         // DUR p.658 and CONVX p.560 share an argument list but NOT their y range:
         // DUR prints "Range y > 0", CONVX prints "Range 0 < y < 1". Checked apart
-        // on purpose — collapsing them would invent a range for one of the two.
+        // on purpose - collapsing them would invent a range for one of the two.
         if (f <= 0) return domErr(ev, name); // both: "Range f > 0"
         if (y <= 0 or (eqi(name, "convx") and y >= 1)) return domErr(ev, name);
         const cfs = args[2..];

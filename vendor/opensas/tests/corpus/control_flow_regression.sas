@@ -1,9 +1,9 @@
 /* QA tick163 regression net for the DATA-step control-flow refactor
-   (BUG-controlflownesting, 3a0f4ea — body compiled to a flat op stream).
+   (BUG-controlflownesting, 3a0f4ea - body compiled to a flat op stream).
    Locks in control transfers the sibling control_flow_nesting.sas omits:
    LEAVE/CONTINUE/GOTO/LINK from inside a SELECT nested in a loop, nested LINK,
    value-list DO with LEAVE/CONTINUE, backward-GOTO retry, and the index value
-   after normal loop exit (ascending and descending). GREEN — behaviour matches
+   after normal loop exit (ascending and descending). GREEN - behaviour matches
    SAS 9.4; any drift here is a control-flow regression. */
 
 /* LEAVE out of a SELECT that sits inside a DO loop (SELECT is not a loop). */

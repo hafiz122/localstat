@@ -1,5 +1,5 @@
 /* procreport rest3 LINE (basic): a LINE statement inside a compute-after block
-   writes a free-text summary line at the break position — literal text, a numeric
+   writes a free-text summary line at the break position - literal text, a numeric
    variable value (optionally formatted), and @col column pointers. Here the group
    subtotal (compute after reg) prints a per-region total line, and the grand total
    (compute after / rbreak) prints an overall total. LINE reads the AGGREGATED

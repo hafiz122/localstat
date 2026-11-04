@@ -1,4 +1,4 @@
-/* GAP-inoperators (1/3): `=<` and `=>` are the LEGACY spellings of LE and GE —
+/* GAP-inoperators (1/3): `=<` and `=>` are the LEGACY spellings of LE and GE -
    `=<` means <= and `=>` means >=. SAS 9.4 still accepts both "for
    compatibility with previous releases of SAS" (Language Reference: Concepts p.127, Table 6.4
    footnotes 2 and 3). The lexer emits the SAME .le/.ge tokens as `<=`/`>=`, so
@@ -8,8 +8,8 @@
      - `x =-1` is still an assignment of -1, not a comparison
      - `=*` (sounds-like) still lexes as its own `.eq`+`.star` pair
      - `<=` / `>=` are untouched
-   The loud half of the same footnotes — the legacy spellings are NOT valid in
-   a WHERE clause — is a captured-diagnostics test in parser_expr.zig, since a
+   The loud half of the same footnotes - the legacy spellings are NOT valid in
+   a WHERE clause - is a captured-diagnostics test in parser_expr.zig, since a
    step ERROR would syntax-check-skip the rest of this file. */
 data _null_;
   x = 3;
@@ -33,6 +33,6 @@ data _null_;
   sndx = ('Smith' =* 'Smyth');
   put neg= sndx=;
   if x => 3 then put 'IF-GE TAKEN';
-  if x =< 2 then put 'IF-LE TAKEN — WRONG';
+  if x =< 2 then put 'IF-LE TAKEN - WRONG';
                 else put 'IF-LE SKIPPED';
 run;

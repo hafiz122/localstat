@@ -1,5 +1,5 @@
 /* QA-tick147 regression lock: INFILE reading semantics that clinical data
-   depends on — DSD embedded-comma quoting, consecutive-delimiter missings,
+   depends on - DSD embedded-comma quoting, consecutive-delimiter missings,
    trailing-delimiter missing, and MISSOVER short-record handling. */
 data _null_;
   infile datalines dsd;

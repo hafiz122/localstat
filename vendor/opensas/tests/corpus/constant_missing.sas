@@ -1,7 +1,7 @@
 /* GAP-constmissing: the documented CONSTANT names we lacked (doc p.555) and
    EXACTINT's nbytes arg. *RECIP == the base value on IEEE hardware; the LOG*
    take an optional base (default E). Unknown names / bad args still fail loud
-   (missing + NOTE on stderr — asserted in charfns.zig's test block). */
+   (missing + NOTE on stderr - asserted in charfns.zig's test block). */
 data _null_;
   lb  = constant('LOGBIG');
   ls  = constant('LOGSMALL');

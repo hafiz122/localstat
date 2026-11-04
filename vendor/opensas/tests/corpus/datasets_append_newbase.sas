@@ -1,9 +1,9 @@
 /* BUG-datasetschange: APPEND to a non-existent BASE= auto-creates it as a
-   copy of DATA= (SAS: append-to-nothing = create) instead of erroring — both
+   copy of DATA= (SAS: append-to-nothing = create) instead of erroring - both
    PROC APPEND and PROC DATASETS APPEND; a second append to the now-existing
    base appends normally. CHANGE to a FREE name still renames. The ERROR paths
    (CHANGE to a taken name; MODIFY RENAME/FORMAT/LABEL of an unknown variable)
-   fail loud and are pinned by proc.zig's captured-diag unit test — a step
+   fail loud and are pinned by proc.zig's captured-diag unit test - a step
    ERROR skips all later steps (BUG-errhalt), so they can't share a fixture. */
 data src; id=1; x=10; run;
 proc append base=fresh data=src; run;

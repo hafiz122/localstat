@@ -1,4 +1,4 @@
-/* Macro-function completeness: %sysevalf types, %qscan, %symexist/%symglobl —
+/* Macro-function completeness: %sysevalf types, %qscan, %symexist/%symglobl -
    incl. the defensive "option or default" pattern common in SDTM driver macros.
    Synthetic. macro-macrofns. */
 data _null_; length s $12;

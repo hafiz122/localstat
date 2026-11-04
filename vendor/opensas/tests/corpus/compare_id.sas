@@ -1,5 +1,5 @@
 /* QA regression (BUG-compareid fixed): PROC COMPARE matches obs BY the ID key,
-   not positionally — same data in different row order compares EQUAL. */
+   not positionally - same data in different row order compares EQUAL. */
 data base; input id v; datalines;
 1 10
 2 20

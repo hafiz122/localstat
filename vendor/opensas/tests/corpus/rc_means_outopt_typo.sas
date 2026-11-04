@@ -1,4 +1,4 @@
-/* GAP-gapsexitingone §5b re-verdict — `/ autonam` is not one of the six
+/* GAP-gapsexitingone §5b re-verdict - `/ autonam` is not one of the six
    documented PROC MEANS OUTPUT options (AUTOLABEL/AUTONAME/KEEPLEN/LEVELS/
    NOINHERIT/WAYS), so it is the USER's typo, exit 1. Gap twin:
    rc_means_outopt_gap.sas. expect-rc: 1 */

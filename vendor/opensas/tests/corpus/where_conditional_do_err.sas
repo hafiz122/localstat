@@ -1,4 +1,4 @@
-/* BUG-whereconditional — the DO-body twin of where_conditional_err.sas: a
+/* BUG-whereconditional - the DO-body twin of where_conditional_err.sas: a
    WHERE statement inside a DO block was silently HOISTED and applied
    UNCONDITIONALLY (and the hoist even leaked the loop variable into the
    output). Language Reference: Concepts printed p.232 Table 11.6 reserves "Execute the selection

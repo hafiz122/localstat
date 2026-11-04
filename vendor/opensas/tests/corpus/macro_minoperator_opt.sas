@@ -1,9 +1,9 @@
-/* BUG-minoperatoropt: OPTIONS MINOPERATOR [MINDELIMITER='c'] — the SYSTEM-option
+/* BUG-minoperatoropt: OPTIONS MINOPERATOR [MINDELIMITER='c'] - the SYSTEM-option
    form of the `in`/`#` gate (SAS 9.4). It must behave exactly like the %MACRO
    `/ minoperator` definition option: member and non-member take DIFFERENT
    branches. Before the fix the OPTIONS form was silently ignored AND the
    un-gated `in` fell through to "non-blank text = TRUE", so every operand was
-   a member at exit 0. The un-gated (NOMINOPERATOR) `in` is now a loud ERROR —
+   a member at exit 0. The un-gated (NOMINOPERATOR) `in` is now a loud ERROR -
    pinned by in-file tests in macro.zig (green fixtures only). */
 
 options minoperator mindelimiter=',';
@@ -28,7 +28,7 @@ run;
 
 /* the / minoperator definition option still wins on its own, and a macro
    defined with MINDELIMITER= overrides the system one for its own body.
-   (The delimiter here avoids ';' — a semicolon inside a %if condition
+   (The delimiter here avoids ';' - a semicolon inside a %if condition
    truncates the branch scan, a pre-existing scanner limitation.) */
 options mindelimiter=' ';
 %macro h(x) / minoperator mindelimiter=':';

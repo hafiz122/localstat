@@ -1,4 +1,4 @@
-/* BUG-fileopts: FILE options were silently swallowed — `file "x" dlm="," dsd;`
+/* BUG-fileopts: FILE options were silently swallowed - `file "x" dlm="," dsd;`
    wrote space-separated output with NO diagnostic. Now DLM sets the PUT list
    separator and DSD quotes values containing the delimiter (SAS DSD semantics).
    The file lands in .zig-cache and is read back via INFILE into the log so the

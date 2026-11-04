@@ -1,10 +1,10 @@
-/* GAP-modifywherestmt — a WHERE STATEMENT in a MODIFY step: filter-then-match,
+/* GAP-modifywherestmt - a WHERE STATEMENT in a MODIFY step: filter-then-match,
    implemented. Was refused at rc 2 (safe, but a gap); before the refusal it was
    silently wrong in OPPOSITE directions per shape (single-dataset IGNORED the
    statement; the BY shape flushed the filtered copy and DESTROYED hidden rows).
 
-   The exact case — a WHERE excluding a master row whose BY key a transaction
-   row matches — is GENUINELY DOC-SILENT (Table 23.3 has no subsetting row;
+   The exact case - a WHERE excluding a master row whose BY key a transaction
+   row matches - is GENUINELY DOC-SILENT (Table 23.3 has no subsetting row;
    _DSENMR does not distinguish physically-absent from WHERE-excluded), but
    every timing statement points one way and one names MODIFY explicitly:
      * Statements ref printed p.360: "SAS selects observations from each input
@@ -21,7 +21,7 @@
    row updated out of the filter is still written (block 4).
    expect-rc: 0 */
 
-/* ---- 1: BY shape, WHERE on the BY var — the old DESTROY shape, flipped.
+/* ---- 1: BY shape, WHERE on the BY var - the old DESTROY shape, flipped.
         k=1 is hidden from the match and from the transaction; it must come
         back EXACTLY as stored. k=2 is overlaid; k=3 is selected but unmatched. */
 data m; do k = 1 to 3; v = k * 10; output; end; run;
@@ -33,7 +33,7 @@ data m;
 run;
 proc print data=m noobs; title "1 by + where: k=1 survives, k=2 -> 999"; run;
 
-/* ---- 2: rider 1 (p.360) — the bare statement filters the TRANSACTION too.
+/* ---- 2: rider 1 (p.360) - the bare statement filters the TRANSACTION too.
         t k=1 fails k>1, so it never iterates: no _DSENMR, no p.600 ERROR
         (rc 0 is the assertion), and master k=1 stays untouched. */
 data m2; do k = 1 to 2; v = k * 10; output; end; run;
@@ -45,7 +45,7 @@ data m2;
 run;
 proc print data=m2 noobs; title "2 transaction filtered too: k=1 -> 10 (not 111)"; run;
 
-/* ---- 3: single-dataset shape — the statement was silently IGNORED before.
+/* ---- 3: single-dataset shape - the statement was silently IGNORED before.
         Only the selected rows are read and updated. */
 data s; do k = 1 to 4; v = k * 10; output; end; run;
 data s;
@@ -55,7 +55,7 @@ data s;
 run;
 proc print data=s noobs; title "3 single + where: 10 20 31 41"; run;
 
-/* ---- 4: rider 2 (WHEREUP= default, Language Reference: Concepts p.215) — written rows are NOT
+/* ---- 4: rider 2 (WHEREUP= default, Language Reference: Concepts p.215) - written rows are NOT
         re-evaluated: k=2..4 are selected, updated to NEGATIVE values that
         fail k>1, and still written (not removed, not re-filtered). */
 data w; do k = 1 to 4; v = k; output; end; run;
@@ -66,7 +66,7 @@ data w;
 run;
 proc print data=w noobs; title "4 no write-side re-eval: 1 -8 -7 -6"; run;
 
-/* ---- 5: the where= OPTION twin on a BY master — same root fix. It discarded
+/* ---- 5: the where= OPTION twin on a BY master - same root fix. It discarded
         the positions and flushed the filtered copy: k=1 was GONE at rc 0. */
 data o; do k = 1 to 4; v = k * 10; output; end; run;
 data t5; k = 2; v = 999; output; run;
@@ -79,7 +79,7 @@ proc print data=o noobs; title "5 where= option on BY master: k=1 survives"; run
 /* ---- 6: the doc-silent case, end to end. Master (k=1,x=5) fails where x>10;
         transaction (k=1,x=20) passes it (x rides BOTH inputs). Filter-then-
         match: the transaction is UNMATCHED (_DSENMR), the p.601 idiom OUTPUTs
-        a NEW row, and the hidden master row is re-emitted untouched — the
+        a NEW row, and the hidden master row is re-emitted untouched - the
         master ends with BOTH k=1 rows. */
 data d; k = 1; x = 5; output; k = 2; x = 15; output; run;
 data t6; k = 1; x = 20; output; k = 2; x = 25; output; run;

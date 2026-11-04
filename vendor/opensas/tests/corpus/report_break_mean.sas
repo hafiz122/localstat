@@ -1,4 +1,4 @@
-/* QA tick196: BREAK/RBREAK SUMMARIZE with an MEAN analysis column (d0badee) —
+/* QA tick196: BREAK/RBREAK SUMMARIZE with an MEAN analysis column (d0badee) -
    VERIFIED GREEN. The existing report_break_summarize fixture covers SUM only;
    this pins the MEAN path where each subtotal and the grand total must be the
    MEAN over that scope's RAW detail rows, NOT the mean of the subtotals:

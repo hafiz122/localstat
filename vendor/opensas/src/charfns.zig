@@ -63,7 +63,7 @@ fn dequoteNameLit(s: []const u8) []const u8 {
     return s;
 }
 
-/// NVALID(...,'NLITERAL'): is `s` itself a SAS name literal — 'name'n or
+/// NVALID(...,'NLITERAL'): is `s` itself a SAS name literal - 'name'n or
 /// "name"n, embedded quotes of the same kind doubled, inner name 1-32 bytes.
 fn isNameLiteral(s: []const u8) bool {
     if (s.len < 4) return false; // shortest: 'a'n
@@ -97,13 +97,13 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const s = try toStr(ev, args[0]);
         const posf = toNum(args[1]);
         // BUG-charfnsmissingtype: SUBPAD is `Categories: Character` (SAS 9.4
-        // Functions and CALL Routines: Reference p.1529 — "Returns a substring
+        // Functions and CALL Routines: Reference p.1529 - "Returns a substring
         // that has a length that you specify"), so EVERY give-up arm below is a
         // BLANK CHARACTER. A numeric `.` flips the receiving variable's TYPE and
         // turns a later `put (x) ($char10.);` into a hard ERROR at rc 1.
         if (isMiss(posf)) return .{ .str = "" };
         // NOTE-subpadinvpos: SUBPAD's `position` "is a positive integer" (p.1529),
-        // so a nonpositive one is an INVALID argument — and the volume's general
+        // so a nonpositive one is an INVALID argument - and the volume's general
         // rule (p.5) is that an invalid argument, "for example, missing or outside
         // the prescribed range", makes SAS "write a note to the log …, set _ERROR_
         // to 1, and set the result to a missing value". We already returned the
@@ -111,14 +111,14 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         // branching on _ERROR_ never saw its own bad subscript.
         //
         // The shared domain path (MISC-fnseterror) returns a NUMERIC missing,
-        // which is right for its ~40 numeric callers and wrong here — so this
+        // which is right for its ~40 numeric callers and wrong here - so this
         // routes through `domErrChar`, the character flavour: identical NOTE,
         // identical `_ERROR_=1`, blank result. The alternative (teaching `domErr`
         // itself about types) would have touched every numeric caller for one
         // character one.
         if (posf < 1) return domErrChar(ev, name);
         // Positions and lengths too big for an i64 are "outside the prescribed
-        // range" the same way — still CHARACTER.
+        // range" the same way - still CHARACTER.
         const start: usize = @intCast((toInt(posf) orelse return .{ .str = "" }) - 1);
         const outlen: usize = if (args.len == 3)
             @intCast(toInt(@max(toNum(args[2]), 0)) orelse return .{ .str = "" })
@@ -288,9 +288,9 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         var buf: [64]u8 = undefined;
         // BUG-charfnsmissingtype: unknown method → blank CHARACTER, never `.`
         // BUG-charfnsnodomerr: and that blank is LOUD. p.976 states the failure
-        // mode verbatim — "If method is invalid, the returned digest is blank,
+        // mode verbatim - "If method is invalid, the returned digest is blank,
         // and a note, warning, or error message is issued stating that the
-        // argument is invalid." — so this is doc-mandated, not house consistency.
+        // argument is invalid." - so this is doc-mandated, not house consistency.
         const n = hashDigest(method, try toStr(ev, args[1]), &buf) orelse return domErrChar(ev, name);
         return .{ .str = try hexEncodeUpper(ev, buf[0..n]) }; // SAS HASHING → UPPERCASE hex (doc p.975)
     }
@@ -300,7 +300,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const key = try toStr(ev, args[1]);
         var buf: [64]u8 = undefined;
         // BUG-charfnsmissingtype: unknown method → blank CHARACTER, never `.`
-        // BUG-charfnsnodomerr: loud, on p.979's own sentence — identical wording
+        // BUG-charfnsnodomerr: loud, on p.979's own sentence - identical wording
         // to HASHING's ("a note, warning, or error message is issued").
         const n = hmacDigest(method, key, try toStr(ev, args[2]), &buf) orelse return domErrChar(ev, name);
         return .{ .str = try hexEncodeUpper(ev, buf[0..n]) }; // SAS → UPPERCASE hex, matches HASHING_TERM
@@ -317,14 +317,14 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const n = toNum(args[0]);
         // BUG-charfnsmissingtype: BYTE is `Categories: Character` (SAS 9.4 Functions
         // and CALL Routines: Reference p.282, `Range 0–255`), so an out-of-range or
-        // missing `n` yields the CHARACTER missing — a blank — not a numeric `.`.
+        // missing `n` yields the CHARACTER missing - a blank - not a numeric `.`.
         // p.5's general invalid-argument rule says "sets the result to a missing
         // value"; for a character function that missing value is blank, and handing
         // back a `.` here flips the receiving variable's TYPE (see the module note
         // on scan, BUG-scanmissingtype).
         // BUG-charfnsnodomerr: that blank is LOUD. BYTE's own entry states
         // `Range 0–255` on `n`, so an out-of-range or missing `n` is exactly
-        // p.5's case — "If the value of an argument is invalid (for example,
+        // p.5's case - "If the value of an argument is invalid (for example,
         // missing or outside the prescribed range), SAS writes a note to the log
         // indicating that the argument is invalid, sets _ERROR_ to 1, and sets
         // the result to a missing value." domErrChar is all three at once.
@@ -334,7 +334,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         return .{ .str = out };
     }
     if (eqi(name, "collate")) {
-        // COLLATE(start[,end]) | (start,,length) — ASCII run from `start`. With no
+        // COLLATE(start[,end]) | (start,,length) - ASCII run from `start`. With no
         // end-position, run to the end of the sequence or `length` chars (default
         // 200), capped at 255 (doc p.521).
         // BUG-charfnsmissingtype: COLLATE is `Categories: Character` (p.521), so
@@ -343,7 +343,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         // BUG-collateomittedstart: an OMITTED start-position defaults to 0. The
         // Functions Reference p.524 Example 3 is literally `y = collate(,,56);`,
         // described as "the COLLATE function returns the first 56 characters of the
-        // ASCII collating sequence" — first 56 means positions 0..55, so the empty
+        // ASCII collating sequence" - first 56 means positions 0..55, so the empty
         // slot is position 0, not a give-up.
         // The omission IS distinguishable from an explicit `collate(.)`: the parser
         // fills an empty positional slot with an empty-STRING literal to keep the
@@ -356,8 +356,8 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const lo: f64 = if (omitted_start) 0 else toNum(args[0]);
         // BUG-charfnsnodomerr splits what follows in two, because the doc does.
         // DOC-SILENT: an explicit `collate(.)` gives up blank and stays quiet
-        // (pinned in BUG-charfnsmissingtype). Note the ORIGINAL premise here —
-        // "an omitted arg is indistinguishable from `collate(.)`" — was DISPROVEN
+        // (pinned in BUG-charfnsmissingtype). Note the ORIGINAL premise here -
+        // "an omitted arg is indistinguishable from `collate(.)`" - was DISPROVEN
         // by BUG-collateomittedstart above; the decline still stands, but on the
         // narrower and correct ground that only the EXPLICIT missing reaches here.
         if (isMiss(lo)) return .{ .str = "" };
@@ -381,7 +381,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
             const len_arg = if (args.len == 3) toNum(args[2]) else std.math.nan(f64);
             const length: u16 = if (isMiss(len_arg)) 200 else @intFromFloat(@max(len_arg, 0));
             // DOC-SILENT (BUG-charfnsnodomerr): `length` is the one COLLATE
-            // argument the doc gives NO range for — p.522 says only "specifies
+            // argument the doc gives NO range for - p.522 says only "specifies
             // the number of characters" / "Default 200". With no prescribed
             // range there is nothing for p.5 to be outside of, so a zero (or
             // clamped-negative) length stays a quiet blank. Declined, not missed.
@@ -486,7 +486,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     if (eqi(name, "substr")) return try substr(ev, name, args);
     if (eqi(name, "index")) {
         if (args.len != 2) return badArity(ev, name, "2", args.len);
-        // ponytail: trim BOTH operands (BUG-likepadwidth) — this doubles as the
+        // ponytail: trim BOTH operands (BUG-likepadwidth) - this doubles as the
         // WHERE CONTAINS path (parser desugars `x contains y` → index(x,y)>0),
         // whose needle must not NOMATCH just because it carries trailing
         // blanks (`'cat' contains 't '`). True SAS pads the SOURCE to its
@@ -511,7 +511,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     }
     if (eqi(name, "like")) {
         // SQL LIKE: `%` = any sequence, `_` = any single char, else literal.
-        // ponytail: trim BOTH operands (BUG-likepadwidth) — true SAS compares
+        // ponytail: trim BOTH operands (BUG-likepadwidth) - true SAS compares
         // the pattern against the value blank-padded to its DECLARED width
         // (trailing blanks significant, `_` matches a blank), but the width
         // isn't reachable at the functions boundary: args arrive as evaluated
@@ -647,7 +647,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         if (isMiss(nf) or nf < 0 or s.len == 0) return .{ .str = s };
         const n: usize = @intCast(toInt(nf) orelse return .{ .str = s }); // guards ±inf/huge
         // BUG-repeatoom: SAS truncates to the receiving variable's length (char max
-        // 32767), so cap the build there — a huge finite count must not OOM/hang.
+        // 32767), so cap the build there - a huge finite count must not OOM/hang.
         const max_len: usize = 32767;
         var out: std.ArrayList(u8) = .empty;
         var k: usize = 0;
@@ -692,7 +692,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         if (eqi(cn, "sqrtmaceps")) return numVal(@sqrt(EPS));
         if (eqi(cn, "big")) return numVal(BIG);
         if (eqi(cn, "small")) return numVal(SMALL);
-        // GAP-constmissing (doc p.555): the *RECIP pair — on IEEE hardware 1/BIG
+        // GAP-constmissing (doc p.555): the *RECIP pair - on IEEE hardware 1/BIG
         // is subnormal-but-finite and 1/SMALL is finite (both re-invert), so
         // BIGRECIP=BIG and SMALLRECIP=SMALL here.
         if (eqi(cn, "bigrecip")) return numVal(BIG);
@@ -708,7 +708,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
             return numVal(@exp2(@as(f64, @floatFromInt(8 * nb - 11))));
         }
         // LOG<constant><,base> (doc p.557-559): base defaults to E and must
-        // exceed 1+SQRTMACEPS — a bad base fails loud, never a wrong number.
+        // exceed 1+SQRTMACEPS - a bad base fails loud, never a wrong number.
         if (eqi(cn, "logbig") or eqi(cn, "logbigrecip") or eqi(cn, "logsmall") or
             eqi(cn, "logsmallrecip") or eqi(cn, "logmaceps"))
         {
@@ -726,7 +726,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         // non-overlapping occurrences of a substring; optional 3rd-arg modifiers
         // i=ignore-case, t=trim trailing blanks (both string and substring), like
         // COUNTC/COUNTW/FINDC. Unknown letters fail LOUD (NOTE-findcunknownmod,
-        // D-002) — same policy as wordSpec, which SCAN/COUNTW/FINDW share.
+        // D-002) - same policy as wordSpec, which SCAN/COUNTW/FINDW share.
         // (BUG-countmodifiers)
         if (args.len < 2) return badArity(ev, name, "2 or more", args.len);
         var s = try toStr(ev, args[0]);
@@ -913,7 +913,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         return numVal(0);
     }
     if (eqi(name, "indexw")) {
-        // position of `word` delimited by `delim` (default blank — p.1034; do
+        // position of `word` delimited by `delim` (default blank - p.1034; do
         // NOT widen, that blank-only default is INDEXW's documented behavior)
         if (args.len < 2) return badArity(ev, name, "2 or more", args.len);
         const s = try toStr(ev, args[0]);
@@ -931,7 +931,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     if (eqi(name, "findw")) {
         // FINDW(string, word <, chars> <, modifiers> <, startpos>): position of
         // `word` as a delimited word, 0 if absent. 2-arg default delimiters are
-        // the full SCAN set (FINDW p.781 — INDEXW above stays blank-only).
+        // the full SCAN set (FINDW p.781 - INDEXW above stays blank-only).
         // Modifiers: class adders + i/t/k; `e` returns the WORD NUMBER instead
         // (BUG-findwdefaults). A numeric optional arg is the start position.
         if (args.len < 2 or args.len > 5) return badArity(ev, name, "2 to 5", args.len);
@@ -1012,7 +1012,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         return numVal(@floatFromInt(std.mem.trimEnd(u8, try toStr(ev, args[0]), " ").len)); // 0 for blank
     }
     if (eqi(name, "lengthc") or eqi(name, "lengthm")) {
-        // storage/memory length — for an in-memory value, its full byte length
+        // storage/memory length - for an in-memory value, its full byte length
         if (args.len != 1) return badArity(ev, name, "1", args.len);
         return numVal(@floatFromInt((try toStr(ev, args[0])).len));
     }
@@ -1023,7 +1023,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const y = toNum(args[1]);
         if (isMiss(x) or isMiss(y)) return Value.missing;
         // GAP-modzerror: zero divisor takes the shared domErr path (NOTE +
-        // _ERROR_=1 + missing), same as MOD — was silent missing, so the
+        // _ERROR_=1 + missing), same as MOD - was silent missing, so the
         // `if _error_ then …` idiom never fired (qa-findings-tick138).
         if (y == 0) return domErr(ev, name);
         return numVal(x - @trunc(x / y) * y);
@@ -1081,7 +1081,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     }
     if (eqi(name, "nvalid")) {
         // BUG-nvalidmod (tick243 F1): shadows statfns' nvalid (charfns
-        // dispatches first) — the old one ignored args[1] and trimmed BOTH
+        // dispatches first) - the old one ignored args[1] and trimmed BOTH
         // sides. Doc p.1267: trailing blanks ignored; a LEADING blank is data.
         if (args.len < 1 or args.len > 2) return badArity(ev, name, "1 or 2", args.len);
         const s = std.mem.trimEnd(u8, try toStr(ev, args[0]), " ");
@@ -1106,10 +1106,10 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         // BUG-nliteralquotes (tick243 F2): a valid V7 name is returned UNCHANGED
         // (isValidName adds the 32-byte cap the old inline check lacked).
         if (isValidName(s)) return .{ .str = s };
-        // >32 bytes: neither a V7 name nor expressible as an n-literal — SAS
+        // >32 bytes: neither a V7 name nor expressible as an n-literal - SAS
         // writes an ERROR, sets _ERROR_=1, returns a blank (doc p.1225-1226).
         // ponytail: the declared-length insufficient-space sub-case (c) stays
-        // the generic PDV clamp — a fn can't see its target width.
+        // the generic PDV clamp - a fn can't see its target width.
         if (s.len > 32) {
             note(ev, "Invalid argument to function NLITERAL (name exceeds 32 bytes).", .{});
             ev.setError() catch {};
@@ -1223,7 +1223,7 @@ test "GAP-constmissing: CONSTANT's documented names + EXACTINT nbytes (doc p.555
     h.prime();
     var e = h.ev();
 
-    // the filled gaps — values are the doc definitions evaluated in f64
+    // the filled gaps - values are the doc definitions evaluated in f64
     try near((try constant1(&e, "logbig")).num, 709.782712893384);
     try near((try constant1(&e, "logsmall")).num, -708.3964185322641);
     try near((try constant1(&e, "logmaceps")).num, -36.043653389117154);
@@ -1334,7 +1334,7 @@ test "NOTE-findcunknownmod: COUNT/COUNTC/FINDC fail loud on an unknown modifier 
         }
     }.f;
 
-    // unknown letters were silently ignored (else => {}) — the requested
+    // unknown letters were silently ignored (else => {}) - the requested
     // character class never applied. Now: .err naming the letter + missing,
     // the wordSpec policy (D-002).
     try t.expect((try dispatch(&e, "count", &.{ sv("aAaA"), sv("a"), sv("q") })).?.isMissing());
@@ -1373,7 +1373,7 @@ test "BUG-charfnsmissingtype: BYTE/COLLATE/HASHING/HASHING_HMAC/HTMLENCODE give 
     // Every one of these is `Categories: Character` in the SAS 9.4 Functions and
     // CALL Routines: Reference (BYTE p.282, COLLATE p.521, HASHING p.975,
     // HASHING_HMAC p.978, HTMLENCODE p.1019), so p.5's "sets the result to a
-    // missing value" means the CHARACTER missing — a blank. A numeric `.` here
+    // missing value" means the CHARACTER missing - a blank. A numeric `.` here
     // flips the receiving variable's TYPE, and then `put (x) ($char10.);` is a
     // hard ERROR at rc 1 where SAS prints blanks at rc 0. The union TAG is the
     // assertion; the rendered text is not the regression surface.
@@ -1395,7 +1395,7 @@ test "BUG-charfnsmissingtype: BYTE/COLLATE/HASHING/HASHING_HMAC/HTMLENCODE give 
         try t.expectEqualStrings("", std.mem.trim(u8, v.str, " "));
     }
 
-    // HTMLENCODE's bad-option arm still ERRORs loudly — and still hands back a
+    // HTMLENCODE's bad-option arm still ERRORs loudly - and still hands back a
     // character (pinned in NOTE-htmlencodeopts above as well; kept here so the
     // whole class reads in one place).
     const before = h.diags.count();
@@ -1403,7 +1403,7 @@ test "BUG-charfnsmissingtype: BYTE/COLLATE/HASHING/HASHING_HMAC/HTMLENCODE give 
     try t.expect(bad_opt == .str);
     try t.expect(h.diags.count() > before);
 
-    // The good paths are untouched — value AND type.
+    // The good paths are untouched - value AND type.
     try t.expectEqualStrings("P", (try dispatch(&e, "byte", &.{nvv(80)})).?.str); // p.282's own example
     try t.expectEqualStrings("ABC", (try dispatch(&e, "collate", &.{ nvv(65), nvv(67) })).?.str);
     try t.expectEqualStrings("ABC", (try dispatch(&e, "collate", &.{ nvv(65), Value.missing, nvv(3) })).?.str);
@@ -1482,7 +1482,7 @@ test "BUG-charfnsnodomerr: the char give-up arms the DOC diagnoses are loud; the
 
     // ── DOC-SILENT, declined on purpose ───────────────────────────────────
     // (a) COLLATE with an omitted/missing start-position. p.524 Example 3 is
-    //     `y = collate(,,56);` — a WORKING call in the Functions Reference — and
+    //     `y = collate(,,56);` - a WORKING call in the Functions Reference - and
     //     an omitted arg is indistinguishable from `.` by the time it reaches
     //     here, so warning would fire on documented-correct usage.
     // (b) COLLATE's `length`. p.522 gives it no range at all ("Default 200"),

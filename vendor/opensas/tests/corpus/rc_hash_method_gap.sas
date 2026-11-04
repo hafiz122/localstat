@@ -1,9 +1,9 @@
-/* GAP-gapsexitingone §5c — the hash-method catch-all was SPLIT, not re-tagged.
+/* GAP-gapsexitingone §5c - the hash-method catch-all was SPLIT, not re-tagged.
 
    SETCUR is in the SAS 9.4 Component Objects reference's own dictionary of
    hash language elements (printed p.23 TOC), so `h.setcur()` is valid SAS we
    have not written: an opensas GAP → rc 2. Its typo twin lives in
-   rc_hash_method_typo.sas and must STAY rc 1 — re-tagging the whole catch-all
+   rc_hash_method_typo.sas and must STAY rc 1 - re-tagging the whole catch-all
    would have told a user who mistyped a method name to file an opensas issue.
 
    The PROC PRINT proves the split discriminates: the implemented methods

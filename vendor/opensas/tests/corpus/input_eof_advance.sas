@@ -1,4 +1,4 @@
-/* GAP-inputeofdegrade (part 2/3) — a RECORD ADVANCE past EOF ends the step; it
+/* GAP-inputeofdegrade (part 2/3) - a RECORD ADVANCE past EOF ends the step; it
    does not silently re-read the current record.
 
    SAS 9.4 DATA Step Statements ref printed p.178 (pdf 189; that page's OWN
@@ -9,7 +9,7 @@
        end-of-file, then execution stops.
 
    The step ends AT the INPUT statement, so nothing after it runs and the
-   implicit OUTPUT never fires — no observation, partial or otherwise. That is
+   implicit OUTPUT never fires - no observation, partial or otherwise. That is
    documented by a worked example rather than inferred: printed p.323 (footer
    "RETAIN Statement 323") puts a PUT on EACH SIDE of an INPUT over two data
    lines and reports "The first PUT statement is executed three times, whereas
@@ -19,13 +19,13 @@
 
    WHAT WAS WRONG: three copies of `if (li + 1 < lines.len) li += 1;` silently
    declined to advance and read on against the SAME record. So `input x $ / y $;`
-   over an ODD number of records handed y the value already sitting in x — a
+   over an ODD number of records handed y the value already sitting in x - a
    FABRICATED value, at exit 0.
    expect-rc: 0 */
 
-/* 1 — the fabrication itself. THREE records, two consumed per iteration, so
+/* 1 - the fabrication itself. THREE records, two consumed per iteration, so
    iteration 2 reads x=r3 and its `/` asks for a 4th record. Exactly ONE
-   observation may be written. It used to write a second one with y=r3 — the
+   observation may be written. It used to write a second one with y=r3 - the
    value re-read out of x, which is the whole defect: not a missing value, a
    DUPLICATE of a real one, indistinguishable from data. */
 data one;
@@ -40,10 +40,10 @@ r3
 run;
 proc print data=one noobs; title "1 one obs; NO r3/r3 row"; run;
 
-/* 2 — the PUT above fires ONCE, not twice: p.323's evidence reproduced. A
+/* 2 - the PUT above fires ONCE, not twice: p.323's evidence reproduced. A
    diagnostic-only fix would still have run the body a second time. */
 
-/* 3 — `#n` is the other advance spelling and stops the same way. #2 on a
+/* 3 - `#n` is the other advance spelling and stops the same way. #2 on a
    one-record file asks for a record that is not there. */
 data hn;
   infile datalines;
@@ -55,8 +55,8 @@ solo
 run;
 proc print data=hn noobs; title "3 #2 past EOF: no obs"; run;
 
-/* 4 — DLM= reads go through a SEPARATE record scanner (io.readDelim) that had
-   its OWN copy of the same pattern — the producer the ticket did not name. Same
+/* 4 - DLM= reads go through a SEPARATE record scanner (io.readDelim) that had
+   its OWN copy of the same pattern - the producer the ticket did not name. Same
    shape, same fix, and without it this case still fabricated. */
 data dl;
   infile datalines dlm=',';
@@ -70,7 +70,7 @@ e,f
 run;
 proc print data=dl noobs; title "4 dlm= advance past EOF: one obs"; run;
 
-/* 4b — DLM= with `#n`, the FIFTH guard. Added because mutation testing found it
+/* 4b - DLM= with `#n`, the FIFTH guard. Added because mutation testing found it
    had ZERO coverage: deleting that guard left the whole 1842-case suite GREEN,
    because nothing anywhere combined a delimited read with a `#n` past the end.
    A guard the suite cannot see is not protecting anything. */
@@ -84,7 +84,7 @@ a,b
 run;
 proc print data=dh noobs; title "4b dlm= #2 past EOF: no obs"; run;
 
-/* 5 — CONTROL: an EVEN record count is fully satisfied and must be untouched.
+/* 5 - CONTROL: an EVEN record count is fully satisfied and must be untouched.
    Four records, two per iteration, two observations, no stop. */
 data even;
   infile datalines;
@@ -98,9 +98,9 @@ r4
 run;
 proc print data=even noobs; title "5 even count: two obs, unchanged"; run;
 
-/* 6 — CONTROL: short-record handling is a DIFFERENT rule and stays. Under
+/* 6 - CONTROL: short-record handling is a DIFFERENT rule and stays. Under
    TRUNCOVER the advance still works (that is BUG-inputmultirecmode) and a short
-   record still yields missing without spilling — only the advance PAST THE END
+   record still yields missing without spilling - only the advance PAST THE END
    stops. */
 data tc;
   infile datalines truncover;

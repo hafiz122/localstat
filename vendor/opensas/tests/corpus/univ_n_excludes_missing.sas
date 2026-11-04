@@ -1,4 +1,4 @@
-/* GAP-univmissingtable, the CONFORMANT half — pinned green so the missing-count
+/* GAP-univmissingtable, the CONFORMANT half - pinned green so the missing-count
    work cannot regress the number it has to agree with.
 
    Base SAS 9.4 Procedures Guide: Statistical Procedures, printed p.408
@@ -8,18 +8,18 @@
 
    So UNIVARIATE's N is a NON-MISSING count, and when the "Missing Values"
    table is finally rendered its count must be the complement of this N against
-   the observation total — not an independently computed number that can drift.
+   the observation total - not an independently computed number that can drift.
    This fixture pins the three quantities and their arithmetic on the same data:
 
      * UNIVARIATE Moments N = 4 (of 6 observations, 2 missing)
-     * UNIVARIATE `output out= n= nmiss=` = 4 and 2 — the count ALREADY EXISTS
+     * UNIVARIATE `output out= n= nmiss=` = 4 and 2 - the count ALREADY EXISTS
        and is already correct; only the DISPLAY table is missing
-     * PROC MEANS N / N Miss = 4 / 2 — the same two numbers from the sibling
+     * PROC MEANS N / N Miss = 4 / 2 - the same two numbers from the sibling
      * 4 + 2 = 6 = the row count from PROC FREQ's own missing line
 
    Also pins the INTERNAL INCONSISTENCY that makes this more than a missing
    line: PROC FREQ prints "Frequency Missing = 2" and PROC MEANS prints
-   "N Miss 2" for this very data, while UNIVARIATE prints neither — one program,
+   "N Miss 2" for this very data, while UNIVARIATE prints neither - one program,
    three PROCs, two of them reporting and one silent.
 
    Deliberately uses NO WEIGHT and NO FREQ statement: p.408's pre-exclusion

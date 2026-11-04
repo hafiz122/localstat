@@ -4,7 +4,7 @@ n  nmiss  sumwgt  sum  css  uss  range  std  var  stderr  cv
 zero-row table, column declared: sumwgt 0 = n 0
 n  sumwgt
 0       0
-CONTROL: one non-missing value — sumwgt tracks n, unchanged
+CONTROL: one non-missing value - sumwgt tracks n, unchanged
 n  sumwgt  sum
 1       1    5
 CONTROL: sumwgt of an EXPRESSION takes the same rule

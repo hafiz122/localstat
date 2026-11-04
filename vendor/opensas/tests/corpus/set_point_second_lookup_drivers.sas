@@ -1,4 +1,4 @@
-/* QA tick377 cross-landing sweep — GAP-secondsetstmt (837590ea) interaction pins.
+/* QA tick377 cross-landing sweep - GAP-secondsetstmt (837590ea) interaction pins.
    The landing rewired WHICH STATEMENT DRIVES A STEP: a second SET carrying
    POINT= is claimed as a direct-access lookup while the SEQUENTIAL driver keeps
    iteration, EOF and the implicit output (Statements ref p.341 Example 6). The
@@ -11,20 +11,20 @@
    Report 2  single-dataset MODIFY driver + POINT= lookup.
    Report 3  multi-source (concatenated) sequential driver + POINT= lookup.
    Report 4  NOBS= on the LOOKUP statement reports the LOOKUP's obs count,
-             NOBS= on the DRIVER reports the driver's — the two SET statements
+             NOBS= on the DRIVER reports the driver's - the two SET statements
              keep their own counts (Statements p.336 NOBS=).
    Report 5  keep=/rename= data set options apply to the claimed lookup.
    Report 6  in= on the driver, and a COMPUTED (non-_N_) POINT= index.
-   Report 7  explicit OUTPUT alongside the lookup — the driver still owns
+   Report 7  explicit OUTPUT alongside the lookup - the driver still owns
              iteration, so two OUTPUTs per driver row give 2*N rows.
 
    Report 8  SET driver + a SUM STATEMENT reading the lookup column (QA tick377
              F2 repro A verbatim): the accumulator is first-mentioned AT the sum
              statement, AFTER the lookup's columns, and reading b provokes NO
              false `uninitialized` NOTE (the NOTE half is pinned by the
-             captured-diagnostics tests in src/exec.zig — this surface is
+             captured-diagnostics tests in src/exec.zig - this surface is
              stdout-only).
-   Report 9  the report-1 MERGE shape through PROC EXPORT CSV — first-mention
+   Report 9  the report-1 MERGE shape through PROC EXPORT CSV - first-mention
              PDV order is equally user-visible in the exported header row.
 
    COLUMN ORDER is the SAS first-mention rule and is pinned CORRECT in every
@@ -32,7 +32,7 @@
    lookup's columns land at the SET statement that carries the option
    (Statements ref p.341 Example 6 makes the second SET an ordinary
    compile-time source). Reports 1 and 2 used to pin the lookup FIRST and
-   report 8's accumulator ahead of the lookup — QA tick377 F2; fixed by
+   report 8's accumulator ahead of the lookup - QA tick377 F2; fixed by
    seeding the lookup's PDV columns at the carrying node. */
 
 data drv; input a; datalines;
@@ -107,11 +107,11 @@ proc print data=r5b; run;
 data r6; set drv(in=ind); f = ind; p = 3 - _n_; set lk point=p; run;
 proc print data=r6; run;
 
-/* 7: explicit OUTPUT — the DRIVER still owns iteration */
+/* 7: explicit OUTPUT - the DRIVER still owns iteration */
 data r7; set drv; set lk point=_n_; output; output; run;
 proc print data=r7; run;
 
-/* 8: QA tick377 F2 repro A — a sum statement reading the lookup column:
+/* 8: QA tick377 F2 repro A - a sum statement reading the lookup column:
    b is first-mentioned at the SET that carries POINT=, tot at the sum
    statement → a b tot (was a tot b + a false "Variable b is uninitialized.").
    The plain-second-SET control from the same QA report: same order, same sums. */
@@ -120,7 +120,7 @@ proc print data=r8; run;
 data r8c; set drv; set lk; tot + b; run;
 proc print data=r8c; run;
 
-/* 9: the report-1 MERGE shape through PROC EXPORT CSV — the header row pins
+/* 9: the report-1 MERGE shape through PROC EXPORT CSV - the header row pins
    k,p,q,b through a second user-visible surface. */
 proc export data=r1 outfile="tests/corpus/includes/spsld_r1.csv" dbms=csv replace; run;
 data r9;

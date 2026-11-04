@@ -1,4 +1,4 @@
-/* audit-tick: length_stmt — several var-groups in one LENGTH, mixed char/num,
+/* audit-tick: length_stmt - several var-groups in one LENGTH, mixed char/num,
    and a numbered range d1-d3 all take their group length. */
 data d;
   length a b $ 8 c 4 d1-d3 8;

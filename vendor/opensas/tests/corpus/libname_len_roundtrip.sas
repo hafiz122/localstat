@@ -1,5 +1,5 @@
 /* BUG-libnamelenloss: the native .sas7bdat write→read round-trip keeps a char
-   column's DECLARED length — `length code $8` holding "AB"/"CD" must come back
+   column's DECLARED length - `length code $8` holding "AB"/"CD" must come back
    Len 8, not the data max 2 (declared width is controlled SDTM metadata; a
    shrunk width silently truncates later-stored longer values). PROC COPY to a
    directory libname writes src.sas7bdat EAGERLY; the second libname's preloaded

@@ -1,4 +1,4 @@
-/* BUG-appendcharwidth — PROC APPEND must not store a value wider than the
+/* BUG-appendcharwidth - PROC APPEND must not store a value wider than the
    BASE= column's declared char width. Base SAS 9.4 Procedures Guide, DATASETS
    APPEND Statement (the PROC APPEND chapter defers to it, printed p.110): the
    FORCE criteria (printed p.588) are a DATA= variable "not in the BASE= data
@@ -10,14 +10,14 @@
    set to fit them into the length that is specified in the BASE= data set."
    The stale ponytail rationale over appendRows claimed char width "isn't
    tracked in this tree"; it has been since GAP-sqldatatypewidth, so the doc's
-   LENGTH case was reachable and unchecked — the descriptor said Char 3 while
+   LENGTH case was reachable and unchecked - the descriptor said Char 3 while
    the appended cell held 8 bytes, and one table disagreed with itself by
    reader (PRINT/EXPORT render the raw cell, the DATA-step read clips to the
    descriptor). Fixed AT THE STORE like the SQL twin 1ab28654: appended cells
    reconcile to the BASE= declared length, so every surface is right by
    construction. Pinned through FOUR surfaces (PRINT cell, CONTENTS
    descriptor, DATA-step read-back, raw EXPORT bytes) plus controls. The
-   no-FORCE ERROR runs LAST — a step ERROR skips all later steps
+   no-FORCE ERROR runs LAST - a step ERROR skips all later steps
    (BUG-errhalt); the captured ERROR and the untouched base are pinned in
    proc.zig's BUG-appendcharwidth unit test, numeric lengths too. (no PHI)
    expect-rc: 1 */
@@ -43,7 +43,7 @@ data chk; set fbase;             /* read-back surface: agrees with PRINT       *
   put 'READBACK=[' s +0 '] len=' l;
 run;
 
-/* EXPORT reads the raw cells — read the file back RAW so the stored bytes are
+/* EXPORT reads the raw cells - read the file back RAW so the stored bytes are
    pinned, not a round-trip that could re-clip on import (siov pattern) */
 proc export data=fbase outfile="tests/corpus/includes/acw_rt.csv" dbms=csv replace; run;
 data raw;
@@ -53,7 +53,7 @@ data raw;
 run;
 proc print data=raw noobs; run;
 
-/* no-FORCE on a declared length mismatch ERRORs and appends nothing — LAST:
+/* no-FORCE on a declared length mismatch ERRORs and appends nothing - LAST:
    the step ERROR halts the program here (BUG-errhalt). */
 data nbase; length s $3; s='abc'; run;
 proc append base=nbase data=fnew; run;

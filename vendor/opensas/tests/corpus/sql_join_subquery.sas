@@ -1,4 +1,4 @@
-/* Inline view (subquery) in a JOIN — GH#14 ISS-sqljoinsubquery.
+/* Inline view (subquery) in a JOIN - GH#14 ISS-sqljoinsubquery.
    1) simple `inner join (select …) b on …`
    2) min-date-per-subject idiom: join a group-by aggregate subquery. */
 data ec;

@@ -3,11 +3,11 @@
 
    Three error arms live in readInfileLines and only ONE of them continued:
    StreamTooLong and ReadFailed already returned error.ExecError, the OPEN
-   failure did not — and its own doc comment already claimed the open error was
+   failure did not - and its own doc comment already claimed the open error was
    "a HARD SAS error … never a silent 0-obs step". Two shapes of real damage,
    both probed on a clean-rebuilt binary:
      (a) `data out; set src; infile 'nope'; input v $; run;` wrote EVERY driver
-         row with v MISSING — a fabricated value in a written data set;
+         row with v MISSING - a fabricated value in a written data set;
      (b) `data sc.keeper; infile 'nope'; input i; run;` REPLACED a live 3-obs
          permanent member with an EMPTY one, at exit 1, readable at exit 0.
    (b) is the inverse of Example Code 8.6's "WARNING: Data set WORK.TEST was not
@@ -34,7 +34,7 @@ data _null_;
 run;
 
 /* Control 2: the SET-driven shape that produced the fabricated missings, with a
-   real file — every row keeps its read value. */
+   real file - every row keeps its read value. */
 data mixed;
   set src;
   infile 'tests/corpus/includes/si_n7.txt';
@@ -42,7 +42,7 @@ data mixed;
 run;
 data _null_; set mixed; put 'mixed id=' id ' z=' z; run;
 
-/* FAILING STEP, LAST: nothing below the INFILE runs — no INPUT, no PUT, no row. */
+/* FAILING STEP, LAST: nothing below the INFILE runs - no INPUT, no PUT, no row. */
 data out_never;
   set src;
   infile 'tests/corpus/includes/no_such_file_audit_errhaltclass.dat';

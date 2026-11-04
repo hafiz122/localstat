@@ -1,6 +1,6 @@
 /* BUG-selectwhenafterother: a WHEN after OTHERWISE used to fold AHEAD of the
    OTHERWISE into the if-chain, so the post-OTHERWISE WHEN could fire (SAS 9.4
-   raises a syntax error — OTHERWISE must be the LAST clause). Step 1 is the
+   raises a syntax error - OTHERWISE must be the LAST clause). Step 1 is the
    positive case and prints below; step 2 fails LOUD at parse time (ERROR on
    stderr, exit 1) and prints nothing. If the silent fold regresses, step 2
    would append a='five' here and mismatch.

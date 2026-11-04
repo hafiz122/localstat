@@ -1,9 +1,9 @@
-/* BUG-modifybymasterdriven: `MODIFY master trans; BY k;` is TRANSACTION-driven —
+/* BUG-modifybymasterdriven: `MODIFY master trans; BY k;` is TRANSACTION-driven -
    one DATA-step iteration per TRANSACTION observation, never one per master row.
    Language Reference: Concepts p.596 counts exactly 3 REPLACEs + 3 OUTPUTs = the 6 transaction rows of
    the p.595 program, and p.599 Table 23.4 has NO _IORC_ code for "a master row
    with no transaction" because that iteration does not exist.  (UPDATE's
-   master-driven, group-collapsing driver — correct for UPDATE, p.586 Step 2 —
+   master-driven, group-collapsing driver - correct for UPDATE, p.586 Step 2 -
    used to run MODIFY too, giving every master row a _SOK iteration.) */
 
 data m; input k stock; datalines;
@@ -26,7 +26,7 @@ data m; modify m t; by k; put 'ITER k=' k ' iorc=' _iorc_; run;
 proc print data=m noobs; run;
 
 /* p.599 Table 23.4: consecutive transaction obs with the same unmatched BY
-   value EACH get an iteration — the first returns _DSENMR (1230015), the
+   value EACH get an iteration - the first returns _DSENMR (1230015), the
    subsequent ones _DSEMTR.  _DSEMTR's numeric value is oracle-blocked
    (NOTE-modifydsemtr; %sysrc(_dsemtr) fails loud by design), so opensas
    stamps a DISTINCT non-SAS sentinel (-1230015) rather than guessing a number
@@ -46,7 +46,7 @@ data m2; modify m2 t2; by k; put 'k=' k ' _iorc_=' _iorc_; _error_=0; run;
 proc print data=m2 noobs; run;
 
 /* p.588 Table 23.3 "Duplicate BY-values": MODIFY with BY allows duplicates in
-   BOTH data sets — each transaction matches the NEXT master obs with that key:
+   BOTH data sets - each transaction matches the NEXT master obs with that key:
    x=10+100=110, then x=11+200=211; the k=2 master obs is never visited. */
 title 'duplicate BY values in master and transaction match in order';
 data m3; input k x; datalines;

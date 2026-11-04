@@ -1,16 +1,16 @@
-//! Expression evaluator — `(ast.Expr, *Pdv) → Value`. Walks the immutable AST
+//! Expression evaluator - `(ast.Expr, *Pdv) → Value`. Walks the immutable AST
 //! (M0.2), reads variables from the PDV (M0.3), and returns a SAS `Value` (M0.1).
 //! Matches the lexer's house style: small error set, arena allocation, names
 //! compared case-insensitively (via the PDV).
 //!
 //! The SAS semantics that actually bite here:
 //!   * Missing *propagates* through arithmetic (`. + 1` → `.`) but does NOT in
-//!     comparisons — there, missing is simply the lowest value (`. < 5` is true).
+//!     comparisons - there, missing is simply the lowest value (`. < 5` is true).
 //!   * Every comparison / logical op yields a numeric `1` or `0`, never a bool.
 //!   * A char used in arithmetic/comparison auto-converts to numeric; a numeric
 //!     used in `||` auto-converts to char.
 //!   * Runtime mishaps (divide-by-zero, bad numeric text) are NOTEs + a missing
-//!     result — SAS keeps going. The exceptions: an out-of-range array subscript
+//!     result - SAS keeps going. The exceptions: an out-of-range array subscript
 //!     is a SAS execution ERROR that aborts the DATA step via `error.ExecError`
 //!     (BUG-arrayoorerror); `OutOfMemory` comes from the arena.
 //!
@@ -25,7 +25,7 @@ const ast = @import("ast.zig");
 const diag = @import("diag.zig");
 const pdv_mod = @import("pdv.zig");
 const Value = @import("value.zig").Value;
-const format = @import("format.zig"); // expandYear — the shared YEARCUTOFF window (BUG-date-literal-2digityear)
+const format = @import("format.zig"); // expandYear - the shared YEARCUTOFF window (BUG-date-literal-2digityear)
 
 // diag.Error (OutOfMemory + Lex/Parse/ExecError) so an out-of-range array
 // subscript can abort the DATA step LOUD (BUG-arrayoorerror), mirroring
@@ -61,8 +61,8 @@ pub const Evaluator = struct {
     /// LAG/DIF state (semantics live in functions.zig). Keyed per call site;
     /// each value is that call's FIFO of recent inputs. Holds `Value` (not just
     /// f64) so `lag()` of a CHARACTER variable returns the prior row's string
-    /// (BUG-lagchar); DIF still coerces to numeric. Fresh per Evaluator — i.e.
-    /// per DATA step — so it resets between steps but survives the iteration loop.
+    /// (BUG-lagchar); DIF still coerces to numeric. Fresh per Evaluator - i.e.
+    /// per DATA step - so it resets between steps but survives the iteration loop.
     lag: std.StringHashMapUnmanaged(std.ArrayList(Value)) = .empty,
     /// Allocator for cross-iteration state (the `lag` map and its FIFOs/RNG
     /// streams): the DATA-step executor swaps `arena` to a per-row scratch
@@ -76,7 +76,7 @@ pub const Evaluator = struct {
     /// BUG-declaredobjnamevalue: the names this DATA step declared as COMPONENT
     /// OBJECTS (`declare hash h;` / `declare hiter hi;` / `h = _new_ hash();`).
     /// Component Objects Ref printed p.12: "The DECLARE statement tells the
-    /// compiler that the object reference myhash is of type hash" — the name is
+    /// compiler that the object reference myhash is of type hash" - the name is
     /// an object reference, not a numeric or character variable, so it has no
     /// value for `evalVariable` to hand back. The executor owns the list (one
     /// per step, filled by its compile walk) and we hold a POINTER, so a later
@@ -95,7 +95,7 @@ pub const Evaluator = struct {
             .missing => Value.missing,
             .variable => |name| self.evalVariable(name),
             .unary => |u| self.evalUnary(u),
-            // PERF-inlist: an OR/AND chain may be an all-literal IN/NOT-IN — probe
+            // PERF-inlist: an OR/AND chain may be an all-literal IN/NOT-IN - probe
             // the membership-set fast path (falls through to evalBinary if not).
             .binary => |b| if (b.op == .@"or" or b.op == .@"and") self.evalOrAnd(e, b) else self.evalBinary(b),
             .call => |c| self.evalCall(c),
@@ -103,22 +103,22 @@ pub const Evaluator = struct {
         };
     }
 
-    /// THE one point where a bare name becomes a value — every EXPRESSION
+    /// THE one point where a bare name becomes a value - every EXPRESSION
     /// position routes here: an assignment RHS, an IF/SELECT condition, a DO
     /// bound, an array subscript, a function argument, a hash method's
     /// `key:`/`data:` slot, WHERE. (A PUT item is not an `ast.Expr` and is the
-    /// one exception — see `rejectObjectName` below.)
+    /// one exception - see `rejectObjectName` below.)
     ///
     /// BUG-declaredobjnamevalue: a DATA-step component-object reference shares
     /// the variable namespace but is NOT a value, so `x = h + 1;` and
     /// `h.add(key: 1, data: inner);` used to fabricate a numeric missing and
-    /// exit 0 — the silent-wrong-answer class D-002 exists to prevent. The
+    /// exit 0 - the silent-wrong-answer class D-002 exists to prevent. The
     /// SAS 9.4 volumes give no verbatim log text for this, so the BASIS is the
     /// house fail-loud rule plus the type fact cited at `objects` above. rc 1,
     /// not 2: writing an object name where a value belongs is invalid SAS, a
     /// user error (D-009b(ii)), so it must NOT be routed through `failGap`.
     /// ponytail: checked at the READ, so a never-executed `if 0 then x = h;`
-    /// stays quiet where SAS 9.4 rejects it at compile time — no value is
+    /// stays quiet where SAS 9.4 rejects it at compile time - no value is
     /// fabricated either way; add a compile-pass scan if a program needs the
     /// earlier report.
     fn evalVariable(self: *Evaluator, name: []const u8) Error!Value {
@@ -130,7 +130,7 @@ pub const Evaluator = struct {
 
     /// The BUG-declaredobjnamevalue predicate, kept `pub` for its ONE other
     /// entry class: a PUT item is not an `ast.Expr`, so exec.zig's PUT renderer
-    /// reads the PDV itself and never reaches `evalVariable` — `put h;` printed
+    /// reads the PDV itself and never reaches `evalVariable` - `put h;` printed
     /// a fabricated `.` at exit 0 for the same reason `x = h + 1;` did. Two
     /// entry classes, one predicate, one message (the shape
     /// BUG-hashofhashexplicit settled), so the two cannot drift apart.
@@ -154,7 +154,7 @@ pub const Evaluator = struct {
         // not fit i64, so guard before @intFromFloat (which panics on overflow).
         // A MISSING (NaN) subscript is out of range too (BUG-arraysubmissing): NaN
         // fails every `<`/`>` compare, so it must be caught explicitly or it slips
-        // past the span check — SAS 9.4 halts the step, same as any OOR.
+        // past the span check - SAS 9.4 halts the step, same as any OOR.
         const xf = @floor(x);
         if (std.math.isNan(x) or xf < 1 or xf > @as(f64, @floatFromInt(elements.len)))
             return self.subscriptOor(xf, ar.name, ar.line);
@@ -164,7 +164,7 @@ pub const Evaluator = struct {
 
     /// BUG-arrayoorerror: SAS 9.4 treats an out-of-range array subscript as an
     /// execution-time ERROR ("Array subscript out of range") that sets _ERROR_=1
-    /// and stops the DATA step at the offending statement — a soft set-to-missing
+    /// and stops the DATA step at the offending statement - a soft set-to-missing
     /// would let a bad index sail through a clinical program. Fail loud: report
     /// the ERROR, flag _ERROR_, and abort the step via ExecError. `line` is the
     /// source line of the subscript reference (NOTE-arrayoorlineno; 0 = unknown,
@@ -217,7 +217,7 @@ pub const Evaluator = struct {
         if (!gop.found_existing) gop.value_ptr.* = try self.buildInSet(e, b);
         const is = gop.value_ptr.* orelse return self.evalBinary(b);
         // The chain compares `var` numerically to every (numeric) literal, so the
-        // per-row test is numeric regardless of var type — matching the OR-chain's
+        // per-row test is numeric regardless of var type - matching the OR-chain's
         // `cmp`, which coerces a char operand via toNum. ponytail: a char var emits
         // ONE conversion NOTE here vs one-per-element in the OR-chain (the value is
         // identical, and once-per-comparison is the more SAS-faithful log anyway).
@@ -282,11 +282,11 @@ pub const Evaluator = struct {
     }
 
     fn evalCall(self: *Evaluator, c: ast.Call) Error!Value {
-        // __dimchk — synthetic node the parser emits for a MULTI-dimensional array
+        // __dimchk - synthetic node the parser emits for a MULTI-dimensional array
         // reference (parser_expr.arraySubscript). SAS 9.4 checks EACH subscript
         // against ITS dimension's bounds BEFORE folding to a flat index; without
         // this, a per-dimension OOR (`a{3,1}` / `a{1,3}` on a{2,2}) silently carries
-        // into a valid-but-WRONG flat slot — reads/writes the wrong element with no
+        // into a valid-but-WRONG flat slot - reads/writes the wrong element with no
         // error (BUG-arraymultidimoor, data corruption). Args: [0]=name, [1]=line,
         // then per dimension a triple (idx_expr, lo, size). Each subscript is
         // truncated (@floor) to an integer like the 1-D path, then bounds-checked;
@@ -328,8 +328,8 @@ pub const Evaluator = struct {
         // V-meta family on an ARRAY ELEMENT: vname(ch[i]), vtype(ch[i]), … .
         // parser.rewriteVMeta only rewrites the bare `vfunc(NAME)` form; a
         // dynamic subscript (`[i]`) never matches, so resolve the element's
-        // backing variable name here — `ar.elements` is the parse-time member
-        // list — and dispatch to the name-taking `…x` twin (mirrors BUG-vlength).
+        // backing variable name here - `ar.elements` is the parse-time member
+        // list - and dispatch to the name-taking `…x` twin (mirrors BUG-vlength).
         if (c.args.len == 1 and c.args[0] == .array_ref) {
             if (vMetaTwin(c.name)) |twin| {
                 const ar = c.args[0].array_ref;
@@ -346,7 +346,7 @@ pub const Evaluator = struct {
             }
         }
         // VLENGTH(var): the storage (declared) length, distinct from the value width
-        // — only resolvable from the variable itself, not its (evaluated) value, so
+        // - only resolvable from the variable itself, not its (evaluated) value, so
         // handle a bare-variable argument here where the PDV is in reach
         // (BUG-vlength). A non-variable arg falls through to VLENGTH-of-a-value.
         if (std.ascii.eqlIgnoreCase(c.name, "vlength") and c.args.len == 1 and c.args[0] == .variable) {
@@ -359,7 +359,7 @@ pub const Evaluator = struct {
         }
         // LENGTHC(var): the DECLARED char width incl. trailing blanks (GAP-lengthc-declared).
         // opensas stores char values UNPADDED (EPIC-charfixedwidth deferred), so read the
-        // declared width from the variable directly — same bare-var precedent as VLENGTH.
+        // declared width from the variable directly - same bare-var precedent as VLENGTH.
         // A non-var arg, or a var with no declared LENGTH (len==0), falls through to the
         // value-based lengthc (counts the value's bytes). LENGTH/LENGTHN (used/trimmed) unaffected.
         if (std.ascii.eqlIgnoreCase(c.name, "lengthc") and c.args.len == 1 and c.args[0] == .variable) {
@@ -370,29 +370,29 @@ pub const Evaluator = struct {
         }
         // `of x:` evaluated AS the call (a CALL statement's args are evaluated
         // one by one, never through the loop below): valid SAS there too
-        // (funcref printed p.6) but only the function-arg path expands it —
+        // (funcref printed p.6) but only the function-arg path expands it -
         // loud GAP (rc 2), never a fabricated missing.
         if (std.ascii.eqlIgnoreCase(c.name, "__ofprefix")) {
             diag.markGap();
             return self.diags.fail(error.ExecError, 0, "the name: prefix form of var_list is only supported in function arguments", .{});
         }
-        // `of _numeric_ / _all_ / _character_` — the parser leaves the special
+        // `of _numeric_ / _all_ / _character_` - the parser leaves the special
         // list name; expand it here to the current PDV's matching variables (the
         // runtime list can't be known at parse time). Skip automatic/helper vars.
         var argv: std.ArrayList(Value) = .empty;
-        // BUG-prxmatchpad (GH#28): the SUBJECT of a PRX function — prxmatch(rx,
-        // subject), prxchange(rx, times, subject), prxposn(rx, n, source) — is a
+        // BUG-prxmatchpad (GH#28): the SUBJECT of a PRX function - prxmatch(rx,
+        // subject), prxchange(rx, times, subject), prxposn(rx, n, source) - is a
         // bare char VARIABLE read PADDED to its declared length: fixed-width
         // storage again, the exact rule `concatStr` applies to `||` operands
         // (BUG-concatnopad; Language Reference: Concepts p.49). functions.zig sees
-        // only evaluated Values (a `.str` carries no variable name), so — like
-        // VLENGTH/LENGTHC above — the bare-var case must be caught here where the
+        // only evaluated Values (a `.str` carries no variable name), so - like
+        // VLENGTH/LENGTHC above - the bare-var case must be caught here where the
         // raw AST is still in hand. Live SAS 9.4: `length s $8; s="abc";`
         // prxmatch('/abc$/', s) is 0 (subject "abc"+5 blanks, `$` fails) while a
-        // literal subject still matches — the PRX engine was never at fault, the
+        // literal subject still matches - the PRX engine was never at fault, the
         // subject just arrived unpadded. Only a declared char VARIABLE diverts;
         // literals, computed expressions (trim(s) et al.) and len==0 vars fall
-        // through unpadded — the documented LENGTHC fallthrough. Storage stays
+        // through unpadded - the documented LENGTHC fallthrough. Storage stays
         // unpadded (EPIC-charfixedwidth); CALL PRXCHANGE/PRXPOSN are exec.zig's
         // separate lineage and keep their current reads.
         const prx_subject: ?usize = blk: {
@@ -403,13 +403,13 @@ pub const Evaluator = struct {
             break :blk null;
         };
         for (c.args, 0..) |*arg, ai| {
-            // `of x:` (Language Reference: Concepts printed p.70 Table 4.5) — arrives as a synthetic
+            // `of x:` (Language Reference: Concepts printed p.70 Table 4.5) - arrives as a synthetic
             // `__ofprefix("x")` argument (parser.expandOf, the `__dimchk`
             // pattern); expand the prefix against the live PDV here, the same
             // deferral and the same automatic/helper exemption as the special
             // lists beside it. Empty match: Table 4.5 settles only the matching
             // rule, so D-002 + the "special list matched no variables" precedent
-            // above decide — a loud ERROR (rc 1: a typo'd prefix is the user's),
+            // above decide - a loud ERROR (rc 1: a typo'd prefix is the user's),
             // never a silent zero-argument call.
             if (arg.* == .call and std.ascii.eqlIgnoreCase(arg.call.name, "__ofprefix") and
                 arg.call.args.len == 1 and arg.call.args[0] == .str)
@@ -439,9 +439,9 @@ pub const Evaluator = struct {
                 continue;
             };
             // BUG-prxmatchpad: this arg is the SUBJECT slot of a PRX call and a
-            // bare char variable with a declared LENGTH — contribute its value
-            // padded to that width (concatStr's rule). Anything else — literal,
-            // expression, numeric var, undeclared-width var — takes the ordinary
+            // bare char variable with a declared LENGTH - contribute its value
+            // padded to that width (concatStr's rule). Anything else - literal,
+            // expression, numeric var, undeclared-width var - takes the ordinary
             // path below unchanged.
             if (prx_subject) |si| if (ai == si and arg.* == .variable) {
                 if (self.pdv.indexOf(arg.variable)) |vi| {
@@ -466,10 +466,10 @@ pub const Evaluator = struct {
         if (std.math.isNan(x) or std.math.isNan(y)) {
             // GAP-missgennote: arithmetic on a missing operand yields missing AND
             // logs SAS's note (Language Reference: Concepts p.110, Ex. 5.1). Fires too when the missing
-            // came from an invalid char→num coercion just above — uniform rule:
+            // came from an invalid char→num coercion just above - uniform rule:
             // an operand was missing, so the result is. Div-by-zero never reaches
             // here (its own note); comparisons don't route through arith.
-            // ponytail: no "(N times) at (Line):(Column)" aggregation — one plain
+            // ponytail: no "(N times) at (Line):(Column)" aggregation - one plain
             // NOTE per occurrence, like the GH#74 conversion notes.
             self.note("Missing values were generated as a result of performing an operation on missing values.", .{});
             return Value.missing;
@@ -481,12 +481,12 @@ pub const Evaluator = struct {
             .div => blk: {
                 if (y == 0) {
                     // NOTE-invalidnumdataloc (GH#78): no "at line N column M"
-                    // tail — AST expressions carry no source span, so the only
+                    // tail - AST expressions carry no source span, so the only
                     // printable position was a frozen 0/0 literal, which reads
                     // as a bug. An omitted position is honest; 0/0 was not.
                     self.note("Division by zero detected.", .{});
                     try self.setError();
-                    return Value.missing; // reported here — not the NaN path below
+                    return Value.missing; // reported here - not the NaN path below
                 }
                 break :blk x / y;
             },
@@ -495,7 +495,7 @@ pub const Evaluator = struct {
         };
         // Overflow (±inf) and invalid (NaN) both collapse to SAS missing.
         // NOTE-overflownonote (tick183): overflow NOTES on the way to missing
-        // — the same math-domain NOTE functions.zig's domErr emits — matching
+        // - the same math-domain NOTE functions.zig's domErr emits - matching
         // the div-by-zero path just above (was the only silent numeric-error
         // path).
         if (std.math.isInf(r)) {
@@ -503,7 +503,7 @@ pub const Evaluator = struct {
             return Value.missing;
         }
         // BUG-powdomainnote: an invalid pow (negative base ^ fractional
-        // exponent → NaN) was the last SILENT domain error in this evaluator —
+        // exponent → NaN) was the last SILENT domain error in this evaluator -
         // sqrt(-1)/log(-1) (functions.zig domErr), MOD-by-zero and
         // divide-by-zero all NOTE + set _ERROR_ on the same class. Match the
         // siblings exactly: same wording, _ERROR_=1, missing, keep going.
@@ -525,11 +525,11 @@ pub const Evaluator = struct {
 
     /// SAS automatic `_ERROR_`: an invalid char→num conversion or a division by
     /// zero inside an EXPRESSION sets it to 1, live in-step (Language Reference: Concepts p.110/111),
-    /// exactly as the INPUT path in pdv.zig does (CHARNUM-errorvar) — without
+    /// exactly as the INPUT path in pdv.zig does (CHARNUM-errorvar) - without
     /// it the validation idiom `if _error_ then …` silently never fires
     /// (BUG-exprnoerrorvar). Plain PDV var; the executor resets it per iteration.
     /// pub: functions.zig routes its invalid-argument NOTEs through this same
-    /// setter (MISC-fnseterror) — one _ERROR_ path for exprs and functions.
+    /// setter (MISC-fnseterror) - one _ERROR_ path for exprs and functions.
     pub fn setError(self: *Evaluator) Error!void {
         try self.pdv.set("_error_", .{ .num = 1 });
     }
@@ -542,12 +542,12 @@ pub const Evaluator = struct {
                 const trimmed = std.mem.trim(u8, s, " ");
                 if (trimmed.len == 0) return std.math.nan(f64); // blank char → missing
                 // A quoted special-missing token ('.K') coerces via the w. informat
-                // to that special missing, not plain missing — so `x=.K` matches
+                // to that special missing, not plain missing - so `x=.K` matches
                 // `x='.K'` (GH#58). Try this before parseFloat; no invalid-value NOTE.
                 if (Value.parseSpecialMissing(trimmed)) |sm| return sm.num;
                 // SAS logs a NOTE on EVERY implicit char→num conversion (GH#74),
                 // matching the char→num ASSIGNMENT note in pdv.zig (GH#9). Line 0
-                // — AST nodes carry no source span (see `note` below).
+                // - AST nodes carry no source span (see `note` below).
                 self.note("Character values have been converted to numeric values at the places given by: (Line):(Column).", .{});
                 return pdv_mod.sasParseFloat(trimmed) orelse {
                     // Rejected by SAS's `w.` informat (unparsable, or a Zig-only
@@ -556,7 +556,7 @@ pub const Evaluator = struct {
                     // and flags _ERROR_=1. Real SAS tails it "at line N column M."
                     // (Language Reference: Concepts Example Code 4.1 logs the sibling "Invalid character
                     // data … at line 53 column 7."), but no expression span exists
-                    // here to fill N/M — GH#78: omit the position rather than print
+                    // here to fill N/M - GH#78: omit the position rather than print
                     // a frozen "line 0 column 0" (NOTE-invalidnumdataloc).
                     self.note("Invalid numeric data, '{s}'.", .{s});
                     try self.setError();
@@ -567,13 +567,13 @@ pub const Evaluator = struct {
     }
 
     /// `||` operand text: a bare char VARIABLE contributes its value PADDED to
-    /// its declared length — fixed-length char vars carry their trailing blanks
+    /// its declared length - fixed-length char vars carry their trailing blanks
     /// into concatenation (Language Reference: Concepts p.49: that is exactly why TRIM is needed;
     /// BUG-concatnopad). A literal/expression keeps its own width; a numeric
     /// converts BEST12 right-justified (BUG-numcharwidth, via toStr). The PDV
     /// truncates stored values to the declared length on assignment, so only
     /// padding is needed here, never truncation. ponytail: array ELEMENTS of a
-    /// char array arrive as `.array_ref` (value only) and stay unpadded —
+    /// char array arrive as `.array_ref` (value only) and stay unpadded -
     /// resolve-and-pad them too if a fixture ever needs it.
     fn concatStr(self: *Evaluator, e: *const ast.Expr, v: Value) Error![]const u8 {
         const s = try self.toStr(v);
@@ -605,7 +605,7 @@ pub const Evaluator = struct {
 
     fn note(self: *Evaluator, comptime fmt: []const u8, args: anytype) void {
         // Best-effort: losing a NOTE under OOM is fine, the real error surfaces
-        // at the next allocation. Line 0 — AST nodes carry no line yet.
+        // at the next allocation. Line 0 - AST nodes carry no line yet.
         self.diags.report(.note, 0, fmt, args) catch {};
     }
 };
@@ -633,14 +633,14 @@ fn isAutoVar(name: []const u8) bool {
 }
 
 /// Member variables of an ARRAY declared over a special list (`_numeric_` /
-/// `_character_` / `_all_`), resolved against the live PDV in declaration order —
+/// `_character_` / `_all_`), resolved against the live PDV in declaration order -
 /// data vars only, auto/BY-flag helpers skipped. The set is a runtime fact, so
 /// array_ref / array_assign / dim all resolve it here (GH#48; mirrors the
 /// `of _character_` handling in evalCall).
 /// ponytail: expands against the WHOLE PDV, like `of _numeric_` and PROC SORT's
 /// special lists (#26). SAS's exact rule is "vars of that type defined BEFORE the
 /// array statement", so a same-type loop index / temp declared later is also
-/// swept in — harmless for the common `do i=1 to dim(v); v[i]=…` pattern (i is
+/// swept in - harmless for the common `do i=1 to dim(v); v[i]=…` pattern (i is
 /// last, its stray write is invisible). Upgrade to source-position filtering if a
 /// program's dim()/binding depends on excluding later-declared vars.
 pub fn specialArrayNames(arena: std.mem.Allocator, pdv: *const pdv_mod.Pdv, kind: ast.SpecialArr) Error![]const []const u8 {
@@ -753,7 +753,7 @@ const Fixture = struct {
     fn deinit(self: *Fixture) void {
         self.arena.deinit();
     }
-    // Bind pdv/diags to the arena only once `self` is at its final address —
+    // Bind pdv/diags to the arena only once `self` is at its final address -
     // `arena.allocator()` captures `&self.arena`, so priming before the Fixture
     // stops moving would dangle.
     fn prime(self: *Fixture) void {
@@ -774,11 +774,11 @@ const Fixture = struct {
 // on a malformed body (the lexer then keeps the plain string).
 // BUG-date-literal-2digityear (D-002 silent-wrong): a 2-digit year in a
 // date/datetime literal now expands through the shared YEARCUTOFF span
-// (format.expandYear — lrcon printed pp.141-142, default 1926), the same
+// (format.expandYear - lrcon printed pp.141-142, default 1926), the same
 // window the informat path already applies, so `'26oct02'd` and its informat
 // twin read identically. The old "4-digit years only (no yearcutoff)"
 // ponytail was not a decisions.md ruling and silently produced year-00NN
-// dates at rc 0 — the worst failure class for clinical output — so removing
+// dates at rc 0 - the worst failure class for clinical output - so removing
 // it is deliberate.
 
 fn cdIsDigit(c: u8) bool {
@@ -814,7 +814,7 @@ pub fn dateConst(s: []const u8) ?f64 {
     const year = std.fmt.parseInt(i64, str[i + 3 ..], 10) catch return null;
     // BUG-date-literal-2digityear: a 2-digit year windows through the shared
     // YEARCUTOFF span (expandYear passes ≥100 through verbatim), matching the
-    // informat readers — `'26oct02'd` is 26OCT2002, never year 2.
+    // informat readers - `'26oct02'd` is 26OCT2002, never year 2.
     return @floatFromInt(sasDate(format.expandYear(year), mon, day));
 }
 
@@ -907,7 +907,7 @@ test "date/datetime literals window 2-digit years via YEARCUTOFF (BUG-date-liter
 }
 
 fn fixture() Fixture {
-    // No allocator() call here — the returned value is moved by the caller.
+    // No allocator() call here - the returned value is moved by the caller.
     return .{ .arena = std.heap.ArenaAllocator.init(std.testing.allocator) };
 }
 
@@ -962,7 +962,7 @@ test "NOTE-overflownonote: arithmetic overflow gives missing WITH a NOTE" {
     try t.expectEqual(@as(f64, 3), (try e.eval(b.bin(.div, b.num(6), b.num(2)))).num);
     try t.expectEqual(@as(usize, 2), f.diags.count());
 
-    // NaN (invalid pow) NOTES too now (BUG-powdomainnote — same wording as
+    // NaN (invalid pow) NOTES too now (BUG-powdomainnote - same wording as
     // domErr, _ERROR_=1); div-by-zero keeps its own NOTE.
     try t.expect((try e.eval(b.bin(.pow, b.num(-1), b.num(0.5)))).isMissing());
     try t.expectEqual(@as(usize, 3), f.diags.count());
@@ -979,14 +979,14 @@ test "BUG-powdomainnote: invalid pow NOTES + sets _ERROR_ like sqrt(-1)/MOD-by-z
     var e = f.ev();
     const b = f.b();
 
-    // (-1)**0.5 → missing WITH the domain NOTE (was silent — the only domain
+    // (-1)**0.5 → missing WITH the domain NOTE (was silent - the only domain
     // error class in this evaluator that said nothing).
     try t.expect((try e.eval(b.bin(.pow, b.num(-1), b.num(0.5)))).isMissing());
     try t.expectEqual(@as(usize, 1), f.diags.count());
     try t.expectEqualStrings("pow: argument out of domain (result set to missing)", f.diags.list.items[0].message);
     // _ERROR_ = 1, same as functions.zig domErr (sqrt/log/MOD-by-zero).
     try t.expectEqual(@as(f64, 1), (f.pdv.get("_error_") orelse unreachable).num);
-    // a NOTE, not an ERROR — execution continues; a later valid pow is fine.
+    // a NOTE, not an ERROR - execution continues; a later valid pow is fine.
     try t.expect(!f.diags.hasErrors());
     try t.expectEqual(@as(f64, 8), (try e.eval(b.bin(.pow, b.num(2), b.num(3)))).num);
 }
@@ -1054,7 +1054,7 @@ test "concat pads a char VARIABLE to its declared length (BUG-concatnopad)" {
     var e = f.ev();
     const b = f.b();
 
-    // length t $5; t="fox" — stored unpadded, declared width 5
+    // length t $5; t="fox" - stored unpadded, declared width 5
     const ti = try f.pdv.declare("t", .char);
     f.pdv.vars.items[ti].len = 5;
     try f.pdv.set("t", .{ .str = "fox" });
@@ -1063,7 +1063,7 @@ test "concat pads a char VARIABLE to its declared length (BUG-concatnopad)" {
     try t.expectEqualStrings("fox  !", (try e.eval(b.bin(.concat, b.vbl("t"), b.str("!")))).str);
     // "!" || t → "!fox  " (padding is positional)
     try t.expectEqualStrings("!fox  ", (try e.eval(b.bin(.concat, b.str("!"), b.vbl("t")))).str);
-    // var || var: both pad — length a $3 b $3; a="x"; b="y" → "x  y  "
+    // var || var: both pad - length a $3 b $3; a="x"; b="y" → "x  y  "
     const ai = try f.pdv.declare("a", .char);
     f.pdv.vars.items[ai].len = 3;
     try f.pdv.set("a", .{ .str = "x" });
@@ -1080,8 +1080,8 @@ test "concat pads a char VARIABLE to its declared length (BUG-concatnopad)" {
 }
 
 // BUG-prxmatchpad test hook: captures the LAST argument the PRX function
-// received — the SUBJECT slot in all three forms (prxmatch: args[1];
-// prxchange/prxposn: args[2]) — so the padding is pinned at the exact boundary
+// received - the SUBJECT slot in all three forms (prxmatch: args[1];
+// prxchange/prxposn: args[2]) - so the padding is pinned at the exact boundary
 // the fix changed: what the evaluator hands the function layer. null = the arg
 // arrived as something other than a string (e.g. 2-arg prxposn's numeric n).
 var prxpad_subject: ?[]const u8 = null;
@@ -1100,7 +1100,7 @@ test "PRX subject: a bare char VARIABLE pads to its declared width (BUG-prxmatch
     e.call_fn = &prxpadEcho;
     const b = f.b();
 
-    // length s $8; s="abc" — stored unpadded (EPIC-charfixedwidth), declared 8
+    // length s $8; s="abc" - stored unpadded (EPIC-charfixedwidth), declared 8
     const si = try f.pdv.declare("s", .char);
     f.pdv.vars.items[si].len = 8;
     try f.pdv.set("s", .{ .str = "abc" });
@@ -1123,15 +1123,15 @@ test "PRX subject: a bare char VARIABLE pads to its declared width (BUG-prxmatch
     _ = try e.eval(mk(f.arena.allocator(), "prxchange", &.{ b.vbl("rx"), b.num(-1), b.vbl("s") }));
     try t.expectEqualStrings("abc" ++ "     ", prxpad_subject.?);
     // prxposn(rx, 1, s): the args[2] source pads; the 2-arg form's last arg is
-    // the numeric n — never an early string conversion
+    // the numeric n - never an early string conversion
     _ = try e.eval(mk(f.arena.allocator(), "prxposn", &.{ b.vbl("rx"), b.num(1), b.vbl("s") }));
     try t.expectEqualStrings("abc" ++ "     ", prxpad_subject.?);
     _ = try e.eval(mk(f.arena.allocator(), "prxposn", &.{ b.vbl("rx"), b.num(1) }));
     try t.expect(prxpad_subject == null);
-    // a LITERAL subject keeps its own width — no declared length to pad to
+    // a LITERAL subject keeps its own width - no declared length to pad to
     _ = try e.eval(mk(f.arena.allocator(), "prxmatch", &.{ b.str("/abc$/"), b.str("abc") }));
     try t.expectEqualStrings("abc", prxpad_subject.?);
-    // a computed expression — "abc"||"" — arrives unpadded (the documented
+    // a computed expression - "abc"||"" - arrives unpadded (the documented
     // fallthrough: only the BARE variable pads; the trim(s) idiom is pinned
     // end-to-end in bug_prxmatchpad.sas, where the real function table is live
     // and a nested call is not intercepted by this echo)
@@ -1139,7 +1139,7 @@ test "PRX subject: a bare char VARIABLE pads to its declared width (BUG-prxmatch
     _ = try e.eval(mk(f.arena.allocator(), "prxmatch", &.{ b.str("/abc$/"), cat }));
     try t.expectEqualStrings("abc", prxpad_subject.?);
     // a no-declared-length char var and a NUMERIC var take the ordinary path
-    // (the numeric stays .num — char conversion is the callee's job, as before)
+    // (the numeric stays .num - char conversion is the callee's job, as before)
     try f.pdv.set("plain", .{ .str = "abc" });
     _ = try e.eval(mk(f.arena.allocator(), "prxmatch", &.{ b.str("/abc$/"), b.vbl("plain") }));
     try t.expectEqualStrings("abc", prxpad_subject.?);
@@ -1176,7 +1176,7 @@ test "array subscript: out-of-range is a SAS ERROR that aborts the step (BUG-arr
     // the ERROR is captured in diagnostics (no spawned abort), _ERROR_ flagged
     try t.expect(f.diags.hasErrors());
     try t.expectEqual(@as(f64, 1), f.pdv.get("_error_").?.num);
-    // a MISSING (NaN) subscript is out of range too — fails loud, not soft
+    // a MISSING (NaN) subscript is out of range too - fails loud, not soft
     // (BUG-arraysubmissing): a missing accumulator key must halt, not silently
     // read/write missing. Previously exempted; now routed through subscriptOor.
     try t.expectError(error.ExecError, e.eval(ref(a, elems, b.miss())));
@@ -1249,7 +1249,7 @@ test "GAP-ofcolonprefix: __ofprefix expands against the live PDV; empty match is
     try t.expect(f.diags.hasErrors());
     try t.expect(std.mem.indexOf(u8, f.diags.list.items[f.diags.count() - 1].message, "matched no variables") != null);
 
-    // an ordinary no-match prefix: same loud ERROR (rc 1 — no markGap)
+    // an ordinary no-match prefix: same loud ERROR (rc 1 - no markGap)
     var f2 = fixture();
     defer f2.deinit();
     f2.prime();
@@ -1282,7 +1282,7 @@ test "GH#74: implicit conversions in an expression log the SAS NOTE" {
     try t.expect(std.mem.indexOf(u8, f.diags.list.items[0].message, "converted to numeric") != null);
 
     // unparsable char→num: converted note + invalid-data note, then the
-    // missing-generated note (GAP-missgennote — the mul's operand is missing)
+    // missing-generated note (GAP-missgennote - the mul's operand is missing)
     _ = try e.eval(b.bin(.mul, b.str("abc"), b.num(1)));
     try t.expectEqual(@as(usize, 4), f.diags.count());
     try t.expect(std.mem.indexOf(u8, f.diags.list.items[2].message, "Invalid numeric data, 'abc'") != null);
@@ -1302,12 +1302,12 @@ test "NOTE-invalidnumdataloc: no frozen 'line 0 column 0' in the rendered NOTE (
     const b = f.b();
 
     // AST expressions carry no source span, so these NOTEs have no honest
-    // position to print — they must OMIT it, not freeze 0/0 into the text.
+    // position to print - they must OMIT it, not freeze 0/0 into the text.
     _ = try e.eval(b.bin(.mul, b.str("abc"), b.num(1)));
     try t.expectEqualStrings("Invalid numeric data, 'abc'.", f.diags.list.items[1].message);
     _ = try e.eval(b.bin(.div, b.num(1), b.num(0)));
     try t.expectEqualStrings("Division by zero detected.", f.diags.list.items[3].message);
-    // The RENDERED log: plain "NOTE: …" — no "(L0)" tag, no position text.
+    // The RENDERED log: plain "NOTE: …" - no "(L0)" tag, no position text.
     const log = try f.diags.render();
     try t.expect(std.mem.indexOf(u8, log, "NOTE: Invalid numeric data, 'abc'.\n") != null);
     try t.expect(std.mem.indexOf(u8, log, "NOTE: Division by zero detected.\n") != null);

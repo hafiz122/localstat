@@ -1,10 +1,10 @@
 /* BUG-infilevarnoop (qa tick356 F2): assigning `_INFILE_` was a SILENT NO-OP,
-   and its mere presence — even on a DEAD branch — blanked every `_INFILE_`
+   and its mere presence - even on a DEAD branch - blanked every `_INFILE_`
    read in the step (the assignment declared the name in the compile-time PDV,
    so the uninit pass that set refs_infile early-returned and the record
    buffer was never published). `_INFILE_` is now recognised as an automatic
    in ONE place, independent of PDV membership, and a write goes THROUGH to
-   the held record so the next INPUT re-parses the edited buffer — the Language Reference: Concepts
+   the held record so the next INPUT re-parses the edited buffer - the Language Reference: Concepts
    p.517 varying-record-layout look-ahead idiom, pinned side by side with the
    dead-branch shape so the two can never silently disagree again. */
 data _null_;
@@ -51,7 +51,7 @@ abcdefgh
 run;
 
 /* a write after a RELEASING input lands in the stale buffer (SAS: invisible)
-   — the next INPUT reads the FRESH record, never the edited text */
+   - the next INPUT reads the FRESH record, never the edited text */
 data _null_;
   infile datalines truncover;
   input a $3.;

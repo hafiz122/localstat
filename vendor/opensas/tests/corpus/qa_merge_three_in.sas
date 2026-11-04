@@ -1,6 +1,6 @@
 /* 3-way match-merge with IN= on all sources: gaps + overlaps in every
    combination (a-only, a&c, a&b, b-only via id3). Exercises multi-dataset
-   IN= flag resolution across non-matching keys — uncovered by bm_merge_three. */
+   IN= flag resolution across non-matching keys - uncovered by bm_merge_three. */
 data a; input id x; datalines;
 1 1
 2 2

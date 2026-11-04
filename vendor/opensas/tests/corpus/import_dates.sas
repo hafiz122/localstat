@@ -1,6 +1,6 @@
 /* GAP-importtypes: PROC IMPORT's EFI detects date/time columns (Base SAS 9.4
    Procedures Guide, IMPORT chapter, printed p. 1330: a value a Date and Time
-   format or numeric informat fits is declared NUMERIC, else character) — the
+   format or numeric informat fits is declared NUMERIC, else character) - the
    column becomes NUMERIC with the matching format attached (p. 1340-41:
    JAN2001 → MONYY7.). A MIXED column and DOC-SILENT patterns (slash dates)
    stay character. The empty-file ERROR half is pinned by the captured-diag

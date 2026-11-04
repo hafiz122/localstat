@@ -5,7 +5,7 @@
   %local k n;
   %let k = 5;
   %let n = 0;
-  %do %until(&k >= 3);      /* true at entry — must still run once */
+  %do %until(&k >= 3);      /* true at entry - must still run once */
     %let n = %eval(&n + 1);
     %let k = %eval(&k + 1);
   %end;
@@ -18,7 +18,7 @@
 %macro while_none;
   %local w;
   %let w = 0;
-  %do %while(1 = 0);        /* false at entry — must run zero times */
+  %do %while(1 = 0);        /* false at entry - must run zero times */
     %let w = %eval(&w + 1);
   %end;
   %global w_iters;

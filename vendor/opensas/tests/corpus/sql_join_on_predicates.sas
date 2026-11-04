@@ -1,4 +1,4 @@
-/* BUG-sqlonpredicates (GH#18) — a JOIN's ON span never went through
+/* BUG-sqlonpredicates (GH#18) - a JOIN's ON span never went through
    desugarPredicates, so every SQL-only predicate in it was SILENTLY WRONG AT
    RC 0, in both directions at once:
 
@@ -9,7 +9,7 @@
 
    Cause: `pe.Parser.parseExpr` consumes exactly one expression and leaves the
    cursor on the first token it cannot use, WITHOUT reporting that it stopped.
-   `a.x between b.lo and b.hi` therefore collapsed to a bare `a.x` — and a bare
+   `a.x between b.lo and b.hi` therefore collapsed to a bare `a.x` - and a bare
    column reference is always truthy, so the ON matched every pair. The LIKE /
    CONTAINS / IS NOT NULL spellings collapsed to a bare `b.nm` whose first
    character is non-numeric, i.e. always falsy, so they matched nothing.
@@ -26,7 +26,7 @@
        LIKE in group 6 of sql-expression, above the group-7 comparisons.
    So ON now runs the ONE shared desugarPredicates the other eight sites use.
 
-   This fixture pins the ROW SETS, not just the headline BETWEEN count — the
+   This fixture pins the ROW SETS, not just the headline BETWEEN count - the
    already-correct cases (IN/NOT IN, the six comparison operators, and the
    `col = col` equi-join hash fast path) are pinned here too so a future change
    to the join pipeline cannot regress them silently. Invented data (D-011). */
@@ -66,7 +66,7 @@ proc sql;
   title 'isnotmissing';   select a.x, b.nm from a join b on b.nm is not missing;
 quit;
 
-/* ── already correct — pinned against regression ─────────────────────── */
+/* ── already correct - pinned against regression ─────────────────────── */
 proc sql;
   /* ponytail: a MULTI-element `in ('abc', 'zzz')` in an ON is refused upstream
      of the predicate path ("UNSUPPORTED: PROC SQL: unsupported SELECT") because

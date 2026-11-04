@@ -1,5 +1,5 @@
 /* BUG-scandelim + BUG-scanmodifiers + BUG-findwdefaults + BUG-quotetrailingblank:
-   SCAN/COUNTW share ONE ASCII default delimiter set (blank !$%&()*+,-./;<^| —
+   SCAN/COUNTW share ONE ASCII default delimiter set (blank !$%&()*+,-./;<^| -
    tab/CR/LF only via the `s` modifier, never `>`); the class-adder/k modifiers
    are wired into SCAN and COUNTW; FINDW gets the SCAN default set plus its own
    delimiter/modifier/startpos args (INDEXW keeps blank-only); QUOTE preserves

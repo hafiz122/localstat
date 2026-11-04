@@ -2,13 +2,13 @@
    (aa136fbd / 46aca5bc / 6f40a438).
 
    Two guards landed that can only go WRONG by being too strict, and five
-   existing fixtures were repaired by ADDING `length` declarations — which is
+   existing fixtures were repaired by ADDING `length` declarations - which is
    exactly the shape that hides an over-strict check behind a green suite:
 
    (a) Language Reference: Concepts p.613 "If you use a key or data variable without declaring or
        initializing that key or data variable outside the hash object, an error
        occurs." The check runs at defineDone against the compile-time PDV. Every
-       LEGITIMATE way to establish a variable must still pass — not just LENGTH.
+       LEGITIMATE way to establish a variable must still pass - not just LENGTH.
    (b) Language Reference: Concepts p.621 Note "If an associated hash iterator is pointing to THE KEY,
        the REMOVE method does not remove the key or data." The guard is
        key-scoped: removing ANY OTHER key, removing with a never-walked or
@@ -27,7 +27,7 @@ run;
 
 /* (a) the seven establishment routes ────────────────────────────────────── */
 
-/* R1 LENGTH — the shape the five repaired fixtures now use (control) */
+/* R1 LENGTH - the shape the five repaired fixtures now use (control) */
 data _null_;
   length k 8 v 8;
   declare hash h();
@@ -57,7 +57,7 @@ data _null_;
   put "R3 array elem  rc=" rc " a2=" a2;
 run;
 
-/* R4 CALL MISSING only — p.613's own prescribed priming idiom */
+/* R4 CALL MISSING only - p.613's own prescribed priming idiom */
 data _null_;
   call missing(k, v);
   declare hash h();
@@ -111,7 +111,7 @@ run;
 
 /* (b) the REMOVE guard is KEY-scoped, not iterator-scoped ────────────────── */
 
-/* P1 iterator parked on key 1; remove(key: 3) — a DIFFERENT key — must work */
+/* P1 iterator parked on key 1; remove(key: 3) - a DIFFERENT key - must work */
 data _null_;
   length k 8 v 8;
   declare hash h(ordered:'a');
@@ -138,7 +138,7 @@ data _null_;
   put "P2 remove via k       rc=" rc2 " n=" n;
 run;
 
-/* P3 iterator DECLARED but never walked — no cursor, so no protection */
+/* P3 iterator DECLARED but never walked - no cursor, so no protection */
 data _null_;
   length k 8 v 8;
   declare hash h(ordered:'a');
@@ -150,7 +150,7 @@ data _null_;
   put "P3 never walked       rc=" rc " n=" n;
 run;
 
-/* P4 iterator EXHAUSTED — the cursor is off the end, so no protection */
+/* P4 iterator EXHAUSTED - the cursor is off the end, so no protection */
 data _null_;
   length k 8 v 8;
   declare hash h(ordered:'a');

@@ -44,10 +44,10 @@ Variables      1
 l
 2
 2
-having char alias, remerge — one row
+having char alias, remerge - one row
 ub  mv
 AB   2
-having char alias, grouped — one row
+having char alias, grouped - one row
 b   ub  mv
 CD  CD   2
 control: having numeric computed alias

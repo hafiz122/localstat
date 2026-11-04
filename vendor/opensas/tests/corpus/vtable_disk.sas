@@ -1,4 +1,4 @@
-/* GAP-vtabledisk: SASHELP.VTABLE must list a libref's DISK-ONLY members —
+/* GAP-vtabledisk: SASHELP.VTABLE must list a libref's DISK-ONLY members -
    te.sas7bdat below is never SET/loaded, yet the XPT-creation idiom
    (vtable scan -> CALL SYMPUT count -> %do) must find it. */
 libname l "tests/programs/sas7bdat_read/inputs";

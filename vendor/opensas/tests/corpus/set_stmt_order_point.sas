@@ -1,5 +1,5 @@
 /* BUG-setstmtorder regression net: a POINT= driver (BUG-setpoint) keeps
-   its executable-at-the-node read — the .once driver has no sequential
+   its executable-at-the-node read - the .once driver has no sequential
    read to split around, so the statement-order split must not touch it.
    The explicit DO loop drives the direct-access reads. */
 data d; input v; datalines;

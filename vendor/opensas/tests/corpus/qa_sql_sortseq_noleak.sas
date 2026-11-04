@@ -1,4 +1,4 @@
-/* QA tick417 cross-landing sweep — SQL's SORTSEQ=LINGUISTIC comparator must not
+/* QA tick417 cross-landing sweep - SQL's SORTSEQ=LINGUISTIC comparator must not
    leak past ORDER BY, checked on SIX paths the landing (f6fdd6de) did not probe.
 
    GAP-sqlsortseqlinguistic forked PROC SQL's comparator into cmpVal (byte) and
@@ -14,7 +14,7 @@
      self-join =      an equijoin on a char key must stay byte-exact
      MIN / MAX        lexical aggregates, not ordering
      HAVING           char predicate on a grouped column
-     INTO :           takes the COLLATED order, because it reads ORDER BY —
+     INTO :           takes the COLLATED order, because it reads ORDER BY -
                       the one place the collation SHOULD reach
 
    apple and APPLE are the probe: EQUAL under the fold, DISTINCT under bytes, so

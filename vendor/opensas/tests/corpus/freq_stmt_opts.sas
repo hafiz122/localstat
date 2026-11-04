@@ -1,11 +1,11 @@
 /* GAP-freqlow-tick276 (doc-finder tick276, F5+F6): PROC FREQ statement surface.
-   F6: the PROC FREQ statement option loop now names every token — implemented
+   F6: the PROC FREQ statement option loop now names every token - implemented
    (DATA= / ORDER= / NOPRINT / NLEVELS), legitimately inert pagination/display
    (COMPRESS / PAGE / FORMCHAR=), anything else a loud "option X is not
    supported" (the loud half is pinned by the GAP-freqlow-tick276 test in
-   src/proc.zig — a green corpus run cannot contain an ERROR). This fixture is
+   src/proc.zig - a green corpus run cannot contain an ERROR). This fixture is
    the POSITIVE control: every option below must keep parsing and rendering.
-   F5: an n-way stratum whose obs ALL have zero weight has no observations —
+   F5: an n-way stratum whose obs ALL have zero weight has no observations -
    SAS prints NO table for it (was: a phantom empty grid "Total 0 / 100.00" a
    reader cannot tell from a real result). `weight w / zeros` re-includes it. */
 data d;

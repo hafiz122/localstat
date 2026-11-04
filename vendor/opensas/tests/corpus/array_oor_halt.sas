@@ -1,6 +1,6 @@
 /* BUG-arrayoorerror: an out-of-range array subscript is an execution-time
    ERROR (SAS 9.4: "ERROR: Array subscript out of range") that sets _ERROR_=1
-   and halts the DATA step at the offending statement — not a soft NOTE +
+   and halts the DATA step at the offending statement - not a soft NOTE +
    set-to-missing + continue. The ERROR is on stderr (asserted via captured
    diagnostics in eval.zig's test); stdout pins the HALT: the PUT after the
    bad subscript never runs.
@@ -16,7 +16,7 @@ run;
 data _null_;
   array a[3] a1-a3 (1 2 3);
   i = 5;
-  x = a[i];        /* ERROR: Array subscript out of range — the step stops HERE */
+  x = a[i];        /* ERROR: Array subscript out of range - the step stops HERE */
   put 'after-oor'; /* never reached */
 run;
 

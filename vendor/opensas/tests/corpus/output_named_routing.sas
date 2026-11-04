@@ -1,7 +1,7 @@
 /* BUG-outputundeclared non-regression: named `output <name>;` must still route
    to any dataset the DATA statement declared, matched CASE-INSENSITIVELY, incl.
    the primary. A bare `output;` fans to every declared dataset. (Only an
-   UNdeclared name is now the loud ERROR — that path halts the step and cannot
+   UNdeclared name is now the loud ERROR - that path halts the step and cannot
    appear in a green stdout fixture, so it lives in the tick166 findings .md.) */
 data lo hi;
   input v;

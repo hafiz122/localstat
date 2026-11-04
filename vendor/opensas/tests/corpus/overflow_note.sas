@@ -1,7 +1,7 @@
 /* NOTE-overflownonote (tick183): numeric overflow collapsed to missing with NO
-   NOTE while 6/0 noted — inconsistent. Overflow now emits the same math-domain
+   NOTE while 6/0 noted - inconsistent. Overflow now emits the same math-domain
    NOTE domErr uses ("<op>: argument out of domain (result set to missing)") on
-   stderr — asserted via captured diagnostics in the functions.zig/eval.zig
+   stderr - asserted via captured diagnostics in the functions.zig/eval.zig
    test blocks; this fixture pins that the RESULTS stay missing and that normal
    values are unchanged (no spurious NOTE path is taken). */
 data _null_;

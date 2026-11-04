@@ -1,6 +1,6 @@
-/* BUG-whereconditional — a WHERE statement nested in an IF branch was silently
+/* BUG-whereconditional - a WHERE statement nested in an IF branch was silently
    HOISTED and applied UNCONDITIONALLY: `if x>10 then where x<3;` filtered
-   every row even though x>10 is never true — a conditional filter that
+   every row even though x>10 is never true - a conditional filter that
    always fires is a silent wrong answer. Language Reference: Concepts printed p.232 Table 11.6
    reserves "Execute the selection conditionally" for the subsetting IF (a
    WHERE expression tests the condition BEFORE an observation is read into

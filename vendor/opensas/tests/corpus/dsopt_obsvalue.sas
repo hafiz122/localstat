@@ -1,5 +1,5 @@
 /* BUG-dsobsvaluenovalidate (doc-finder tick300 F5): the dataset-option path
-   validated option NAMES (BUG-wheredsoptswallow) but never option VALUES —
+   validated option NAMES (BUG-wheredsoptswallow) but never option VALUES -
    `set d(obs=abc)` silently read EVERY row while the OPTIONS-statement and
    INFILE-option paths both error on the same garbage. Garbage values now fail
    LOUD naming the option and the value (pinned by in-file tests in io.zig);

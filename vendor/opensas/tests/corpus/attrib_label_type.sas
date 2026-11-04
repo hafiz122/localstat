@@ -1,7 +1,7 @@
 /* ISS-attriblabeltype (GH#11): a label-only ATTRIB must not type the variable.
  * Per Language Reference: Concepts p.51 only LENGTH=/FORMAT=/INFORMAT= create-or-type a var; LABEL=
  * cannot. So `retain RFICDTC ''` (a char constant, Language Reference: Concepts p.509-510) establishes
- * CHARACTER and the assignment stays char — no char->num conversion to missing. */
+ * CHARACTER and the assignment stays char - no char->num conversion to missing. */
 data O;
   attrib RFICDTC label="ICF Date";
   retain RFICDTC '';

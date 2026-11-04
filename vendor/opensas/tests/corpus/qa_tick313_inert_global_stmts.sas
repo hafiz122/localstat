@@ -1,16 +1,16 @@
-/* QA tick312 F1 / BUG-inertglobalstmts — POSITIVE CONTROL: every log-only /
+/* QA tick312 F1 / BUG-inertglobalstmts - POSITIVE CONTROL: every log-only /
    session-only SAS 9.4 global statement, each placed BETWEEN two working
    steps. Real SAS accepts all of these silently; a batch interpreter cannot
    observe any of them (opensas renders no SAS log, no graphics, one session).
    The pre-fix regression hard-ERRORed each one, and because a step ERROR trips
-   syntax-check mode, ONE of these statements truncated every LATER step — the
+   syntax-check mode, ONE of these statements truncated every LATER step - the
    second PROC PRINT below is the output that matters (exit 0, both tables).
    Doc: Language Reference: Concepts p.209 (PAGE "skips to a new page in the SAS log", SKIP "skips a
    specified number of lines in the SAS log"), Language Reference: Concepts p.181 (CHECKPOINT
    EXECUTE_ALWAYS is a no-op unless checkpoint mode is on), SAS Global
    Statements: Reference (RESETLINE/SYSECHO same log family; LOCK always
    grantable single-session), SAS/GRAPH family of the already-inert GOPTIONS
-   (AXIS/LEGEND/PATTERN/SYMBOL). MISSING stays loud on purpose (Language Reference: Concepts p.106 —
+   (AXIS/LEGEND/PATTERN/SYMBOL). MISSING stays loud on purpose (Language Reference: Concepts p.106 -
    it changes INPUT decoding, so it is result-changing, not inert). */
 data d; x=1; run;
 page;

@@ -4,11 +4,11 @@
    never saw it. `%if 1 ¬= 2` lexed as `1` `¬` `=` `2`: the leftover token made
    reportEvalParse fire while the leaf `1` still tested truthy, i.e. the RIGHT
    branch AND a hard error at once. `%if ¬(1=2)` was plainly wrong (took %ELSE).
-   Glued `%eval(1¬=2)` was worse still — the operand became "1¬", compared false,
+   Glued `%eval(1¬=2)` was worse still - the operand became "1¬", compared false,
    and the grammar consumed everything, so it was silently 0 with NO error.
 
    Table 6.3 "Macro Language Operators" (Macro Language Reference printed p.87-88)
-   carries the glyph on both rows it belongs to — `¬^~ NOT` and `¬= ^= ~= NE` — so
+   carries the glyph on both rows it belongs to - `¬^~ NOT` and `¬= ^= ~= NE` - so
    this one must WORK. That is the same authority that made `<>` LOUD last tick
    (absent from the table, NOTE-macroevalops): one table, both edges.
 
@@ -25,7 +25,7 @@ data _null_;
   put "ne_false  =[%ne_false]";
   put "ne_zero   =[%ne_zero]";
   put "not_glyph =[%not_glyph]";
-  /* glued, no blanks — ordinary SAS, and the silent-0 shape */
+  /* glued, no blanks - ordinary SAS, and the silent-0 shape */
   put "glued     =[%eval(1¬=2)]";
   put "eval_ne   =[%eval(0 ¬= 2)] [%eval(5 ¬= 5)]";
   put "eval_not  =[%eval(¬0)] [%eval(¬1)]";

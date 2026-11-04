@@ -1,5 +1,5 @@
 /* NOTE-gotodowhilespin (@pi-mo tick293): %GOTO out of a conditional %DO
-   (%while/%until) leaves the loop like %return — the label resolves in the
+   (%while/%until) leaves the loop like %return - the label resolves in the
    enclosing body. Was: %do %until SPUN to the 100000-iteration convergence
    cap and errored (a goto suppresses resolveText, so the loop condition came
    back empty/false and the bottom-test never broke); %do %while escaped only

@@ -1,7 +1,7 @@
 /* NOTE-declarehashtrim (QA tick336 F8): "the `dataset:` name TRIM landed on
    `h.output()` but not on `declare hash`, so the two ends of the same feature
    disagree." REPRODUCED (declare end errored 'hash dataset woo       not
-   found' for an EXISTING member — loud but wrong), then FIXED in exec.zig's
+   found' for an EXISTING member - loud but wrong), then FIXED in exec.zig's
    hashDeclare with the same trim hashOutput grew in BUG-hashoutputnametrim.
    This fixture pins the split-by-group idiom working at BOTH ends; the
    captured-diagnostics test in src/exec.zig (NOTE-declarehashtrim) pins it

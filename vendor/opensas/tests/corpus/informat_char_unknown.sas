@@ -3,7 +3,7 @@
    prints "ERROR: The informat zzz was not found or could not be loaded." to
    stderr and flags the run failed (non-zero exit).
    BUG-informatnotfoundcontinues (Language Reference: Concepts p.518) tightened the READ side: the
-   step now STOPS at the unknown informat — a substituted verbatim read would
+   step now STOPS at the unknown informat - a substituted verbatim read would
    land wrong DATA in a populated data set, worse than no data. (The WRITE
    side keeps its loud-then-fallback render: there it only mis-renders.)
    stdout therefore pins ONLY the first step below. Recognized char informats

@@ -1,5 +1,5 @@
 /* EBNF-closeout: the generic format_ref grammar ([$] name [w] . [d]) resolves
-   a $-prefixed user format, a built-in DOLLARw.d, and a bare w.d — proving the
+   a $-prefixed user format, a built-in DOLLARw.d, and a bare w.d - proving the
    production opensas now annotates. */
 proc format;
   value $sex "M"="Male" "F"="Female";

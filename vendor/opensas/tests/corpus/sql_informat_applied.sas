@@ -1,5 +1,5 @@
 /* GAP-sqlcolumnattr: CREATE TABLE's INFORMAT= was stored as metadata (it showed
-   in CONTENTS) but never APPLIED — '15JAN2020' into a date9. column landed as
+   in CONTENTS) but never APPLIED - '15JAN2020' into a date9. column landed as
    missing with an invalid-data NOTE. The informat now reads VALUES/UPDATE
    character input with the INPUT() function's semantics: date9. -> the SAS day
    (rendered below via the attached FORMAT=), $upcase. case-folds; an unreadable

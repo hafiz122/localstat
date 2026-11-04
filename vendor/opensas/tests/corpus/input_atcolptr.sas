@@ -1,4 +1,4 @@
-/* BUG-inputatvarptr: INPUT `@n` column pointer — numeric-literal AND variable
+/* BUG-inputatvarptr: INPUT `@n` column pointer - numeric-literal AND variable
    operand. A `@` followed by a number or a variable NAME is a COLUMN POINTER
    (move the input pointer to column n before the next read); a trailing `@`
    with NO operand is the line-hold. Previously `@var` was mis-parsed as a

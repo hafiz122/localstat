@@ -1,7 +1,7 @@
 /* BUG-combcallcrash: a huge / non-finite count or k passed to a combinatorics
    CALL routine used to panic (`integer part of floating point value out of
    bounds`) on the unguarded `@intFromFloat`. Now routed through fns.toInt: an
-   out-of-range count clamps to the last item, k to a no-op — no crash. A normal
+   out-of-range count clamps to the last item, k to a no-op - no crash. A normal
    small call in the same step proves the guard didn't break the happy path. */
 data _null_;
   /* out-of-range counts: must not crash, clamp to the last arrangement */

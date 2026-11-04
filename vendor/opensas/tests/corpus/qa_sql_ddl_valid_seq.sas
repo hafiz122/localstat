@@ -1,9 +1,9 @@
 /* QA tick236 GREEN tripwire (regression guard, not a new feature).
    The BUG-sqlerrorswallow landing rewired interleaveStep's step-run error path
    to fail loud on an unreported non-OOM SQL error. Highest regression risk: it
-   must stay SILENT on VALID SQL. This threads a full valid DDL/DML sequence —
+   must stay SILENT on VALID SQL. This threads a full valid DDL/DML sequence -
    CREATE(col attrs) / INSERT(bare + col-list) / UPDATE SET / ALTER ADD / DROP
-   TABLE — through that path, then re-uses the dropped name to prove DROP truly
+   TABLE - through that path, then re-uses the dropped name to prove DROP truly
    removed it, and ends with a SELECT. Every statement is legal, so stdout is
    exactly the listing below and exit 0. If the error-swallow gate ever
    false-positives on a valid step, or DROP stops removing, this goes red.

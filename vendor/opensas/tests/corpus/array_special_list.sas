@@ -1,5 +1,5 @@
 /* GH#48 ISS-arrayspeciallist: `array v{*} _character_ / _numeric_ / _all_` must
-   expand against the PDV — dim() = count of matching vars, and v[i] writes must
+   expand against the PDV - dim() = count of matching vars, and v[i] writes must
    bind to the real variables. Was a silent no-op: dim=1, writes hit a phantom. */
 data _null_;
   length a b c $5; a='.'; b='x'; c='.';

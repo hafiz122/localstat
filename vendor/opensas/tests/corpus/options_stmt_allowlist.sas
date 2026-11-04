@@ -1,5 +1,5 @@
 /* BUG-optionsstmtswallow (doc-finder tick300 F3): the OPTIONS statement
-   recognized twelve names and silently DISCARDED every other token — a typo
+   recognized twelve names and silently DISCARDED every other token - a typo
    (`obbs=2` for `obs=2`) silently read EVERY row, and `obs=2k` silently became
    obs=2 because the `k` lexes as a separate token. Now every OPTIONS token is
    either HONOURED below, on the explicit inert allowlist (D-014: display/log/
@@ -23,12 +23,12 @@ Cherry
 run;
 
 /* HONOURED: the SORTSEQ= system option supplies PROC SORT's default collation
-   (Language Reference: Concepts p.533) — apple sorts before Banana under LINGUISTIC */
+   (Language Reference: Concepts p.533) - apple sorts before Banana under LINGUISTIC */
 options sortseq=linguistic;
 proc sort data=names; by name; run;
 proc print data=names noobs; run;
 
-/* HONOURED: obs=2k is 2048 — the K suffix is a magnitude, not a token to drop
+/* HONOURED: obs=2k is 2048 - the K suffix is a magnitude, not a token to drop
    (before the fix this silently read 2 rows) */
 data five; do i=1 to 5; output; end; run;
 options obs=2k;
@@ -56,7 +56,7 @@ data c; set five(drop=zz); run;
 proc print data=c noobs; run;
 
 /* INERT guard-rail defaults: MERGENOBY=NOWARN (Language Reference: Concepts p.574) and
-   VARINITCHK=NOTE are exactly opensas's behavior — accepted, not errors */
+   VARINITCHK=NOTE are exactly opensas's behavior - accepted, not errors */
 options mergenoby=nowarn varinitchk=note;
 data m1; x=1; run;
 data m2; y=2; run;

@@ -1,5 +1,5 @@
 /* BUG-commaparen: the COMMA/DOLLAR informats read parentheses as a NEGATIVE
-   value — `(1,234)` -> -1234 (Language Reference: Concepts "Reading Nonstandard Numeric Data": parens
+   value - `(1,234)` -> -1234 (Language Reference: Concepts "Reading Nonstandard Numeric Data": parens
    require the COMMA informat; leading paren = minus sign). Was silently read as
    missing. Covers all three read paths: input() function, INPUT statement, and
    the plain `w.` guard (parens are invalid there -> missing, per SAS). */

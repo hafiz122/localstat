@@ -1,5 +1,5 @@
-/* BUG-wherene (QA-audit42): inside a WHERE expression `<>` means NOT-EQUAL —
-   the documented SAS WHERE quirk — not the Group-I MAX operator. All three
+/* BUG-wherene (QA-audit42): inside a WHERE expression `<>` means NOT-EQUAL -
+   the documented SAS WHERE quirk - not the Group-I MAX operator. All three
    routes: WHERE statement, where= dataset option, PROC WHERE. The option route
    also proves serializeParens round-trips the `<>` token (tokenText dropped it
    to "" and the filter silently kept every row). */

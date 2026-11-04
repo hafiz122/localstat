@@ -5,7 +5,7 @@
    where x = (a min b);" (verbatim below) and p.215: "All SAS expression
    operators are valid for a WHERE expression, which include … minimum and
    maximum …". Only the SYMBOLS are WHERE-special: `<>` is NE and `><` errors
-   (BUG-wherene, pinned in where_ch11_operators) — the word forms are ordinary
+   (BUG-wherene, pinned in where_ch11_operators) - the word forms are ordinary
    Group-I operators on every route. */
 data e; input a b; datalines;
 1 2
@@ -23,7 +23,7 @@ data r4; set e(where=((a max b)=2)); put 'OPT-MAX  ' a b; run;
 proc print data=e noobs; where (a max b)=2; run;
 proc sql; select * from e where (a max b)=2; quit;
 /* the ambiguity the exclusion guarded against: min/max as ordinary VARIABLE
-   names in a WHERE must keep working on every route — operand position is
+   names in a WHERE must keep working on every route - operand position is
    untouched by the operator reading */
 data v; input min max x; datalines;
 5 9 1

@@ -1,8 +1,8 @@
 const std = @import("std");
-const pdv = @import("pdv.zig"); // sasParseFloat — the char→num twin (import cycle is fine, Zig is lazy)
+const pdv = @import("pdv.zig"); // sasParseFloat - the char→num twin (import cycle is fine, Zig is lazy)
 
 /// A SAS data value. SAS has exactly two data types: numeric (an IEEE-754
-/// double) and character (a byte string). There is no integer, no boolean —
+/// double) and character (a byte string). There is no integer, no boolean -
 /// every number is an `f64`, every truth test collapses to `truthy()` below.
 ///
 /// A numeric can be *missing* (`.`). We represent missing as a quiet NaN so
@@ -48,7 +48,7 @@ pub const Value = union(enum) {
     }
 
     /// Sort rank of a missing numeric: ._ (0) < . (1) < .A (2) < … < .Z (27).
-    /// Real numbers rank above all of these — the comparison handles that.
+    /// Real numbers rank above all of these - the comparison handles that.
     pub fn missingRank(x: f64) u8 {
         const code: u8 = @intCast(@as(u64, @bitCast(x)) & miss_code_mask);
         return if (code == 27) 0 else code + 1;
@@ -64,7 +64,7 @@ pub const Value = union(enum) {
         };
     }
 
-    /// A missing *numeric*. Character values are never "missing" in SAS — an
+    /// A missing *numeric*. Character values are never "missing" in SAS - an
     /// absent char is the blank/empty string, which `truthy()` reads as false.
     pub fn isMissing(self: Value) bool {
         return switch (self) {
@@ -78,8 +78,8 @@ pub const Value = union(enum) {
     ///   character → SAS first applies the implicit char→numeric conversion
     ///     (trimmed `w.` informat; blank/unparseable → missing), THEN numeric
     ///     truthiness: '0' and 'abc' are BOTH false, '2.5' true
-    ///     (BUG-charinboolean — was C-style "any non-blank → true").
-    /// ponytail: the conversion/invalid-data NOTEs SAS logs here are omitted —
+    ///     (BUG-charinboolean - was C-style "any non-blank → true").
+    /// ponytail: the conversion/invalid-data NOTEs SAS logs here are omitted -
     /// truthy() has no diags handle (same split as numToChar: "the NOTE stays
     /// with each caller"). Route through an Evaluator helper if a fixture ever
     /// asserts those notes.
@@ -96,13 +96,13 @@ pub const Value = union(enum) {
         };
     }
 
-    /// WHERE-clause truthiness (Language Reference: Concepts p.216) — DELIBERATELY different from
+    /// WHERE-clause truthiness (Language Reference: Concepts p.216) - DELIBERATELY different from
     /// `truthy()` and the two must not be unified (BUG-wherebarechar): "The
     /// names of character variables can also stand alone. SAS selects
     /// observations where the value of the character variable is not blank."
     /// No char→numeric conversion, so '0' is TRUE here but false in an `if`.
     /// Numeric rule identical to truthy(). Called ONLY by the top-level WHERE
-    /// evaluators (exec.applyWhereStmt, io.applyWhere, sql's WHERE paths) —
+    /// evaluators (exec.applyWhereStmt, io.applyWhere, sql's WHERE paths) -
     /// ponytail: a char operand nested inside and/or/not still converts via
     /// truthy() (eval.zig), the p.216 rule as documented covers the bare case.
     pub fn whereTruthy(self: Value) bool {
@@ -142,7 +142,7 @@ test "whereTruthy: WHERE's bare-char rule is non-blank, NOT numeric conversion (
     try t.expect(Value.whereTruthy(.{ .num = 1 }));
     try t.expect(!Value.whereTruthy(.{ .num = 0 }));
     try t.expect(!Value.whereTruthy(Value.missing));
-    // character: non-blank is TRUE — the sharp divergences from truthy()
+    // character: non-blank is TRUE - the sharp divergences from truthy()
     try t.expect(Value.whereTruthy(.{ .str = "0" })); // WHERE: true; IF: false
     try t.expect(Value.whereTruthy(.{ .str = "abc" })); // WHERE: true; IF: missing→false
     try t.expect(Value.whereTruthy(.{ .str = ".A" })); // non-blank char → true
@@ -175,7 +175,7 @@ test "special missing: encode, rank order, display char (G-specialmiss)" {
 
 test "parseSpecialMissing: text ingestion (ISS-specialmissing)" {
     const t = std.testing;
-    // NaN != NaN under expectEqual — compare bit patterns.
+    // NaN != NaN under expectEqual - compare bit patterns.
     const bits = struct {
         fn of(v: Value) u64 {
             return @bitCast(v.num);

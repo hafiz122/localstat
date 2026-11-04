@@ -1,5 +1,5 @@
 /* BUG-coloninformatwidth: a colon-modified informat `:$w.` sets the variable's
-   storage length to w AND truncates the read to w characters — the informat
+   storage length to w AND truncates the read to w characters - the informat
    width governs the read, not just the token length. Control: a bare `$` (plain
    list input, no informat) keeps SAS's default 8-char length (BUG-inputlistlen). */
 data t;

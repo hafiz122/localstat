@@ -1,4 +1,4 @@
-/* GAP-inputeofdegrade (part 3/3) — a FLOWOVER list-input SPILL that runs out of
+/* GAP-inputeofdegrade (part 3/3) - a FLOWOVER list-input SPILL that runs out of
    records ends the step; it does not write the partial observation.
 
    FLOWOVER is the default. Statements ref printed p.132 (footer "132 Chapter 2 /
@@ -13,7 +13,7 @@
        end-of-file, then execution stops.
 
    WHAT WAS WRONG, stated precisely: opensas assigned the remaining variables
-   MISSING and wrote the observation — which is MISSOVER's documented behaviour,
+   MISSING and wrote the observation - which is MISSOVER's documented behaviour,
    printed p.133: "prevents an INPUT statement from reading a new input data
    record ... variables without any values assigned are set to missing." The two
    options are defined by contrast, and opensas was silently giving FLOWOVER
@@ -22,11 +22,11 @@
 
    THE OBSERVATION COUNT IS DOC-PRINTED, not inferred. Printed p.145 (footer
    "INFILE Statement 145") gives a three-data-line program and states "the data
-   set SCORES contains two, not three, observations" — an iteration that reaches
+   set SCORES contains two, not three, observations" - an iteration that reaches
    EOF mid-observation contributes NOTHING.
    expect-rc: 0 */
 
-/* 1 — the spill at EOF. Record 2 holds only 2 of the 3 values, so FLOWOVER wants
+/* 1 - the spill at EOF. Record 2 holds only 2 of the 3 values, so FLOWOVER wants
    a record 3. There is none: ONE observation, and no `4 5 .` row. */
 data one;
   infile datalines;
@@ -39,7 +39,7 @@ data one;
 run;
 proc print data=one noobs; title "1 no partial row"; run;
 
-/* 2 — the spill ACROSS records still works when a record IS available: this is
+/* 2 - the spill ACROSS records still works when a record IS available: this is
    FLOWOVER doing its documented job, and it must not be collateral damage.
    Three records of one token each, `input a b;` → ONE observation a=1 b=2, then
    iteration 2 takes record 3 and stops. */
@@ -55,7 +55,7 @@ data spill;
 run;
 proc print data=spill noobs; title "2 spill works; odd tail drops"; run;
 
-/* 3 — EVEN token count: fully satisfied, nothing to stop for. The control that
+/* 3 - EVEN token count: fully satisfied, nothing to stop for. The control that
    proves blocks 1-2 are the EOF rule and not a lost observation. */
 data even;
   infile datalines;
@@ -69,9 +69,9 @@ data even;
 run;
 proc print data=even noobs; title "3 even: two obs, unchanged"; run;
 
-/* 4 — MISSOVER: the option whose JOB is the behaviour block 1 removed. It is
+/* 4 - MISSOVER: the option whose JOB is the behaviour block 1 removed. It is
    handed a one-record window, so it never consults the next record and assigns
-   missing instead — observation KEPT. If this block ever loses its row, the fix
+   missing instead - observation KEPT. If this block ever loses its row, the fix
    has leaked out of FLOWOVER and broken the documented option (D-014). */
 data mo;
   infile datalines missover;
@@ -84,7 +84,7 @@ data mo;
 run;
 proc print data=mo noobs; title "4 MISSOVER keeps the partial obs"; run;
 
-/* 5 — TRUNCOVER, the same contrast on the other short-record option. */
+/* 5 - TRUNCOVER, the same contrast on the other short-record option. */
 data tc;
   infile datalines truncover;
   input p q r;

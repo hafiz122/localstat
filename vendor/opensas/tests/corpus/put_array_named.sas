@@ -1,4 +1,4 @@
-/* put a[i]=; — named output of an array element: the label is the RESOLVED
+/* put a[i]=; - named output of an array element: the label is the RESOLVED
    element's own name (a[2] → a2=20). Verified vs SAS 9.4 (FEAT-putarraynamed).
    Plain `put a[2];` and whole-array `put a[*];` stay unchanged. */
 data _null_;

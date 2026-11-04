@@ -3,7 +3,7 @@
    boundary count; and an unknown non-blank INTNX alignment / INTCK method is
    missing + NOTE (blank still defaults BEGINNING / DISCRETE). */
 data _null_;
-  /* DTMONTH continuous — anniversary carries the time-of-day */
+  /* DTMONTH continuous - anniversary carries the time-of-day */
   s1 = intck('dtmonth','15jan2020:10:00:00'dt,'15mar2020:09:00:00'dt,'c'); /* 1: 15MAR 10:00 anniv not reached */
   s2 = intck('dtmonth','15jan2020:10:00:00'dt,'15mar2020:11:00:00'dt,'c'); /* 2: anniv passed */
   s3 = intck('dtmonth','15jan2020:10:30:00'dt,'15feb2020:09:00:00'dt,'c'); /* 0 */

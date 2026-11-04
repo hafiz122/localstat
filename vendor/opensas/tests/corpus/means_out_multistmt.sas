@@ -1,5 +1,5 @@
 /* BUG-meansoutmultistmt: EACH OUTPUT statement in PROC MEANS builds its OWN
-   output dataset with its OWN stat list — SAS never merges two OUTPUT
+   output dataset with its OWN stat list - SAS never merges two OUTPUT
    statements into one. opensas used a single out_name slot + one shared spec
    list: the 2nd statement overwrote the name and appended its specs, so `a`
    was never created and `b` got ALL columns concatenated.

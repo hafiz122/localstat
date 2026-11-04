@@ -1,4 +1,4 @@
-//! Diagnostics — line-tagged messages collected across lex/parse/exec, plus
+//! Diagnostics - line-tagged messages collected across lex/parse/exec, plus
 //! the shared error set every stage returns. Matches the lexer's Error style:
 //! a tiny error set for control flow (callers `try`), while the human-readable
 //! detail lives here so the CLI can print a SAS-style log at the end.
@@ -9,7 +9,7 @@
 const std = @import("std");
 
 /// What went wrong, at the type level. Stages return these; the accompanying
-/// `Diagnostics` holds the readable text. Mirrors the lexer's error set —
+/// `Diagnostics` holds the readable text. Mirrors the lexer's error set -
 /// grow it as stages land, don't invent per-call error types.
 pub const Error = error{
     LexError,
@@ -45,13 +45,13 @@ pub const Diagnostic = struct {
     /// exit code, but does NOT trigger step-skipping syntax-check mode
     /// (BUG-errhalt is about STEP errors). Two species: a macro-language
     /// error confined to the failing macro (real SAS: "the macro will stop
-    /// executing" — a macro error must not silently kill independent later
+    /// executing" - a macro error must not silently kill independent later
     /// steps; that took the study meter 26/27 → 0/27), and an rc-by-design
     /// condition whose method returns a documented return code the caller
-    /// inspects (SEV-rcbydesignerr — see Diagnostics.rcErr).
+    /// inspects (SEV-rcbydesignerr - see Diagnostics.rcErr).
     recoverable: bool = false,
     /// GH#17 ISS-macrolinemap: this `line` is in POST-EXPANSION coordinates of a
-    /// macro-generated token stream, NOT a source line — so `render` marks it
+    /// macro-generated token stream, NOT a source line - so `render` marks it
     /// `(expanded L86)` and no reader (or a line-map harness) mistakes it
     /// for a line in a source/macro file. Set from `Diagnostics.expansion_space`.
     expanded: bool = false,
@@ -66,13 +66,13 @@ pub const Diagnostics = struct {
     /// sets it when `macro.expand` actually transformed the source (a no-op macro
     /// pass keeps it false → plain syntax errors still report their real source line).
     /// Every diagnostic recorded while set is flagged `expanded` so `render` marks it.
-    /// ponytail: run-global flag, not a true source→line map — the honest cheap fix
+    /// ponytail: run-global flag, not a true source→line map - the honest cheap fix
     /// (mark, don't mislead). Upgrade path: thread an offset→source-line map through
     /// macro.zig so the reported line is the ORIGINAL source line; heavy, do it only
     /// if a study actually needs exact macro line numbers, not just "not a lie".
     expansion_space: bool = false,
     /// F7: `options nonotes;` suppresses log NOTEs; `options notes;` re-enables.
-    /// Set by main's OPTIONS branch — `report` drops `.note` diagnostics while set
+    /// Set by main's OPTIONS branch - `report` drops `.note` diagnostics while set
     /// (warnings/errors always record). Production clinical runs rely on NONOTES.
     suppress_notes: bool = false,
     /// GH#3 ISS-steperrhalt: `options nosyntaxcheck;` opts OUT of the post-step-
@@ -80,7 +80,7 @@ pub const Diagnostics = struct {
     /// BUG-errhalt); `options syntaxcheck;` re-arms it. Default ON: opensas
     /// models BATCH SAS, whose documented behavior after a step error skips every
     /// later step (Language Reference: Concepts pp.170/177-178 make error-stop
-    /// mode-dependent — the reporter's SAS Studio observation is the NON-batch
+    /// mode-dependent - the reporter's SAS Studio observation is the NON-batch
     /// half), and the stop-all is the project's clinical fail-loud safety
     /// property (CLIN-failloud). Set by main's OPTIONS branch exactly like
     /// suppress_notes; read by main's runExpanded gate (D-024).
@@ -91,7 +91,7 @@ pub const Diagnostics = struct {
     }
 
     /// Record a diagnostic; `fmt`/`args` are `std.fmt`-formatted into the arena.
-    /// Returns only OutOfMemory — recording a problem is not itself the failure.
+    /// Returns only OutOfMemory - recording a problem is not itself the failure.
     pub fn report(
         self: *Diagnostics,
         severity: Severity,
@@ -131,13 +131,13 @@ pub const Diagnostics = struct {
     /// Record an rc-by-design ERROR (SEV-rcbydesignerr): a condition whose
     /// method returns a documented return code the caller is expected to
     /// inspect. SAS 9.4 Component Objects: Reference gives every hash method
-    /// the same contract — "A return code of zero indicates success; a
+    /// the same contract - "A return code of zero indicates success; a
     /// nonzero value indicates failure. If you do not supply a return code
     /// variable for the method call and the method fails, then an appropriate
     /// error message is written to the log." (ADD printed p.24, FIND_NEXT
     /// p.53, OUTPUT p.73, REMOVE p.82; offset +11 per the volume's
     /// provenance header.) The log ERROR is SAS's own, so it stays an ERROR
-    /// and still fails the exit code — but errhalt-skipping later steps
+    /// and still fails the exit code - but errhalt-skipping later steps
     /// would make the documented check-the-rc pattern useless (the D-014
     /// shape: legal SAS turned into a step-killer), so it is recoverable.
     pub fn rcErr(self: *Diagnostics, line: usize, comptime fmt: []const u8, args: anytype) error{OutOfMemory}!void {
@@ -174,7 +174,7 @@ pub const Diagnostics = struct {
         return false;
     }
 
-    /// True only for STEP errors — the syntax-check-mode trigger (BUG-errhalt).
+    /// True only for STEP errors - the syntax-check-mode trigger (BUG-errhalt).
     /// Recoverable errors (recoverableErr) still fail the run's exit code via
     /// hasErrors() but do not poison later independent steps.
     pub fn hasStepErrors(self: *const Diagnostics) bool {
@@ -184,15 +184,15 @@ pub const Diagnostics = struct {
         return false;
     }
 
-    /// GH#3 ISS-steperrhalt: mark every live step error as spent — it keeps its
+    /// GH#3 ISS-steperrhalt: mark every live step error as spent - it keeps its
     /// log line and its hasErrors()/exit-code weight, but it no longer reads as
     /// `hasStepErrors()`. main calls this BEFORE each step it runs under
     /// `options nosyntaxcheck;` (syntax_check == false): there the recorded step
-    /// errors belong to EARLIER steps, and every "this step stopped" consumer —
-    /// exec.zig's two DATA-step compile gates and commitOut's not-replaced rule —
+    /// errors belong to EARLIER steps, and every "this step stopped" consumer -
+    /// exec.zig's two DATA-step compile gates and commitOut's not-replaced rule -
     /// keys on hasStepErrors() believing main already skipped anything older
     /// ("hasStepErrors() is this step's alone", exec.zig). Leaving them armed
-    /// would halt the innocent later step at compile and withhold its output —
+    /// would halt the innocent later step at compile and withhold its output -
     /// i.e. the option would change nothing observable. Spending restores the
     /// per-step invariant instead of special-casing each consumer. A NO-OP under
     /// the default: there the skip gate needs the errors armed to keep skipping.
@@ -210,7 +210,7 @@ pub const Diagnostics = struct {
             if (d.line == 0) {
                 try buf.print(self.arena, "{s}: {s}\n", .{ d.severity.tag(), d.message });
             } else if (d.expanded) {
-                // GH#17: post-expansion offset, not a source line — say so, so the
+                // GH#17: post-expansion offset, not a source line - say so, so the
                 // number is never line-mapped into an innocent source/macro file.
                 try buf.print(self.arena, "{s}(expanded L{d}): {s}\n", .{ d.severity.tag(), d.line, d.message });
             } else {
@@ -223,13 +223,13 @@ pub const Diagnostics = struct {
 
 // ── exit-code contract (D-009 / FLY-exitcodes) ───────────────────────────────
 // A calling coding agent routes on the process exit code: 0 = clean; 1 =
-// user-program error (their SAS is wrong — parse/exec/data errors → "fix your
+// user-program error (their SAS is wrong - parse/exec/data errors → "fix your
 // SAS"); 2 = opensas defect or gap (an UNSUPPORTED feature/PROC or an internal
 // panic → "file an opensas issue"). A gap OUTRANKS a user error: an opensas
 // defect is worth surfacing even when the program also has a bad statement.
 
 /// Process-global "an opensas gap was hit this run" flag. Set by every
-/// UNSUPPORTED path — main.failLoud and proc.unsupported — so `exitCode` can tell
+/// UNSUPPORTED path - main.failLoud and proc.unsupported - so `exitCode` can tell
 /// an opensas defect (2) from the user's own error (1).
 var g_gap: bool = false;
 pub fn markGap() void {
@@ -351,7 +351,7 @@ test "syntax_check defaults ON; spendStepErrors keeps the error loud, drops the 
     defer arena.deinit();
     var diags = Diagnostics.init(arena.allocator());
 
-    // The batch stop-all is the DEFAULT — nothing may flip it implicitly.
+    // The batch stop-all is the DEFAULT - nothing may flip it implicitly.
     try std.testing.expect(diags.syntax_check);
 
     try diags.report(.err, 5, "step error", .{}); // the failing step's ERROR

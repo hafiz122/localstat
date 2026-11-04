@@ -1,4 +1,4 @@
-//! CLI — the whole pipeline, wired end to end: read a `.sas` file, split it into
+//! CLI - the whole pipeline, wired end to end: read a `.sas` file, split it into
 //! Modified by LocalStat: PROC REG dispatch, explicit ODS rejection, and CLI
 //! input-failure exit behavior. See docs/RUNTIME_CHANGES.md.
 //!
@@ -7,7 +7,7 @@
 //!
 //! Step framing is C3's job: the parser (A2) parses one step's *body* and knows
 //! nothing of `data name;` / `proc …;`. We split the token stream at `data`/
-//! `proc` keywords that sit on a statement boundary — safe because the lexer
+//! `proc` keywords that sit on a statement boundary - safe because the lexer
 //! emits `datalines` content as `.data_line` tokens, so a `data` buried in raw
 //! data never looks like a keyword. Datasets a step creates are kept in a
 //! `Library` so a later step's `set` finds them.
@@ -18,7 +18,7 @@
 //! output is exactly the log we accumulate here.
 //!
 //! ponytail: no dataset options (`data x(keep=…)`), no PROC but PRINT, and the
-//! PRINT layout is a plain aligned table, not SAS's exact listing — grow with
+//! PRINT layout is a plain aligned table, not SAS's exact listing - grow with
 //! the corpus. Unsupported features print `UNSUPPORTED: <feature>` to stderr,
 //! the marker the corpus runner reads to name the next backlog task.
 
@@ -50,7 +50,7 @@ pub fn main(init: std.process.Init) !void {
             ai += 1;
         } else if (std.mem.eql(u8, args[ai], "--version") or std.mem.eql(u8, args[ai], "-V")) {
             // GH#10 ISS-versionflag: SHORT-CIRCUIT before the input file is even
-            // opened — `sas --version anything.sas` still prints, and the old
+            // opened - `sas --version anything.sas` still prints, and the old
             // behavior ("sas: cannot read --version (FileNotFound)") left a
             // release binary with no way to name itself (the issue template
             // demands a Version from every reporter). stdout, not the log:
@@ -86,7 +86,7 @@ pub fn main(init: std.process.Init) !void {
     var tables = sas.table_result.Collector{ .arena = a };
     interpretWithTables(a, &out, &diags, src, io, if (tables_path != null) &tables else null) catch |e| {
         // A propagated lex/parse/exec error already recorded a located diagnostic
-        // via diags.fail() — render() below prints `ERROR(Ln): …`. Only emit the
+        // via diags.fail() - render() below prints `ERROR(Ln): …`. Only emit the
         // bare error-name line when NO diagnostic carries the detail (e.g.
         // OutOfMemory), so we don't duplicate a location-less `ERROR: LexError`
         // above the real one (DIAG-lexloc). exit(1) still fires below via
@@ -115,11 +115,11 @@ pub fn main(init: std.process.Init) !void {
     if (rc != 0) std.process.exit(rc);
 }
 
-/// THE exit code for a finished run — D-009 plus the D-009a ABORT override.
-/// 0 clean, 1 user-program error (their SAS is wrong — parse/exec/data errors
+/// THE exit code for a finished run - D-009 plus the D-009a ABORT override.
+/// 0 clean, 1 user-program error (their SAS is wrong - parse/exec/data errors
 /// reported via `diags`, or a format error via `format.formatErrored`), 2 opensas
-/// defect/gap (any UNSUPPORTED: path — `failLoud`'s `g_failed` or proc's
-/// unsupported → `diag.gapHit()` — plus a caught propagated defect). A gap
+/// defect/gap (any UNSUPPORTED: path - `failLoud`'s `g_failed` or proc's
+/// unsupported → `diag.gapHit()` - plus a caught propagated defect). A gap
 /// outranks a user error so a calling agent files an opensas issue on 2 and fixes
 /// the SAS on 1. (CLIN-failloud: a fail-loud still exits non-zero.)
 ///
@@ -127,7 +127,7 @@ pub fn main(init: std.process.Init) !void {
 /// it: the user's ABORT halted the session and their return code becomes the
 /// process exit code, deliberately NOT confined to {0,1,2}.
 ///
-/// BUG-wasmignoresabortrc — this is a FUNCTION, and pub, because it had been
+/// BUG-wasmignoresabortrc - this is a FUNCTION, and pub, because it had been
 /// COPIED: `wasm.zig` open-coded the two signals and `diag.exitCode` but not the
 /// abort line above it, so `abort return 3` returned 1 on that surface. The
 /// arithmetic was never the problem (audit §6/I5); the duplication was.
@@ -142,7 +142,7 @@ pub fn processExitCode(diags: *const sas.diag.Diagnostics) u8 {
 /// default (`File.Writer.init` → pwrite at a tracked offset starting at 0).
 /// Under `sas prog.sas > log 2>&1` (stdout+stderr share one file) positional
 /// writes collided with stderr's own offset-0 start and the streams overwrote
-/// each other — silently losing/corrupting PROC PRINT tables and PUT output.
+/// each other - silently losing/corrupting PROC PRINT tables and PUT output.
 /// Streaming mode writes at the shared OS file position, so combined streams
 /// interleave in write order like real SAS.
 fn stdoutWriter(io: Io, buf: []u8) Io.File.Writer {
@@ -156,13 +156,13 @@ pub var g_failed: bool = false;
 /// TEST-quietnoise: negative tests exercise the fail-loud path but must not spam
 /// stderr (it hides a REAL failure in the green gate). In a test build the message
 /// is CAPTURED here for the test to assert on; the CLI (is_test=false) still prints
-/// `ERROR:` to stderr and exits non-zero — fail-loud is unchanged.
+/// `ERROR:` to stderr and exits non-zero - fail-loud is unchanged.
 var g_test_err_buf: [512]u8 = undefined;
 pub var g_test_last_err: []const u8 = "";
 
 /// Emit a SAS-style `ERROR:` line to the log (stderr) and mark the run failed.
 /// `g_failed` is the GAP half of D-009 (→ rc 2, "file an opensas issue"), so
-/// this is for UNSUPPORTED paths ONLY — a user error uses `userErr` below.
+/// this is for UNSUPPORTED paths ONLY - a user error uses `userErr` below.
 fn failLoud(comptime fmt: []const u8, args: anytype) void {
     g_failed = true;
     if (@import("builtin").is_test) {
@@ -172,14 +172,14 @@ fn failLoud(comptime fmt: []const u8, args: anytype) void {
     }
 }
 
-/// DEC-abortrcvsD009 — `failLoud`'s D-009 sibling for the OTHER class: the
+/// DEC-abortrcvsD009 - `failLoud`'s D-009 sibling for the OTHER class: the
 /// user's SAS is wrong (they named a data set/libref that is not there, or gave
 /// a format the column's type forbids), so the run exits **1** ("fix your SAS"),
 /// not 2 ("file an opensas issue"). `failLoud` was doing double duty for both
 /// classes, which put PROC PRINT's `Data set X is not sorted…` at rc 2 while the
 /// six proc.zig sites emitting the BYTE-IDENTICAL message sat at rc 1.
 /// Routing through `diags` is what makes it rc 1 (main's `user_err` reads
-/// `diags.hasErrors()`), and it deliberately matches those twins exactly — a
+/// `diags.hasErrors()`), and it deliberately matches those twins exactly - a
 /// plain step error, so errhalt/syntax-check treats a PRINT error like a MEANS
 /// error. Under `is_test` the captured reporter holds it, never stderr (D-003).
 fn userErr(diags: *sas.diag.Diagnostics, comptime fmt: []const u8, args: anytype) void {
@@ -194,26 +194,26 @@ pub fn interpret(a: std.mem.Allocator, out: *std.ArrayList(u8), diags: *sas.diag
 }
 
 fn interpretWithTables(a: std.mem.Allocator, out: *std.ArrayList(u8), diags: *sas.diag.Diagnostics, src: []const u8, io: ?Io, tables: ?*sas.table_result.Collector) !void {
-    // Drop any user format catalog from a prior run — it points into that run's
+    // Drop any user format catalog from a prior run - it points into that run's
     // (now-freed) arena, and `format.apply` reads the global catalog (PROC FORMAT
-    // reinstalls its own this run) — plus format.zig's other run-scoped globals
+    // reinstalls its own this run) - plus format.zig's other run-scoped globals
     // (BUG-fmterrorneverreset: g_fmt_error, g_nofmterr; see resetPerRun there).
     sas.format.resetPerRun();
     sas.functions.resetPerRun(); // drop prior-run prx/dsfns/hashing handles (taste #12)
     sas.diag.resetGap(); // clear the per-run opensas-gap flag (D-009 exit code)
     // …and resetGap's TWIN gap flag (BUG-fmterrorneverreset): `gap` is `g_failed
     // or gapHit()`, so clearing only one half left the other sticky. wasm.zig was
-    // clearing this itself — i.e. the reset list had been COPIED, which is how the
+    // clearing this itself - i.e. the reset list had been COPIED, which is how the
     // format flags above came to leak there.
     g_failed = false;
     sas.exec.g_abort_rc = null; // clear any prior run's ABORT (BUG-abortreturncode)
-    fileref_count = 0; // new session: drop prior-run filerefs (their name/path slices point into the prior run's freed arena — wasm runs many programs per load)
+    fileref_count = 0; // new session: drop prior-run filerefs (their name/path slices point into the prior run's freed arena - wasm runs many programs per load)
     var lib = sas.exec.Library.init(a);
     lib.diags = diags; // GH#15: so a read-only-libref output access reports LOUD
     sas.functions.bindLibrary(&lib); // BUG-sclbind: give SCL fns the live Library
 
     // One up-front expand (throwaway diags, discarded output) purely to discover
-    // LIBNAME declarations and load input datasets — dataset references do not depend
+    // LIBNAME declarations and load input datasets - dataset references do not depend
     // on runtime macro timing, so this side-effect-free pass is safe and avoids
     // double-loading per chunk.
     var junk = sas.diag.Diagnostics.init(a);
@@ -221,7 +221,7 @@ fn interpretWithTables(a: std.mem.Allocator, out: *std.ArrayList(u8), diags: *sa
     // GH#17 ISS-macrolinemap: if the macro processor transformed the source at all,
     // every line the run reports is a POST-EXPANSION offset (macro bodies/%do add
     // newlines the source never had), so diag marks those positions `(expanded Lnn)`
-    // instead of a bare `(Lnn)` that masquerades as — and gets line-mapped into — a
+    // instead of a bare `(Lnn)` that masquerades as - and gets line-mapped into - a
     // source/macro file. A no-op macro pass (plain program) leaves expanded==src, so
     // ordinary syntax errors keep their true, unmarked source line.
     diags.expansion_space = !std.mem.eql(u8, src, setup_expanded);
@@ -239,7 +239,7 @@ fn interpretWithTables(a: std.mem.Allocator, out: *std.ArrayList(u8), diags: *sa
     try bindDiskRefs(a, librefs, io != null);
     // Datasets read from a directory libname are loaded read-only: track their
     // object pointers so writeLibOutputs never writes an unmodified input back
-    // (stray `.sas7bdat` churn that shadows an edited `.csv`) — E-sas7write-noreadback.
+    // (stray `.sas7bdat` churn that shadows an edited `.csv`) - E-sas7write-noreadback.
     var loaded_ro: std.ArrayList(*sas.dataset.Dataset) = .empty;
     var damaged: std.StringHashMap(void) = .init(a);
     if (io) |iov| try loadLibInputs(a, iov, &lib, librefs, setup_toks, &loaded_ro, &damaged, diags);
@@ -260,7 +260,7 @@ fn interpretWithTables(a: std.mem.Allocator, out: *std.ArrayList(u8), diags: *sa
     var session = sas.macro.Session.init(a, diags);
     // GH#13 GAP-callexecutemacro: publish the run's Session to the macro layer
     // so exec.zig's CALL EXECUTE can macro-process its argument at CALL TIME
-    // (Macro Language: Reference printed p.123 — macro elements execute
+    // (Macro Language: Reference printed p.123 - macro elements execute
     // immediately, the SAS statements they generate are deferred to the step
     // boundary). Cleared on the way out: the hook is process-global and a
     // stale pointer to this stack slot would outlive the arena.
@@ -310,13 +310,13 @@ const StepCtx = struct {
     session: *sas.macro.Session,
     loaded_ro: *std.ArrayList(*sas.dataset.Dataset),
     // NOTE-truncreadmsg: two-level names whose member file was PRESENT but
-    // unreadable (already reported once, naming the real cause) — later
+    // unreadable (already reported once, naming the real cause) - later
     // loadLibInputs passes skip the re-read AND the re-report.
     damaged: *std.StringHashMap(void),
     tables: ?*sas.table_result.Collector = null,
     ended: bool = false, // ENDSAS seen: stop reading input, exit normally (BUG-endsasexit)
     // NOTE-chunkrelativelineno (QA tick312 F3): the current raw chunk's start
-    // line in src, minus 1 — tokenize restarts line numbering per chunk, so a
+    // line in src, minus 1 - tokenize restarts line numbering per chunk, so a
     // diagnostic after the first top-level `run;` was reported CHUNK-RELATIVE
     // (a typo on source line 9 came out as L3).
     line_off: usize = 0,
@@ -325,13 +325,13 @@ const StepCtx = struct {
 /// The doc's step-halt NOTE, shared verbatim by the FAILING step (GH#3
 /// ISS-steperrhalt NOTE parity) and by each syntax-check-skipped step
 /// (BUG-errhalt). Trailing period per Language Reference: Concepts Ch.8
-/// Examples 8.2/8.4/8.8 — the log's old bare wording dropped it.
+/// Examples 8.2/8.4/8.8 - the log's old bare wording dropped it.
 const step_halt_note = "The SAS System stopped processing this step because of errors.";
 
 /// The LAST literal `yearcutoff=<n>` value in this slice's OPTIONS statements,
 /// or null when none is present (the common slice: no second pass, no extra
 /// work). Statement-boundary walk, not `segments()`: it must run BEFORE the
-/// segment loop exists to consume, and it reads only — no segs, no reports.
+/// segment loop exists to consume, and it reads only - no segs, no reports.
 /// A mid-step (hoisted) OPTIONS is seen too: it takes effect for its step's
 /// compile, the same claim the hoisting itself is justified by.
 fn pendingYearcutoff(toks: []const Token) ?i64 {
@@ -361,30 +361,30 @@ fn runExpanded(ctx: *StepCtx, text: []const u8, allow_anon: bool) sas.diag.Error
     const a = ctx.a;
     var toks = try sas.lexer.tokenize(a, text, ctx.diags);
     // NOTE-chunkrelativelineno: `text` is one rawSegments chunk (or a step
-    // flushed from it), so its lines number from 1 — shift them back to
+    // flushed from it), so its lines number from 1 - shift them back to
     // absolute source lines. Only when NO macro pass transformed the source:
     // with transformation the number is a post-expansion offset, honestly
-    // marked `(expanded Lnn)` by GH#17 — shifting that would mislabel twice.
+    // marked `(expanded Lnn)` by GH#17 - shifting that would mislabel twice.
     if (!ctx.diags.expansion_space and ctx.line_off > 0) {
         for (toks) |*t| t.line += ctx.line_off;
     }
     // BUG-yearcutoffflushorder: a global OPTIONS statement flushes TOGETHER
     // WITH the step it precedes (one run;/quit; blob out of rawSegments), but a
-    // '…'d date LITERAL in the step resolves during THIS tokenize — before the
-    // segment loop below dispatches the OPTIONS statement — so it windowed
+    // '…'d date LITERAL in the step resolves during THIS tokenize - before the
+    // segment loop below dispatches the OPTIONS statement - so it windowed
     // under the PRIOR cutoff while the step's exec-time informat reads (running
     // later) already saw the new one: one step, two windows. Real SAS windows
     // both under the new cutoff (probe: `options yearcutoff=1950; a='26oct49'd;
-    // b=input('01jan49',date9.);` — a=2049 AND b=2049, never 1949/2049). So
+    // b=input('01jan49',date9.);` - a=2049 AND b=2049, never 1949/2049). So
     // when this slice carries a literal YEARCUTOFF=, wire it and RE-TOKENIZE
     // before anything compiles: the option state is in effect before the
-    // step's tokens exist. handleGlobal below stays the authority — it
+    // step's tokens exist. handleGlobal below stays the authority - it
     // re-applies the identical value with no diagnostics, still fails LOUD on
     // garbage (this pre-pass deliberately skips non-numeric values for it),
     // and still covers `yearcutoff=&v` (macro.zig resolves the & during
     // expansion, so a bound value arrives here already literal). Re-lex into a
     // SCRATCH reporter: identical text, so pass 1 already recorded every
-    // diagnostic this pass could add — never double-report. ponytail: a
+    // diagnostic this pass could add - never double-report. ponytail: a
     // yearcutoff AFTER the step in the same (remainder) slice pre-applies to
     // that whole slice; real-SAS ordering there is untestable, and the old
     // tokenize-first behavior for it was equally arbitrary.
@@ -400,7 +400,7 @@ fn runExpanded(ctx: *StepCtx, text: []const u8, allow_anon: bool) sas.diag.Error
     }
     toks = try coalesceLibrefs(a, toks, ctx.librefs.items);
     // BUG-existdisk: a libref member named only inside macro text first appears
-    // as a literal `lib.ds` token HERE, after runtime expansion — the up-front
+    // as a literal `lib.ds` token HERE, after runtime expansion - the up-front
     // preload in `interpret` never saw it. Load any still-missing members now.
     if (ctx.io) |iov| try loadLibInputs(a, iov, ctx.lib, ctx.librefs.items, toks, ctx.loaded_ro, ctx.damaged, ctx.diags);
     const segs = try segments(a, toks, !allow_anon, ctx.diags);
@@ -411,11 +411,11 @@ fn runExpanded(ctx: *StepCtx, text: []const u8, allow_anon: bool) sas.diag.Error
         if (seg.global) {
             // NOTE-globalstmtunresolved: a top-level global statement never
             // passes bindStepVars (that is the step path), so discharge the
-            // pending unresolved-&name warnings HERE — late binding cannot
+            // pending unresolved-&name warnings HERE - late binding cannot
             // apply (no prior step exists in the chunk), the same reasoning
             // that makes %PUT warnable (Macro Language Ref. printed p.152).
             // A HOISTED mid-step global skips this: its tokens remain in the
-            // step, where bindStepVars already discharges them — warning here
+            // step, where bindStepVars already discharges them - warning here
             // too would say it twice. Before any handling: SAS's word scanner
             // warns when the resolution fails, ahead of the statement itself.
             if (!seg.hoisted) try sas.macro.warnUnresolvedIn(toks[seg.start..seg.end], ctx.diags);
@@ -427,21 +427,21 @@ fn runExpanded(ctx: *StepCtx, text: []const u8, allow_anon: bool) sas.diag.Error
             // members through one path). Execution order governs from here on.
             if (eqi(toks[seg.start].text, "libname")) {
                 // null diags: options were already validated by the whole-program
-                // pre-pass (GAP-libnameopt) — re-reporting here would double-count.
+                // pre-pass (GAP-libnameopt) - re-reporting here would double-count.
                 const nl = try parseLibnames(a, null, toks[seg.start..seg.end]);
                 for (nl.items) |lr| try rebindLibref(ctx, lr);
             }
             try handleGlobal(a, ctx.globals, ctx.diags, toks[seg.start..seg.end]);
         } else if (seg.bad) {
             // BUG-opencodestmtswallow: the unrecognized open-code statement,
-            // reported LOUD in source position — steps BEFORE it ran; this .err
+            // reported LOUD in source position - steps BEFORE it ran; this .err
             // then errhalt-skips every later step (BUG-errhalt), matching SAS
             // batch (ERROR 180-322 → syntax-check mode).
             const bt = toks[seg.start];
             if (eqi(bt.text, "missing") and (seg.start + 1 >= seg.end or toks[seg.start + 1].tag != .eq)) {
                 // BUG-missingstmtwrongclass: the MISSING statement (Language Reference: Concepts printed
                 // p.519, a worked example shown TWICE) is VALID SAS opensas
-                // doesn't implement → a named gap, rc 2 (D-009/D-009b(i)) — not
+                // doesn't implement → a named gap, rc 2 (D-009/D-009b(i)) - not
                 // "your SAS is not valid in open code" rc 1. Same message as
                 // parser.zig's DATA-step arm (D-009b corollary: the twin
                 // settles by internal consistency). `missing = 5;` keeps the
@@ -453,7 +453,7 @@ fn runExpanded(ctx: *StepCtx, text: []const u8, allow_anon: bool) sas.diag.Error
             }
         } else if (seg.endsas) {
             // BUG-endsasexit: ENDSAS terminates the session NORMALLY (Language Reference: Concepts
-            // p.10/p.487 step boundary) — stop reading input, keep the exit
+            // p.10/p.487 step boundary) - stop reading input, keep the exit
             // code whatever the steps before it earned (0 on a clean run).
             // Later segments in this slice were never even scanned; later
             // chunks and the CALL EXECUTE queue check ctx.ended below.
@@ -461,17 +461,17 @@ fn runExpanded(ctx: *StepCtx, text: []const u8, allow_anon: bool) sas.diag.Error
             break;
         } else if (ctx.diags.hasStepErrors() and ctx.diags.syntax_check) {
             // Syntax-check mode (BUG-errhalt): after any STEP ERROR, later
-            // DATA/PROC steps are skipped — real SAS batch behavior. A truncated
+            // DATA/PROC steps are skipped - real SAS batch behavior. A truncated
             // intermediate must not flow on into a plausible-looking clinical
             // dataset (a real MH run wrote 310 wrong obs to TARGET; CLIN-failloud).
             // GH#3 ISS-steperrhalt: `options nosyntaxcheck;` opts OUT for the rest
-            // of the run (D-024) — the gate then never fires and the steps below
+            // of the run (D-024) - the gate then never fires and the steps below
             // run. Global statements still apply while steps are being skipped
             // (branch above), so a mid-program toggle takes effect immediately.
             try ctx.diags.note(0, step_halt_note, .{});
         } else {
             // GH#3 ISS-steperrhalt: under NOSYNTAXCHECK the run continues past an
-            // earlier step's error, so spend the stale step-errors FIRST —
+            // earlier step's error, so spend the stale step-errors FIRST -
             // exec.zig's compile gates and commitOut's not-replaced rule key on
             // hasStepErrors() believing anything older was already skipped here.
             // The diagnostics stay recorded: the log and the exit code are
@@ -487,20 +487,20 @@ fn runExpanded(ctx: *StepCtx, text: []const u8, allow_anon: bool) sas.diag.Error
             } else try runStep(a, ctx.out, ctx.lib, ctx.diags, step_toks, ctx.globals, ctx.io, ctx.tables);
             // NOTE parity (GH#3 ISS-steperrhalt): real SAS ends the FAILING step
             // ITSELF with the same NOTE the later skipped steps get (Language
-            // Reference: Concepts Ch.8 Examples 8.2/8.4/8.8) — opensas used to
+            // Reference: Concepts Ch.8 Examples 8.2/8.4/8.8) - opensas used to
             // print it only for the SKIPPED ones. Reaching this branch proves no
             // step error was live at entry (the gate skips otherwise;
             // NOSYNTAXCHECK spent them), so a NOTE here is THIS step's own.
             if (ctx.diags.hasStepErrors()) try ctx.diags.note(0, step_halt_note, .{});
         }
     }
-    // CALL EXECUTE drain (FEAT-callexecute): the current step(s) finished — now
+    // CALL EXECUTE drain (FEAT-callexecute): the current step(s) finished - now
     // run the program text CALL EXECUTE queued, FIFO. Queued code may itself
     // CALL EXECUTE (appends to the same queue), so pop-and-run until empty.
     // ponytail: recursion depth = queue chain length (each nested runExpanded
     // drains the rest); fine for realistic call-execute fan-out, convert to a
     // flat worklist if a program ever queues thousands of fragments.
-    // Queued fragments are GENERATED text, not a source chunk — keep their
+    // Queued fragments are GENERATED text, not a source chunk - keep their
     // fragment-relative lines rather than shifting them into this chunk's
     // source range (pre-existing behavior). Save/restore: this runExpanded may
     // itself be an interleaveStep flush mid-chunk, and the chunk's later steps
@@ -528,7 +528,7 @@ fn interleaveStep(ctx_ptr: *anyopaque, text: []const u8) std.mem.Allocator.Error
     runExpanded(ctx, owned, false) catch |e| switch (e) {
         error.OutOfMemory => return error.OutOfMemory,
         // BUG-sqlerrorswallow: swallowing here lets macro expansion continue to
-        // the next run;/quit; boundary — safe ONLY because the error path is
+        // the next run;/quit; boundary - safe ONLY because the error path is
         // supposed to have recorded a located diagnostic first (→ non-zero exit).
         // Some paths break that invariant: PROC SQL's select-list column resolver
         // returns error.ParseError with NO diag (sql.zig resolveCol …orelse return),
@@ -536,7 +536,7 @@ fn interleaveStep(ctx_ptr: *anyopaque, text: []const u8) std.mem.Allocator.Error
         // 0. If nothing was recorded, surface the error loudly so it can't hide.
         else => if (!ctx.diags.hasErrors()) {
             // GAP-gapsexitingone §5d: an error with NO diagnostic is OUR defect,
-            // never the user's — the CLI surface of this same invariant
+            // never the user's - the CLI surface of this same invariant
             // (runFile's `failLoud("{t}")`, audit §2 row 67) already exits 2, and
             // the D-009b corollary settles the twin by internal consistency alone.
             // The report is still swallowed for macro continuation, as before.
@@ -549,23 +549,23 @@ fn interleaveStep(ctx_ptr: *anyopaque, text: []const u8) std.mem.Allocator.Error
 const Libref = struct { name: []const u8, dir: []const u8, readonly: bool };
 
 /// GAP-ebnfrcwrongclass: DOCUMENTED LIBNAME statement options that real SAS
-/// 9.4 runs clean but opensas does not implement — the rc-2 subset of the
+/// 9.4 runs clean but opensas does not implement - the rc-2 subset of the
 /// catch-all below (the message already NAMES the option; only the class
 /// moves, same shape as proc.zig's isFreqTablesGapOption split). Members,
 /// each with its printed-page citation:
-///   INENCODING= / OUTENCODING= — Procedures Guide `=== pdf 582/583 ===`
+///   INENCODING= / OUTENCODING= - Procedures Guide `=== pdf 582/583 ===`
 ///     (printed pp. 532-533): the CVP example's own
 ///     `LIBNAME outlib 'SAS-library' outencoding="…";` is shown in the log
 ///     assigned CLEAN on "Engine: V9"; Table 17.9 (COPY) names both as
 ///     LIBNAME options. opensas does no transcoding → named gap.
-///   CVPMULTIPLIER= — Procedures Guide printed p.1566 (`=== pdf 1616 ===`):
-///     "read about the CVPMULTIPLIER= option" — the CVP family's LIBNAME
+///   CVPMULTIPLIER= - Procedures Guide printed p.1566 (`=== pdf 1616 ===`):
+///     "read about the CVPMULTIPLIER= option" - the CVP family's LIBNAME
 ///     option; real SAS runs it clean (it implies the CVP engine).
-/// NOT members: plain `cvp=` (the tick431 row's premise — the docs document
+/// NOT members: plain `cvp=` (the tick431 row's premise - the docs document
 /// the CVP ENGINE, Statements Ref printed p.221, which the engine arm above
 /// already gaps; no `CVP=` LIBNAME OPTION exists in the docs, so it keeps the
 /// typo class), and the open-ended SAS/ACCESS engine-option set
-/// (audit-exitcodecontract.md:653 — an unlicensed real SAS rejects those too,
+/// (audit-exitcodecontract.md:653 - an unlicensed real SAS rejects those too,
 /// never a false rc 2).
 fn isDocLibnameGapOpt(opt: []const u8) bool {
     inline for (.{ "inencoding", "outencoding", "cvpmultiplier" }) |o|
@@ -578,10 +578,10 @@ fn isDocLibnameGapOpt(opt: []const u8) bool {
 /// Collect `libname NAME "dir" [access=readonly];` declarations. These sit at
 /// statement level but bind session-wide, so they're collected in a pre-pass.
 /// `diags` is non-null ONLY at the whole-program pre-pass (GAP-libnameopt):
-/// the option-list validation fires THERE — once per program over the fully
-/// expanded source — never in the segment re-bind (which passes null, so an
+/// the option-list validation fires THERE - once per program over the fully
+/// expanded source - never in the segment re-bind (which passes null, so an
 /// executed libname isn't double-reported) and never in the statement loops
-/// (they keep skipping LIBNAME per isMidStepSkippable, D-014a — BUG-libnamemidstepboth).
+/// (they keep skipping LIBNAME per isMidStepSkippable, D-014a - BUG-libnamemidstepboth).
 fn parseLibnames(a: std.mem.Allocator, diags: ?*sas.diag.Diagnostics, toks: []const Token) !std.ArrayList(Libref) {
     var list: std.ArrayList(Libref) = .empty;
     for (toks, 0..) |t, i| {
@@ -593,30 +593,30 @@ fn parseLibnames(a: std.mem.Allocator, diags: ?*sas.diag.Diagnostics, toks: []co
         while (pi < toks.len and toks[pi].tag != .semicolon and toks[pi].tag != .string) pi += 1;
         if (pi >= toks.len or toks[pi].tag != .string) continue;
         // NOTE-libnameengine (D-015 silent superset): the engine keyword used
-        // to be accepted and SKIPPED — member format is sniffed from the file
+        // to be accepted and SKIPPED - member format is sniffed from the file
         // extension, so `libname t boguseng "x";` ran CLEAN where SAS errors
         // "The BOGUSENG engine cannot be found." Allowlist = the engines for
         // the formats opensas implements: BASE and its documented alias V9
-        // (native dir/.sas7bdat — "V9 is an alias for the BASE engine",
-        // Procedures Guide p.1032) and XPORT (transport files — "use the XPORT
+        // (native dir/.sas7bdat - "V9 is an alias for the BASE engine",
+        // Procedures Guide p.1032) and XPORT (transport files - "use the XPORT
         // keyword to specify the XPORT engine", Procedures Guide p.531).
         // Engines the doc names but opensas does NOT implement (CVP/JMP/JSON/
-        // WebDAV — Statements Ref p.221 stubs — XML, SPDE, ORACLE, …) are
+        // WebDAV - Statements Ref p.221 stubs - XML, SPDE, ORACLE, …) are
         // REJECTED AT THE STATEMENT, not accepted-and-failed-later: the engine
         // slot is advisory today (format comes from the extension), so there
-        // IS no later loud point — deferring is the same silent swallow.
+        // IS no later loud point - deferring is the same silent swallow.
         if (pi > i + 2 and toks[i + 2].tag == .name) {
             const eng = toks[i + 2].text;
             if (!eqi(eng, "base") and !eqi(eng, "v9") and !eqi(eng, "xport")) {
                 if (diags) |d| {
                     // GAP-gapsexitingone §5d SPLIT: a DOCUMENTED base engine
                     // opensas does not implement (the list above: JSON/XML/SPDE/
-                    // CVP/JMP/WebDAV) is a gap — real SAS 9.4 finds the engine
-                    // and runs — so rc 2 with a message that says "not
+                    // CVP/JMP/WebDAV) is a gap - real SAS 9.4 finds the engine
+                    // and runs - so rc 2 with a message that says "not
                     // supported"; "cannot be found" mis-describes it and rc 1
                     // would tell the agent to fix valid SAS. An UNKNOWN name
                     // (a typo, or a SAS/ACCESS engine an unlicensed SAS also
-                    // rejects — ORACLE degrades here, never a false rc 2) keeps
+                    // rejects - ORACLE degrades here, never a false rc 2) keeps
                     // SAS's own rc-1 wording.
                     if (isDocLibEngine(eng)) {
                         sas.diag.markGap();
@@ -630,18 +630,18 @@ fn parseLibnames(a: std.mem.Allocator, diags: ?*sas.diag.Diagnostics, toks: []co
         var readonly = false;
         // GAP-libnameopt: the option list AFTER the path string gains a real
         // final else. It used to be one scan for the bare WORD "readonly"
-        // anywhere before the `;` — so `libname x "p" bogusopt=1;` ran clean
+        // anywhere before the `;` - so `libname x "p" bogusopt=1;` ran clean
         // (the audit probe) and a typo'd `acces=readonly` silently LEFT THE
         // LIB UNPROTECTED (it did match the value word, hiding the typo).
         // Classes (SAS 9.4 Language Reference, LIBNAME statement):
-        //   ACCESS=READONLY — HONOURED: writes to the lib error "read-only
+        //   ACCESS=READONLY - HONOURED: writes to the lib error "read-only
         //     library" (GH#15, audit probe); ACCESS=TEMP accepted (read-write).
-        //   COMPRESS= / REUSE= — INERT: on-disk storage properties a reader
+        //   COMPRESS= / REUSE= - INERT: on-disk storage properties a reader
         //     is transparent to; opensas holds datasets in memory and writes
         //     csv/xpt through its own drivers, uncompressed either way.
-        //   INENCODING=/OUTENCODING=/CVPMULTIPLIER= — DOCUMENTED, clean in
+        //   INENCODING=/OUTENCODING=/CVPMULTIPLIER= - DOCUMENTED, clean in
         //     real SAS, unimplemented here → NAMED rc-2 gap (isDocLibnameGapOpt).
-        //   anything else — a typo or an unfiled engine option → LOUD at rc 1,
+        //   anything else - a typo or an unfiled engine option → LOUD at rc 1,
         //     naming it.
         var j = pi + 1;
         while (j < toks.len and toks[j].tag != .semicolon) {
@@ -652,7 +652,7 @@ fn parseLibnames(a: std.mem.Allocator, diags: ?*sas.diag.Diagnostics, toks: []co
                 if (eqi(v, "readonly")) {
                     readonly = true;
                 } else if (eqi(v, "temp")) {
-                    // accepted — behaves read-write (audit probe)
+                    // accepted - behaves read-write (audit probe)
                 } else if (diags) |d| {
                     try d.report(.err, toks[j].line, "Invalid value for the ACCESS= LIBNAME option.", .{});
                 }
@@ -664,14 +664,14 @@ fn parseLibnames(a: std.mem.Allocator, diags: ?*sas.diag.Diagnostics, toks: []co
             } else {
                 if (diags) |d| {
                     // The documented-but-unimplemented set is OUR gap (rc 2,
-                    // D-009/D-009b(i)) — a user running valid SAS must not be
+                    // D-009/D-009b(i)) - a user running valid SAS must not be
                     // told their code is broken; the byte-identical message
                     // already NAMES the option. Typos and unfiled engine
                     // options keep rc 1 (never a false rc 2).
                     if (isDocLibnameGapOpt(toks[j].text)) sas.diag.markGap();
                     try d.report(.err, toks[j].line, "LIBNAME option {s} is not supported", .{toks[j].text});
                 }
-                // one ERROR per statement (SAS shape) — skip the rest of THIS
+                // one ERROR per statement (SAS shape) - skip the rest of THIS
                 // libname; the pass still collects later librefs.
                 while (j < toks.len and toks[j].tag != .semicolon) j += 1;
             }
@@ -683,11 +683,11 @@ fn parseLibnames(a: std.mem.Allocator, diags: ?*sas.diag.Diagnostics, toks: []co
 
 /// GH#34 ISS-fmtcatalog: for each `OPTIONS FMTSEARCH=` libref, read a
 /// `formats.sas7bcat` catalog from its directory and append its VALUE-format
-/// definitions to the catalog `format.apply` consults — so `put(x, WORKSHOP.)`
+/// definitions to the catalog `format.apply` consults - so `put(x, WORKSHOP.)`
 /// decodes a label instead of failing loud. Mirrors PROC FORMAT's install
 /// (proc.zig runFormat) so in-program and catalog formats coexist.
 /// ponytail: probes only the explicit FMTSEARCH list and only the default
-/// `formats.sas7bcat` member — SAS's implicit WORK/LIBRARY search order and named
+/// `formats.sas7bcat` member - SAS's implicit WORK/LIBRARY search order and named
 /// `lib.catalog` members aren't (the corpus always names the libref explicitly).
 fn loadFmtCatalogs(a: std.mem.Allocator, toks: []const Token, librefs: []const Libref) !void {
     const refs = try parseFmtSearch(a, toks);
@@ -703,7 +703,7 @@ fn loadFmtCatalogs(a: std.mem.Allocator, toks: []const Token, librefs: []const L
         const bytes = sas.io.readFileRaw(a, path) orelse continue; // no catalog there
         const ufs = sas.sas7bcat.read(a, bytes) catch |e| switch (e) {
             error.OutOfMemory => return error.OutOfMemory,
-            // A present-but-unparseable catalog is an opensas gap — fail loud.
+            // A present-but-unparseable catalog is an opensas gap - fail loud.
             else => {
                 failLoud("cannot load format catalog {s} ({t})", .{ path, e });
                 continue;
@@ -748,7 +748,7 @@ fn parseFmtSearch(a: std.mem.Allocator, toks: []const Token) ![]const []const u8
 }
 
 /// Windows-authored study programs bind librefs with `\` separators
-/// (`"&XPT.\ae.xpt"` — GAP-proccopy); normalize so unix file ops see a real path.
+/// (`"&XPT.\ae.xpt"` - GAP-proccopy); normalize so unix file ops see a real path.
 fn normalizeSeps(a: std.mem.Allocator, p: []const u8) ![]const u8 {
     if (std.mem.indexOfScalar(u8, p, '\\') == null) return p;
     const q = try a.dupe(u8, p);
@@ -790,13 +790,13 @@ fn rebindLibref(ctx: *StepCtx, lr: Libref) !void {
     try syncReadonlyRefs(ctx.a, ctx.lib, ctx.librefs.items); // GH#15: readonly may flip at runtime
 }
 
-/// `proc copy in=LIB out=LIB [memtype=data]; select m1 m2 …; run;` — the SDTM
+/// `proc copy in=LIB out=LIB [memtype=data]; select m1 m2 …; run;` - the SDTM
 /// XPT-export idiom (GAP-proccopy): `libname xptfile XPORT "…&member..xpt";
 /// proc copy in=sasfile out=xptfile; select <member>;` per %do iteration. Each
 /// selected member is written through the out= binding CURRENT at this step
-/// (the per-iteration re-bind is the whole point — the end-of-run pass only
+/// (the per-iteration re-bind is the whole point - the end-of-run pass only
 /// sees the last one). ponytail: disk-write only, the member is not registered
-/// in-memory under `out.m` — a later read finds it on disk through the normal
+/// in-memory under `out.m` - a later read finds it on disk through the normal
 /// libref loader. EXCLUDE / bare COPY without SELECT fail loud.
 fn runProcCopy(ctx: *StepCtx, toks: []const Token) sas.diag.Error!void {
     const a = ctx.a;
@@ -833,7 +833,7 @@ fn runProcCopy(ctx: *StepCtx, toks: []const Token) sas.diag.Error!void {
             return;
         }
     }
-    // DEC-abortrcvsD009: these three are USER errors (rc 1), not gaps (rc 2) —
+    // DEC-abortrcvsD009: these three are USER errors (rc 1), not gaps (rc 2) -
     // opensas implements `in=/out=/select`, and real SAS errors on all three too
     // ("The IN= option must be specified", "Libref X is not assigned", "File
     // LIB.MEM.DATA does not exist"). The mirror of 321b444e's reductio applies to
@@ -886,7 +886,7 @@ fn coalesceLibrefs(a: std.mem.Allocator, toks: []const Token, librefs: []const L
     var i: usize = 0;
     while (i < toks.len) {
         // Fold `<libref>.<name>` for a declared libref, and also the implicit
-        // `work.<name>` (WORK is the default library) — BUG-twolevelread.
+        // `work.<name>` (WORK is the default library) - BUG-twolevelread.
         if (i + 2 < toks.len and toks[i].tag == .name and toks[i + 1].tag == .dot and
             toks[i + 2].tag == .name and (findLibref(librefs, toks[i].text) != null or eqi(toks[i].text, "work")))
         {
@@ -910,32 +910,32 @@ fn splitTwoLevel(librefs: []const Libref, name: []const u8) ?struct { lr: Libref
 
 /// Read every input `libref.dataset` referenced (not the `data <libref.x>`
 /// target) from its `dir/dataset.csv` into the Library, so `set`/`merge` find it.
-/// A MISSING member file stays silent here — SET's "File X does not exist" is
+/// A MISSING member file stays silent here - SET's "File X does not exist" is
 /// then truthful. A PRESENT-but-unreadable member (truncated/damaged sas7bdat/
 /// xpt) is reported ONCE at the referencing token's line, naming the real cause
 /// (NOTE-truncreadmsg), recorded in `damaged` so later passes neither re-read
 /// nor re-report it, and the .err trips syntax-check mode before the step runs
-/// — the misleading downstream "does not exist" never prints.
+/// - the misleading downstream "does not exist" never prints.
 fn loadLibInputs(a: std.mem.Allocator, io: Io, lib: *sas.exec.Library, librefs: []const Libref, toks: []const Token, loaded_ro: *std.ArrayList(*sas.dataset.Dataset), damaged: *std.StringHashMap(void), diags: *sas.diag.Diagnostics) !void {
     for (toks, 0..) |t, i| {
         if (t.tag != .name) continue;
         const two = splitTwoLevel(librefs, t.text) orelse continue;
         if (i > 0 and toks[i - 1].tag == .name and eqi(toks[i - 1].text, "data")) continue; // output target
         if (lib.find(t.text) != null) continue; // already loaded / created
-        if (damaged.contains(t.text)) continue; // already reported — no re-read, no re-report
+        if (damaged.contains(t.text)) continue; // already reported - no re-read, no re-report
 
         // A libref pointed straight at a dataset FILE (not a directory): every
         // member name maps to that one file. Read the file itself by extension.
-        // (QA: `libname s "real.sas7bdat"; set s.x;` must load real rows — before
+        // (QA: `libname s "real.sas7bdat"; set s.x;` must load real rows - before
         // this it built `real.sas7bdat/x.sas7bdat`, missed, and no-op'd exactly
         // like a bogus path.)
         if (sas.io.endsWithIgnoreCase(two.lr.dir, ".sas7bdat") or sas.io.endsWithIgnoreCase(two.lr.dir, ".xpt")) {
             if (Io.Dir.cwd().readFileAlloc(io, two.lr.dir, a, max_file)) |bytes| {
-                // BUG-filelibrefmember (F6): the file holds ONE member — serve it
+                // BUG-filelibrefmember (F6): the file holds ONE member - serve it
                 // only under the name stamped in it (XPT DSCRPTR) or, for
                 // sas7bdat, its filename stem. A mismatch skips the load, so the
                 // referencing SET fails loud ("File X does not exist") exactly
-                // like any absent member — a typo'd name no longer silently
+                // like any absent member - a typo'd name no longer silently
                 // reads the wrong dataset. An XPT stamp truncates to 8 chars, so
                 // a longer request also matches on its first 8.
                 const held = sas.io.stampedMemberName(two.lr.dir, bytes);
@@ -946,7 +946,7 @@ fn loadLibInputs(a: std.mem.Allocator, io: Io, lib: *sas.exec.Library, librefs: 
                         if (maybe) |ds| {
                             // F9-sidecar: apply a sibling `.labels` sidecar (the
                             // file's stem + .labels) exactly as the directory
-                            // path does — labels/formats/informats survive a
+                            // path does - labels/formats/informats survive a
                             // FILE-libref read too.
                             const dot = std.mem.lastIndexOfScalar(u8, two.lr.dir, '.') orelse two.lr.dir.len;
                             const lpath = try std.fmt.allocPrint(a, "{s}{s}", .{ two.lr.dir[0..dot], sas.io.label_ext });
@@ -960,7 +960,7 @@ fn loadLibInputs(a: std.mem.Allocator, io: Io, lib: *sas.exec.Library, librefs: 
                         error.OutOfMemory => return error.OutOfMemory,
                         // NOTE-truncreadmsg: a PRESENT but unreadable member
                         // (truncated/damaged sas7bdat/xpt) was swallowed here
-                        // and surfaced downstream as "File X does not exist" —
+                        // and surfaced downstream as "File X does not exist" -
                         // the file plainly DOES exist. Name the real problem
                         // once (shape matches "cannot load format catalog"
                         // above); the .err errhalt-skips the referencing step.
@@ -987,13 +987,13 @@ fn loadLibInputs(a: std.mem.Allocator, io: Io, lib: *sas.exec.Library, librefs: 
                         try sas.io.applyLabelSidecar(a, ds, lb);
                     } else |_| {}
                     try lib.putInput(t.text, ds); // GH#15: preloading a readonly INPUT is a legal read
-                    try loaded_ro.append(a, ds); // read-only input — not re-written unless replaced
+                    try loaded_ro.append(a, ds); // read-only input - not re-written unless replaced
                     break;
                 }
             } else |e| switch (e) {
                 error.OutOfMemory => return error.OutOfMemory,
                 // NOTE-truncreadmsg (as above): report the present-but-damaged
-                // member and STOP probing — falling through to a stale .csv
+                // member and STOP probing - falling through to a stale .csv
                 // sidecar would silently read superseded data (D-002).
                 else => {
                     try diags.report(.err, t.line, "cannot load {s} ({t}): the file exists but is damaged or truncated", .{ path, e });
@@ -1006,11 +1006,11 @@ fn loadLibInputs(a: std.mem.Allocator, io: Io, lib: *sas.exec.Library, librefs: 
 }
 
 /// Write every dataset in a writable libref: an XPORT libref → `.xpt`; a directory
-/// libref → native `.sas7bdat` (AUTHORITATIVE on reload — preserves variable
+/// libref → native `.sas7bdat` (AUTHORITATIVE on reload - preserves variable
 /// type/length, E-sas7write-hookup) PLUS a `.csv` sidecar (diff-friendly / legacy;
 /// ignored on reload when the `.sas7bdat` is present). `.labels` sidecar as before.
 /// Whether `ds` should be written back to disk. A read-only-loaded input that was
-/// never replaced (same object pointer as when loaded) is NOT persisted — writing
+/// never replaced (same object pointer as when loaded) is NOT persisted - writing
 /// it back dirties the input dir and a generated `.sas7bdat` would shadow an edited
 /// `.csv` on the next read. A step that re-creates the name via `lib.put` installs a
 /// NEW object, so it's absent from `loaded_ro` → persisted (E-sas7write-noreadback).
@@ -1023,7 +1023,7 @@ fn writeLibOutputs(a: std.mem.Allocator, io: Io, lib: *sas.exec.Library, librefs
         const two = splitTwoLevel(librefs, nm) orelse continue;
         if (two.lr.readonly) continue;
         // A dataset only READ from a directory libname (same object as loaded, never
-        // replaced by a `data lib.x;`) is not persisted — writing it back is stray
+        // replaced by a `data lib.x;`) is not persisted - writing it back is stray
         // churn that shadows an edited source (E-sas7write-noreadback).
         if (!shouldPersist(lib.sets.items[i], loaded_ro)) continue;
         try writeMember(a, io, two.lr, two.ds, lib.sets.items[i]);
@@ -1032,13 +1032,13 @@ fn writeLibOutputs(a: std.mem.Allocator, io: Io, lib: *sas.exec.Library, librefs
 
 /// Write ONE member through a libref binding. Shared by end-of-run
 /// writeLibOutputs and the eager PROC COPY path (GAP-proccopy), which must
-/// write through the binding CURRENT at copy time — the end-of-run pass only
+/// write through the binding CURRENT at copy time - the end-of-run pass only
 /// sees the libref's FINAL binding.
 fn writeMember(a: std.mem.Allocator, io: Io, lr: Libref, ds_name: []const u8, ds: *sas.dataset.Dataset) sas.diag.Error!void {
     // `libname o xport "f.xpt"` writes the member out as XPORT v5 to that file
-    // (CLIN-xptwrite). ONE member per .xpt (multi-member append unsupported —
+    // (CLIN-xptwrite). ONE member per .xpt (multi-member append unsupported -
     // F7(a)): before overwriting an existing file, compare the member stamped
-    // in it and REFUSE LOUDLY (D-002) when it differs — the old behavior
+    // in it and REFUSE LOUDLY (D-002) when it differs - the old behavior
     // silently destroyed the first dataset with a clean exit code. Re-writing
     // the SAME member (or its ≤8-char stamp prefix) is a legal replace.
     if (sas.io.endsWithIgnoreCase(lr.dir, ".xpt")) {
@@ -1047,14 +1047,14 @@ fn writeMember(a: std.mem.Allocator, io: Io, lr: Libref, ds_name: []const u8, ds
                 const same = eqi(held, ds_name) or
                     (ds_name.len > 8 and held.len == 8 and eqi(ds_name[0..8], held));
                 if (!same) {
-                    failLoud("XPORT: {s} already holds member {s} — one member per transport file is supported; use a separate .xpt path per member (member {s} NOT written, {s} preserved)", .{ lr.dir, held, ds_name, held });
+                    failLoud("XPORT: {s} already holds member {s} - one member per transport file is supported; use a separate .xpt path per member (member {s} NOT written, {s} preserved)", .{ lr.dir, held, ds_name, held });
                     return;
                 }
             }
         } else |_| {}
         // the XPT member header carries the dataset name (≤8): stamp the BARE
         // member name, not a two-level `libref.member` (truncates to `libref.m`
-        // — Pinnacle 21 keys the define.xml match on it).
+        // - Pinnacle 21 keys the define.xml match on it).
         var named = ds.*;
         named.name = ds_name;
         const bytes = sas.io.writeXport(a, &named) catch |e| switch (e) {
@@ -1064,8 +1064,8 @@ fn writeMember(a: std.mem.Allocator, io: Io, lr: Libref, ds_name: []const u8, ds
                 return;
             },
         };
-        // A real XPT-export macro makes the target dir via `X mkdir` — a no-op
-        // global here — so create the parent ourselves.
+        // A real XPT-export macro makes the target dir via `X mkdir` - a no-op
+        // global here - so create the parent ourselves.
         if (std.fs.path.dirname(lr.dir)) |parent| Io.Dir.cwd().createDirPath(io, parent) catch {};
         Io.Dir.cwd().writeFile(io, .{ .sub_path = lr.dir, .data = bytes }) catch {};
         return;
@@ -1080,7 +1080,7 @@ fn writeMember(a: std.mem.Allocator, io: Io, lr: Libref, ds_name: []const u8, ds
 
     Io.Dir.cwd().createDirPath(io, lr.dir) catch {};
     // E-sas7write-hookup: persist a directory-LIBNAME member as native
-    // `.sas7bdat` — the AUTHORITATIVE reload format (io.member_exts prefers it),
+    // `.sas7bdat` - the AUTHORITATIVE reload format (io.member_exts prefers it),
     // so variable type/length survive a TARGET reload that CSV re-guessed
     // (META-fidelity: all-digit char '007' stays Char, not re-typed Num). The
     // `.csv` is still written as a diff-friendly / legacy sidecar (the program
@@ -1089,7 +1089,7 @@ fn writeMember(a: std.mem.Allocator, io: Io, lr: Libref, ds_name: []const u8, ds
     const s7bytes = sas.io.writeSas7bdat(a, ds) catch |e| switch (e) {
         error.OutOfMemory => return error.OutOfMemory,
         // GAP-xport0colskip: a 0-variable dataset has NO writable .sas7bdat
-        // shape — read() itself refuses ncol==0 (a file we'd reject on
+        // shape - read() itself refuses ncol==0 (a file we'd reject on
         // reload) and no real-file 0-column layout evidence exists.
         //
         // SEV-zerocolrefusal re-litigated the severity and KEPT exit 2. The
@@ -1097,25 +1097,25 @@ fn writeMember(a: std.mem.Allocator, io: Io, lr: Libref, ds_name: []const u8, ds
         // /pdf 261: "NOTE: The data set WORK.NULL has 1 observations and 0
         // variables.") does NOT conflict, because it is about a WORK set and
         // that exact program already exits 0 here with a correct 1-obs/0-var
-        // descriptor — verified by probe. Exit 2 fires only for the strictly
+        // descriptor - verified by probe. Exit 2 fires only for the strictly
         // LARGER program that also demands a native library write, which p.246
         // never does and no volume describes. D-009 then settles it: the writer
         // returns error.Unsupported, which IS the "UNSUPPORTED feature" gap
         // class, and a gap is 2. Downgrading on "but real SAS exits 0" would
-        // make rc=2 unreachable — every gap is by construction valid SAS that
+        // make rc=2 unreachable - every gap is by construction valid SAS that
         // real SAS runs clean, so that cannot be the test.
         //
         // The message must NOT promise the CSV rescues it: probed, a 0-column
         // `.csv` was two bytes ("\n\n") and reloaded as ONE PHANTOM `VAR1`
         // column with 0 observations, so the member does not survive the run at
         // all. Claiming otherwise is the silent-wrong-output class house rules
-        // put first — which is also why exit 0 + WARNING is wrong here: it would
+        // put first - which is also why exit 0 + WARNING is wrong here: it would
         // wave a pipeline past real data destruction. BUG-csvzerocolphantom then
         // stopped that file existing: writeCsv REFUSES ncol==0 (CSV cannot
-        // encode it — see io.writeCsvImpl) and returns an empty body, which the
+        // encode it - see io.writeCsvImpl) and returns an empty body, which the
         // `text.len > 0` guard below skips exactly as `s7bytes` is skipped here.
         error.Unsupported => blk: {
-            failLoud("SAS7BDAT: {s}/{s}.sas7bdat NOT written — a 0-variable data set has no native representation, and CSV cannot encode one either (an empty header row reads back as a phantom column), so NO file is written and this member does NOT survive the run", .{ lr.dir, ds_name });
+            failLoud("SAS7BDAT: {s}/{s}.sas7bdat NOT written - a 0-variable data set has no native representation, and CSV cannot encode one either (an empty header row reads back as a phantom column), so NO file is written and this member does NOT survive the run", .{ lr.dir, ds_name });
             break :blk "";
         },
         error.NotSas7bdat, error.Damaged => blk: { // reader-side tags; fail loud if the writer ever raises one
@@ -1130,11 +1130,11 @@ fn writeMember(a: std.mem.Allocator, io: Io, lr: Libref, ds_name: []const u8, ds
     const path = try std.fmt.allocPrint(a, "{s}/{s}.csv", .{ lr.dir, ds_name });
     const text = try sas.io.writeCsv(a, ds);
     // BUG-csvzerocolphantom: an empty body means the writer REFUSED (0 variables
-    // — CSV has no encoding for it; it reported the gap itself). Skip the write
+    // - CSV has no encoding for it; it reported the gap itself). Skip the write
     // rather than leave a file that reloads as a lie, same shape as `s7bytes`.
     if (text.len > 0) Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = text }) catch {};
     // variable labels go in a SEPARATE `.labels` sidecar (the sas7bdat writer
-    // carries type/length but not labels/formats yet) — unchanged behavior
+    // carries type/length but not labels/formats yet) - unchanged behavior
     // (BUG-labelspersist); no file is written when nothing is labeled.
     if (try sas.io.labelSidecar(a, ds)) |meta| {
         const lpath = try std.fmt.allocPrint(a, "{s}/{s}{s}", .{ lr.dir, ds_name, sas.io.label_ext });
@@ -1158,20 +1158,20 @@ fn stepStarts(a: std.mem.Allocator, toks: []const Token) ![]usize {
 
 const Seg = struct { start: usize, end: usize, global: bool, bad: bool = false, endsas: bool = false, hoisted: bool = false };
 
-/// Split the token stream into top-level segments — DATA/PROC steps and global
-/// statements (TITLE/FOOTNOTE/OPTIONS/FILENAME/ODS/X) — in order. A step runs to
+/// Split the token stream into top-level segments - DATA/PROC steps and global
+/// statements (TITLE/FOOTNOTE/OPTIONS/FILENAME/ODS/X) - in order. A step runs to
 /// its `run;`/`quit;` (or the next step); a global statement to its `;`. Global
 /// keywords that occur *inside* a step (before its run/quit) stay part of it.
 /// BUG-opencodestmtswallow: an unrecognized open-code statement no longer falls
 /// off the end of the chain silently (a typo'd `titl 'x';` / `libnam raw 'p';`
 /// or an unimplemented `endsas;` vanished at exit 0). Three classes, mirroring
 /// the OPTIONS fix (BUG-optionsstmtswallow):
-///   (a) implemented statements — the two arms below, unchanged;
-///   (b) an explicit INERT allowlist (parser.isInertGlobalKw) — real SAS
+///   (a) implemented statements - the two arms below, unchanged;
+///   (b) an explicit INERT allowlist (parser.isInertGlobalKw) - real SAS
 ///       top-level statements a batch interpreter cannot observe, skipped to
 ///       their `;` (the D-014 lesson: erroring on THOSE kills every real
 ///       program);
-///   (c) anything else — recorded, and when the stream held at least one real
+///   (c) anything else - recorded, and when the stream held at least one real
 ///       segment it becomes a `bad` seg that runExpanded reports LOUD in source
 ///       position (steps before it ran; the .err errhalt-skips the rest, like
 ///       SAS batch). With NO real segments the stream keeps the anonymous
@@ -1254,7 +1254,7 @@ fn rawSegments(a: std.mem.Allocator, src: []const u8) ![][]const u8 {
 }
 
 /// `strict` is false only for the single-chunk whole-program slice that may
-/// fall back to the anonymous `data _null_` run — there an unrecognized
+/// fall back to the anonymous `data _null_` run - there an unrecognized
 /// statement keeps the fallback (which errors on its own terms). Everywhere
 /// else (flushed step boundaries, CALL EXECUTE fragments, later chunks) an
 /// unrecognized open-code statement becomes a loud `bad` seg even when the
@@ -1263,7 +1263,7 @@ fn segments(a: std.mem.Allocator, toks: []const Token, strict: bool, diags: *sas
     var list: std.ArrayList(Seg) = .empty;
     var unknown: ?usize = null; // first unrecognized open-code statement start
     // D-022 (GH#83 part 2): inert-skipped statements whose form IS observable
-    // in batch (DM's FILE/OUT log redirection) — spans collected during the
+    // in batch (DM's FILE/OUT log redirection) - spans collected during the
     // scan, noted at the end (see there).
     var inert: std.ArrayList(Seg) = .empty;
     var i: usize = 0;
@@ -1286,7 +1286,7 @@ fn segments(a: std.mem.Allocator, toks: []const Token, strict: bool, diags: *sas
             // harmlessly skipped (the parser's isMidStepSkippable skip).
             // FILENAME/ODS hoist identically (BUG-filenamemidstep): SAS global
             // statements take effect when ENCOUNTERED (step-compile time), i.e.
-            // before the step executes — so a hoisted `filename f 'new';`
+            // before the step executes - so a hoisted `filename f 'new';`
             // re-binds f before `file f;` runs, exactly SAS's observable order.
             // EXCEPT PROC SQL:
             // it produces MULTIPLE listings interleaved with its own statements
@@ -1303,7 +1303,7 @@ fn segments(a: std.mem.Allocator, toks: []const Token, strict: bool, diags: *sas
                 // BUG-endsasmidstep: ENDSAS is an ordinary step boundary
                 // wherever it lands (Language Reference: Concepts p.10/p.487). Mid-step: the step
                 // keeps the statements BEFORE it (they run and print), then
-                // the session ends NORMALLY — nothing after ENDSAS is even
+                // the session ends NORMALLY - nothing after ENDSAS is even
                 // read, same as the open-code arm below. The `=` guard keeps
                 // `endsas = 5;` a plain assignment. (PROC SQL self-parses;
                 // endsas inside it stays its own concern, like its titles.)
@@ -1317,7 +1317,7 @@ fn segments(a: std.mem.Allocator, toks: []const Token, strict: bool, diags: *sas
                     while (j < end and toks[j].tag != .semicolon) j += 1;
                     const gend = if (j < end) j + 1 else j;
                     // .hoisted: the tokens ALSO stay in the step, so the step's
-                    // bindStepVars discharges their unresolved-& warnings — the
+                    // bindStepVars discharges their unresolved-& warnings - the
                     // global-seg discharge skips these or they warn twice.
                     try list.append(a, .{ .start = k, .end = gend, .global = true, .hoisted = true });
                     k = gend;
@@ -1346,7 +1346,7 @@ fn segments(a: std.mem.Allocator, toks: []const Token, strict: bool, diags: *sas
             i = end;
         } else if (!is_assign and eqi(t.text, "endsas")) {
             // BUG-endsasexit: ENDSAS is an ordinary step boundary that ends
-            // the session NORMALLY (Language Reference: Concepts p.10, p.487) — not an error. Steps
+            // the session NORMALLY (Language Reference: Concepts p.10, p.487) - not an error. Steps
             // before it ran; it stops the scan here, so nothing after it is
             // even read (real ENDSAS semantics; the mid-program case). A
             // trailing `endsas;` is a production idiom and must exit 0.
@@ -1374,24 +1374,24 @@ fn segments(a: std.mem.Allocator, toks: []const Token, strict: bool, diags: *sas
         try list.insert(a, at, .{ .start = u, .end = uend, .global = false, .bad = true });
     };
     // D-022 (BUG-xstmtopencodesplit, GH#83 part 2): the inert skip stays silent
-    // for everything a batch run cannot observe — but DM's FILE/OUT log
+    // for everything a batch run cannot observe - but DM's FILE/OUT log
     // redirection IS observable (a downstream log check reads a file nobody
     // wrote), so it NOTEs, exactly like the mid-step parser arm; the SAME
     // emitter, and the SAME whole-word predicate (`dm 'log;clear;output;clear'`
     // stays silent). Emitted HERE, at the end, and only when this slice produced
     // real segments (or strict mode, where there is no fallback): a slice that
     // is ONLY inert statements falls back to the anonymous `data _null_` run in
-    // runExpanded, whose parser arm notes the very same statement — emitting
+    // runExpanded, whose parser arm notes the very same statement - emitting
     // here too would double the NOTE.
     if (strict or list.items.len > 0)
         for (inert.items) |s| try sas.parser.noteUnexecuted(diags, toks[s.start..s.end]);
     return list.items;
 }
 
-/// `X <command>;` — the only global whose keyword is a common variable name, so
+/// `X <command>;` - the only global whose keyword is a common variable name, so
 /// require a command WORD after it (an `x =` / bare `x` is a DATA-step
 /// reference). The command may be a quoted string OR bare words (`x mkdir
-/// "/tmp/d";` — SAS quotes the command optionally) — the SAME recognizer
+/// "/tmp/d";` - SAS quotes the command optionally) - the SAME recognizer
 /// parser.zig's mid-step x/dm arm runs (BUG-xstmtopencodesplit, GH#83: when the
 /// two disagreed, the bare-name form was accepted silently mid-step yet errored
 /// "not valid in open code" between steps).
@@ -1415,33 +1415,33 @@ fn stepEnd(toks: []const Token, from: usize) usize {
 }
 
 /// Accumulated TITLE/FOOTNOTE state. Lives in sql.zig (as `sas.sql.Titles`) so
-/// PROC SQL — which stamps its own SELECT listings — shares ONE instance with this
+/// PROC SQL - which stamps its own SELECT listings - shares ONE instance with this
 /// top-level handler (GAP-titleinsql). The numbered-line/cancel semantics and the
 /// stamp order (titles atop a listing, footnotes below) live on the type there.
 const Globals = sas.sql.Titles;
 
 /// A top-level global statement. TITLE/FOOTNOTE update the persistent state
 /// (emitted later by the listing procs); OPTIONS/FILENAME/ODS/X are accepted and
-/// produce no output (opensas: parse + accept) — EXCEPT the ODS sub-statements
+/// produce no output (opensas: parse + accept) - EXCEPT the ODS sub-statements
 /// that change WHAT is produced (SELECT/EXCLUDE/OUTPUT/TRACE), which fail LOUD.
 fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics, toks: []const Token) !void {
-    if (try g.set(a, diags, toks)) return; // TITLE/FOOTNOTE — consumed into the shared state
+    if (try g.set(a, diags, toks)) return; // TITLE/FOOTNOTE - consumed into the shared state
     const kw = toks[0].text;
-    // `X <command>;` in open code — NOT executed (settled, D-022), but no longer
+    // `X <command>;` in open code - NOT executed (settled, D-022), but no longer
     // SILENT about it: the SAME NOTE the mid-step parser arm emits (GH#83 part
     // 2). The statement used to fall through every chain below to a quiet no-op.
     if (eqi(kw, "x")) return sas.parser.noteUnexecuted(diags, toks);
     // OPTIONS: every token must be a KNOWN option (BUG-optionsstmtswallow).
     // Twelve names were recognized and EVERY other token fell off the chain
-    // with no final `else` — `options obbs=2;` (a typo for obs=2) then read
+    // with no final `else` - `options obbs=2;` (a typo for obs=2) then read
     // EVERY row at exit 0, and `options obs=2k;` silently became obs=2 (the `k`
     // lexes as a separate token and vanished). Three classes below:
-    //   (a) RESULT-CHANGING options — honoured here (Language Reference: Concepts citation per arm),
+    //   (a) RESULT-CHANGING options - honoured here (Language Reference: Concepts citation per arm),
     //       or LOUD as unsupported when honouring lives in the exec layer;
-    //   (b) an explicit INERT allowlist (isInertOption) — display/log/session
+    //   (b) an explicit INERT allowlist (isInertOption) - display/log/session
     //       cosmetics a batch interpreter genuinely cannot observe. The D-014
     //       lesson: erroring on THOSE kills every real program, so they stay
-    //       accepted — but ENUMERATED, so the chain has a real final `else`;
+    //       accepted - but ENUMERATED, so the chain has a real final `else`;
     //   everything else is a typo or an unfiled gap → LOUD, naming it.
     if (startsWithI(kw, "options")) {
         var i: usize = 1;
@@ -1460,7 +1460,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                 sas.format.setNoFmtErr(false);
                 i += 1;
             } else if (eqi(t.text, "nonotes")) {
-                // `options nonotes;` — suppress log NOTEs (production clinical runs
+                // `options nonotes;` - suppress log NOTEs (production clinical runs
                 // rely on it); `notes` re-enables (F7: was accepted but inert).
                 diags.suppress_notes = true;
                 i += 1;
@@ -1469,7 +1469,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                 i += 1;
             } else if (eqi(t.text, "nosyntaxcheck")) {
                 // GH#3 ISS-steperrhalt: `options nosyntaxcheck;` opts OUT of the
-                // post-step-error stop-all for the rest of the run — later
+                // post-step-error stop-all for the rest of the run - later
                 // independent steps execute (the NON-batch half of Language
                 // Reference: Concepts pp.170/177-178, which is what the issue's
                 // SAS Studio reporter saw). The DEFAULT stays the batch stop-all
@@ -1481,7 +1481,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                 diags.syntax_check = true; // re-arm the stop-all (the default)
                 i += 1;
             } else if (eqi(t.text, "yearcutoff")) {
-                // `options yearcutoff=<n>;` — wire the shared YEARCUTOFF span
+                // `options yearcutoff=<n>;` - wire the shared YEARCUTOFF span
                 // (BUG-yearcutoffstmt: parsed then DROPPED → 2-digit years kept
                 // the 1926 default = silent wrong dates). Fail LOUD on garbage.
                 const v = if (i + 2 < toks.len and toks[i + 1].tag == .eq and toks[i + 2].tag == .number)
@@ -1496,7 +1496,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                     return;
                 }
             } else if (eqi(t.text, "obs") or eqi(t.text, "firstobs")) {
-                // `options obs=N|MAX|MIN;` / `options firstobs=N|MAX|MIN;` — the
+                // `options obs=N|MAX|MIN;` / `options firstobs=N|MAX|MIN;` - the
                 // GLOBAL default last/first obs for every subsequent input read
                 // until reset (`obs=max` restores all-obs; Language Reference: Concepts p.247 +
                 // p.517 Table 21.5; BUG-globalobs). Values honour the K/M/G
@@ -1513,7 +1513,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                     return;
                 }
             } else if (eqi(t.text, "missing")) {
-                // `options missing='X';` — display char for a PLAIN missing
+                // `options missing='X';` - display char for a PLAIN missing
                 // numeric (Language Reference: Concepts p.209/234; BUG-optmissing: parsed then DROPPED
                 // → `.` printed regardless = silent wrong listing). `missing='';`
                 // /`missing='.'` resets to the default `.`. Special missings
@@ -1528,7 +1528,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                     return;
                 }
             } else if (eqi(t.text, "sysparm")) {
-                // `options sysparm="text";` — the macro system option (Macro
+                // `options sysparm="text";` - the macro system option (Macro
                 // Reference printed pp.486-487, "Valid in: ... OPTIONS
                 // statement"): ONE session value that the SYSPARM() function
                 // and the &SYSPARM automatic both read (GAP-sysparm-opt). A
@@ -1544,7 +1544,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                     return;
                 }
             } else if (eqi(t.text, "linesize") or eqi(t.text, "pagesize") or eqi(t.text, "ls") or eqi(t.text, "ps")) {
-                // `options linesize=N pagesize=N;` (GAP-listingwidth) — captured
+                // `options linesize=N pagesize=N;` (GAP-listingwidth) - captured
                 // and validated; listing procs do NOT wrap/paginate to them yet
                 // (accepted, not an error). Fail LOUD on garbage like OBS=.
                 const is_ls = eqi(t.text, "linesize") or eqi(t.text, "ls");
@@ -1584,11 +1584,11 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                 return;
             } else if (eqi(t.text, "sortseq")) {
                 // SORTSEQ= system option: the DEFAULT collation for PROC SORT
-                // (Language Reference: Concepts p.533 — BY honours the linguistic collation of
+                // (Language Reference: Concepts p.533 - BY honours the linguistic collation of
                 // SORTSEQ=LINGUISTIC-sorted data; proc.zig BUG-sortseq).
                 // HONOURED: runSort seeds from io.global_sortseq_linguistic.
                 //
-                // BUG-sortseqbaresuperset — DECLINED, and the volume refutes the
+                // BUG-sortseqbaresuperset - DECLINED, and the volume refutes the
                 // premise rather than leaving it open. The ticket says bare
                 // `options sortseq=linguistic;` running clean is a silent
                 // superset of the p.2415 Restrictions line ("The
@@ -1601,7 +1601,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                 //     the third maintenance release of SAS 9.4, you can specify
                 //     linguistic collation using the SORTSEQ= option in the SQL
                 //     procedure AND BY SPECIFYING THE SORTSEQ=LINGUISTIC SYSTEM
-                //     OPTION." — a DATED feature statement, i.e. the restriction
+                //     OPTION." - a DATED feature statement, i.e. the restriction
                 //     describes the pre-M3 state; and its Note: "Only PROC SORT
                 //     and PROC SQL are affected when the SORTSEQ=LINGUISTIC
                 //     system option is specified."
@@ -1632,7 +1632,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                     // gap, rc 2, same message. Anything else is a typo'd VALUE
                     // → rc 1, the OPTIONS-statement wording.
                     // LINGUISTIC(<collating-options>) is on the GAP arm, and
-                    // BUG-rcsplitmembership F2 MOVED IT TO rc 1 IN ERROR — that
+                    // BUG-rcsplitmembership F2 MOVED IT TO rc 1 IN ERROR - that
                     // half is reverted here, the rest of F2/F3/F4/F5 stands.
                     // F2 cited the p.2415 Restrictions line, which the header
                     // comment above now shows is stale (refuted four times, once
@@ -1642,7 +1642,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                     // asymmetry decides an undecided value: a wrong rc 2 costs
                     // one spurious "file an opensas issue", a wrong rc 1 tells a
                     // user their valid SAS is broken. So it goes back to the gap
-                    // arm — we honour bare LINGUISTIC but implement none of the
+                    // arm - we honour bare LINGUISTIC but implement none of the
                     // collating-options, and silently ignoring them would change
                     // sort order without saying so (D-002).
                     if (isUnimplSortseq(v) or (eqi(v, "linguistic") and i + 3 < toks.len and toks[i + 3].tag == .lparen)) {
@@ -1664,7 +1664,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
             } else if (eqi(t.text, "mergenoby")) {
                 // Language Reference: Concepts p.574: controls whether SAS ISSUES A MESSAGE when MERGE
                 // runs without BY. NOWARN is exactly opensas's behavior (a no-BY
-                // 1:1 merge proceeds silently — made row-correct by
+                // 1:1 merge proceeds silently - made row-correct by
                 // BUG-mergenobymissing) → inert. WARN/ERROR change the log /
                 // step flow from inside the merge driver (exec.zig) → LOUD, and
                 // an invalid value is LOUD too: a silent no-op defeats the
@@ -1690,8 +1690,8 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                 // Language Reference: Concepts p.488: VARINITCHK=ERROR STOPS the DATA step on an
                 // uninitialized variable. NOTE is the SAS default and opensas's
                 // exact behavior (the uninit NOTE, GH#75) → inert. WARN/ERROR/
-                // ABEND upgrade that NOTE — the emitter is exec.zig's
-                // noteUninitVars (a one-line upgrade once that file is free) —
+                // ABEND upgrade that NOTE - the emitter is exec.zig's
+                // noteUninitVars (a one-line upgrade once that file is free) -
                 // so until then they fail LOUD rather than no-op a requested
                 // safety check.
                 if (i + 2 < toks.len and toks[i + 1].tag == .eq and toks[i + 2].tag == .name) {
@@ -1701,7 +1701,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                         continue;
                     }
                     if (eqi(v, "warn") or eqi(v, "warning") or eqi(v, "error") or eqi(v, "abend")) {
-                        // GAP-gapsexitingone §5d: same shape as MERGENOBY — the
+                        // GAP-gapsexitingone §5d: same shape as MERGENOBY - the
                         // guard IS the documented unimplemented set (NOTE is
                         // honoured above; garbage → "Invalid value", rc 1).
                         sas.diag.markGap();
@@ -1713,7 +1713,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                 return;
             } else if (eqi(t.text, "noreplace")) {
                 // Language Reference: Concepts p.178 names REPLACE/NOREPLACE. NOREPLACE must REFUSE to
-                // overwrite an existing dataset — the check belongs to the
+                // overwrite an existing dataset - the check belongs to the
                 // output drivers (exec.zig). Silently accepting it would
                 // overwrite exactly what the user asked to protect → LOUD.
                 // (REPLACE, the SAS default and opensas's behavior, is inert.)
@@ -1725,7 +1725,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                 return;
             } else if (eqi(t.text, "validvarname")) {
                 // Inert-equivalent: opensas's name handling is a fixed SUPERSET
-                // of every mode — name literals are always accepted, IMPORT
+                // of every mode - name literals are always accepted, IMPORT
                 // headers are always mangled per V7 (io.zig). The VALUE is still
                 // validated so `validvarname=v8` (a typo) dies.
                 if (i + 2 < toks.len and toks[i + 1].tag == .eq and toks[i + 2].tag == .name and
@@ -1749,10 +1749,10 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
     }
     // ods/x: accepted, no-op
     if (startsWithI(kw, "filename")) {
-        // `filename REF "path";` — register the fileref so a later INFILE/FILE
+        // `filename REF "path";` - register the fileref so a later INFILE/FILE
         // can name it (GAP-filenameref: FILENAME was inert → the bare fileref
         // hit the parser's quoted-path requirement and errored). A device keyword
-        // other than DISK (e.g. PIPE) fails LOUD — no PIPE engine. Forms with no
+        // other than DISK (e.g. PIPE) fails LOUD - no PIPE engine. Forms with no
         // path (`filename ref;`, `filename ref clear;`) stay accepted-inert.
         if (toks.len >= 2 and toks[1].tag == .name) {
             var j: usize = 2;
@@ -1764,13 +1764,13 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
             // BUG-filenameconcatnoop: the FILENAME CONCATENATION form
             // `filename ref ('a.txt' 'b.txt');` (Language Reference: Concepts Table 21.5 p.517:
             // "FILENAME statement with concatenation, wildcard, or piping")
-            // was silently accepted and registered NOTHING — the later INFILE
+            // was silently accepted and registered NOTHING - the later INFILE
             // then errored "expected an infile path" exactly as if the REF
             // were undefined, pointing the user at the wrong statement. No
             // concat engine exists, so fail LOUD at the FILENAME statement,
             // like the sibling `pipe` device on the same Table 21.5 row.
             if (j < toks.len and toks[j].tag == .lparen) {
-                // GAP-gapsexitingone §5d: the guard is the lparen itself — the
+                // GAP-gapsexitingone §5d: the guard is the lparen itself - the
                 // documented concatenation form, valid SAS → gap, rc 2.
                 sas.diag.markGap();
                 return diags.fail(error.ParseError, toks[1].line, "FILENAME concatenation (a parenthesised list of files) is not supported", .{});
@@ -1778,7 +1778,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
             if (j < toks.len and toks[j].tag == .string) {
                 if (device) |d| if (!eqi(d, "disk")) {
                     // GAP-gapsexitingone §5d SPLIT: a DOCUMENTED device keyword
-                    // (the FILENAME syntax diagram's closed list — PIPE, FTP,
+                    // (the FILENAME syntax diagram's closed list - PIPE, FTP,
                     // SOCKET, …) is valid SAS we lack an engine for → gap, rc 2,
                     // same message. Anything else is a typo'd device word →
                     // rc 1, "not recognized" (the OPTIONS-statement wording).
@@ -1790,15 +1790,15 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                 };
                 try registerFileref(diags, toks[1].line, toks[1].text, toks[j].text);
                 // GAP-filenameopt: trailing name=value options after the path
-                // were parsed and silently IGNORED (the audit probe) — a typo'd
+                // were parsed and silently IGNORED (the audit probe) - a typo'd
                 // `lrelc=100` vanished. Enumerate (SAS 9.4 FILENAME statement,
                 // DISK device) and end in a real else:
-                //   LRECL=<n>      — INERT: the infile reader takes full lines of
+                //   LRECL=<n>      - INERT: the infile reader takes full lines of
                 //     any length (same reasoning as INFILE lrecl=, GH#64 ISS-infilelrecl).
-                //   TERMSTR=CRLF|CR|LF|NL — INERT: the reader splits on \n and
+                //   TERMSTR=CRLF|CR|LF|NL - INERT: the reader splits on \n and
                 //     trims \r (io.zig readLines), so every terminator variant
                 //     reads byte-identically.
-                //   RECFM=V — INERT: variable-length records are the only record
+                //   RECFM=V - INERT: variable-length records are the only record
                 //     form the reader has. RECFM=<fixed-length F/N…> would need
                 //     a padded-record reader → LOUD, never a silent line-split.
                 //   anything else (ENCODING=, a typo, …) → LOUD, naming it.
@@ -1819,7 +1819,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
                             // report+return (the OPTIONS-arm style in this same
                             // function): captured .err, later steps errhalt-skip.
                             // GAP-gapsexitingone §5d SPLIT: a documented record
-                            // form (F/N/P/VB/VS/VBS/U/D — V is the inert arm
+                            // form (F/N/P/VB/VS/VBS/U/D - V is the inert arm
                             // above) is valid SAS → gap, rc 2, same message;
                             // garbage is a typo'd value → rc 1.
                             if (isDocRecfm(v.text)) {
@@ -1853,7 +1853,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
             return diags.fail(error.ParseError, toks[1].line, "ODS OUTPUT (capture to dataset) is not supported yet", .{});
         }
         if (eqi(sub, "select") or eqi(sub, "exclude") or eqi(sub, "trace")) {
-            sas.diag.markGap(); // §5d — same shape as OUTPUT above
+            sas.diag.markGap(); // §5d - same shape as OUTPUT above
             return diags.fail(error.ParseError, toks[1].line, "ODS {s} is not supported yet", .{sub});
         }
         if (!eqi(sub, "listing") or (toks.len > 2 and toks[2].tag != .semicolon and !eqi(toks[2].text, "close"))) {
@@ -1866,7 +1866,7 @@ fn handleGlobal(a: std.mem.Allocator, g: *Globals, diags: *sas.diag.Diagnostics,
 
 // ── FILENAME fileref registry (GAP-filenameref) ─────────────────────────────
 // Session-wide, like the global OBS=/MISSING= state: paths are token slices
-// (program-lifetime), so no allocation. ponytail: fixed 64 slots — a program
+// (program-lifetime), so no allocation. ponytail: fixed 64 slots - a program
 // declaring more filerefs errors loud rather than silently dropping one.
 const Fileref = struct { name: []const u8, path: []const u8 };
 const max_filerefs = 64;
@@ -1879,7 +1879,7 @@ fn registerFileref(diags: *sas.diag.Diagnostics, line: usize, name: []const u8, 
         return;
     };
     if (fileref_count == max_filerefs) {
-        // GAP-gapsexitingone §5d: the 64-slot ceiling is OURS — SAS 9.4 has no
+        // GAP-gapsexitingone §5d: the 64-slot ceiling is OURS - SAS 9.4 has no
         // fileref limit, so a program tripping it is valid SAS refused by an
         // opensas limitation → gap, rc 2 (D-009b(i)).
         sas.diag.markGap();
@@ -1898,9 +1898,9 @@ fn findFileref(name: []const u8) ?[]const u8 {
 /// display/pagination/log cosmetics and session tuning that a batch
 /// interpreter with no windowing environment genuinely cannot observe. An
 /// option belongs here ONLY when accepting it silently can never change data
-/// or listing content — anything that can is honoured in handleGlobal's
+/// or listing content - anything that can is honoured in handleGlobal's
 /// OPTIONS chain or fails loud there. (MINOPERATOR/MINDELIMITER look inert
-/// here only because the macro layer already applied them at scan time —
+/// here only because the macro layer already applied them at scan time -
 /// BUG-minoperatoropt; the statement text passes through to us.)
 fn isInertOption(name: []const u8) bool {
     const list = [_][]const u8{
@@ -1910,14 +1910,14 @@ fn isInertOption(name: []const u8) bool {
         "topmargin",    "bottommargin", "leftmargin", "rightmargin",
         "formchar",     "formdlim",
         // label display is OPT-IN per proc (PROC PRINT LABEL/SPLIT=), never a
-        // system default — LABEL/NOLABEL toggle a default nothing reads here
+        // system default - LABEL/NOLABEL toggle a default nothing reads here
         "label",        "nolabel",
         // log cosmetics
         "source",       "nosource",    "source2",    "nosource2",   "echo",
         "noecho",       "msglevel",    "stimer",     "nostimer",    "fullstimer",
         "nofullstimer",
         // macro toggles/debugging (the macro processor runs regardless; the
-        // `in` gate itself was already applied by macro.zig — see above)
+        // `in` gate itself was already applied by macro.zig - see above)
         "mprint",       "nomprint",    "mlogic",     "nomlogic",    "symbolgen",
         "nosymbolgen",  "mrecall",     "nomrecall",  "merror",      "nomerror",
         "serror",       "noserror",    "quotelenmax", "noquotelenmax",
@@ -1930,7 +1930,7 @@ fn isInertOption(name: []const u8) bool {
         "sortsize",     "memsize",     "realmemsize", "sumsize",    "cpucount",
         "threads",      "nothreads",   "s",          "s2",          "spool",
         "nospool",      "dtreset",     "nodtreset",  "noerrorabend", "replace",
-        // format search order: there are no format catalogs — PROC FORMAT
+        // format search order: there are no format catalogs - PROC FORMAT
         // registers into the single global table (format.zig), nothing to search
         "fmtsearch",
     };
@@ -1940,7 +1940,7 @@ fn isInertOption(name: []const u8) bool {
 
 /// Tokens past the optional `= value` of an inert OPTIONS entry, `i` pointing
 /// just past the option NAME: 0 when no `=` follows, else the eq plus the
-/// value — a scalar (number/string/name, optionally signed) or a balanced (…)
+/// value - a scalar (number/string/name, optionally signed) or a balanced (…)
 /// group (`fmtsearch=(lib work)`). A dangling `=` consumes nothing; the main
 /// loop's non-name guard then errors on it.
 fn skipOptionValue(toks: []const Token, i: usize) usize {
@@ -1974,7 +1974,7 @@ fn skipOptionValue(toks: []const Token, i: usize) usize {
 
 /// Rewrite `infile REF;` / `file REF;` naming a registered fileref into the
 /// quoted path the parser requires (parser.zig owns the INFILE/FILE grammar and
-/// only takes a .string — resolving here as a token patch keeps the parser
+/// only takes a .string - resolving here as a token patch keeps the parser
 /// untouched). No registered filerefs (the common case) or no match → the
 /// original slice, no copy.
 fn resolveFilerefs(a: std.mem.Allocator, body: []const Token) ![]const Token {
@@ -1995,7 +1995,7 @@ fn startsWithI(text: []const u8, prefix: []const u8) bool {
 }
 
 /// Read a DATA-statement output dataset name at `*pos`, consuming a two-level
-/// `libref.member` when present (`DATA TOKEEP.TOKDM;` — DSOPT-out). Advances `pos`
+/// `libref.member` when present (`DATA TOKEEP.TOKDM;` - DSOPT-out). Advances `pos`
 /// past the name (and the `.member`). The full `libref.member` string is the
 /// dataset name, so writeLibOutputs routes it to the libref like SET reads do.
 fn dataName(a: std.mem.Allocator, toks: []const Token, pos: *usize) sas.diag.Error![]const u8 {
@@ -2010,19 +2010,19 @@ fn dataName(a: std.mem.Allocator, toks: []const Token, pos: *usize) sas.diag.Err
 
 fn runStep(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library, diags: *sas.diag.Diagnostics, toks: []const Token, g: *Globals, io: ?Io, tables: ?*sas.table_result.Collector) sas.diag.Error!void {
     if (eqi(toks[0].text, "data")) {
-        // header: `data [name] ;`  — a name, else an anonymous output dataset.
+        // header: `data [name] ;`  - a name, else an anonymous output dataset.
         var pos: usize = 1;
         var name: []const u8 = "_data_";
         if (pos < toks.len and toks[pos].tag == .name) {
             name = try dataName(a, toks, &pos); // handles a two-level `libref.member`
         }
-        // dataset options on the primary: `data out(keep=x rename=(a=b)); …` — the
+        // dataset options on the primary: `data out(keep=x rename=(a=b)); …` - the
         // option tokens (between the parens) are applied to the result after the
         // step runs (DSOPT); io.zig owns the parse+apply, main just carves them out.
         const opt_toks = if (pos < toks.len and toks[pos].tag == .lparen) skipParens(toks, &pos) else &[_]Token{};
         // `data a b …;` declares several output datasets (SAS 9.4 Language Reference: Concepts, DATA
-        // statement): the implicit bottom-of-step output — and a bare
-        // `output;` — writes the current observation to EVERY named dataset,
+        // statement): the implicit bottom-of-step output - and a bare
+        // `output;` - writes the current observation to EVERY named dataset,
         // and ALL are created even when zero observations are written
         // (BUG-multioutput; silently dropping the extras was data loss).
         // Collect the extras WITH their per-dataset options; runData registers
@@ -2041,7 +2041,7 @@ fn runStep(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
         }
         const res = try runData(a, out, lib, diags, toks[pos + 1 ..], name, io, extras.items);
         // A STOPPED step may have registered nothing over an existing member
-        // (GAP-errgatereplaces), so `lib.find` here could hand back the SURVIVOR —
+        // (GAP-errgatereplaces), so `lib.find` here could hand back the SURVIVOR -
         // applying this step's keep=/drop=/rename= to it would mutate the very
         // data set the "was not replaced" rule just saved. Deliberately coarser
         // than commitOut's rule (it skips the MODIFY-exempt and new-name cases
@@ -2049,12 +2049,12 @@ fn runStep(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
         // against silently editing rescued data.
         if (!diags.hasStepErrors()) {
             // BUG-modifydsoptdescriptor / BUG-modifydsoptwhere: a MODIFY master
-            // is FROZEN against DATA-statement data set options — its descriptor
+            // is FROZEN against DATA-statement data set options - its descriptor
             // (KEEP=/DROP=/RENAME=) and its ROWS (WHERE=, which was permanently
             // deleting every non-matching observation from the stored file).
             // It must be frozen against BOTH spellings. exec.zig's
             // modifyFrozenMaster froze the statement form (`modify d; drop y;`)
-            // at the schema choke point; these two lines are the OTHER door —
+            // at the schema choke point; these two lines are the OTHER door -
             // they run AFTER the step, straight onto the committed dataset, so
             // the freeze never saw them and `data d(drop=y); modify d;` still
             // deleted column y and every value in it.
@@ -2067,7 +2067,7 @@ fn runStep(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
                 try sas.io.applyDatasetOptionsRefs(a, ds, toks_out, diags, false, res.refs); // OUTPUT dataset options: DKROCOND=WARN
             };
             // The extras are NOT exempt: `data master other(drop=y); modify master;`
-            // creates `other` fresh, so it takes the ordinary full-PDV schema —
+            // creates `other` fresh, so it takes the ordinary full-PDV schema -
             // the same per-OUTPUT (not per-step) rule exec.zig applies for
             // p.260's Example 8. Only a name that resolves to the master itself
             // is frozen, which the pointer test below still catches.
@@ -2086,7 +2086,7 @@ fn runStep(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
 /// the step exactly like the primary's options.
 const DataOut = struct { name: []const u8, opt_toks: []const Token };
 
-/// Register one DATA-step output — UNLESS the step was stopped by an error and a
+/// Register one DATA-step output - UNLESS the step was stopped by an error and a
 /// member of that name already exists. Language Reference: Concepts printed p.175 (Example Code 8.6; pdf
 /// index 192, offset +17, the page's own footer re-verified here):
 ///
@@ -2094,12 +2094,12 @@ const DataOut = struct { name: []const u8, opt_toks: []const Token };
 ///
 /// A NEW name is still created: that same example's following `proc print
 /// data=test` reports "NOTE: No variables in data set WORK.TEST" and NOT "does
-/// not exist", so the stopped step left a member behind (BUG-emptycols parity —
+/// not exist", so the stopped step left a member behind (BUG-emptycols parity -
 /// exec's gates already `seedSchema` the compile-time columns). The two halves
 /// are why "skip lib.put on a bad step" is too blunt.
 ///
 /// GAP-errgatereplaces: this ONE place covers all 18 AUDIT-errhaltclass sites
-/// that stop a step WITHOUT erroring — exec.zig's two compile-time gates (:720,
+/// that stop a step WITHOUT erroring - exec.zig's two compile-time gates (:720,
 /// :770) and every `report`-and-continue that hands back a spent `.once` driver.
 /// They all return normally, so `lib.put` used to fire for every one of them and
 /// a live permanent member was replaced by the stopped step's empty output. The
@@ -2118,10 +2118,10 @@ fn commitOut(a: std.mem.Allocator, lib: *sas.exec.Library, diags: *sas.diag.Diag
     try lib.put(name, ds);
 }
 
-/// Is there already a data set of this name — in the Library, or on disk under a
+/// Is there already a data set of this name - in the Library, or on disk under a
 /// bound libref? The disk half is not optional: `loadLibInputs` deliberately does
 /// NOT preload a `data <libref.x>` OUTPUT target, so a member written by an
-/// EARLIER RUN is invisible to `lib.find` — and that is exactly the case where
+/// EARLIER RUN is invisible to `lib.find` - and that is exactly the case where
 /// replacing it destroys real data. Reuses BUG-existdisk's probe rather than a
 /// second one.
 fn memberExists(lib: *sas.exec.Library, name: []const u8) bool {
@@ -2135,7 +2135,7 @@ fn memberExists(lib: *sas.exec.Library, name: []const u8) bool {
 /// are REGISTERED at the end through `commitOut`, so the "was not replaced" rule
 /// governs every output of the step, not just the first.
 /// What `runData` hands back to the step loop. `modify_master` is the name on
-/// this step's MODIFY statement (null when there is none) — taken from the
+/// this step's MODIFY statement (null when there is none) - taken from the
 /// executor's OWN `modify_names` AFTER `expandPrefixes`, never re-derived from
 /// the tokens, so the caller's descriptor freeze cannot disagree with
 /// exec.zig's (BUG-modifydsoptdescriptor).
@@ -2145,7 +2145,7 @@ fn runData(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
     // GAP-liststmt: a statement-initial `list;` (echo the current input record
     // to the log) fell through to the assignment parse → the MISLEADING
     // "expected '=' in assignment". Fail LOUD with the real story instead.
-    // ponytail: statement-initial only — `if x then list;` still hits the old
+    // ponytail: statement-initial only - `if x then list;` still hits the old
     // parse error until LIST is actually implemented (parser.zig owns that).
     for (body_in, 0..) |t, i| {
         const boundary = i == 0 or body_in[i - 1].tag == .semicolon;
@@ -2175,7 +2175,7 @@ fn runData(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
     // dataset object the registration below (and runStep's option-application)
     // will see. They are REGISTERED after the step, with the primary, so a
     // stopped step cannot replace a live `data x lib.keeper;` member either
-    // (GAP-errgatereplaces — patching only the primary leaves the sibling
+    // (GAP-errgatereplaces - patching only the primary leaves the sibling
     // output destroying data).
     const xds = try a.alloc(*sas.dataset.Dataset, extras.len);
     for (extras, 0..) |x, i| {
@@ -2188,16 +2188,16 @@ fn runData(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
 
     try out.appendSlice(a, ex.log.items);
     // This step's own errors: main skips a step once any prior one errored.
-    // MODIFY is EXEMPT — it edits the master IN PLACE, so there is no "replace"
+    // MODIFY is EXEMPT - it edits the master IN PLACE, so there is no "replace"
     // for Language Reference: Concepts' warning to be about, and its re-emitted master is the edit.
     // Withholding it would DISCARD the successfully-applied transactions, the
     // silent row loss BUG-modifybynomatch (§4 of audit-errhaltclass) exists to
-    // prevent — that site reports `.err` and continues on purpose.
+    // prevent - that site reports `.err` and continues on purpose.
     const stopped = diags.hasStepErrors() and ex.modify_names == null;
     for (extras, 0..) |x, i| try commitOut(a, lib, diags, x.name, xds[i], stopped);
     if (!eqi(name, "_null_")) try commitOut(a, lib, diags, name, ds, stopped);
     // BUG-dropoptfalsewarn: hand the step's FULL PDV name set to the
-    // output-option "never been referenced" check — the same set the
+    // output-option "never been referenced" check - the same set the
     // STATEMENT path validates against (exec.assertReferenced). Without it
     // `data b(drop=e); set a end=e;` false-warned: the finalized output
     // schema no longer carries the executor-dropped end= temp.
@@ -2205,25 +2205,25 @@ fn runData(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
     for (pdv.vars.items) |v| try refs.append(a, v.name);
     return .{
         .refs = refs.items,
-        // exec.zig's own post-expandPrefixes value — the single source of truth
+        // exec.zig's own post-expandPrefixes value - the single source of truth
         // for "which dataset is the MODIFY master" (BUG-modifydsoptdescriptor).
         .modify_master = if (ex.modify_names) |m| (if (m.len > 0) m[0] else null) else null,
     };
 }
 
-/// `opt_toks` with every clause that would EDIT THE STORED MASTER removed —
+/// `opt_toks` with every clause that would EDIT THE STORED MASTER removed -
 /// KEEP=, DROP=, RENAME= (the descriptor: BUG-modifydsoptdescriptor) and WHERE=
 /// (the rows: BUG-modifydsoptwhere). Everything else is copied verbatim. Used
 /// ONLY for a MODIFY master.
 ///
 /// WHY WHERE= BELONGS HERE, measured and then cited. `data d(where=(x>15));
 /// modify d;` PERMANENTLY DELETED every non-matching observation from the
-/// stored data set — verified through four independent read paths and then in a
+/// stored data set - verified through four independent read paths and then in a
 /// SEPARATE PROCESS re-reading the .sas7bdat, so it was the physical file and
 /// not a session copy. The reference gives MODIFY no output to filter: printed
-/// p.240 (`=== pdf 251 ===`, offset +11) — "Replaces, deletes, and appends
+/// p.240 (`=== pdf 251 ===`, offset +11) - "Replaces, deletes, and appends
 /// observations in an existing SAS data set IN PLACE but does not create an
-/// additional copy" — and all four Syntax Forms hang `<(data-set-options)>` off
+/// additional copy" - and all four Syntax Forms hang `<(data-set-options)>` off
 /// the MODIFY statement, while the DATA statement gets only the bare
 /// Restriction "This data set must also appear in the DATA statement". The
 /// Notes make the placement explicit for the one option whose misplacement they
@@ -2234,15 +2234,15 @@ fn runData(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
 /// SILENT, not an ERROR, for internal consistency rather than by taste: the
 /// three descriptor options on this exact spelling are already silently
 /// ineffective (p.253's "it is not necessary to put NWSTOCK in a DROP
-/// statement"), and WHERE= is the same shape — an option on the DATA statement
+/// statement"), and WHERE= is the same shape - an option on the DATA statement
 /// of a MODIFY step that would edit the stored master. Whether real SAS warns
 /// here is NOT in the volumes; what is settled is that it must not destroy.
 ///
 /// The call is still MADE with the stripped list rather than skipped, so
 /// `data d(bogusopt=1); modify d;` keeps failing loud on the unknown option
-/// (D-002) — skipping outright would have traded one silent bug for another.
+/// (D-002) - skipping outright would have traded one silent bug for another.
 ///
-/// The clause boundaries mirror `io.zig`'s own option walk exactly — a name
+/// The clause boundaries mirror `io.zig`'s own option walk exactly - a name
 /// list runs until the next `name =` key (with `a1-a3` ranges consumed whole),
 /// and RENAME=/WHERE= carry a balanced paren group, skipped as a GROUP for the
 /// reason io.zig gives at its own where-arm: a `name =` INSIDE the predicate
@@ -2278,23 +2278,23 @@ fn stripMasterOptions(a: std.mem.Allocator, opt_toks: []const Token) ![]const To
 }
 
 /// Collect the variables of every `length` (and `attrib … length=`) statement in
-/// the body, in declaration order, tagging each char (`$`) vs numeric — so the
+/// the body, in declaration order, tagging each char (`$`) vs numeric - so the
 /// executor can build the PDV (and thus the output columns) in SAS variable order,
 /// carrying the declared char width. Groups share one type:
 /// `length a b c $ 10  x 8;` → a,b,c char; x numeric.
 fn lengthVars(a: std.mem.Allocator, body: []const Token, diags: *sas.diag.Diagnostics) ![]sas.exec.DeclVar {
     var list: std.ArrayList(sas.exec.DeclVar) = .empty;
     // GH#73: variables whose length is already established by a PRIOR statement
-    // (an assignment `x = …`) — a later char LENGTH on such a var is IGNORED by
+    // (an assignment `x = …`) - a later char LENGTH on such a var is IGNORED by
     // SAS (first length wins) and warns; drop it from the pre-seed list so the
     // first assignment's length stands instead of the late one truncating.
     var seen: std.ArrayList([]const u8) = .empty;
-    // GH#70: true once a SET/MERGE/UPDATE/MODIFY has brought input columns in —
+    // GH#70: true once a SET/MERGE/UPDATE/MODIFY has brought input columns in -
     // a char LENGTH declared AFTER that meets an already-numeric source var and is
     // the fatal conflict; a LENGTH declared BEFORE is schema-pinning (lenient).
     var saw_input = false;
     // BUG-varorder: true once a var-declaring statement (RETAIN/FORMAT/INFORMAT/
-    // INPUT/assignment/sum) has passed — SAS establishes a variable at the first
+    // INPUT/assignment/sum) has passed - SAS establishes a variable at the first
     // statement that mentions it, so a LENGTH/ATTRIB after one seeds its vars
     // AFTER those statements' vars (`.late`), not unconditionally first.
     // ponytail: DO-index/ARRAY-member vs LENGTH order left unhandled (rare).
@@ -2311,7 +2311,7 @@ fn lengthVars(a: std.mem.Allocator, body: []const Token, diags: *sas.diag.Diagno
         if (boundary and body[i].tag == .name and i + 1 < body.len and body[i + 1].tag == .plus)
             saw_declaring = true;
         // RETAIN/FORMAT/INFORMAT/INPUT establish the vars they name (a special
-        // name LIST like _numeric_ names no new variable — it expands later).
+        // name LIST like _numeric_ names no new variable - it expands later).
         if (boundary and body[i].tag == .name and (eqi(body[i].text, "retain") or
             eqi(body[i].text, "format") or eqi(body[i].text, "informat") or eqi(body[i].text, "input")))
         {
@@ -2322,11 +2322,11 @@ fn lengthVars(a: std.mem.Allocator, body: []const Token, diags: *sas.diag.Diagno
                     saw_declaring = true;
                     // BUG-lengthaftersetinput: an INPUT variable is ESTABLISHED at
                     // its informat width, so a later char LENGTH/ATTRIB naming it
-                    // is ignored + warns (Language Reference: Concepts p.49 note 1) — the GH#73 guard
+                    // is ignored + warns (Language Reference: Concepts p.49 note 1) - the GH#73 guard
                     // below consults this same list. ponytail: informat names
                     // (`date9.` in `input d date9.;`) land here too; they only
                     // false-fire if a later char LENGTH re-declares that exact
-                    // name — and then the p.49 warning is still the right call.
+                    // name - and then the p.49 warning is still the right call.
                     if (is_input) try seen.append(a, body[j].text);
                 };
         }
@@ -2351,7 +2351,7 @@ fn lengthVars(a: std.mem.Allocator, body: []const Token, diags: *sas.diag.Diagno
                         for (names.items) |nm| try list.append(a, .{ .name = nm, .type = .num });
                     // BUG-speciallistphantom (GH#79): `_ALL_`/`_NUMERIC_`/
                     // `_CHARACTER_` are variable name LISTS (Statements Ref
-                    // printed p.24), never a variable of their own — seeding
+                    // printed p.24), never a variable of their own - seeding
                     // one minted a phantom column named after the keyword.
                     // Nothing is lost: the vars the list names are established
                     // (a length on them is first-length-wins, GH#73) or not
@@ -2380,7 +2380,7 @@ fn lengthVars(a: std.mem.Allocator, body: []const Token, diags: *sas.diag.Diagno
                             _ = list.orderedRemove(k);
                         } else k += 1;
                     }
-                    // BUG-lengthaftersetinput: a char LENGTH after a SET/MERGE —
+                    // BUG-lengthaftersetinput: a char LENGTH after a SET/MERGE -
                     // split into an early type sentinel + a late length copy.
                     try splitAfterSet(a, &list, group_start, saw_input);
                 } else {
@@ -2390,7 +2390,7 @@ fn lengthVars(a: std.mem.Allocator, body: []const Token, diags: *sas.diag.Diagno
             for (list.items[stmt_start..]) |*dv| dv.late = late; // BUG-varorder
             continue;
         }
-        // `attrib v1 v2 label='…' length=[$]n format=f …;` — the length= option must
+        // `attrib v1 v2 label='…' length=[$]n format=f …;` - the length= option must
         // seed the PDV var's type/length exactly like a LENGTH statement, so a char
         // var declared only via ATTRIB (ISS-attriblength: e.g. an `if 0;` shell
         // dataset) is Char n, not Char 1, and its assignments don't truncate to 1.
@@ -2408,9 +2408,9 @@ fn lengthVars(a: std.mem.Allocator, body: []const Token, diags: *sas.diag.Diagno
                 {
                     group_named += 1;
                     // BUG-speciallistphantom (GH#79): `_ALL_`/`_NUMERIC_`/
-                    // `_CHARACTER_` are variable name LISTS — ATTRIB's own p.34
+                    // `_CHARACTER_` are variable name LISTS - ATTRIB's own p.34
                     // "any form that SAS allows" delegates to the p.24 enumeration
-                    // — never a variable of their own. Seeding one minted a phantom
+                    // - never a variable of their own. Seeding one minted a phantom
                     // column named after the keyword; the group's FORMAT=/INFORMAT=/
                     // LABEL= still reaches the listed vars via exec's expansion.
                     if (!isSpecialListName(body[i].text)) try list.append(a, .{ .name = body[i].text, .type = .num });
@@ -2419,7 +2419,7 @@ fn lengthVars(a: std.mem.Allocator, body: []const Token, diags: *sas.diag.Diagno
                 // The group's options (name `=` value …), applying length=.
                 // ISS-attriblabeltype: only a var-creating option (LENGTH=/FORMAT=/
                 // INFORMAT=, Language Reference: Concepts p.51) may seed type. A label-only group cannot even
-                // create the var — dropping it lets a later `retain X ''` establish
+                // create the var - dropping it lets a later `retain X ''` establish
                 // CHARACTER (Language Reference: Concepts p.509-510) instead of this default-numeric seed
                 // pre-empting it and corrupting the char assignment to missing.
                 var creates = false;
@@ -2452,7 +2452,7 @@ fn lengthVars(a: std.mem.Allocator, body: []const Token, diags: *sas.diag.Diagno
                         creates = true; // format=/informat= create the var
                         // BUG-attribfmttype: a `$` (character) spec with NO explicit
                         // length= types the group CHAR at the spec WIDTH (Language Reference: Concepts p.50
-                        // Ex 4.1: `attrib Flavor format=$10.` → Char 10) — else the
+                        // Ex 4.1: `attrib Flavor format=$10.` → Char 10) - else the
                         // default-numeric seed here pre-empts declareStmt's char
                         // guess and a char assignment rots to missing.
                         if (!group_has_len) {
@@ -2470,10 +2470,10 @@ fn lengthVars(a: std.mem.Allocator, body: []const Token, diags: *sas.diag.Diagno
                     list.shrinkRetainingCapacity(group_start); // label-only → don't seed type
                 } else if (group_has_len) {
                     // BUG-lengthaftersetinput: the same p.49 note-1 guard the
-                    // LENGTH branch runs — a char var already established by a
+                    // LENGTH branch runs - a char var already established by a
                     // prior assignment/INPUT keeps its first length; the ATTRIB
                     // length= is IGNORED + warns. (Only an explicit length= is a
-                    // length re-specification — a format=$w. ATTACHES to an
+                    // length re-specification - a format=$w. ATTACHES to an
                     // existing var silently, BUG-attribfmttype's pinned design.)
                     var k = group_start;
                     while (k < list.items.len) {
@@ -2495,7 +2495,7 @@ fn lengthVars(a: std.mem.Allocator, body: []const Token, diags: *sas.diag.Diagno
     // seedColumnsOf's GH#69/#70 type-conflict checks (and the lenient schema-pin)
     // need the LENGTH declaration in the PDV before the input columns are seeded.
     // BUG-lengthaftersetinput: EXCEPT the late copies splitAfterSet appended for
-    // a char length declared AFTER the SET (char, after_input, len>0) — those
+    // a char length declared AFTER the SET (char, after_input, len>0) - those
     // seed AFTER the source columns so exec's first-wins length guard sees the
     // carried source length, keeps it, and warns (Language Reference: Concepts p.49 note 1) instead of
     // truncating. The zero-len sentinels stay early (type check + PDV order).
@@ -2507,9 +2507,9 @@ fn lengthVars(a: std.mem.Allocator, body: []const Token, diags: *sas.diag.Diagno
 
 /// BUG-lengthaftersetinput (QA tick356 F3, Language Reference: Concepts p.49 note 1): a CHAR length
 /// declared AFTER a SET/MERGE/UPDATE/MODIFY must not truncate the length the
-/// source already established — but this scan cannot know whether the source
+/// source already established - but this scan cannot know whether the source
 /// carries the var, so each surviving decl in `start..` splits in two:
-///   - the decl itself becomes a zero-len TYPE sentinel, still seeded EARLY —
+///   - the decl itself becomes a zero-len TYPE sentinel, still seeded EARLY -
 ///     the GH#70 fatal type check's declaredOf hit, the lenient schema-pin and
 ///     the pre-pass PDV position (output column order) are all unchanged, and a
 ///     var the source does NOT carry is still defined here;
@@ -2530,8 +2530,8 @@ fn splitAfterSet(a: std.mem.Allocator, list: *std.ArrayList(sas.exec.DeclVar), s
     }
 }
 
-/// Width of a CHARACTER format/informat spec at `start` (`$` + name?/width) —
-/// BUG-attribfmttype — or null when the spec is numeric (no leading `$`). Width
+/// Width of a CHARACTER format/informat spec at `start` (`$` + name?/width) -
+/// BUG-attribfmttype - or null when the spec is numeric (no leading `$`). Width
 /// comes from the width number (`$10.` → 10) or the name's trailing digits
 /// (`$char12.` → 12); no digits → 0 (no declared width, seedDeclVar keeps the
 /// default). Mirrors skipFormatValue's token shape.
@@ -2555,7 +2555,7 @@ fn attribSpecCharWidth(body: []const Token, start: usize) ?usize {
 }
 
 /// `_numeric_`/`_character_`/`_all_` in a RETAIN/FORMAT list name no NEW variable
-/// (they expand against the PDV later) — BUG-varorder's declaring-stmt scan.
+/// (they expand against the PDV later) - BUG-varorder's declaring-stmt scan.
 fn isSpecialListName(name: []const u8) bool {
     return eqi(name, "_numeric_") or eqi(name, "_character_") or eqi(name, "_all_");
 }
@@ -2599,7 +2599,7 @@ fn sortInPlaceTarget(toks: []const Token) ?[]const u8 {
 }
 
 /// Dispatch a `proc <name> …; … run;` step by name. Each proc hand-parses its
-/// own tokens (parser.zig is A2's) — SORT lives in proc.zig; PRINT is below.
+/// own tokens (parser.zig is A2's) - SORT lives in proc.zig; PRINT is below.
 fn runProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library, diags: *sas.diag.Diagnostics, toks: []const Token, g: *Globals, tables: ?*sas.table_result.Collector) sas.diag.Error!void {
     if (toks.len < 2 or toks[1].tag != .name) {
         failLoud("PROC name missing or unrecognized", .{});
@@ -2626,7 +2626,7 @@ fn runProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
 
     if (eqi(proc, "sort")) {
         // GH#15: PROC SORT with no OUT= (or OUT= the source) sorts the source
-        // IN PLACE — it mutates the dataset directly, never through Library.put,
+        // IN PLACE - it mutates the dataset directly, never through Library.put,
         // so guard the read-only libref here. OUT= to a distinct member routes
         // through put and is caught there.
         if (sortInPlaceTarget(toks)) |src| if (lib.readonlyOut(src)) return lib.failReadonly(src);
@@ -2670,11 +2670,11 @@ fn runProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
     } else if (eqi(proc, "append")) {
         try sas.proc.runAppend(pcx, toks);
     } else if (eqi(proc, "printto")) {
-        // PROC PRINTTO redirects the log/output destinations — irrelevant under
+        // PROC PRINTTO redirects the log/output destinations - irrelevant under
         // this harness (the runner captures stdout/stderr). A KNOWN, NAMED no-op
         // (both `printto log=...;` and bare `printto;`); the else below keeps
         // fail-loud INTACT for genuinely-unsupported PROCs (D-002 / GH#67).
-        // ponytail: accepted-as-listing — opensas has one output stream, so a
+        // ponytail: accepted-as-listing - opensas has one output stream, so a
         // redirection correctly leaves output on stdout.
     } else {
         failLoud("PROC {s} is not supported", .{proc});
@@ -2696,8 +2696,8 @@ const PrintOpts = struct {
     split: ?u8 = null, // `split='c'` → break header labels on c into multiple header lines
     vars: ?[]const []const u8 = null, // `var a b;` column select (in order)
     sums: ?[]const []const u8 = null, // `sum x;` totals
-    by: ?[]const []const u8 = null, // `by g;` — section the listing per BY group
-    id: ?[]const []const u8 = null, // `id v;` — v replaces the `Obs` column as the leftmost row identifier (F1)
+    by: ?[]const []const u8 = null, // `by g;` - section the listing per BY group
+    id: ?[]const []const u8 = null, // `id v;` - v replaces the `Obs` column as the leftmost row identifier (F1)
     // per-print label overrides from a `label v="text";` statement (parallel arrays).
     lbl_names: ?[]const []const u8 = null,
     lbl_texts: ?[]const []const u8 = null,
@@ -2706,7 +2706,7 @@ const PrintOpts = struct {
     fmt_specs: ?[]const []const u8 = null,
 
     /// The header text for column `c`: the per-print override, else the column's
-    /// stored label, else the name — only when label mode is on (F-printlabel).
+    /// stored label, else the name - only when label mode is on (F-printlabel).
     fn header(self: PrintOpts, c: Column) []const u8 {
         if (!self.label) return c.name;
         if (self.lbl_names) |names| for (names, self.lbl_texts.?) |n, t|
@@ -2760,7 +2760,7 @@ fn printProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Libra
         }
         // `split='c'`: c breaks each column header label into multiple header
         // lines (GAP-printsplit). Must be exactly one character. SAS: SPLIT=
-        // IMPLIES label mode (tick274 F5) — the ubiquitous `split='/'` idiom
+        // IMPLIES label mode (tick274 F5) - the ubiquitous `split='/'` idiom
         // never writes `label`, and headers must come from labels.
         if (toks[i].tag == .name and eqi(toks[i].text, "split") and i + 2 < toks.len and toks[i + 1].tag == .eq and toks[i + 2].tag == .string) {
             const s = toks[i + 2].text;
@@ -2816,13 +2816,13 @@ fn printProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Libra
             continue;
         }
         if (eqi(toks[i].text, "by")) {
-            // shared PROC BY scanner (PROCBY-printfreq; 2363dc7 family) —
+            // shared PROC BY scanner (PROCBY-printfreq; 2363dc7 family) -
             // DESCENDING/NOTSORTED accepted via parser.scanByList since
             // GAP-procbydescending; decoded at the printTable BY block.
             try sas.proc.parseProcBy(a, diags, toks, &i, &blist);
             continue;
         }
-        // `label v="text" w='...';` — per-print label overrides; also turns label
+        // `label v="text" w='...';` - per-print label overrides; also turns label
         // mode ON (SAS applies the labels a PROC PRINT LABEL statement defines).
         if (eqi(toks[i].text, "label")) {
             i += 1;
@@ -2834,10 +2834,10 @@ fn printProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Libra
             opts.label = true;
             continue;
         }
-        // `format v1 v2 fmt1 v3 fmt2 …;` — per-print format overrides; a format
+        // `format v1 v2 fmt1 v3 fmt2 …;` - per-print format overrides; a format
         // applies to every var named since the previous one (SAS shape, mirrors
         // parser.parseFormatList). A var never given a format, or any other
-        // token shape, fails loud (D-002) — never silently skipped
+        // token shape, fails loud (D-002) - never silently skipped
         // (BUG-printfmtstmt).
         if (eqi(toks[i].text, "format")) {
             var pending: std.ArrayList([]const u8) = .empty; // vars awaiting a format
@@ -2867,16 +2867,16 @@ fn printProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Libra
         // level HANDLES there (D-014a, parser.isMidStepSkippable): a hoisted
         // TITLE/FOOTNOTE/OPTIONS/FILENAME/ODS was already EXECUTED by the
         // driver (main.segments hoists it to a global segment BEFORE this
-        // step — BUG-filenamemidstep), and an inert statement (GOPTIONS/DM/
-        // SASFILE/PAGE/…) is unobservable — skipping either is honest
+        // step - BUG-filenamemidstep), and an inert statement (GOPTIONS/DM/
+        // SASFILE/PAGE/…) is unobservable - skipping either is honest
         // (GAP-globalpredicatemismatch: this used to be isGlobalKw, which
-        // ALSO skipped ODS/LIBNAME/FILENAME when they were never hoisted —
-        // a silent no-op — while erroring on the inert set top level
+        // ALSO skipped ODS/LIBNAME/FILENAME when they were never hoisted -
+        // a silent no-op - while erroring on the inert set top level
         // accepts, asserting the same statement is both harmless and fatal).
         // LIBNAME is skipped too: it EXECUTED in the up-front parseLibnames
-        // pre-pass (BUG-libnamemidstepboth — it both ran and errored).
+        // pre-pass (BUG-libnamemidstepboth - it both ran and errored).
         // Unknown statements hit the fail-loud below.
-        // BUG-printprintglobalargs: skip the WHOLE statement to its `;` — a
+        // BUG-printprintglobalargs: skip the WHOLE statement to its `;` - a
         // global stmt may carry name-token args (`title j=c "x"`, `options
         // nodate`), and those args would otherwise fall to the fail-loud below.
         if (sas.parser.isMidStepSkippable(toks[i].text)) {
@@ -2888,7 +2888,7 @@ fn printProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Libra
             failLoud("PROC PRINT statement {s} is not supported yet", .{toks[i].text});
             return;
         }
-        // BUG-printsubstmtsilent: anything else is a typo (`vae x;`) — fail
+        // BUG-printsubstmtsilent: anything else is a typo (`vae x;`) - fail
         // loud naming it, matching the PROC-line options behavior.
         failLoud("PROC PRINT statement {s} is not supported", .{toks[i].text});
         return;
@@ -2909,7 +2909,7 @@ fn printProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Libra
     const ds = if (target) |n| lib.find(n) else lastDataset(lib);
     if (ds == null) {
         // DEC-abortrcvsD009: rc 1. Both arms are the user's error in real-SAS
-        // terms — a named set that is not there ("File WORK.X.DATA does not
+        // terms - a named set that is not there ("File WORK.X.DATA does not
         // exist", exec.zig's rc-1 twin) or `proc print;` with no _LAST_ ("No
         // data set open to look up variables"). PROC PRINT itself is supported,
         // so nothing here is an opensas gap; and if an EARLIER step hit a real
@@ -2918,25 +2918,25 @@ fn printProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Libra
         return;
     }
     // GAP-varcolonprefix: expand `pfx:` entries now that the dataset is known
-    // (PDV order — see expandVarList). Serves var/id/sum alike; BY is not a
+    // (PDV order - see expandVarList). Serves var/id/sum alike; BY is not a
     // variable-list statement here (scanByList owns its wire form).
     const pcols = ds.?.columns.items;
     if (opts.vars) |vs| opts.vars = try expandVarList(a, pcols, vs, diags) orelse return;
     if (opts.sums) |ss| opts.sums = try expandVarList(a, pcols, ss, diags) orelse return;
     if (opts.id) |ids| opts.id = try expandVarList(a, pcols, ids, diags) orelse return;
     // NOTE-fmtnumoncharcoerce: the PROC-step FORMAT statement gets the same
-    // compile-time type check as the DATA step's (exec.declareStmt) — a
+    // compile-time type check as the DATA step's (exec.declareStmt) - a
     // numeric format on a char column (or a `$` on numeric) silently coerced
     // the cell to '.' at render (exit 0). Fail BEFORE any output is produced.
     for (fnames.items, fspecs.items) |vn, fspec| {
         const ci = ds.?.indexOf(vn) orelse continue; // unknown var: printTable's existing behavior stands
-        if (fspec.len == 0) continue; // `format v;` disassociates — no type to conflict
+        if (fspec.len == 0) continue; // `format v;` disassociates - no type to conflict
         const col_char = ds.?.columns.items[ci].type == .char;
         if (col_char == sas.format.specIsChar(fspec)) continue;
         // DEC-abortrcvsD009: rc 1, matching the THREE sites already emitting this
         // byte-identical message at rc 1 (exec.zig:1515/1517 declareStmt,
         // proc.zig:2394). It is SAS's own ERROR text for a program whose FORMAT
-        // statement contradicts the column's type — the user's SAS is wrong.
+        // statement contradicts the column's type - the user's SAS is wrong.
         if (col_char)
             userErr(diags, "The numeric format {s} cannot be used with character variable {s}.", .{ fspec, vn })
         else
@@ -2957,8 +2957,8 @@ fn printProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Libra
 }
 
 /// Collect the `.name` tokens of a `var`/`sum`/`id` list, leaving `i` on its
-/// `;`. A name directly followed by `:` is kept as one "pfx:" entry — the
-/// DROP/KEEP parseNameList model (GAP-dropcolon) — for expandVarList
+/// `;`. A name directly followed by `:` is kept as one "pfx:" entry - the
+/// DROP/KEEP parseNameList model (GAP-dropcolon) - for expandVarList
 /// (GAP-varcolonprefix); a bare colon never survives token-skipping into a name.
 fn collectNames(a: std.mem.Allocator, toks: []const Token, i: *usize, list: *std.ArrayList([]const u8)) !void {
     i.* += 1; // skip the keyword
@@ -2973,13 +2973,13 @@ fn collectNames(a: std.mem.Allocator, toks: []const Token, i: *usize, list: *std
 
 /// GAP-varcolonprefix: expand any "pfx:" entries (collectNames' wire form) in
 /// a var/id/sum list against the dataset's columns, case-insensitively, in PDV
-/// order — Language Reference: Concepts printed p.62: a variable list refers to its variables "in the
+/// order - Language Reference: Concepts printed p.62: a variable list refers to its variables "in the
 /// same order that SAS uses to keep track of the variables", and p.69's own
 /// Example 7 puts a variable list in PROC PRINT's VAR statement (the prefix
 /// form is defined beside it). PROC PRINT's VAR entry (procedures guide
 /// printed pp.1784-1785) restricts nothing: `VAR variable(s)`. One expansion
 /// point, so printTable's resolution/dedup/totals see only plain names. A
-/// prefix matching NO column is a typo'd prefix — the SAME loud rc-1
+/// prefix matching NO column is a typo'd prefix - the SAME loud rc-1
 /// "Variable X not found." as an unknown name (Table 4.5 settles only the
 /// matching rule; GAP-ofcolonprefix's empty-match arm is the precedent, and
 /// both sites now agree). Returns null with the diag already reported.
@@ -3006,8 +3006,8 @@ fn expandVarList(a: std.mem.Allocator, cols: []const Column, names: []const []co
 /// If the tokens at `*i` spell a format spec (`[$]name[w][.[d]]` or `[$]w.[d]`),
 /// consume them, return the reconstructed spec string, and advance `*i`;
 /// otherwise consume nothing and return null. Token-stream mirror of
-/// parser.tryFormatSpec (specs tokenize unevenly — `8.2` is one number,
-/// `comma10.2` is name+".2", `date9.` is name+dot — so stitch the pieces back).
+/// parser.tryFormatSpec (specs tokenize unevenly - `8.2` is one number,
+/// `comma10.2` is name+".2", `date9.` is name+dot - so stitch the pieces back).
 fn fmtSpecToks(a: std.mem.Allocator, toks: []const Token, i: *usize) !?[]const u8 {
     var j = i.*;
     var buf: std.ArrayList(u8) = .empty;
@@ -3067,7 +3067,7 @@ fn printTable(a: std.mem.Allocator, out: *std.ArrayList(u8), ds: *sas.dataset.Da
     if (opts.vars) |vs| {
         for (vs) |vn| {
             const j = resolveCol(cols, vn) orelse return varNotFound(a, diags, vn);
-            // tick274 F4: SAS KEEPS a repeated column — an ID∩VAR overlap prints
+            // tick274 F4: SAS KEEPS a repeated column - an ID∩VAR overlap prints
             // the variable twice (ID statement doc), and a duplicated VAR entry
             // too (VAR is positional, no dedup). Only the no-VAR branch below
             // dedups (ID var must not reappear among "all remaining columns").
@@ -3077,7 +3077,7 @@ fn printTable(a: std.mem.Allocator, out: *std.ArrayList(u8), ds: *sas.dataset.Da
         if (!containsIdx(sel.items, j)) try sel.append(a, j);
     }
     // BUG-printsumnotinvar: a SUM var not already displayed (VAR/ID) is auto-
-    // ADDED by SAS, appended after the VAR columns — else its column and grand
+    // ADDED by SAS, appended after the VAR columns - else its column and grand
     // total silently vanish (blank total lines, rc 0).
     if (opts.sums) |ss| for (ss) |sn| {
         const j = resolveCol(cols, sn) orelse return varNotFound(a, diags, sn);
@@ -3121,21 +3121,21 @@ fn printTable(a: std.mem.Allocator, out: *std.ArrayList(u8), ds: *sas.dataset.Da
         };
     };
 
-    // With BY: one section per contiguous BY group — a BY-line header, the
-    // group's own column header + rows, and (with SUM) a per-group subtotal —
+    // With BY: one section per contiguous BY group - a BY-line header, the
+    // group's own column header + rows, and (with SUM) a per-group subtotal -
     // then a grand total. Without BY: one flat section (the original layout).
     if (opts.by) |bys| {
-        // GAP-procbydescending: parseProcBy emits scanByList's wire encoding —
+        // GAP-procbydescending: parseProcBy emits scanByList's wire encoding -
         // decode once for clean names, per-key directions and NOTSORTED.
         const pb = try sas.proc.decodeProcBy(a, bys);
-        // BUG-byvarnotfound: BY resolution had no not-found branch — a typo'd
+        // BUG-byvarnotfound: BY resolution had no not-found branch - a typo'd
         // BY var was silently dropped (flat listing, empty BY line, rc 0).
         // Same loud "Variable X not found." as the VAR/SUM/ID resolvers (F3).
         var bcols: std.ArrayList(usize) = .empty;
         for (pb.names) |bn| try bcols.append(a, resolveCol(cols, bn) orelse return varNotFound(a, diags, bn));
         // BUG-printbyunsorted: BY demands sorted data. A backward step between
         // groups (which any repeated non-adjacent key forces) errors like SAS
-        // instead of emitting duplicate sections — per key under BY DESCENDING
+        // instead of emitting duplicate sections - per key under BY DESCENDING
         // (GAP-procbydescending); BY NOTSORTED drops the check.
         var g0: usize = 0;
         var prev_g: usize = 0;
@@ -3154,7 +3154,7 @@ fn printTable(a: std.mem.Allocator, out: *std.ArrayList(u8), ds: *sas.dataset.Da
             g0 += 1;
             while (g0 < nrows and byRowsEqual(ds, prev_g, g0, bcols.items)) g0 += 1;
         }
-        // BUG-byvaltitle: #BYVAL/#BYVAR substitution context, in BY order —
+        // BUG-byvaltitle: #BYVAL/#BYVAR substitution context, in BY order -
         // #BYVAR prefers the label, #BYVAL takes the group's formatted value
         // (filled per group below; same render as the BY line).
         var byvars: ?[]Globals.ByVar = null;
@@ -3384,7 +3384,7 @@ fn byRowsEqual(ds: *sas.dataset.Dataset, i: usize, j: usize, bcols: []const usiz
 }
 
 /// BUG-sortseq-byverify: the print-side BY verify's character arm under
-/// `options sortseq=linguistic;` — the SAME ASCII case-fold as proc.zig's
+/// `options sortseq=linguistic;` - the SAME ASCII case-fold as proc.zig's
 /// cmpStrLing (the collation the sort used), over the trimmed strings this
 /// twin already compares. Allocation-free: fold per byte, pad with ' ' like
 /// cmpStr so a prefix orders below its extension.
@@ -3400,9 +3400,9 @@ fn cmpStrLingTrim(a: []const u8, b: []const u8) std.math.Order {
 }
 
 /// The BY-key index where row `i`'s key steps BACKWARD from row `j`'s in the
-/// BY-specified order — ascending per key, inverted under BY DESCENDING
+/// BY-specified order - ascending per key, inverted under BY DESCENDING
 /// (GAP-procbydescending; proc.byOrderViolation's twin, so PRINT and the
-/// proc.zig PROCs apply the same rule) — else null. Equal keys continue.
+/// proc.zig PROCs apply the same rule) - else null. Equal keys continue.
 /// (Storage order: missing lowest, char trimmed, binary.)
 ///
 /// BUG-sortseq-byverify: under the system SORTSEQ=LINGUISTIC the character
@@ -3411,7 +3411,7 @@ fn cmpStrLingTrim(a: []const u8, b: []const u8) std.math.Order {
 /// collation of sorted data when you use the SORT procedure with the
 /// SORTSEQ=LINGUISTIC option."), not the byte order that reads a
 /// linguistically sorted dataset (apple Banana Zebra) as "not sorted in
-/// ascending sequence" and — via BUG-errhalt — kills every later step of a
+/// ascending sequence" and - via BUG-errhalt - kills every later step of a
 /// valid program. Grouping (byRowsEqual) stays byte-exact: two distinct-case
 /// groups (A vs a) stay separate sections; the fold is the ORDER check only.
 fn byRowOrderViolation(ds: *sas.dataset.Dataset, i: usize, j: usize, bcols: []const usize, descs: []const bool) ?usize {
@@ -3503,7 +3503,7 @@ fn fmtCell(a: std.mem.Allocator, v: sas.Value, fmt: ?[]const u8) ![]const u8 {
 }
 
 /// A value as SAS renders it: character verbatim, numeric through the ONE shared
-/// BEST12. renderer (`format.bestNum`) — the same path `put` and `||` use — so a
+/// BEST12. renderer (`format.bestNum`) - the same path `put` and `||` use - so a
 /// computed value like `0.1+0.2` prints `0.3`, not the raw f64. (BUG-bestfmt: the
 /// old per-callsite `{d}` here leaked full f64 precision into PROC PRINT.)
 fn fmtValue(a: std.mem.Allocator, v: sas.Value) ![]const u8 {
@@ -3540,7 +3540,7 @@ fn eqi(x: []const u8, y: []const u8) bool {
     return std.ascii.eqlIgnoreCase(x, y);
 }
 
-/// GAP-gapsexitingone §5d — the closed documented sets behind the LIBNAME/
+/// GAP-gapsexitingone §5d - the closed documented sets behind the LIBNAME/
 /// FILENAME/SORTSEQ catch-all splits: membership = documented valid SAS 9.4
 /// opensas does not implement → the gap arm (rc 2); anything else = typo →
 /// rc 1. Kept deliberately short: an exotic-but-valid name degrades to rc 1,
@@ -3548,19 +3548,19 @@ fn eqi(x: []const u8, y: []const u8) bool {
 fn isDocLibEngine(eng: []const u8) bool {
     // Base-product engines the Statements Ref names (the parseLibnames comment
     // cites p.221 for the stubs). SAS/ACCESS engines (ORACLE, …) are absent on
-    // purpose — an unlicensed real SAS rejects those too, so they stay on the
+    // purpose - an unlicensed real SAS rejects those too, so they stay on the
     // rc-1 "cannot be found" arm.
     // BUG-rcsplitmembership F5: the VERSIONED base engines were missing. QA
     // flagged them as an open question because the Statements Ref's LIBNAME
     // section is a "has moved to SAS Global Statements" stub with no
-    // engine-name value list — true, but the Procedures Guide settles it in two
+    // engine-name value list - true, but the Procedures Guide settles it in two
     // places. (1) A worked LIBNAME statement uses V8 as the engine-name:
-    // "libname MyLib v8 'source-library-pathname' shortfileext;" — printed
+    // "libname MyLib v8 'source-library-pathname' shortfileext;" - printed
     // p.1577 (`=== pdf 1626 ===`), PROC MIGRATE, migrating a short-extension
     // library. (2) Overview: MIGRATE Procedure, printed p.1566 (`=== pdf 1615
     // ===`): "The migration must occur within the same engine family. For
     // example, V6, V7, or V8 can migrate to V9, but V6TAPE must migrate to
-    // V9TAPE." — six engine names, of which V9 is already honoured as the BASE
+    // V9TAPE." - six engine names, of which V9 is already honoured as the BASE
     // alias, leaving the five below. Real SAS 9.4 FINDS all of them; opensas
     // implements only the V9/BASE on-disk format, so they are gaps (rc 2), not
     // "cannot be found" (rc 1).
@@ -3570,7 +3570,7 @@ fn isDocLibEngine(eng: []const u8) bool {
 }
 
 fn isDocFilenameDevice(d: []const u8) bool {
-    // BUG-rcsplitmembership F3 — RE-DERIVED IN FULL from the two enumerations
+    // BUG-rcsplitmembership F3 - RE-DERIVED IN FULL from the two enumerations
     // in the Statements reference, which the first cut of this list did
     // not read to the end (twelve documented names were missing, so real SAS
     // programs got rc 1 "fix your SAS"):
@@ -3583,8 +3583,8 @@ fn isDocFilenameDevice(d: []const u8) bool {
     //       (`=== pdf 119-122 ===`): AZURE CATALOG CLIPBOARD DATAURL EMAIL
     //       (SMTP) FILESRVC FTP HADOOP S3 SFTP SOCKET URL WEBDAV ZIP.
     // DISK is honoured at the call site, so it is absent here on purpose.
-    // TEMP and DDE appear in NEITHER enumeration — in fact in none of the eight
-    // extracted volumes — but they are kept: they are real device types
+    // TEMP and DDE appear in NEITHER enumeration - in fact in none of the eight
+    // extracted volumes - but they are kept: they are real device types
     // documented in SAS Global Statements / the host companions (this volume's
     // FILENAME section is a "has moved to SAS Global Statements" stub, and both
     // device-type lists close with "Values in addition to the ones listed here
@@ -3611,7 +3611,7 @@ fn isDocRecfm(v: []const u8) bool {
 }
 
 fn isUnimplSortseq(v: []const u8) bool {
-    // BUG-rcsplitmembership F4 — RE-DERIVED IN FULL from the one sentence that
+    // BUG-rcsplitmembership F4 - RE-DERIVED IN FULL from the one sentence that
     // enumerates them, Base SAS 9.4 Procedures Guide printed p.2410
     // (`=== pdf 2459 ===`), SORTSEQ=collating-sequence: "specifies one of the
     // PROC SORT statement collating-sequence-options (ASCII, DANISH, EBCDIC,
@@ -3621,7 +3621,7 @@ fn isUnimplSortseq(v: []const u8) bool {
     // lists is the ten below; the previous enumeration held five of them, so
     // ITALIAN/POLISH/SPANISH/REVERSE were called typos (rc 1) though real SAS
     // runs them.  ASCII is the tenth and is deliberately NOT here: it is
-    // opensas's actual collation, honoured at the call site (rc 0) — a
+    // opensas's actual collation, honoured at the call site (rc 0) - a
     // supported value, not a gap.  LINGUISTIC is likewise absent on purpose:
     // p.2415 excludes it from the SYSTEM option outright (F2), so it belongs on
     // the rc-1 typo arm, not here.
@@ -3642,7 +3642,7 @@ fn containsIdx(list: []const usize, x: usize) bool {
     return false;
 }
 
-/// F3 helper: report a user ERROR (rc=1 — "fix your SAS", not an opensas gap) for
+/// F3 helper: report a user ERROR (rc=1 - "fix your SAS", not an opensas gap) for
 /// a PROC PRINT var/id naming no column. `ERROR: Variable X not found.` (SAS
 /// uppercases the name). Returns void so callers `return varNotFound(...)`.
 fn varNotFound(a: std.mem.Allocator, diags: *sas.diag.Diagnostics, name: []const u8) void {
@@ -3670,12 +3670,12 @@ fn skipParens(toks: []const Token, pos: *usize) []const Token {
 // ── tests ──────────────────────────────────────────────────────────────────
 
 /// DEC-abortrcvsD009: the exit code a CLI run WOULD produce. Tests pin the RC,
-/// not just the message — asserting the message alone passes with the wrong rc,
+/// not just the message - asserting the message alone passes with the wrong rc,
 /// which is the entire bug class here. In-process and captured; nothing is
 /// spawned (D-003). Call `resetRcSignals` first: the signals are process-globals
 /// shared across tests.
 /// BUG-wasmignoresabortrc: this is now a thin alias for the REAL `processExitCode`
-/// rather than a third open-coding of the same expression — a copy that omitted
+/// rather than a third open-coding of the same expression - a copy that omitted
 /// the ABORT override is exactly what shipped on the wasm surface, and a test
 /// helper that re-derives the answer cannot catch that.
 fn testRc(diags: *const sas.diag.Diagnostics) u8 {
@@ -3700,11 +3700,11 @@ fn rcOf(a: std.mem.Allocator, out: *std.ArrayList(u8), src: []const u8, log: *[]
     var d = sas.diag.Diagnostics.init(a);
     interpret(a, out, &d, src, null) catch |e| {
         // Same contract as runFile: a propagated lex/parse/exec error already
-        // recorded a located diagnostic (diags.fail) — the rc below reads the
+        // recorded a located diagnostic (diags.fail) - the rc below reads the
         // recorded signals. Only an UNRECORDED error (OOM) is worth throwing.
         // (Whether fail's error propagates at all depends on the statement
         // landing in interleaveStep's swallowed flush vs the trailing
-        // remainder — the CLI catches either way, so the pin must too.)
+        // remainder - the CLI catches either way, so the pin must too.)
         if (!d.hasErrors()) return e;
     };
     log.* = try d.render();
@@ -3757,7 +3757,7 @@ test "BUG-sqlerrorswallow: PROC SQL select of a non-existent column fails loud (
     try interpret(a, &out, &d1, mk ++ "proc sql; select nosuchcol from class; quit;\n", null);
     try std.testing.expect(d1.hasErrors());
 
-    // A valid select stays clean — the fix must not fail-loud on good SQL.
+    // A valid select stays clean - the fix must not fail-loud on good SQL.
     out.clearRetainingCapacity();
     var d2 = sas.diag.Diagnostics.init(a);
     try interpret(a, &out, &d2, mk ++ "proc sql; select name, age from class where age > 13; quit;\n", null);
@@ -3772,7 +3772,7 @@ test "PROC PRINT BY on unsorted data fails loud like SAS (BUG-printbyunsorted)" 
     const mk = "data d; input g $ x; datalines;\n";
 
     // repeated non-adjacent group (A B A) → SAS "not sorted in ascending sequence"
-    // DEC-abortrcvsD009: rc **1**, not 2 — the user's data is unsorted, PROC PRINT
+    // DEC-abortrcvsD009: rc **1**, not 2 - the user's data is unsorted, PROC PRINT
     // is not missing a feature. Pinned as an rc so it cannot regress to a gap the
     // way it originally shipped (probed pre-fix: this exact log line gave rc 2 from
     // PRINT and rc 1 from the six proc.zig sites emitting the identical message).
@@ -3802,10 +3802,10 @@ test "PROC PRINT BY on unsorted data fails loud like SAS (BUG-printbyunsorted)" 
     try std.testing.expect(std.mem.indexOf(u8, out.items, "g=B") != null);
 }
 
-test "DEC-abortrcvsD009: a user error exits 1 and a gap exits 2 — the SAME log line must not carry two rcs" {
+test "DEC-abortrcvsD009: a user error exits 1 and a gap exits 2 - the SAME log line must not carry two rcs" {
     // D-009: rc 1 = "fix your SAS", rc 2 = "file an opensas issue". main.failLoud
     // sets `g_failed`, which is the GAP signal, and it was doing double duty for
-    // both classes — so five user errors in this file exited 2. Every case below
+    // both classes - so five user errors in this file exited 2. Every case below
     // pins the RC, not the message: asserting the message alone passes with the
     // wrong rc, which is exactly how these shipped.
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -3813,7 +3813,7 @@ test "DEC-abortrcvsD009: a user error exits 1 and a gap exits 2 — the SAME log
     const a = arena.allocator();
     var out: std.ArrayList(u8) = .empty;
 
-    // (1) THE STRONGEST CASE — byte-identical message, two exit codes. The PROC
+    // (1) THE STRONGEST CASE - byte-identical message, two exit codes. The PROC
     // FORMAT type clash is SAS's own ERROR text and exec.zig's DATA-step twin
     // (declareStmt) already emits it at rc 1. Both surfaces are pinned on the
     // same wording so neither can drift.
@@ -3840,7 +3840,7 @@ test "DEC-abortrcvsD009: a user error exits 1 and a gap exits 2 — the SAME log
     try std.testing.expectEqual(@as(u8, 1), testRc(&d3));
     try std.testing.expect(!g_failed); // NOT the gap signal
 
-    // (3)/(4) PROC COPY is implemented — a missing IN= or an unbound OUT= libref
+    // (3)/(4) PROC COPY is implemented - a missing IN= or an unbound OUT= libref
     // is the program's error, not a missing feature. (The third converted COPY
     // site, `select`ing an absent member, sits behind the `io` requirement and is
     // probe- + mutation-verified against the real binary instead.)
@@ -3856,7 +3856,7 @@ test "DEC-abortrcvsD009: a user error exits 1 and a gap exits 2 — the SAME log
     try interpret(a, &out, &d5, "data x; v=1; run;\nproc copy in=work out=nolib; select x; run;\n", null);
     try std.testing.expectEqual(@as(u8, 1), testRc(&d5));
 
-    // GAP CONTROLS — these must STAY 2. If a later sweep demotes them, rc 2 stops
+    // GAP CONTROLS - these must STAY 2. If a later sweep demotes them, rc 2 stops
     // being reachable and the calling agent is told to fix SAS that is already fine.
     resetRcSignals();
     out.clearRetainingCapacity();
@@ -3870,7 +3870,7 @@ test "DEC-abortrcvsD009: a user error exits 1 and a gap exits 2 — the SAME log
     try interpret(a, &out, &d7, "data d; x=1; run;\nproc print data=d double; run;\n", null);
     try std.testing.expectEqual(@as(u8, 2), testRc(&d7)); // unsupported PRINT option: a real gap
 
-    // CLEAN CONTROL — nothing above leaked a sticky global into a good run.
+    // CLEAN CONTROL - nothing above leaked a sticky global into a good run.
     resetRcSignals();
     out.clearRetainingCapacity();
     var d8 = sas.diag.Diagnostics.init(a);
@@ -3879,13 +3879,13 @@ test "DEC-abortrcvsD009: a user error exits 1 and a gap exits 2 — the SAME log
     resetRcSignals();
 }
 
-test "GAP-gapsexitingone §5d: main.zig's gaps exit 2 — and every split's typo arm provably stays 1" {
+test "GAP-gapsexitingone §5d: main.zig's gaps exit 2 - and every split's typo arm provably stays 1" {
     // The OTHER D-009 direction in this file: these sites reported through
-    // `diags` (rc 1, "fix your SAS") for constructs that are valid SAS 9.4 —
+    // `diags` (rc 1, "fix your SAS") for constructs that are valid SAS 9.4 -
     // and a gap is rc 2 ("file an opensas issue") even though real SAS exits 0
     // (D-009b(i)). Every case pins the RC, not the message: the message alone
     // passed with the wrong rc for years (audit §6/I1). Each SPLIT pins BOTH
-    // arms — documented operand at 2, typo at 1 — so the gap arm can never be
+    // arms - documented operand at 2, typo at 1 - so the gap arm can never be
     // re-tagged wholesale and eat a typo again. The CONFLATED catch-alls
     // (audit §5d LEFT rows) are pinned at 1 so a future wholesale re-tag reds.
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -3913,7 +3913,7 @@ test "GAP-gapsexitingone §5d: main.zig's gaps exit 2 — and every split's typo
     try std.testing.expectEqual(@as(u8, 2), try rcOf(a, &out, "data a; input x; list; datalines;\n1\n;\nrun;\n", &log));
     try std.testing.expect(std.mem.indexOf(u8, log, "The LIST statement is not supported") != null); // message unchanged
 
-    // the 64-fileref ceiling is OURS — SAS 9.4 has no fileref limit
+    // the 64-fileref ceiling is OURS - SAS 9.4 has no fileref limit
     var many: []const u8 = "";
     for (0..65) |i| many = try std.fmt.allocPrint(a, "{s}filename f{d} \"x{d}.txt\";\n", .{ many, i, i });
     try std.testing.expectEqual(@as(u8, 2), try rcOf(a, &out, many, &log));
@@ -3921,7 +3921,7 @@ test "GAP-gapsexitingone §5d: main.zig's gaps exit 2 — and every split's typo
 
     // ── SPLIT: documented operand → 2, typo → 1, on the SAME guard ──
     // SORTSEQ (Procedures Guide p.2410): the collating-sequence-options and the
-    // SAS-provided translation tables. BUG-rcsplitmembership F4 — the whole
+    // SAS-provided translation tables. BUG-rcsplitmembership F4 - the whole
     // sentence, not the five that came to mind; each of the four that used to
     // sit on the typo arm is pinned by name so a partial list reds again.
     try std.testing.expectEqual(@as(u8, 2), try rcOf(a, &out, "options sortseq=danish;\n", &log));
@@ -3931,14 +3931,14 @@ test "GAP-gapsexitingone §5d: main.zig's gaps exit 2 — and every split's typo
         const src = try std.fmt.allocPrint(a, "options sortseq={s};\n", .{v});
         try std.testing.expectEqual(@as(u8, 2), try rcOf(a, &out, src, &log));
     }
-    // ASCII is the tenth name in that sentence and is HONOURED, not a gap —
+    // ASCII is the tenth name in that sentence and is HONOURED, not a gap -
     // it is opensas's own collation, so it must stay rc 0.
     try std.testing.expectEqual(@as(u8, 0), try rcOf(a, &out, "options sortseq=ascii;\ndata _null_; x=1; run;\n", &log));
     // BUG-sortseqbaresuperset: LINGUISTIC is a VALID system-option value
-    // (Procedures Guide p.2403 — "starting in the third maintenance release of
+    // (Procedures Guide p.2403 - "starting in the third maintenance release of
     // SAS 9.4 … by specifying the SORTSEQ=LINGUISTIC system option"; SQL
     // Procedure p.261), so the bare form is honoured at rc 0 and the modifier
-    // form is a GAP at rc 2 — NOT the rc 1 that BUG-rcsplitmembership F2 gave
+    // form is a GAP at rc 2 - NOT the rc 1 that BUG-rcsplitmembership F2 gave
     // it on the strength of the stale p.2415 restriction.
     try std.testing.expectEqual(@as(u8, 0), try rcOf(a, &out, "options sortseq=linguistic;\ndata _null_; x=1; run;\n", &log));
     try std.testing.expectEqual(@as(u8, 2), try rcOf(a, &out, "options sortseq=linguistic(collation=pinyin);\n", &log));
@@ -3947,7 +3947,7 @@ test "GAP-gapsexitingone §5d: main.zig's gaps exit 2 — and every split's typo
     try std.testing.expect(std.mem.indexOf(u8, log, "Invalid value for the SORTSEQ option.") != null);
 
     // FILENAME device (the FILE/INFILE device-type dictionary + the FILENAME
-    // access-method sections). BUG-rcsplitmembership F3 — the twelve that were
+    // access-method sections). BUG-rcsplitmembership F3 - the twelve that were
     // missing are pinned by name.
     try std.testing.expectEqual(@as(u8, 2), try rcOf(a, &out, "filename cmd pipe \"echo hi\";\n", &log));
     try std.testing.expect(std.mem.indexOf(u8, log, "FILENAME device pipe is not supported") != null); // unchanged
@@ -3978,7 +3978,7 @@ test "GAP-gapsexitingone §5d: main.zig's gaps exit 2 — and every split's typo
         try std.testing.expectEqual(@as(u8, 2), try rcOf(a, &out, src, &log));
     }
     // V9/BASE stay HONOURED (V9 is the documented BASE alias, p.1032), and a
-    // SAS/ACCESS engine still degrades to rc 1 — neither may drift into the gap arm.
+    // SAS/ACCESS engine still degrades to rc 1 - neither may drift into the gap arm.
     try std.testing.expectEqual(@as(u8, 1), try rcOf(a, &out, "libname t oracle \"nowhere\";\n", &log));
     try std.testing.expect(std.mem.indexOf(u8, log, "The oracle engine cannot be found.") != null);
     try std.testing.expectEqual(@as(u8, 1), try rcOf(a, &out, "libname t boguseng \"nowhere\";\n", &log));
@@ -3991,7 +3991,7 @@ test "GAP-gapsexitingone §5d: main.zig's gaps exit 2 — and every split's typo
     try std.testing.expectEqual(@as(u8, 1), try rcOf(a, &out, "options bogusopt=1;\n", &log));
     try std.testing.expectEqual(@as(u8, 1), try rcOf(a, &out, "libname x \"p\" bogusopt=1;\n", &log));
     try std.testing.expectEqual(@as(u8, 1), try rcOf(a, &out, "filename f \"x.txt\" lrelc=100;\n", &log));
-    // clean control — no sticky gap leaked into a good run
+    // clean control - no sticky gap leaked into a good run
     try std.testing.expectEqual(@as(u8, 0), try rcOf(a, &out, "data _null_; x=1; put x; run;\n", &log));
     resetRcSignals();
 }
@@ -4000,7 +4000,7 @@ test "BUG-fmterrorneverreset: format.zig's run-scoped globals must NOT leak into
     // The CLI runs one program per process, so process exit hid this. `wasm.zig`
     // runs many programs per load and calls this same `interpret`, so the leak is
     // reachable there and only there. NOTHING below calls `resetRcSignals()`
-    // between the two runs of a pair — the point is that `interpret` itself must
+    // between the two runs of a pair - the point is that `interpret` itself must
     // clear the flag. (The test above does reset between cases, which is exactly
     // why its "CLEAN CONTROL" could not see this.)
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -4010,7 +4010,7 @@ test "BUG-fmterrorneverreset: format.zig's run-scoped globals must NOT leak into
     const unknown_fmt = "data _null_; x=1; put x nosuchfmt8.; run;\n";
     const clean = "data _null_; y=2; put y 8.; run;\n";
 
-    // (1) g_fmt_error — the reported half. Program 1 is genuinely wrong (rc 1)…
+    // (1) g_fmt_error - the reported half. Program 1 is genuinely wrong (rc 1)…
     resetRcSignals();
     var d1 = sas.diag.Diagnostics.init(a);
     try interpret(a, &out, &d1, unknown_fmt, null);
@@ -4025,7 +4025,7 @@ test "BUG-fmterrorneverreset: format.zig's run-scoped globals must NOT leak into
     try std.testing.expect(!sas.format.formatErrored());
     try std.testing.expectEqual(@as(u8, 0), testRc(&d2));
 
-    // (2) g_nofmterr — the same leak, opposite sign, and the WORSE direction:
+    // (2) g_nofmterr - the same leak, opposite sign, and the WORSE direction:
     // program 1's `OPTIONS NOFMTERR` must not silence program 2. A false negative
     // on invalid SAS is silent wrong output, the house's worst failure class.
     resetRcSignals();
@@ -4061,14 +4061,14 @@ test "BUG-fmterrorneverreset: format.zig's run-scoped globals must NOT leak into
 
 test "BUG-wasmignoresabortrc / D-009a: the ABORT rc outranks D-009 in the ONE shared exit-code function" {
     // `wasm.run` re-derived the rc from the two D-009 signals and `diag.exitCode`,
-    // which silently dropped the ABORT line that sits ABOVE them in `main` — so
+    // which silently dropped the ABORT line that sits ABOVE them in `main` - so
     // `abort return 3` exited 3 on the CLI and returned 1 in the browser. Both
     // surfaces now call `processExitCode`, and `testRc` is an alias for it, so
     // every case below pins the code wasm.run returns as well as the CLI's.
     //
     // COVERAGE, stated plainly: the CLI end of this is pinned end-to-end by
     // tests/corpus/abort_rc.sas (`expect-rc: 3`) and by the cases here. wasm.run's
-    // one-line CALL has NO automated protection — `zig build test` only COMPILES
+    // one-line CALL has NO automated protection - `zig build test` only COMPILES
     // the wasm target (build.zig:238), nothing executes it, and no fixture runner
     // can. Deduplicating was the point: the untested line is now a call, not a
     // re-implementation, so it can no longer drift on its own.
@@ -4078,7 +4078,7 @@ test "BUG-wasmignoresabortrc / D-009a: the ABORT rc outranks D-009 in the ONE sh
     var out: std.ArrayList(u8) = .empty;
     const mk = "data a; x=1; ";
 
-    // THE SHARPEST CASE FIRST — ABORT reports an ERROR diagnostic, so D-009 alone
+    // THE SHARPEST CASE FIRST - ABORT reports an ERROR diagnostic, so D-009 alone
     // says 1. It must be 3. If the override is ever dropped again this is the
     // assertion that names why: `hasErrors()` and the rc deliberately disagree.
     resetRcSignals();
@@ -4102,7 +4102,7 @@ test "BUG-wasmignoresabortrc / D-009a: the ABORT rc outranks D-009 in the ONE sh
 
     // The override is an OVERRIDE, not a maximum: `abort return 0` exits 0 even
     // though the run recorded an ERROR. D-009a says the user-supplied rc becomes
-    // the exit code, full stop — pinned so nobody "fixes" it into a max().
+    // the exit code, full stop - pinned so nobody "fixes" it into a max().
     resetRcSignals();
     out.clearRetainingCapacity();
     var d4 = sas.diag.Diagnostics.init(a);
@@ -4113,7 +4113,7 @@ test "BUG-wasmignoresabortrc / D-009a: the ABORT rc outranks D-009 in the ONE sh
     // …and it beats a GAP too, which is the ordering `main` has always had (the
     // abort line sits above `gap or user_err`, not inside `diag.exitCode`).
     // The gap must come FIRST: ABORT reports an ERROR, which puts the run into
-    // syntax-check mode (BUG-errhalt) and skips every later step — a probe with
+    // syntax-check mode (BUG-errhalt) and skips every later step - a probe with
     // the PROC after the ABORT looks like it passes and proves nothing. (My first
     // version of this case did exactly that and this assertion caught it.)
     resetRcSignals();
@@ -4192,7 +4192,7 @@ test "BUG-libnamemidstepboth + BUG-filenamemidstep: mid-PROC globals EXECUTE (pr
 
     // BUG-filenamemidstep: FILENAME mid-PROC is now HOISTED by main.segments
     // and EXECUTED before the step (SAS: a global statement takes effect when
-    // encountered — during step compilation, before the step runs). Accepted,
+    // encountered - during step compilation, before the step runs). Accepted,
     // listing renders, and the binding is REAL: a later step reads through it.
     g_failed = false;
     out.clearRetainingCapacity();
@@ -4204,7 +4204,7 @@ test "BUG-libnamemidstepboth + BUG-filenamemidstep: mid-PROC globals EXECUTE (pr
     try std.testing.expect(std.mem.indexOf(u8, out.items, "READ-VIA-MIDPROC-FILEREF:") != null);
 
     // ODS destination mid-PROC: hoisted and accepted as a listing no-op
-    // (batch renders to ONE output stream), same as top level — no longer
+    // (batch renders to ONE output stream), same as top level - no longer
     // FATAL (the over-strict arm D-014 was written against).
     g_failed = false;
     out.clearRetainingCapacity();
@@ -4213,7 +4213,7 @@ test "BUG-libnamemidstepboth + BUG-filenamemidstep: mid-PROC globals EXECUTE (pr
     try std.testing.expect(!g_failed and !d3.hasErrors());
     try std.testing.expect(std.mem.indexOf(u8, out.items, "1") != null); // listing printed
 
-    // ODS OUTPUT mid-PROC stays LOUD — via the hoisted global segment's
+    // ODS OUTPUT mid-PROC stays LOUD - via the hoisted global segment's
     // handleGlobal arm (result-changing, unimplemented), captured diags (D-003).
     var d4 = sas.diag.Diagnostics.init(a);
     try interpret(a, &out, &d4, mk ++ "proc print data=d noobs; ods output zzzq; run;\n", null);
@@ -4241,7 +4241,7 @@ test "GAP-printby-low-tick274: ID∩VAR/dup VAR keep both columns; SPLIT= implie
     try std.testing.expect(!d2.hasErrors());
     try std.testing.expect(std.mem.indexOf(u8, out.items, " x    x   g") != null); // two x columns
 
-    // SPLIT= without LABEL: SAS puts PRINT in label mode — the header is the
+    // SPLIT= without LABEL: SAS puts PRINT in label mode - the header is the
     // label, split on '*', not the variable name.
     out.clearRetainingCapacity();
     var d3 = sas.diag.Diagnostics.init(a);
@@ -4312,7 +4312,7 @@ test "BUG-speciallistphantom: _ALL_/_NUMERIC_/_CHARACTER_ in LENGTH/ATTRIB seed 
     const a = arena.allocator();
 
     // LENGTH: the special-list names seed nothing; a real name in the same
-    // statement still seeds. (Statements Ref printed p.24 — they are variable
+    // statement still seeds. (Statements Ref printed p.24 - they are variable
     // name LISTS, never variables of their own.)
     {
         var diags = sas.diag.Diagnostics.init(a);
@@ -4321,7 +4321,7 @@ test "BUG-speciallistphantom: _ALL_/_NUMERIC_/_CHARACTER_ in LENGTH/ATTRIB seed 
         try std.testing.expectEqual(@as(usize, 1), declared.len);
         try std.testing.expectEqualStrings("v", declared[0].name);
     }
-    // ATTRIB: an all-special group seeds nothing (its options still parse —
+    // ATTRIB: an all-special group seeds nothing (its options still parse -
     // the format reaches the listed vars exec-side); a mixed group seeds only
     // its real names.
     {
@@ -4339,14 +4339,14 @@ test "BUG-speciallistphantom: _ALL_/_NUMERIC_/_CHARACTER_ in LENGTH/ATTRIB seed 
     );
     // …and the reporter's second symptom: the phantom no longer pre-empts a
     // later character assignment, so the misleading "defined as both
-    // character and numeric" conflict cannot fire off a special list — the
+    // character and numeric" conflict cannot fire off a special list - the
     // char var simply takes its value.
     try expectRun(
         "data c2; attrib _character_ format=$8.; a = \"x\"; run;\nproc print data=c2 noobs; run;\n",
         "a\n\nx\n",
     );
     // the type guard survives expansion: a numeric format over `_all_` lands
-    // on a CHARACTER member and is LOUD (rc 1, reported ONCE) — SAS errors
+    // on a CHARACTER member and is LOUD (rc 1, reported ONCE) - SAS errors
     // that attach whichever way the variable is named.
     {
         var diags = sas.diag.Diagnostics.init(a);
@@ -4368,7 +4368,7 @@ test "BUG-lengthaftersetinput: char LENGTH/ATTRIB after SET or INPUT keeps the f
     const p49 = "Length of character variable";
 
     // scan shape after SET: an early zero-len type sentinel (GH#70's fatal type
-    // check + PDV position) + a LATE copy carrying the declared length — and NO
+    // check + PDV position) + a LATE copy carrying the declared length - and NO
     // scan-time warning (a NEW var after SET is legal, so the warn must wait for
     // the PDV-side first-wins guard).
     {
@@ -4393,7 +4393,7 @@ test "BUG-lengthaftersetinput: char LENGTH/ATTRIB after SET or INPUT keeps the f
         try std.testing.expect(std.mem.indexOf(u8, try diags.render(), p49) != null);
     }
     // end-to-end (captured diags; no spawned process): all three establishment
-    // paths agree — established var keeps its first length, p.49 warning arms,
+    // paths agree - established var keeps its first length, p.49 warning arms,
     // the wrong "Multiple lengths" text is GONE, a NEW var after SET/INPUT is
     // still declared at its length with no warning.
     {
@@ -4407,7 +4407,7 @@ test "BUG-lengthaftersetinput: char LENGTH/ATTRIB after SET or INPUT keeps the f
                 "data d; s='abcdefghij'; length s $3; put \"asn=[\" s \"]\"; run;\n" ++
                 "data e; set a; length newv $3; newv='xyz'; put \"new=[\" newv \"]\"; run;\n", null);
         // expected strings carry the BUG-putlistsep blank a list value owes a
-        // following literal (`s "]"` → `… ]`) — the test's intent is lengths.
+        // following literal (`s "]"` → `… ]`) - the test's intent is lengths.
         try std.testing.expectEqualStrings("set=[abcdefghij ]\nsetat=[abcdefghij ]\ninp=[abcdefghij ]\nasn=[abcdefghij ]\nnew=[xyz ]\n", out.items);
         const log = try diags.render();
         try std.testing.expect(std.mem.indexOf(u8, log, "Multiple lengths") == null); // wrong message gone
@@ -4417,7 +4417,7 @@ test "BUG-lengthaftersetinput: char LENGTH/ATTRIB after SET or INPUT keeps the f
             warns += 1;
             try std.testing.expect(std.mem.indexOf(u8, d.message, p49) != null); // every warning is the p.49 one
         }
-        try std.testing.expectEqual(@as(usize, 4), warns); // set, set-attrib, input, assignment — NOT newv
+        try std.testing.expectEqual(@as(usize, 4), warns); // set, set-attrib, input, assignment - NOT newv
     }
     // GH#70 guard-rail: the split must NOT defuse the fatal char-LENGTH-after-SET
     // on a NUMERIC source var (the sentinel keeps the type check in place).
@@ -4430,7 +4430,7 @@ test "BUG-lengthaftersetinput: char LENGTH/ATTRIB after SET or INPUT keeps the f
     }
 }
 
-test "QL-D2: prx/dsfns/hashing globals reset per run — stale handles die, not dangle" {
+test "QL-D2: prx/dsfns/hashing globals reset per run - stale handles die, not dangle" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -4469,7 +4469,7 @@ test "BUG-errhalt: a DATA-step ERROR poisons downstream steps (syntax-check mode
     const a = arena.allocator();
     var diags = sas.diag.Diagnostics.init(a);
     var out: std.ArrayList(u8) = .empty;
-    // "before" prints; the unsorted SET-BY errors; "after" must NOT print —
+    // "before" prints; the unsorted SET-BY errors; "after" must NOT print -
     // real SAS batch enters syntax-check mode after a step error, so a
     // truncated intermediate can't flow into later (clinical) outputs
     // (a real MH run wrote a plausible 310-obs TARGET.MH, golden 227).
@@ -4505,7 +4505,7 @@ test "GH#3 ISS-steperrhalt: the FAILING step ends with the doc's step-halt NOTE;
     var diags = sas.diag.Diagnostics.init(a);
     var out: std.ArrayList(u8) = .empty;
     // Same shape as the BUG-errhalt pin above: the SET-BY step errors, "after"
-    // must stay skipped — this program sets NO option, so the default (batch
+    // must stay skipped - this program sets NO option, so the default (batch
     // stop-all, syntax_check ON) is what runs.
     try interpret(a, &out, &diags,
         "data a; input k; datalines;\n1\n3\n;\nrun;\n" ++
@@ -4516,13 +4516,13 @@ test "GH#3 ISS-steperrhalt: the FAILING step ends with the doc's step-halt NOTE;
     try std.testing.expect(std.mem.indexOf(u8, out.items, "after") == null); // default: later steps skipped
 
     // Parity: the failing step (`data m`) now ends itself with the SAME NOTE the
-    // skipped step gets — exactly two, in the doc's wording, trailing period
+    // skipped step gets - exactly two, in the doc's wording, trailing period
     // included (Language Reference: Concepts Ch.8 Examples 8.2/8.4/8.8). Before
     // the fix the log carried only the skipped step's NOTE.
     try std.testing.expectEqual(@as(usize, 2), countStepHaltNotes(try diags.render()));
 }
 
-test "GH#3 ISS-steperrhalt: OPTIONS NOSYNTAXCHECK lets later independent steps run — loudly (rc 1), in either position" {
+test "GH#3 ISS-steperrhalt: OPTIONS NOSYNTAXCHECK lets later independent steps run - loudly (rc 1), in either position" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -4555,11 +4555,11 @@ test "GH#3 ISS-steperrhalt: OPTIONS NOSYNTAXCHECK lets later independent steps r
         resetRcSignals();
         try interpret(a, &out2, &diags2, "options nosyntaxcheck;\n" ++ src, null);
         try std.testing.expect(diags2.hasErrors()); // the failing step's ERROR stands
-        try std.testing.expectEqual(@as(u8, 1), testRc(&diags2)); // rc 1 — never silent
+        try std.testing.expectEqual(@as(u8, 1), testRc(&diags2)); // rc 1 - never silent
         try std.testing.expect(std.mem.indexOf(u8, out2.items, "independent-one") != null);
         try std.testing.expect(std.mem.indexOf(u8, out2.items, "independent-two") != null);
         try std.testing.expect(std.mem.indexOf(u8, out2.items, "Obs") != null); // the PRINT really printed
-        // exactly ONE step-halt NOTE — the failing step's own (parity); the
+        // exactly ONE step-halt NOTE - the failing step's own (parity); the
         // independent steps RAN, so none of them was skipped into a NOTE
         try std.testing.expectEqual(@as(usize, 1), countStepHaltNotes(try diags2.render()));
     }
@@ -4594,11 +4594,11 @@ test "GH#3 ISS-steperrhalt: OPTIONS NOSYNTAXCHECK lets later independent steps r
     }
 }
 
-test "BUG-sortseq-byverify: PRINT's BY verify honors SORTSEQ=LINGUISTIC — the sort-then-BY-print repro runs (was: valid program killed at rc 1)" {
+test "BUG-sortseq-byverify: PRINT's BY verify honors SORTSEQ=LINGUISTIC - the sort-then-BY-print repro runs (was: valid program killed at rc 1)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
-    defer sas.io.global_sortseq_linguistic = false; // run global — restore like the sql sortseq tests
+    defer sas.io.global_sortseq_linguistic = false; // run global - restore like the sql sortseq tests
     var diags = sas.diag.Diagnostics.init(a);
     var out: std.ArrayList(u8) = .empty;
     // The issue's repro shape: sort linguistically (yielding A a b B c), then
@@ -4630,7 +4630,7 @@ test "GAP-errgatereplaces: a stopped step does not REPLACE an existing member, s
     const src_head = "data k; input id v; datalines;\n1 10\n2 20\n3 30\n;\nrun;\n";
     const warning = "was not replaced because this step was stopped";
 
-    { // (a) REPLACE of an existing member — withheld, and said so.
+    { // (a) REPLACE of an existing member - withheld, and said so.
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
         defer arena.deinit();
         const a = arena.allocator();
@@ -4641,7 +4641,7 @@ test "GAP-errgatereplaces: a stopped step does not REPLACE an existing member, s
         try std.testing.expect(diags.hasErrors());
         try std.testing.expect(std.mem.indexOf(u8, log, "WARNING: Data set WORK.K " ++ warning) != null);
     }
-    { // (b) a NEW name — created (0 obs, compile-time columns), so NO warning.
+    { // (b) a NEW name - created (0 obs, compile-time columns), so NO warning.
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
         defer arena.deinit();
         const a = arena.allocator();
@@ -4651,7 +4651,7 @@ test "GAP-errgatereplaces: a stopped step does not REPLACE an existing member, s
         try std.testing.expect(diags.hasErrors()); // the gate still fires
         try std.testing.expect(std.mem.indexOf(u8, try diags.render(), warning) == null);
     }
-    { // (c) MODIFY edits IN PLACE — there is no replace, and withholding its
+    { // (c) MODIFY edits IN PLACE - there is no replace, and withholding its
         // re-emitted master would DISCARD the transactions that did apply
         // (BUG-modifybynomatch reports .err and continues on purpose).
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -4669,7 +4669,7 @@ test "GAP-errgatereplaces: a stopped step does not REPLACE an existing member, s
 
 test "GH#17 ISS-macrolinemap: macro-expansion error is marked (expanded Lnn); plain error keeps its bare source line" {
     // (a) A multi-line %do body whose expansion errors: the reported line is in
-    // post-expansion coordinates, so it MUST render `(expanded Lnn)` — never a bare
+    // post-expansion coordinates, so it MUST render `(expanded Lnn)` - never a bare
     // `(Lnn)` a line-map harness would blame on an innocent source/macro file.
     {
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -4711,12 +4711,12 @@ test "NOTE-globalstmtunresolved: TITLE/FOOTNOTE/OPTIONS discharge the unresolved
     // FOOTNOTE and OPTIONS still swallowed the same warning because main.zig
     // routes global segments around bindStepVars (the step discharge). Global
     // statements are warnable for the same reason %PUT is: late binding
-    // provably cannot apply — no prior step exists in the chunk. The discharge
+    // provably cannot apply - no prior step exists in the chunk. The discharge
     // is main.zig's call over the segment's tokens, through macro.zig's
     // warnUnresolvedIn and the SAME g_unresolved gate as the step path, so the
     // four controls that must stay silent there stay silent here too.
     // NO CORPUS FIXTURE: the WARNING rides stderr and both suites diff stdout
-    // (tests/corpus_runner.zig) — captured diagnostics (D-003), no spawn.
+    // (tests/corpus_runner.zig) - captured diagnostics (D-003), no spawn.
     const H = struct {
         fn log(src: []const u8) !struct { n: usize, errs: bool } {
             var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -4730,7 +4730,7 @@ test "NOTE-globalstmtunresolved: TITLE/FOOTNOTE/OPTIONS discharge the unresolved
         }
     };
 
-    // THE TICKET — TITLE and FOOTNOTE each warn once, at the statement.
+    // THE TICKET - TITLE and FOOTNOTE each warn once, at the statement.
     {
         const r = try H.log("title \"study &zzz\";\nfootnote2 \"page &zzz\";\n");
         try std.testing.expectEqual(2, r.n);
@@ -4754,10 +4754,10 @@ test "NOTE-globalstmtunresolved: TITLE/FOOTNOTE/OPTIONS discharge the unresolved
     // from a real reference; the g_unresolved gate is what discriminates, and
     // it holds here exactly as on the step/%PUT paths (macro.zig's tests cite
     // printed p.21 / p.38 / p.106 for the first three).
-    //   * `a & b`      — a bare ampersand is not a trigger (blank after &);
-    //   * 'AT&T'       — single quotes: never resolved, never recorded;
-    //   * "%nrstr(&x)" — masked at scan time, so never recorded;
-    //   * &SYS*        — warned EAGERLY by resolveAmpRun, never recorded, so
+    //   * `a & b`      - a bare ampersand is not a trigger (blank after &);
+    //   * 'AT&T'       - single quotes: never resolved, never recorded;
+    //   * "%nrstr(&x)" - masked at scan time, so never recorded;
+    //   * &SYS*        - warned EAGERLY by resolveAmpRun, never recorded, so
     //                    the discharge must not say it a SECOND time.
     {
         const r = try H.log("title \"a & b\";\ntitle2 'AT&T';\ntitle3 \"%nrstr(&x)\";\n%let known=ok;\ntitle4 \"&known\";\ndata _null_; put \"ok\"; run;\n");
@@ -4766,10 +4766,10 @@ test "NOTE-globalstmtunresolved: TITLE/FOOTNOTE/OPTIONS discharge the unresolved
     }
     {
         const r = try H.log("footnote \"&sysnosuchauto\";\n");
-        try std.testing.expectEqual(1, r.n); // exactly once — the eager warning
+        try std.testing.expectEqual(1, r.n); // exactly once - the eager warning
     }
     // A HOISTED mid-step TITLE also warns exactly once: its tokens remain in
-    // the step, where bindStepVars already discharges them — the global-seg
+    // the step, where bindStepVars already discharges them - the global-seg
     // discharge skips hoisted segments or the warning would sound twice.
     {
         const r = try H.log("data _null_;\ntitle \"mid &zzz\";\nput \"ok\";\nrun;\n");
@@ -4789,7 +4789,7 @@ test "NOTE-chunkrelativelineno: diagnostics after the first top-level run; repor
     // QA tick312 F3: rawSegments chunks the program at top-level run;/quit; and
     // each chunk tokenized from line 1, so a typo on source line 9 reported L3.
     // With no macro transformation the number must be the true source line,
-    // unmarked. (Captured diagnostics, D-003 — no aborting process.)
+    // unmarked. (Captured diagnostics, D-003 - no aborting process.)
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -4834,7 +4834,7 @@ test "BUG-yearcutoffflushorder: a same-chunk OPTIONS YEARCUTOFF= windows the SAM
     defer sas.format.setYearCutoff(1926); // run-scoped global: restore the SAS default for later tests
     // The probe: within ONE step the '…'d LITERAL and the exec-time INFORMAT
     // read must agree. Before the fix the literal was lexed during this blob's
-    // tokenize — before the segment loop dispatched the OPTIONS statement — so
+    // tokenize - before the segment loop dispatched the OPTIONS statement - so
     // it windowed under the PRIOR 1926 span (49 → 1949) while the informat
     // (running later) saw 1950 (49 → 2049): one step, two windows. Real SAS
     // windows both under 1950 (lrcon pp.141-142: YEARCUTOFF governs how the
@@ -4850,7 +4850,7 @@ test "BUG-yearcutoffflushorder: a same-chunk OPTIONS YEARCUTOFF= windows the SAM
         "y=2049 z=2049\n",
     );
 
-    // Control: with NO option in play the default span is untouched — the same
+    // Control: with NO option in play the default span is untouched - the same
     // literal still reads 1949 (1926-2025), so the fix moved only what the
     // option itself moves.
     try expectRun(
@@ -4866,12 +4866,12 @@ test "BUG-yearcutoffflushorder: a same-chunk OPTIONS YEARCUTOFF= windows the SAM
     );
 
     // Control for the pre-pass's read-only contract: a NON-numeric value must
-    // NOT pre-apply and must NOT be swallowed by the pre-pass's skip —
+    // NOT pre-apply and must NOT be swallowed by the pre-pass's skip -
     // handleGlobal stays the authority that fails LOUD on it (captured
-    // reporter, D-003 — never a real aborting run), exactly ONCE (a stray
+    // reporter, D-003 - never a real aborting run), exactly ONCE (a stray
     // second report would mean the pre-pass started diagnosing), rc 1. The
     // step after the bad option is skipped (the global ERROR arms BUG-errhalt
-    // syntax-check — D-024 semantics unchanged by this fix).
+    // syntax-check - D-024 semantics unchanged by this fix).
     {
         var arena2 = std.heap.ArenaAllocator.init(std.testing.allocator);
         defer arena2.deinit();
@@ -4892,7 +4892,7 @@ test "BUG-yearcutoffflushorder: a same-chunk OPTIONS YEARCUTOFF= windows the SAM
 test "GH#10 ISS-versionflag: the build-time version is injected and printable" {
     // build.zig wires the options module into THIS module: `-Dversion=` (CI
     // release builds), else `git describe --tags --always`, else "dev". The
-    // CLI prints it verbatim as `opensas <version>` on stdout, exit 0 — so it
+    // CLI prints it verbatim as `opensas <version>` on stdout, exit 0 - so it
     // must be non-empty and single-line printable (a stray newline would
     // corrupt the line a bug reporter pastes).
     try std.testing.expect(build_options.version.len > 0);
@@ -4901,8 +4901,8 @@ test "GH#10 ISS-versionflag: the build-time version is injected and printable" {
 }
 
 test "CALL SYMPUT var resolves in a later step's string literal (BUG-symput)" {
-    // step 1 sets &a at run time; step 2's "&a" — unknown to the up-front macro
-    // pass — must bind to it before step 2 compiles.
+    // step 1 sets &a at run time; step 2's "&a" - unknown to the up-front macro
+    // pass - must bind to it before step 2 compiles.
     try expectRun(
         "data _null_;\n  call symput(\"a\", \"hello\");\nrun;\n" ++
             "data _null_;\n  x = \"&a\";\n  put x=;\nrun;\n",
@@ -4918,7 +4918,7 @@ test "CALL SYMPUT var resolves in a later step's string literal (BUG-symput)" {
 
 test "CALL SYMPUT var resolves BARE (unquoted) in a later step's expression (BUG-symputbare)" {
     // `&cnt` outside quotes: the lexer split it into `&` + name, so binding must
-    // splice the re-lexed value back in — `n = &cnt + 1` → 7 + 1.
+    // splice the re-lexed value back in - `n = &cnt + 1` → 7 + 1.
     try expectRun(
         "data _null_;\n  call symput(\"cnt\", \"7\");\nrun;\n" ++
             "data _null_;\n  n = &cnt + 1;\n  put n=;\nrun;\n",
@@ -4934,7 +4934,7 @@ test "CALL SYMPUT var resolves BARE (unquoted) in a later step's expression (BUG
 
 test "global statements: OPTIONS/TITLE/FOOTNOTE/FILENAME/ODS/X accepted, no DATA-step output (G-global)" {
     // TITLE/FOOTNOTE are settings, not statements that print here: a DATA step
-    // emits only its own log (titles show atop a *proc* — see G-global-apply).
+    // emits only its own log (titles show atop a *proc* - see G-global-apply).
     try expectRun(
         "options nodate;\ntitle \"Rpt\";\nfootnote \"cf\";\ndata _null_;\n  put \"body\";\nrun;\n",
         "body\n",
@@ -4961,7 +4961,7 @@ test "LocalStat: unsupported ODS destinations fail visibly" {
         try std.testing.expectEqual(@as(u8, 2), try rcOf(a, &out, "ods " ++ destination ++ ";\ndata _null_; put 'must not execute'; run;", &log));
         try std.testing.expect(std.mem.indexOf(u8, log, "only text listing") != null);
     }
-    // Group B: captured diagnostics (D-003 — no spawned abort), each naming
+    // Group B: captured diagnostics (D-003 - no spawned abort), each naming
     // its own sub-statement.
     inline for (.{
         .{ "ods select MyTable;\n", "ODS select is not supported yet" },
@@ -4981,7 +4981,7 @@ test "LocalStat: unsupported ODS destinations fail visibly" {
 }
 
 test "BUG-optmissing: OPTIONS MISSING= char prints for a PLAIN missing numeric (PRINT + PUT)" {
-    defer sas.io.global_missing = '.'; // module state — restore for later tests
+    defer sas.io.global_missing = '.'; // module state - restore for later tests
     // core: a missing numeric prints the set char in PROC PRINT and list-PUT;
     // special missings keep their letter; `missing='.'` resets to the default.
     try expectRun(
@@ -4999,7 +4999,7 @@ test "BUG-optmissing: OPTIONS MISSING= char prints for a PLAIN missing numeric (
             "  1    1   .   A\n" ++
             "  2    2   5   3\n",
     );
-    // garbage fails LOUD (captured diagnostic, D-003 — no spawned abort)
+    // garbage fails LOUD (captured diagnostic, D-003 - no spawned abort)
     {
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
         defer arena.deinit();
@@ -5071,7 +5071,7 @@ test "BUG-filenameconcatnoop: FILENAME concatenation form fails loud AT the FILE
     const a = arena.allocator();
     var diags = sas.diag.Diagnostics.init(a);
     var out: std.ArrayList(u8) = .empty;
-    // Language Reference: Concepts Table 21.5 (p.517): "FILENAME statement with concatenation" — was a
+    // Language Reference: Concepts Table 21.5 (p.517): "FILENAME statement with concatenation" - was a
     // silent no-op; the INFILE then mis-errored as if the REF were undefined.
     try interpret(a, &out, &diags, "filename both ('fa.txt' 'fb.txt');\ndata _null_; infile both; input k $ v; run;\n", null);
     try std.testing.expect(diags.hasErrors());
@@ -5101,7 +5101,7 @@ test "GAP-liststmt: DATA-step LIST fails LOUD with a clear message (not the misl
     const log = try diags.render();
     try std.testing.expect(std.mem.indexOf(u8, log, "The LIST statement is not supported") != null);
     try std.testing.expect(std.mem.indexOf(u8, log, "expected '=' in assignment") == null); // the old misdirection is gone
-    // a variable NAMED list (`list = 5;`) is not the statement — still parses
+    // a variable NAMED list (`list = 5;`) is not the statement - still parses
     try expectRun("data _null_; list = 5; put list; run;\n", "5\n");
 }
 
@@ -5147,11 +5147,11 @@ test "BUG-optionsstmtswallow: OPTIONS fails LOUD on typos/unsupported; the inert
         "x\n\n1\n",
     );
     try std.testing.expectEqual(sas.io.CondLevel.warn, sas.io.global_dkricond);
-    // honoured: the K suffix is a magnitude, not a token to drop — obs=2k = 2048
+    // honoured: the K suffix is a magnitude, not a token to drop - obs=2k = 2048
     try expectRun("options obs=2k; data d; x=1; run;\n", "");
     try std.testing.expectEqual(@as(usize, 2048), sas.io.global_obs);
 
-    // GAP-sysparm-opt: ONE session value — the OPTIONS statement writes it,
+    // GAP-sysparm-opt: ONE session value - the OPTIONS statement writes it,
     // the SYSPARM() function reads it, and a &SYSPARM reference in a LATER
     // step (the chunk after the first `run;`) reads it live. Default "".
     try expectRun(
@@ -5163,7 +5163,7 @@ test "BUG-optionsstmtswallow: OPTIONS fails LOUD on typos/unsupported; the inert
 
     const Case = struct { src: []const u8, msg: []const u8 };
     const cases = [_]Case{
-        // a typo on a READ LIMIT — read EVERYTHING before this fix
+        // a typo on a READ LIMIT - read EVERYTHING before this fix
         .{ .src = "options obbs=2;\n", .msg = "system option obbs is not recognized" },
         .{ .src = "options zzzznotanoption=5;\n", .msg = "system option zzzznotanoption is not recognized" },
         // result-changing but honoured only in the exec layer → LOUD gap
@@ -5208,7 +5208,7 @@ test "BUG-opencodestmtswallow: unknown open-code statements fail LOUD naming the
 
     const Case = struct { src: []const u8, msg: []const u8 };
     const cases = [_]Case{
-        // a typo'd global that used to vanish — the listing was built on the
+        // a typo'd global that used to vanish - the listing was built on the
         // setting that never took effect, at exit 0
         .{ .src = "titl 'Study 06';\ndata d; x=1; run;\n", .msg = "statement titl is not valid in open code" },
         .{ .src = "data d; x=1; run;\nlibnam raw '/data';\n", .msg = "statement libnam is not valid in open code" },
@@ -5234,11 +5234,11 @@ test "BUG-opencodestmtswallow: unknown open-code statements fail LOUD naming the
         var diags = sas.diag.Diagnostics.init(a);
         var out: std.ArrayList(u8) = .empty;
         try interpret(a, &out, &diags, c.src, null);
-        try std.testing.expect(!diags.hasErrors()); // NORMAL termination — exit 0
+        try std.testing.expect(!diags.hasErrors()); // NORMAL termination - exit 0
         try std.testing.expectEqualStrings(c.want, out.items);
     }
     // ── ENDSAS mid-STEP (BUG-endsasmidstep, QA tick322 F5): the same ordinary
-    //    step boundary INSIDE a step — the step runs with the statements
+    //    step boundary INSIDE a step - the step runs with the statements
     //    before it (the listing prints), the session ends, nothing after is
     //    read, exit 0. Pre-fix the PROC loop's fail-loud ate it: listing lost
     //    AND the post-endsas steps ran (the error went to g_failed, so
@@ -5247,10 +5247,10 @@ test "BUG-opencodestmtswallow: unknown open-code statements fail LOUD naming the
         // the F5 repro: endsas inside a PROC PRINT step
         .{ .src = "data d; x=1; run;\nproc print data=d noobs;\nendsas;\nrun;\ndata e; y=2; run;\nproc print data=e noobs; run;\n", .want = "x\n\n1\n" },
         // mid-DATA-step: the step's statements before endsas run (d is
-        // written), then the session ends — nothing prints, exit 0
+        // written), then the session ends - nothing prints, exit 0
         .{ .src = "data d; x=1;\nendsas;\nrun;\nproc print data=d noobs; run;\n", .want = "" },
         // positive control: `endsas = 5;` is a plain ASSIGNMENT (the `=`
-        // guard) — the session does NOT end, the print after it runs
+        // guard) - the session does NOT end, the print after it runs
         .{ .src = "data d; endsas = 5; run;\nproc print data=d noobs; run;\n", .want = "endsas\n\n     5\n" },
     };
     for (mid_cases) |c| {
@@ -5261,10 +5261,10 @@ test "BUG-opencodestmtswallow: unknown open-code statements fail LOUD naming the
         var out: std.ArrayList(u8) = .empty;
         g_failed = false;
         try interpret(a, &out, &diags, c.src, null);
-        try std.testing.expect(!diags.hasErrors() and !g_failed); // NORMAL termination — exit 0
+        try std.testing.expect(!diags.hasErrors() and !g_failed); // NORMAL termination - exit 0
         try std.testing.expectEqualStrings(c.want, out.items);
     }
-    // an ERROR before endsas still exits nonzero — endsas is not an eraser
+    // an ERROR before endsas still exits nonzero - endsas is not an eraser
     {
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
         defer arena.deinit();
@@ -5303,7 +5303,7 @@ test "BUG-opencodestmtswallow: unknown open-code statements fail LOUD naming the
 
 test "BUG-missingstmtwrongclass: open-code MISSING is a NAMED rc-2 gap (was rc-1 'not valid in open code'); `missing =` stays the generic error" {
     // The MISSING statement declares special missing values (Language Reference: Concepts printed
-    // p.519, a worked example shown TWICE) — VALID SAS real SAS runs clean, so
+    // p.519, a worked example shown TWICE) - VALID SAS real SAS runs clean, so
     // refusing it is OUR gap: rc 2 (D-009/D-009b(i)), with a message naming
     // MISSING, identical to parser.zig's DATA-step arm (D-009b corollary).
     {
@@ -5320,7 +5320,7 @@ test "BUG-missingstmtwrongclass: open-code MISSING is a NAMED rc-2 gap (was rc-1
         try std.testing.expect(std.mem.indexOf(u8, rendered, "not valid in open code") == null); // the OLD misclass is gone
         try std.testing.expectEqual(@as(u8, 2), testRc(&diags));
     }
-    // `missing = 5;` in open code is not the statement — keeps the generic
+    // `missing = 5;` in open code is not the statement - keeps the generic
     // open-code error at rc 1 (the `=` guard).
     {
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -5349,7 +5349,7 @@ test "BUG-xstmtopencodesplit: open-code X (quoted AND bare-name) and open-code D
 
     // Open-code X in BOTH spellings notes and does not errhalt. The bare-name
     // form (`x mkdir "…";`) is the split itself: mid-step it sailed through,
-    // in open code it used to ERROR "not valid in open code" rc 1 — one
+    // in open code it used to ERROR "not valid in open code" rc 1 - one
     // recognizer now (parser.zig's x/dm arm and main.zig's isXStmt agree).
     {
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -5361,11 +5361,11 @@ test "BUG-xstmtopencodesplit: open-code X (quoted AND bare-name) and open-code D
             "x \"mkdir /tmp/gh83_quoted_never\";\n" ++
             "x mkdir \"/tmp/gh83_bare_never\";\n" ++
             "proc print data=t noobs; run;\n", null);
-        try std.testing.expect(!diags.hasErrors()); // NOTEs, never an ERROR — rc stays 0
+        try std.testing.expect(!diags.hasErrors()); // NOTEs, never an ERROR - rc stays 0
         try std.testing.expectEqualStrings("a\n\n1\n", out.items); // the steps AROUND the X statements ran
         try std.testing.expectEqual(@as(usize, 2), noteCount(&diags, "X statement not executed"));
     }
-    // Open-code DM log-redirection notes — dm_statement.sas's last-line case,
+    // Open-code DM log-redirection notes - dm_statement.sas's last-line case,
     // unreachable from the parser-only fix (the inert skip is main.zig's).
     {
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -5378,7 +5378,7 @@ test "BUG-xstmtopencodesplit: open-code X (quoted AND bare-name) and open-code D
         try std.testing.expectEqual(@as(usize, 1), noteCount(&diags, "DM statement not executed"));
     }
     // …but a file holding ONLY that line falls back to the anonymous
-    // `data _null_` run, whose parser arm notes the very same statement — the
+    // `data _null_` run, whose parser arm notes the very same statement - the
     // segmenter must NOT note it a second time.
     {
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -5391,7 +5391,7 @@ test "BUG-xstmtopencodesplit: open-code X (quoted AND bare-name) and open-code D
         try std.testing.expectEqual(@as(usize, 1), noteCount(&diags, "DM statement not executed"));
     }
     // NEGATIVE CONTROL, and the load-bearing one: the open-code windowing
-    // idiom stays SILENT — the DM predicate matches WHOLE WORDS, so the
+    // idiom stays SILENT - the DM predicate matches WHOLE WORDS, so the
     // "out" inside "output;clear" must not fire it (the commonest DM idiom
     // in the corpus would note for nothing).
     {
@@ -5520,7 +5520,7 @@ test "unsupported PROC/CALL fails loud (CLIN-failloud)" {
     try interpret(a, &out, &d2, "data _null_;\n  call bogusroutine(1);\nrun;\n", null);
     try std.testing.expect(d2.hasErrors());
 
-    // a supported program stays clean — no false failure
+    // a supported program stays clean - no false failure
     g_failed = false;
     out.clearRetainingCapacity();
     var d3 = sas.diag.Diagnostics.init(a);
@@ -5549,7 +5549,7 @@ test "GAP-procprint: bad var / char SUM are user ERRORs (rc=1); unknown option i
     try std.testing.expect(d2.hasErrors());
     try std.testing.expect(std.mem.indexOf(u8, try d2.render(), "does not match type prescribed") != null);
 
-    // F4: an unrecognized PROC PRINT option is no longer swallowed — fail loud as
+    // F4: an unrecognized PROC PRINT option is no longer swallowed - fail loud as
     // an opensas gap (rc=2, captured in g_test_last_err in a test build).
     g_failed = false;
     g_test_last_err = "";
@@ -5584,7 +5584,7 @@ test "PROCBY-printfreq: PRINT BY DESCENDING honored (unsorted-per-spec loud) / F
         try std.testing.expect(std.mem.indexOf(u8, out.items, "g=2") != null);
     }
     // PRINT BY DESCENDING on DESCENDING-sorted data → sections, largest first
-    // (GAP-procbydescending — was: loud "plain ascending BY only").
+    // (GAP-procbydescending - was: loud "plain ascending BY only").
     {
         var out: std.ArrayList(u8) = .empty;
         var d = sas.diag.Diagnostics.init(a);
@@ -5596,7 +5596,7 @@ test "PROCBY-printfreq: PRINT BY DESCENDING honored (unsorted-per-spec loud) / F
     }
     // PRINT BY DESCENDING on ASCENDING data → loud ERROR naming the direction
     // (the sortedness guard flips per key; the printTable guard reports through
-    // `diags` at rc 1 — DEC-abortrcvsD009 — the BUG-printbyunsorted contract).
+    // `diags` at rc 1 - DEC-abortrcvsD009 - the BUG-printbyunsorted contract).
     {
         resetRcSignals();
         var out: std.ArrayList(u8) = .empty;
@@ -5623,7 +5623,7 @@ test "BUG-byvarnotfound: PRINT BY on an unknown variable fails loud; valid BY un
     const mk = "data d; do g = 1 to 2; x = g; output; end; run;\n";
 
     // `by nosuch;` → captured ERROR "Variable NOSUCH not found.", no listing
-    // (was: flat section, empty BY line, rc 0 — the lost-BY-line class).
+    // (was: flat section, empty BY line, rc 0 - the lost-BY-line class).
     {
         var out: std.ArrayList(u8) = .empty;
         var d = sas.diag.Diagnostics.init(a);
@@ -5659,7 +5659,7 @@ test "GH#15 ISS-readonlyguard: output access to ACCESS=READONLY libref fails lou
     const ro = "libname src \"/tmp/opensas_gh15_nodir\" access=readonly;\n";
     const RO = "read-only library";
 
-    // (1) DATA SRC.NEW — CREATING a member in a read-only libref → captured ERROR
+    // (1) DATA SRC.NEW - CREATING a member in a read-only libref → captured ERROR
     // (was: silent exit 0). The data-step write routes through Library.put.
     {
         var out: std.ArrayList(u8) = .empty;
@@ -5668,7 +5668,7 @@ test "GH#15 ISS-readonlyguard: output access to ACCESS=READONLY libref fails lou
         try std.testing.expect(d.hasErrors());
         try std.testing.expect(std.mem.indexOf(u8, try d.render(), RO) != null);
     }
-    // (2) PROC SORT DATA=SRC.EC (no OUT=) — IN-PLACE mutation of a read-only member
+    // (2) PROC SORT DATA=SRC.EC (no OUT=) - IN-PLACE mutation of a read-only member
     // → captured ERROR (was: silent in-memory sort, exit 0). This path never hits
     // Library.put, so it is guarded at the PROC SORT dispatch.
     {
@@ -5725,18 +5725,18 @@ test "GAP-xport0colskip: a 0-variable dataset refuses BOTH writes LOUDLY (no pha
     const lr = Libref{ .name = "o", .dir = "/tmp/opensas_0col", .readonly = false };
 
     // 0 columns: real SAS CREATES the set with a bare NOTE (Macro Language Ref,
-    // SYSDATASTEPPHASE ex. 2, printed p. 246/pdf 261 — "NOTE: The data set
+    // SYSDATASTEPPHASE ex. 2, printed p. 246/pdf 261 - "NOTE: The data set
     // WORK.NULL has 1 observations and 0 variables."), so the set lives; only
     // the native write refuses, and it must be LOUD (a silent skip is the no-op
     // house rules forbid; cf3fecc6 sibling = ERROR). SEV-zerocolrefusal kept
     // exit 2: p.246 is a WORK set and that program already exits 0 here, so the
     // citation and this refusal are about different layers (see writeMember).
-    // 1 observation, 0 variables — the documented shape exactly.
+    // 1 observation, 0 variables - the documented shape exactly.
     const empty = try a.create(sas.dataset.Dataset);
     empty.* = sas.dataset.Dataset.init(a, "o.empty");
     try empty.appendRow(&.{});
     // A leftover from an earlier run would make the two absence assertions below
-    // pass or fail for the wrong reason — start from a known-clean directory.
+    // pass or fail for the wrong reason - start from a known-clean directory.
     Io.Dir.cwd().deleteFile(io_, "/tmp/opensas_0col/empty.sas7bdat") catch {};
     Io.Dir.cwd().deleteFile(io_, "/tmp/opensas_0col/empty.csv") catch {};
     g_failed = false;
@@ -5748,7 +5748,7 @@ test "GAP-xport0colskip: a 0-variable dataset refuses BOTH writes LOUDLY (no pha
 
     // BUG-csvzerocolphantom: NEITHER file may exist. The CSV used to be written
     // as two bytes ("\n\n") that reloaded as one phantom VAR1 column with 0
-    // observations — the observation lost AND a variable fabricated. CSV has no
+    // observations - the observation lost AND a variable fabricated. CSV has no
     // encoding for 0 variables (io.writeCsvImpl explains both grounds), so the
     // writer refuses and the sidecar is no longer created; that reload lie is
     // pinned directly on the two bytes by io.zig's BUG-csvzerocolphantom test,
@@ -5756,7 +5756,7 @@ test "GAP-xport0colskip: a 0-variable dataset refuses BOTH writes LOUDLY (no pha
     try std.testing.expectError(error.FileNotFound, Io.Dir.cwd().access(io_, "/tmp/opensas_0col/empty.csv", .{}));
     try std.testing.expect(std.mem.indexOf(u8, g_test_last_err, "does NOT survive") != null);
 
-    // Control: a normal 1-column member must NOT move — writes, no fail-loud.
+    // Control: a normal 1-column member must NOT move - writes, no fail-loud.
     const ctrl = try a.create(sas.dataset.Dataset);
     ctrl.* = sas.dataset.Dataset.init(a, "o.ctrl");
     _ = try ctrl.addColumn("x", .num);
@@ -5771,7 +5771,7 @@ test "GAP-xport0colskip: a 0-variable dataset refuses BOTH writes LOUDLY (no pha
 }
 
 test "BUG-iostreamclobber: stdout writer is STREAMING, never positional" {
-    // Positional mode pwrites at a tracked offset starting at 0 — under
+    // Positional mode pwrites at a tracked offset starting at 0 - under
     // `sas prog > log 2>&1` that collides with stderr's own offset-0 start and
     // silently clobbers output. Streaming writes at the shared OS position.
     var buf: [64]u8 = undefined;
@@ -5808,7 +5808,7 @@ test "FILE libref serves only the file's own member name + applies sibling .labe
     try Io.Dir.cwd().writeFile(io_, .{ .sub_path = s7l, .data = (try sas.io.labelSidecar(a, &ds)).? });
     try Io.Dir.cwd().writeFile(io_, .{ .sub_path = xp, .data = try sas.io.writeXport(a, &ds) });
 
-    // 1) correct member name reads — and the sibling .labels sidecar (label +
+    // 1) correct member name reads - and the sibling .labels sidecar (label +
     //    format) survives a FILE-libref read, as on the directory path (F9).
     var out: std.ArrayList(u8) = .empty;
     var d1 = sas.diag.Diagnostics.init(a);
@@ -5822,7 +5822,7 @@ test "FILE libref serves only the file's own member name + applies sibling .labe
     try std.testing.expect(std.mem.indexOf(u8, out.items, "LBL=Unique Subject") != null); // label survived
     try std.testing.expect(std.mem.indexOf(u8, out.items, "FMT=3.") != null); // format survived
 
-    // 2) F6: a typo'd member name is NOT served the one file — the load is
+    // 2) F6: a typo'd member name is NOT served the one file - the load is
     //    refused, so SET fails loud like any absent member (captured diag).
     out.clearRetainingCapacity();
     var d2 = sas.diag.Diagnostics.init(a);
@@ -5831,7 +5831,7 @@ test "FILE libref serves only the file's own member name + applies sibling .labe
     try std.testing.expect(d2.hasErrors());
     try std.testing.expect(diagHas(&d2, "File f.zzz_nonexistent does not exist"));
 
-    // 3) XPT: the STAMPED member name governs — `x.flm` reads even though the
+    // 3) XPT: the STAMPED member name governs - `x.flm` reads even though the
     //    stem is "opensas_flm", and `x.opensas_flm` is refused.
     out.clearRetainingCapacity();
     var d3 = sas.diag.Diagnostics.init(a);
@@ -5903,7 +5903,7 @@ test "GAP-libnameopt + GAP-filenameopt: LIBNAME/FILENAME option lists end in a r
         try std.testing.expect(std.mem.indexOf(u8, try d.render(), "LIBNAME option bogusopt is not supported") != null);
         try std.testing.expect(std.mem.indexOf(u8, out.items, "LOST") == null);
     }
-    // the audit's typo risk: `acces=readonly` must die NAMED — never silently
+    // the audit's typo risk: `acces=readonly` must die NAMED - never silently
     // leave the lib unprotected (the old word-scan even matched the value,
     // hiding the typo while binding read-write).
     {
@@ -5958,8 +5958,8 @@ test "GAP-libnameopt + GAP-filenameopt: LIBNAME/FILENAME option lists end in a r
 }
 
 test "GAP-ebnfrcwrongclass: documented-but-unimplemented LIBNAME options (INENCODING=/OUTENCODING=/CVPMULTIPLIER=) are NAMED rc-2 gaps; typos and plain cvp= stay rc 1" {
-    // The catch-all's message already NAMED the option but exited rc 1 — "your
-    // SAS is broken" — for options real SAS runs clean. The documented set is
+    // The catch-all's message already NAMED the option but exited rc 1 - "your
+    // SAS is broken" - for options real SAS runs clean. The documented set is
     // OUR gap: rc 2 (D-009/D-009b(i)), message byte-identical (proc.zig's
     // isFreqTablesGapOption split shape). Citations in isDocLibnameGapOpt.
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -5979,8 +5979,8 @@ test "GAP-ebnfrcwrongclass: documented-but-unimplemented LIBNAME options (INENCO
         try std.testing.expect(std.mem.indexOf(u8, rendered, " is not supported") != null);
         try std.testing.expectEqual(@as(u8, 2), testRc(&d));
     }
-    // A typo (`bogusopt`, `acces`) keeps the rc-1 typo class — never a false
-    // rc 2 — and plain `cvp=` stays rc 1 too: the docs document the CVP
+    // A typo (`bogusopt`, `acces`) keeps the rc-1 typo class - never a false
+    // rc 2 - and plain `cvp=` stays rc 1 too: the docs document the CVP
     // ENGINE (Statements Ref printed p.221, already rc 2 in the engine arm),
     // but no `CVP=` LIBNAME OPTION exists in them (the tick431 row's premise).
     for ([_][]const u8{ "bogusopt=1", "acces=readonly", "cvp=yes" }) |opt| {
@@ -6010,11 +6010,11 @@ test "NOTE-libnameengine: an unknown LIBNAME engine fails loud (SAS: 'engine can
         try std.testing.expect(std.mem.indexOf(u8, try d.render(), "The boguseng engine cannot be found.") != null);
         try std.testing.expect(std.mem.indexOf(u8, out.items, "LOST") == null);
     }
-    // a doc-named but UNIMPLEMENTED engine (JSON — Statements Ref p.221 stub)
+    // a doc-named but UNIMPLEMENTED engine (JSON - Statements Ref p.221 stub)
     // rejects AT THE STATEMENT too: there is no later loud point (engine slot
     // is advisory; format is extension-sniffed), so deferral = silent swallow.
     // GAP-gapsexitingone §5d re-classed it: real SAS 9.4 HAS the JSON engine,
-    // so the refusal is a gap — named "not supported" and rc 2 (pinned in the
+    // so the refusal is a gap - named "not supported" and rc 2 (pinned in the
     // §5d test below), not SAS's rc-1 "cannot be found".
     {
         var out: std.ArrayList(u8) = .empty;
@@ -6023,7 +6023,7 @@ test "NOTE-libnameengine: an unknown LIBNAME engine fails loud (SAS: 'engine can
         try std.testing.expect(d.hasErrors());
         try std.testing.expect(std.mem.indexOf(u8, try d.render(), "LIBNAME engine json is not supported (BASE/V9/XPORT only)") != null);
     }
-    // positive: the engines for the formats opensas implements bind clean —
+    // positive: the engines for the formats opensas implements bind clean -
     // BASE, its documented alias V9 (Procedures Guide p.1032), XPORT (p.531),
     // any case; and engine-less forms are untouched.
     {
@@ -6035,7 +6035,7 @@ test "NOTE-libnameengine: an unknown LIBNAME engine fails loud (SAS: 'engine can
     }
 }
 
-test "NOTE-truncreadmsg: a truncated sas7bdat/xpt member reports 'damaged or truncated' — never 'does not exist'" {
+test "NOTE-truncreadmsg: a truncated sas7bdat/xpt member reports 'damaged or truncated' - never 'does not exist'" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -6054,7 +6054,7 @@ test "NOTE-truncreadmsg: a truncated sas7bdat/xpt member reports 'damaged or tru
 
     // 1) FILE-libref, truncated sas7bdat: ONE truthful ERROR naming the real
     //    cause; the misleading "does not exist" never prints; the referencing
-    //    step errhalt-skips (captured diags — no real aborting process).
+    //    step errhalt-skips (captured diags - no real aborting process).
     {
         var out: std.ArrayList(u8) = .empty;
         var d = sas.diag.Diagnostics.init(a);
@@ -6080,7 +6080,7 @@ test "NOTE-truncreadmsg: a truncated sas7bdat/xpt member reports 'damaged or tru
         try std.testing.expect(!diagHas(&d, "does not exist"));
     }
     // 3) DIR-libref: a damaged .sas7bdat must NOT silently fall through to a
-    //    stale .csv sidecar of the same member (D-002) — loud, csv never read.
+    //    stale .csv sidecar of the same member (D-002) - loud, csv never read.
     {
         const dp = "/tmp/opensas_lb_dd.sas7bdat";
         defer Io.Dir.cwd().deleteFile(io_, dp) catch {};
@@ -6096,7 +6096,7 @@ test "NOTE-truncreadmsg: a truncated sas7bdat/xpt member reports 'damaged or tru
         try std.testing.expect(diagHas(&d, "the file exists but is damaged or truncated"));
         try std.testing.expect(std.mem.indexOf(u8, out.items, "SENTINEL_CSV_ROW") == null);
     }
-    // 4) control: a genuinely MISSING member still says "does not exist" —
+    // 4) control: a genuinely MISSING member still says "does not exist" -
     //    that message is truthful there and must not move.
     {
         var out: std.ArrayList(u8) = .empty;
@@ -6114,12 +6114,12 @@ test "BUG-dropoptfalsewarn: output dataset-option drop=/keep=/rename= of a refer
     defer arena.deinit();
     const a = arena.allocator();
     const mk = "data a; input x; datalines;\n1\n2\n;\nrun;\n";
-    // The ticket's exact case: `e` IS referenced (`if e then`) — the
+    // The ticket's exact case: `e` IS referenced (`if e then`) - the
     // STATEMENT path (`drop e;`) already stayed silent by validating against
     // the PDV (exec.assertReferenced); the OPTION path validated against the
     // FINALIZED schema, which the executor had already stripped of the end=
     // temp. Now both spellings reach the same PDV answer (D-009b's
-    // corollary) — pinned for all THREE lists the message names, plus the
+    // corollary) - pinned for all THREE lists the message names, plus the
     // in= temp and the statement form so they cannot drift apart again.
     {
         var diags = sas.diag.Diagnostics.init(a);
@@ -6134,7 +6134,7 @@ test "BUG-dropoptfalsewarn: output dataset-option drop=/keep=/rename= of a refer
         try std.testing.expect(std.mem.indexOf(u8, out.items, "LAST") != null); // e really drove the step
         try std.testing.expect(!diags.hasStepErrors());
     }
-    // A genuinely never-referenced name must STILL warn — the warning exists
+    // A genuinely never-referenced name must STILL warn - the warning exists
     // to catch a typo'd DROP/KEEP/RENAME name; silencing it is worse than
     // the bug. All three option lists, WARNING (DKROCOND default), step runs.
     {

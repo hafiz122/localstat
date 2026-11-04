@@ -1,6 +1,6 @@
 /* BUG-charinboolean: a CHARACTER value in a truth context is auto-converted
    char→numeric first (w. informat; blank/unparseable → missing), then numeric
-   truthiness — '0' and 'abc' are BOTH false, '2.5' true. */
+   truthiness - '0' and 'abc' are BOTH false, '2.5' true. */
 data _null_;
   length c $3;
   /* literals */

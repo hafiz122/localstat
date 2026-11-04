@@ -1,5 +1,5 @@
 /* GAP-hashinexpr: a hash method/attribute call inside an EXPRESSION used to be
-   a parse error (`if h.find() = 0 then` — while the statement form
+   a parse error (`if h.find() = 0 then` - while the statement form
    `rc = h.find();` parsed fine). The parser now hoists the call into a
    hash_op on a __hashattr_N temp emitted right before the statement. */
 data keys;
@@ -49,9 +49,9 @@ data _null_;
   n = h.num_items; put "n=" n;
 run;
 
-/* GAP-hashinexpr, FUNCTION-ARGUMENT slot. The operand form is doc-attested —
+/* GAP-hashinexpr, FUNCTION-ARGUMENT slot. The operand form is doc-attested -
    SAS 9.4 Component Objects: Reference printed p.84 (REMOVE Method example)
-   writes `do while (hi.next() = 0);`, a method call as a comparison operand —
+   writes `do while (hi.next() = 0);`, a method call as a comparison operand -
    but an argument slot was intercepted one layer earlier by parseCall's
    informat-spec probe, which grabbed `h.` as if it were `date9.` and then
    blamed the paren ("expected ')' to close function call"). `NAME . NAME` is
@@ -76,7 +76,7 @@ data _null_;
   if max(h.find(), -1) = 0 then put "ifarg hit nm=" nm;
 run;
 
-/* Control: informat specs in the same argument slot are UNMOVED — the guard
+/* Control: informat specs in the same argument slot are UNMOVED - the guard
    only declines `NAME . NAME`, which no informat can be. */
 data _null_;
   a = input("14MAR2018", date9.);     put "inf a=" a date9.;

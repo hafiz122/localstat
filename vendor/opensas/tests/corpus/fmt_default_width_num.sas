@@ -1,6 +1,6 @@
 /* GAP-fmtdefwidth-num: a named numeric format with NO explicit width renders at
    its documented SAS DEFAULT width (COMMA/COMMAX/DOLLAR/DOLLARX/NEGPAREN/PERCENT
-   = 6, SAS 9.4 Formats Reference), right-justified into it — the width-less
+   = 6, SAS 9.4 Formats Reference), right-justified into it - the width-less
    forms used to print at natural width with no padding. Explicit-width uses are
    byte-identical controls. */
 data _null_;

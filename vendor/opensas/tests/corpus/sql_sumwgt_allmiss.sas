@@ -1,4 +1,4 @@
-/* BUG-sqlsumwgtallmiss — SUMWGT is 0, not missing, when there is nothing to
+/* BUG-sqlsumwgtallmiss - SUMWGT is 0, not missing, when there is nothing to
    average, and PROC SQL must say what PROC UNIVARIATE says.
 
    SUMWGT IS ONE STATISTIC SHARED BY BOTH SURFACES, so a disagreement is not a
@@ -15,7 +15,7 @@
    - Statistical Procedures printed p.410, "Sum of the Weights": "the sum of the
      weights is calculated as SUM(i=1..n) wi ... If there is no WEIGHT variable,
      the sum of the weights is n." PROC SQL has no WEIGHT clause at all, so the
-     sum of the weights is unconditionally n — and n is 0 here.
+     sum of the weights is unconditionally n - and n is 0 here.
    - Procedures Guide printed p.72, "Computational Requirements for Statistics",
      lists exactly what needs data: "N and NMISS do not require any nonmissing
      observations", "SUM, MEAN, MAX, MIN, RANGE, USS, and CSS require at least
@@ -24,7 +24,7 @@
      "Statistics are reported as missing if they cannot be computed", does not
      reach a sum over an empty set: that is computable, and it is 0.
 
-   The same passage is why SUM/USS/CSS/RANGE/STD/VAR stay MISSING below — they
+   The same passage is why SUM/USS/CSS/RANGE/STD/VAR stay MISSING below - they
    are named in the lists that require data. Both halves are pinned so neither
    can drift into the other (the DATA-derived twin is NOTE-univallmiss). */
 
@@ -40,13 +40,13 @@ proc sql;
     from allmiss;
   title 'zero-row table, column declared: sumwgt 0 = n 0';
   select n(x) as n, sumwgt(x) as sumwgt from emptycol;
-  title 'CONTROL: one non-missing value — sumwgt tracks n, unchanged';
+  title 'CONTROL: one non-missing value - sumwgt tracks n, unchanged';
   select n(x) as n, sumwgt(x) as sumwgt, sum(x) as sum from somemiss;
   title 'CONTROL: sumwgt of an EXPRESSION takes the same rule';
   select sumwgt(x*2) as sw_expr from allmiss;
 quit;
 title;
 
-/* the other surface, on the same data — the numbers must match */
+/* the other surface, on the same data - the numbers must match */
 proc univariate data=allmiss; var x; run;
 proc univariate data=somemiss; var x; run;

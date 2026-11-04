@@ -1,5 +1,5 @@
 /* BUG-vformatxlabel: VFORMATX/VLABELX/VVALUEX must return the ASSIGNED format/
-   label — including when it lives on a SET source's column, not the fresh PDV. */
+   label - including when it lives on a SET source's column, not the fresh PDV. */
 data d;
   amt = 1234.5;
   format amt dollar10.2;

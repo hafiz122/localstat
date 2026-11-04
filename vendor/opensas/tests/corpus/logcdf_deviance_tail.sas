@@ -7,7 +7,7 @@ data _null_;
   /* --- log-space tails (hand-verified vs mpmath 50-digit values) ---
      a1: log Phi(-10). Phi(-10)=7.619853024e-24, ln = ln(7.619853024)-24*ln(10)
        = 2.0307570 - 55.2620422 = -53.23128515051247 (mpmath logQ(10)).
-     a2: log Q(10) — the symmetric right tail, identical value.
+     a2: log Q(10) - the symmetric right tail, identical value.
      a3: log Phi(-38) = -38^2/2 - ln(38*sqrt(2pi)) + ln(1 - 1/38^2 + ...)
        = -722 - 4.556307 - 0.000692 = -726.5572160188201 (mpmath).
      a4: logpdf = -39^2/2 - 0.5*ln(2pi) = -760.5 - 0.9189385332046727

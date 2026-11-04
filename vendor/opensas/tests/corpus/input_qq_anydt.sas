@@ -1,5 +1,5 @@
 /* GAP-inputstmtqq + GAP-anydtinformat (doc-finder tick124).
-   Part 1: INPUT stmt `?`/`??` error-suppression modifier parses (dropped —
+   Part 1: INPUT stmt `?`/`??` error-suppression modifier parses (dropped -
    opensas INPUT is already silent-missing on bad data, so 'abc' reads x=.
    with no ERROR). Part 2: ANYDTDTEw./ANYDTDTMw./ANYDTTMEw. informats read
    "any" date/datetime/time form. 15JAN2020 = SAS day 21929. */

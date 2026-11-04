@@ -1,4 +1,4 @@
-# AGT-ci — independent gate: the manager must not self-attest green.
+# AGT-ci - independent gate: the manager must not self-attest green.
 # Runs the three hermetic suites on every push/PR to main.
 name: ci
 on:

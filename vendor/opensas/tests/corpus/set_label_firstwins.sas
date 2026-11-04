@@ -1,5 +1,5 @@
 /* BUG-setlabellastwins: across SET/MERGE members a variable's LABEL is
-   FIRST-source-wins — the same rule opensas already applies to LENGTH (with
+   FIRST-source-wins - the same rule opensas already applies to LENGTH (with
    the multiple-lengths warning), FORMAT, and INFORMAT. opensas took the LAST.
    A var labelled only in a later member still gets that label. */
 data a;

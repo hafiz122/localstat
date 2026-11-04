@@ -1,4 +1,4 @@
-/* BUG-macropow: %eval/%sysevalf support `**` (exponentiation) in SAS 9.4 —
+/* BUG-macropow: %eval/%sysevalf support `**` (exponentiation) in SAS 9.4 -
    it used to parse as `* <garbage>` and degrade to 0. Binds tighter than
    unary minus (-2**2 = -4), right-associative (2**3**2 = 512), saturating. */
 %put a=%eval(2**10);

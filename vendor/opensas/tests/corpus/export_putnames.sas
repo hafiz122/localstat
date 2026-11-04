@@ -1,4 +1,4 @@
-/* BUG-exportputnames: PROC EXPORT must honor PUTNAMES=NO — the exported file
+/* BUG-exportputnames: PROC EXPORT must honor PUTNAMES=NO - the exported file
    carries NO header row (data rows only); PUTNAMES=YES and the default keep it.
    The option used to be dropped silently → a NO file wrongly carried the header.
    Read the RAW files back (a PROC IMPORT round-trip would hide the bug). (no PHI) */

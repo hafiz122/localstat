@@ -1,6 +1,6 @@
 /* GAP-whereorbang (+ not_expr sibling): `!` / `¦` are alternate spellings of
    the OR operator `|` and `¬` an alternate NOT (Language Reference: Concepts Table 6.6 Groups VI/VII)
-   — previously not lexed at all, so legal SAS failed loud. Lexer aliases them
+   - previously not lexed at all, so legal SAS failed loud. Lexer aliases them
    to the existing pipe/caret tokens; the DOUBLES (`!!`, `¦¦`) stay concat. */
 data _null_;
   a = 1; b = 0;

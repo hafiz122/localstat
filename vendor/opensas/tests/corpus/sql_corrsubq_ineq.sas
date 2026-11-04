@@ -1,7 +1,7 @@
 /* PERF-sqlcorrsubq-ineq: a correlated scalar subquery whose inner WHERE is a
    COMPOUND equality and/or an INEQUALITY (`b.g=a.g and b.v>a.v`) buckets the
    inner table once on the composite equality key and binary-searches a sorted
-   bucket per outer row — these pinned values must match the per-row fallback
+   bucket per outer row - these pinned values must match the per-row fallback
    byte-for-byte. Covers: the rank-within-group idiom (count of b.v > a.v per
    group), all four inequality operators, MIN/MAX over the inequality (the
    next/previous-value idiom), count(col) with inner missings, compound-equality
@@ -34,7 +34,7 @@ proc sql;
 quit;
 proc print data=r1 noobs; run;
 
-/* compound equality (two keys) — count/sum/avg/min/max, flipped operand order */
+/* compound equality (two keys) - count/sum/avg/min/max, flipped operand order */
 proc sql;
   create table r2 as
   select a.id, a.g, a.h,
@@ -60,7 +60,7 @@ proc sql;
 quit;
 proc print data=r3 noobs; run;
 
-/* sum/avg over an inequality BAILS to the per-row path — pin that it stays correct */
+/* sum/avg over an inequality BAILS to the per-row path - pin that it stays correct */
 proc sql;
   create table r4 as
   select a.id,

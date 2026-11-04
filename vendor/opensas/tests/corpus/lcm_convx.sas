@@ -1,5 +1,5 @@
 /* BUG-lcmoverflow + BUG-convxfreq (doc-finder tick277 F2/F1).
-   LCM: lcm(8999999999999999, 8999999999999998) — consecutive ints are coprime,
+   LCM: lcm(8999999999999999, 8999999999999998) - consecutive ints are coprime,
    so LCM = a*b ~= 8.1e31. The u64 a/gcd*b multiply OVERFLOWED and PANICKED the
    interpreter (safe build: abort/core dump; the DATA step died mid-PUT).
    Now a checked multiply returns MISSING and the step RUNS TO COMPLETION.
@@ -12,7 +12,7 @@
    f=1 is unchanged (k(k+1) == k(k+f)): convx(0.05,1,100) = 2/1.05^2. */
 data _null_;
   big = lcm(8999999999999999, 8999999999999998);
-  put big=;         /* missing — and this PUT is REACHED (no abort) */
+  put big=;         /* missing - and this PUT is REACHED (no abort) */
   g = gcd(8999999999999999, 8999999999999998);
   put g=;           /* 1 */
   small = lcm(4, 6);

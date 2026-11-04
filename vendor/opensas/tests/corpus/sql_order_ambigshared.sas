@@ -1,11 +1,11 @@
 /* BUG-sqlorderbyambig (GH#26): ORDER BY an unqualified column that lives in
    BOTH sides of a join, where the SELECT list projects exactly ONE of them.
-   `select a.id … order by id` names the OUTPUT column `id` — ORDER BY
-   resolves result columns before contributing tables — so live SAS 9.4 runs
+   `select a.id … order by id` names the OUTPUT column `id` - ORDER BY
+   resolves result columns before contributing tables - so live SAS 9.4 runs
    it; opensas rejected it as an ambiguous reference. The fix exempts a bare
    ORDER BY name that matches exactly one output column (uniqueOutputCol in
    sql.zig); asc/desc and the listing path are both pinned here. The
-   two-projections edge (`select a.id, b.id`) stays an ERROR — pinned in
+   two-projections edge (`select a.id, b.id`) stays an ERROR - pinned in
    sql_order_ambigshared_both.sas. Invented data (D-011). */
 data a;
   input id x;

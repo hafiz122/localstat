@@ -1,4 +1,4 @@
-/* audit-tick: macro_fn — one probe per member of the production, routed
+/* audit-tick: macro_fn - one probe per member of the production, routed
    through a DATA-step PUT so the resolved text lands on stdout (%put writes
    to the log stream, which the corpus does not diff). */
 %let a = hello world foo;

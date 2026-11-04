@@ -1,4 +1,4 @@
-/* BUG-symputnumfmt: CALL SYMPUT of a NUMERIC converts via BEST12. — right-
+/* BUG-symputnumfmt: CALL SYMPUT of a NUMERIC converts via BEST12. - right-
    justified in a 12-char field (leading blanks), stored UNtrimmed, plus a
    num→char NOTE in the log. Only CALL SYMPUTX trims. (%put writes to the
    log, so the width is shown via PUT + length().) */

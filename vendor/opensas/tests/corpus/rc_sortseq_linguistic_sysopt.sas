@@ -1,4 +1,4 @@
-/* BUG-sortseqbaresuperset — `options sortseq=linguistic(<collating-options>)`
+/* BUG-sortseqbaresuperset - `options sortseq=linguistic(<collating-options>)`
    is a GAP (rc 2), not a user error. This fixture was created one commit
    earlier by BUG-rcsplitmembership F2 pinning rc 1, and F2 WAS WRONG on this
    one value; the pin is corrected here rather than deleted, so the reasoning
@@ -11,7 +11,7 @@
    (`=== pdf 2452 ===`), says: "Starting in the third maintenance release of
    SAS 9.4, you can specify linguistic collation using the SORTSEQ= option in
    the SQL procedure and by specifying the SORTSEQ=LINGUISTIC system option."
-   — a DATED feature statement, so the restriction describes the pre-M3 state.
+   - a DATED feature statement, so the restriction describes the pre-M3 state.
    The SQL Procedure User's Guide printed p.261 (`=== pdf 276 ===`) corroborates
    twice more: "If LINGUISTIC is specified for the SORTSEQ system option, then
    PROC SQL honors the setting", and a CAUTION naming "the SORTSEQ=LINGUISTIC

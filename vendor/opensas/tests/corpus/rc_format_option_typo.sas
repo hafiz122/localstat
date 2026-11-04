@@ -1,4 +1,4 @@
-/* GAP-gapsexitingone §5b re-verdict — a TYPO'd PROC FORMAT option
+/* GAP-gapsexitingone §5b re-verdict - a TYPO'd PROC FORMAT option
    (`mxlablen=8`) is the USER's error, exit 1. The Summary of Optional
    Arguments closes the option set, so the catch-all can tell a typo from
    an unimplemented option; the gap twin pins MAXLABLEN= at rc 2.

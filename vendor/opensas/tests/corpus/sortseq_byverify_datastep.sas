@@ -3,10 +3,10 @@
    p.533 Note). The repro shape: `options sortseq=linguistic;` + PROC SORT puts
    GRP in dictionary order (A a b B c); the DATA step `set s; by grp;` then
    verifies that order. The byte-comparing SET guard read it as "BY variables
-   are not properly sorted" at rc 1 and BUG-errhalt skipped every later step —
+   are not properly sorted" at rc 1 and BUG-errhalt skipped every later step -
    a valid SAS program rejected. Post-fix the whole run is rc 0; the listing
    pins the rows in linguistic order (byte order would be A B a b c) and the
-   first./last. flags pin byte-exact GROUPING (five separate groups — the
+   first./last. flags pin byte-exact GROUPING (five separate groups - the
    fold-equal neighbours A/a and B/b never merge). Invented data.
 
    expect-rc: 0 */

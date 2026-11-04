@@ -1,5 +1,5 @@
 /* BUG-reportnumwidth (MED, silent-wrong): PROC REPORT added +2 to every numeric
-   column width — including columns with an explicit FORMAT= — so a `format=dollar8.2`
+   column width - including columns with an explicit FORMAT= - so a `format=dollar8.2`
    analysis column rendered 10-wide instead of 8. SAS (and PROC PRINT) render an
    explicit-format numeric column at exactly the format width; the 2-blank gutter
    between columns is separate. The two reports below print the same value through

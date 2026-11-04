@@ -12,9 +12,9 @@
 //! back references `\num` (multi-digit), `|` alternation, `^` `$` anchors (`/m` line-aware),
 //! `\b \B`, `\n \t \r \f \v \e \a \xHH`, and the `/i /g /s /m /o` modifiers.
 //!
-//! FAIL-LOUD rule (doc-finder tick133): any other documented PRX construct —
+//! FAIL-LOUD rule (doc-finder tick133): any other documented PRX construct -
 //! lookbehind, `\k`, `\A`, unknown POSIX classes, unknown `/` modifiers, a bad
-//! back reference, an unbalanced pattern — is a COMPILE ERROR, logged LOUD
+//! back reference, an unbalanced pattern - is a COMPILE ERROR, logged LOUD
 //! (ERROR/UNSUPPORTED + missing id), never silently literalized into a pattern
 //! that matches the wrong text (silent-wrong is the clinical worst class).
 //! ponytail: a step budget caps catastrophic backtracking (raise BUDGET if a real
@@ -44,8 +44,8 @@ const Atom = union(enum) {
     aend, //   $
     wordb, //  \b  word boundary
     nwordb, // \B  non-boundary
-    backref: u32, // \N — the text capture group N matched (1-based)
-    look: Look, //   (?=…) / (?!…) — zero-width lookahead
+    backref: u32, // \N - the text capture group N matched (1-based)
+    look: Look, //   (?=…) / (?!…) - zero-width lookahead
     group: Group,
 };
 const Group = struct { alts: []const []const Term, cap: ?u32 };
@@ -60,13 +60,13 @@ const Parser = struct {
     src: []const u8,
     i: usize = 0,
     ncap: u32 = 0,
-    err_msg: ?[]const u8 = null, // WHY a BadPattern — logged LOUD by parse()
+    err_msg: ?[]const u8 = null, // WHY a BadPattern - logged LOUD by parse()
     err_kind: FailKind = .invalid,
 
     const FailKind = enum { invalid, unsupported };
 
     /// Record why the pattern failed (an invalid user pattern, or a documented
-    /// construct this engine does not implement) and bail — parse() turns this
+    /// construct this engine does not implement) and bail - parse() turns this
     /// into the loud ERROR/UNSUPPORTED line tick133 demands.
     fn fail(self: *Parser, kind: FailKind, comptime fmt: []const u8, args: anytype) error{BadPattern} {
         self.err_msg = std.fmt.allocPrint(self.a, fmt, args) catch null;
@@ -98,7 +98,7 @@ const Parser = struct {
         while (self.peek()) |c| {
             if (c == '|' or c == ')') break;
             if (c == '(' and self.i + 2 < self.src.len and self.src[self.i + 1] == '?' and self.src[self.i + 2] == '#') {
-                // (?#…) comment — contributes nothing, ends at the first ')'
+                // (?#…) comment - contributes nothing, ends at the first ')'
                 const close = std.mem.indexOfScalarPos(u8, self.src, self.i + 3, ')') orelse
                     return self.fail(.invalid, "unterminated '(?#' comment", .{});
                 self.i = close + 1;
@@ -128,7 +128,7 @@ const Parser = struct {
         return q;
     }
 
-    /// `{n}` `{n,}` `{n,m}` `{,m}` — a bounded repetition. A malformed `{…` is not
+    /// `{n}` `{n,}` `{n,m}` `{,m}` - a bounded repetition. A malformed `{…` is not
     /// a quantifier: restore and leave the `{` to be read as a literal atom.
     fn parseBrace(self: *Parser) Quant {
         const save = self.i;
@@ -179,21 +179,21 @@ const Parser = struct {
     }
 
     /// `( … )` capturing, `(?:…)` non-capturing, `(?<name>…)`/`(?'name'…)` named
-    /// (numbered left-to-right like any capture — positional PRXPOSN works),
-    /// `(?=…)`/`(?!…)` zero-width lookahead. Everything else under `(?` —
-    /// lookbehind, atomic groups, inline flags, … — fails LOUD, never compiles
+    /// (numbered left-to-right like any capture - positional PRXPOSN works),
+    /// `(?=…)`/`(?!…)` zero-width lookahead. Everything else under `(?` -
+    /// lookbehind, atomic groups, inline flags, … - fails LOUD, never compiles
     /// as literal text (BUG-prxconstruct).
     fn parseGroup(self: *Parser) error{ OutOfMemory, BadPattern }!Atom {
         var cap: ?u32 = null;
         if (self.peek() == '?') {
             const n1 = if (self.i + 1 < self.src.len) self.src[self.i + 1] else 0;
             switch (n1) {
-                0 => return self.fail(.invalid, "unbalanced '(' — missing ')'", .{}),
+                0 => return self.fail(.invalid, "unbalanced '(' - missing ')'", .{}),
                 ':' => self.i += 2,
                 '=', '!' => {
                     self.i += 2;
                     const alts = try self.parseAlt();
-                    if (self.peek() == ')') _ = self.eat() else return self.fail(.invalid, "unbalanced '(?' — missing ')'", .{});
+                    if (self.peek() == ')') _ = self.eat() else return self.fail(.invalid, "unbalanced '(?' - missing ')'", .{});
                     return .{ .look = .{ .alts = alts, .neg = n1 == '!' } };
                 },
                 '<' => {
@@ -218,7 +218,7 @@ const Parser = struct {
             cap = self.ncap;
         }
         const alts = try self.parseAlt();
-        if (self.peek() == ')') _ = self.eat() else return self.fail(.invalid, "unbalanced '(' — missing ')'", .{});
+        if (self.peek() == ')') _ = self.eat() else return self.fail(.invalid, "unbalanced '(' - missing ')'", .{});
         return .{ .group = .{ .alts = alts, .cap = cap } };
     }
 
@@ -261,19 +261,19 @@ const Parser = struct {
             '1'...'9' => {
                 // \1-\9 (multi-digit allowed): match the text group N captured.
                 // A reference to a group not yet opened is a compile ERROR (SAS:
-                // "Invalid back reference") — never the literal digit (BUG-prxbackref).
+                // "Invalid back reference") - never the literal digit (BUG-prxbackref).
                 var n: u32 = e - '0';
                 while (self.peek()) |d| {
                     if (!std.ascii.isDigit(d)) break;
                     _ = self.eat();
                     n = if (n > 100_000) n else n * 10 + (d - '0'); // saturate; only compared to ncap
                 }
-                if (n > self.ncap) return self.fail(.invalid, "invalid back reference \\{d} — pattern has {d} capture group(s) before it", .{ n, self.ncap });
+                if (n > self.ncap) return self.fail(.invalid, "invalid back reference \\{d} - pattern has {d} capture group(s) before it", .{ n, self.ncap });
                 return .{ .backref = n };
             },
             else => {
                 // A documented construct we don't implement (\A \z \k \0 …) fails
-                // LOUD; other escapes follow Perl's passthrough — an escaped
+                // LOUD; other escapes follow Perl's passthrough - an escaped
                 // metachar or ordinary letter is that literal.
                 if (e == '0' or isUnimplementedEscape(e)) return self.fail(.unsupported, "PRX escape '\\{c}' is not supported", .{e});
                 return .{ .lit = e };
@@ -283,8 +283,8 @@ const Parser = struct {
 
     /// The s/// replacement side of a pattern follows the SAME capture-reference
     /// rule as `\num` in the pattern (one engine, one meaning for a group number
-    /// — GAP-prxrepldoubledigit): `$num`/`\num` parse num GREEDILY as a
-    /// multi-digit number ($10 = buffer 10 — Functions and CALL Routines Ref,
+    /// - GAP-prxrepldoubledigit): `$num`/`\num` parse num GREEDILY as a
+    /// multi-digit number ($10 = buffer 10 - Functions and CALL Routines Ref,
     /// printed p.1713: "num is a positive integer"), and a reference past the
     /// last capture group is a compile ERROR, never group 1 + a literal tail.
     /// `$0` (whole match) stays valid.
@@ -298,12 +298,12 @@ const Parser = struct {
                 while (i < repl.len and std.ascii.isDigit(repl[i])) : (i += 1)
                     n = if (n > 100_000) n else n * 10 + (repl[i] - '0'); // saturate; only compared to ncap
                 i -= 1; // the loop's += 1 re-reads the first non-digit
-                if (n > self.ncap) return self.fail(.invalid, "invalid capture reference {c}{d} — pattern has {d} capture group(s)", .{ c, n, self.ncap });
+                if (n > self.ncap) return self.fail(.invalid, "invalid capture reference {c}{d} - pattern has {d} capture group(s)", .{ c, n, self.ncap });
             }
         }
     }
 
-    /// `\xHH` / `\x{H…}` — a byte value. Malformed, or > 0xFF in this
+    /// `\xHH` / `\x{H…}` - a byte value. Malformed, or > 0xFF in this
     /// byte-oriented engine, is a compile error.
     fn parseHex(self: *Parser) error{BadPattern}!u8 {
         var v: u32 = 0;
@@ -377,7 +377,7 @@ const Parser = struct {
                 continue;
             }
             if (c == '[' and self.i + 1 < self.src.len and self.src[self.i + 1] == ':') {
-                // POSIX class [[:name:]] / [[:^name:]] — expand to byte ranges
+                // POSIX class [[:name:]] / [[:^name:]] - expand to byte ranges
                 // (complement ranges for ^, which compose with an outer [^…]).
                 _ = self.eat(); // '['
                 _ = self.eat(); // ':'
@@ -393,7 +393,7 @@ const Parser = struct {
                 }
                 const nm = self.src[nstart..self.i];
                 if (self.peek() == ':') _ = self.eat();
-                if (self.peek() == ']') _ = self.eat() else return self.fail(.invalid, "malformed POSIX class '[[:{s}' — expected ':]'", .{nm});
+                if (self.peek() == ']') _ = self.eat() else return self.fail(.invalid, "malformed POSIX class '[[:{s}' - expected ':]'", .{nm});
                 const base = posixLookup(nm) orelse return self.fail(.invalid, "unknown POSIX class '[[:{s}:]]'", .{nm});
                 if (neg) try appendComplement(self.a, &ranges, base) else for (base) |r| try ranges.append(self.a, r);
                 continue;
@@ -410,7 +410,7 @@ const Parser = struct {
 };
 
 /// Alphabetic escapes that name a real Perl/PRX construct this engine does not
-/// implement — these must fail LOUD, never literalize (tick133). Other letters
+/// implement - these must fail LOUD, never literalize (tick133). Other letters
 /// follow Perl's passthrough: an escaped ordinary letter is the letter itself.
 fn isUnimplementedEscape(e: u8) bool {
     return switch (e) {
@@ -444,7 +444,7 @@ fn posixLookup(name: []const u8) ?[]const [2]u8 {
     return null;
 }
 
-/// Append the byte-complement of `base` (sorted, disjoint ranges) to `ranges` —
+/// Append the byte-complement of `base` (sorted, disjoint ranges) to `ranges` -
 /// eager expansion, so it composes with the class's own `neg` ([^[:^d:]] ≡ [[:d:]]).
 fn appendComplement(a: std.mem.Allocator, ranges: *std.ArrayList([2]u8), base: []const [2]u8) error{OutOfMemory}!void {
     var lo: u16 = 0;
@@ -471,8 +471,8 @@ const M = struct {
     a: std.mem.Allocator,
     text: []const u8,
     ic: bool,
-    dotall: bool, //    /s — '.' also matches \n
-    multiline: bool, // /m — '^'/'$' also match at embedded \n
+    dotall: bool, //    /s - '.' also matches \n
+    multiline: bool, // /m - '^'/'$' also match at embedded \n
     caps: [][2]?usize,
     budget: usize = BUDGET,
 
@@ -549,7 +549,7 @@ const M = struct {
             },
             .look => |lk| {
                 if (lk.neg) {
-                    // Probe against a scratch copy — a (discarded) hit must not
+                    // Probe against a scratch copy - a (discarded) hit must not
                     // leak its captures into the real match state.
                     const save = self.caps;
                     self.caps = self.a.dupe([2]?usize, save) catch return null;
@@ -565,7 +565,7 @@ const M = struct {
                     self.caps = save;
                     return if (hit) null else self.run(k, pos);
                 }
-                // ponytail: a successful probe keeps its captures (Perl semantics —
+                // ponytail: a successful probe keeps its captures (Perl semantics -
                 // a later \N can use them) but they aren't undone if the outer match
                 // backtracks past this lookahead; stale PRXPOSN only in that corner.
                 for (lk.alts) |alt| {
@@ -638,7 +638,7 @@ const Entry = struct {
     dotall: bool = false, //    /s
     multiline: bool = false, // /m
     repl: ?[]const u8 = null, // s/// replacement template
-    freed: bool = false, // CALL PRXFREE — the pattern no longer matches
+    freed: bool = false, // CALL PRXFREE - the pattern no longer matches
     last_src: []const u8 = "",
     last_caps: [][2]?usize = &.{},
     last_which: usize = 0, // PRXPAREN: highest capture group that matched
@@ -649,7 +649,7 @@ const Match = struct { s: usize, e: usize, caps: [][2]?usize };
 var g_arena: ?std.heap.ArenaAllocator = null;
 var g_entries: std.ArrayList(Entry) = .empty;
 
-/// Drop the compiled-pattern registry from a prior run (taste #12) — entries
+/// Drop the compiled-pattern registry from a prior run (taste #12) - entries
 /// live in this module's arena; a stale id must not match in the next run.
 pub fn resetPerRun() void {
     if (g_arena) |*ar| ar.deinit();
@@ -663,7 +663,7 @@ fn arena() std.mem.Allocator {
 }
 
 /// Compile a SAS PRX pattern (`/re/flags`, `s/re/repl/flags`, or a bare `re`) and
-/// register it; returns the 1-based id, or null on a compile error — LOUDLY
+/// register it; returns the 1-based id, or null on a compile error - LOUDLY
 /// (GAP-prxinvalidnote): an invalid pattern logs ERROR, an unimplemented
 /// construct logs UNSUPPORTED and marks the opensas gap (exit 2, D-009).
 pub fn parse(pattern: []const u8) ?u32 {
@@ -715,7 +715,7 @@ pub fn parse(pattern: []const u8) ?u32 {
         'g' => e.global = true,
         's' => e.dotall = true,
         'm' => e.multiline = true,
-        'o' => {}, // compile-once hint — every PRXPARSE here compiles fresh, which honors it
+        'o' => {}, // compile-once hint - every PRXPARSE here compiles fresh, which honors it
         else => {
             loudUnsup("PRX modifier '/{c}' is not supported", .{f});
             return null;
@@ -733,7 +733,7 @@ pub fn parse(pattern: []const u8) ?u32 {
     return @intCast(g_entries.items.len); // 1-based id
 }
 
-/// Scan for the closing delimiter, honoring `\<d>` escapes — `/a\//` is the
+/// Scan for the closing delimiter, honoring `\<d>` escapes - `/a\//` is the
 /// pattern `a/`, not `a\` with a stray tail.
 fn findDelim(src: []const u8, from: usize, d: u8) ?usize {
     var i = from;
@@ -748,14 +748,14 @@ fn findDelim(src: []const u8, from: usize, d: u8) ?usize {
 }
 
 // ── loud-error channel (tick133) ────────────────────────────────────────────
-// A PRX pattern that is invalid (the user's SAS is wrong — SAS logs ERROR and
+// A PRX pattern that is invalid (the user's SAS is wrong - SAS logs ERROR and
 // returns missing) or uses a documented construct this engine does not implement
-// (an opensas gap — UNSUPPORTED + exit 2) must say so LOUD; the old code silently
+// (an opensas gap - UNSUPPORTED + exit 2) must say so LOUD; the old code silently
 // compiled a DIFFERENT pattern (silent-wrong, the clinical worst class). The CLI
-// prints to stderr (SAS-style log); test builds CAPTURE the line (D-003 — never
+// prints to stderr (SAS-style log); test builds CAPTURE the line (D-003 - never
 // spawn an aborting process from a test).
-// ponytail: loudInvalid can't reach the run's Diagnostics — prx.parse is called
-// from functions.zig/exec.zig without a diags handle and prx owns only this file —
+// ponytail: loudInvalid can't reach the run's Diagnostics - prx.parse is called
+// from functions.zig/exec.zig without a diags handle and prx owns only this file -
 // so a user-invalid pattern exits 0 though the ERROR is in the log. Upgrade path:
 // thread ev.diags through the prxparse dispatch (functions.zig) for exit-1 parity.
 pub var g_test_last_err: []const u8 = "";
@@ -887,7 +887,7 @@ pub fn posnSpan(id: u32, n: usize) Span {
 }
 
 /// CALL PRXFREE: release the compiled pattern. The id slot stays (ids remain
-/// stable) but the pattern no longer matches — SAS also sets the id var to missing.
+/// stable) but the pattern no longer matches - SAS also sets the id var to missing.
 pub fn free(id: u32) void {
     if (entryAt(id)) |e| e.freed = true;
 }
@@ -1046,7 +1046,7 @@ test "BUG-prxquant: {n} {n,} {n,m} bounded quantifiers + \\b word boundary" {
     try t.expect(matchId(parse("/^a{2,}$/").?, "aaaa") > 0);
     try t.expectEqual(@as(usize, 0), matchId(parse("/^a{2,}$/").?, "a"));
 
-    // {n,m}: between n and m — greedy, so it consumes as many as allowed
+    // {n,m}: between n and m - greedy, so it consumes as many as allowed
     const zip = parse("/\\d{3,5}/").?;
     try t.expectEqual(@as(usize, 1), matchId(zip, "12345")); // matches at pos 1
     // greedy {3,5} over 7 digits takes the first 5 (verify via a capture change)
@@ -1080,7 +1080,7 @@ test "BUG-prxbackref: back references \\1-\\9 match the captured text" {
     try t.expectEqual(@as(usize, 0), matchId(parse("/(x)|(b)\\2/").?, "ab"));
     // multi-digit reference
     try t.expectEqual(@as(usize, 1), matchId(parse("/(a)(b)(c)(d)(e)(f)(g)(h)(i)\\9/").?, "abcdefghii"));
-    // a reference past the opened groups is a compile ERROR, LOUD — not a literal digit
+    // a reference past the opened groups is a compile ERROR, LOUD - not a literal digit
     g_test_last_err = "";
     try t.expect(parse("/(a)\\2/") == null);
     try t.expect(std.mem.indexOf(u8, g_test_last_err, "invalid back reference") != null);
@@ -1092,7 +1092,7 @@ test "GAP-prxrepldoubledigit: replacement $num is multi-digit, mirrors \\num" {
     const a = ai.allocator();
 
     // $10 = capture buffer 10 (Functions ref, printed p.1713: "num is a
-    // positive integer") — not group 1 + a literal "0".
+    // positive integer") - not group 1 + a literal "0".
     const rx = parse("s/(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)/$10-$1/").?;
     try t.expectEqualStrings("j-akl", try change(a, rx, -1, "abcdefghijkl"));
     // $1-$9 unchanged (controls)
@@ -1109,7 +1109,7 @@ test "GAP-prxrepldoubledigit: replacement $num is multi-digit, mirrors \\num" {
     try t.expectEqual(@as(usize, 0), matchId(parse("/(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)\\10/").?, "abcdefghija0"));
 
     // ambiguity rule, mirroring the pattern side exactly: $10 with only 5
-    // groups is a LOUD compile ERROR — never group 1 + a literal tail.
+    // groups is a LOUD compile ERROR - never group 1 + a literal tail.
     g_test_last_err = "";
     try t.expect(parse("s/(a)(b)(c)(d)(e)/$10/") == null);
     try t.expect(std.mem.indexOf(u8, g_test_last_err, "invalid capture reference $10") != null);
@@ -1152,7 +1152,7 @@ test "BUG-prxconstruct: lookahead, named groups, /s /m, POSIX classes" {
     try t.expectEqual(@as(usize, 0), matchId(parse("/^b/").?, "a\nb"));
     try t.expectEqual(@as(usize, 0), matchId(parse("/c$/").?, "abc\nd"));
 
-    // POSIX classes — including [[:^…]] and [^[:…:]] (complements compose)
+    // POSIX classes - including [[:^…]] and [^[:…:]] (complements compose)
     try t.expectEqual(@as(usize, 3), matchId(parse("/[[:digit:]]+/").?, "ab123"));
     try t.expectEqual(@as(usize, 3), matchId(parse("/[[:alpha:]]+/").?, "12ab"));
     try t.expectEqual(@as(usize, 3), matchId(parse("/[[:^digit:]]+/").?, "12ab34"));

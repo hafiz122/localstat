@@ -1,5 +1,5 @@
 /* GAP-mortnonote: out-of-range MORT args now log the invalid-argument NOTE
-   (doc p.1215) and return missing — the NOTE is on stderr, so it is asserted
+   (doc p.1215) and return missing - the NOTE is on stderr, so it is asserted
    via captured diagnostics in finfns.zig's test block; this fixture pins that
    the RESULTS are missing and valid calls are unchanged. */
 data _null_;

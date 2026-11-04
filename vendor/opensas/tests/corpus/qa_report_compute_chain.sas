@@ -1,4 +1,4 @@
-/* QA tick194: PROC REPORT COMPUTE increment-1 (608c406) — VERIFIED GREEN.
+/* QA tick194: PROC REPORT COMPUTE increment-1 (608c406) - VERIFIED GREEN.
    Multiple computed columns in the detail path, with a computed column
    (dbl) referencing another computed column (tot) that precedes it in the
    COLUMN list. Compute blocks written in column order; SAS evaluates left to

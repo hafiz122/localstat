@@ -1,4 +1,4 @@
-/* BUG-scanmissingtype — SCAN is a CHARACTER function (SAS 9.4 Functions and
+/* BUG-scanmissingtype - SCAN is a CHARACTER function (SAS 9.4 Functions and
    CALL Routines: Reference, 5th ed., p.1462: "Returns the nth word from a
    character string"), so a no-match or an invalid count yields a BLANK
    CHARACTER value, not a numeric missing.
@@ -9,7 +9,7 @@
    red on the rc pin, not just on a diff. Ten blanks is a PASS.
 
    GH#78 also claimed the argument order was inverted (character-list before
-   count). It is not — `SCAN(string, count <, character-list <, modifier>>)` is
+   count). It is not - `SCAN(string, count <, character-list <, modifier>>)` is
    correct and the tail of this fixture pins it. */
 data _null_;
   length t $1;

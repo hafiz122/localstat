@@ -9,7 +9,7 @@ data _null_;
 run;
 
 /* BUG-hashdefinetag: defineData(all:'y') defines every PDV var INCLUDING
-   the keys (SAS semantics — BUG-hashdefinedataall), not a phantom variable
+   the keys (SAS semantics - BUG-hashdefinedataall), not a phantom variable
    literally named 'y'. find() still restores v/w; k is now data too. */
 data _null_;
   declare hash h2();

@@ -1,4 +1,4 @@
-/* GAP-arraysum: `a[i] + expr;` is a SUM statement on an array element —
+/* GAP-arraysum: `a[i] + expr;` is a SUM statement on an array element -
  * the subscripted analog of `var + expr;`. The element is retained across
  * iterations and expr is added each execution (init 0). */
 data src;

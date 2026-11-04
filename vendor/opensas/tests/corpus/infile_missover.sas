@@ -1,6 +1,6 @@
 /* BUG-infilemissover: INFILE record-boundary options. SAS 9.4: MISSOVER/TRUNCOVER
    "control what happens when an INPUT statement reaches the end of the current
-   record" — a short record sets the remaining variables to missing instead of
+   record" - a short record sets the remaining variables to missing instead of
    pulling values from the NEXT line (the default FLOWOVER, which silently misaligns
    all following data). For list input TRUNCOVER behaves like MISSOVER. (no PHI) */
 data mo;

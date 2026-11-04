@@ -1,5 +1,5 @@
 /* BUG-procwherestmtsilent: a PROC-level WHERE whose predicate FAILS TO PARSE
-   used to be dropped silently along with its diagnostics — the proc then ran
+   used to be dropped silently along with its diagnostics - the proc then ran
    on the FULL (unfiltered) table and exited 0. SAS 9.4 fails the step. The
    parse error must propagate LOUD and ABORT the proc (no full-table output).
    The valid PROC PRINT below still filters to id>=2; the malformed WHERE proc

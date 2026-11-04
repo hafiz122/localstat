@@ -1,5 +1,5 @@
 /* BUG-pointnobs (F2): NOBS= is the PHYSICAL observation count of the input
-   dataset — a descriptor-level number. FIRSTOBS=/OBS= only window which
+   dataset - a descriptor-level number. FIRSTOBS=/OBS= only window which
    observations are READ (1 row here); they do not shrink NOBS= (stays 3).
    Both producers (pre-loop init, per-read _setobs_ stamp) must agree. */
 data d; input x; datalines;

@@ -1,4 +1,4 @@
-/* GAP-macrooracle-tick284 (F9) — CALL SYMPUT scope when the macro CONTAINS a
+/* GAP-macrooracle-tick284 (F9) - CALL SYMPUT scope when the macro CONTAINS a
    computed %GOTO. SAS 9.4 Macro Language: Reference, Fifth Edition, printed
    p.77 ("Special Cases of Scope with the CALL SYMPUT Routine"), rule 2 case 3:
 
@@ -10,7 +10,7 @@
 
    A computed %GOTO is "one that uses a label that contains an & or a % in it"
    (p.77; same definition as the printed p.396 footnote). CONTAINS, not
-   executes — so a never-taken `%if 1=0 %then %goto &where;` still forces the
+   executes - so a never-taken `%if 1=0 %then %goto &where;` still forces the
    local scope (T1), which is what distinguishes this rule from "the %goto
    ran". The other rules' cases are pinned in macroedge_symput_scopelocal.sas.
 
@@ -18,7 +18,7 @@
    stderr, which the corpus does not diff. Reverting the fix turns T1-OPEN and
    T2-OPEN into `a token` (wrongly global) and leaves everything else. */
 
-/* T1 — NEVER-EXECUTED computed %GOTO, otherwise-empty local table: the var is
+/* T1 - NEVER-EXECUTED computed %GOTO, otherwise-empty local table: the var is
    LOCAL anyway (doc says "contains"), so it resolves inside the macro and is
    dead in open code. */
 %macro cg1;
@@ -35,9 +35,9 @@ data _null_;
    put "T1-OPEN=[&cgvar1]";
 run;
 
-/* T2 — EXECUTED computed %GOTO to a real label: same scoping, and the branch
+/* T2 - EXECUTED computed %GOTO to a real label: same scoping, and the branch
    itself still works (skips to the label). The label is computed by a macro
-   FUNCTION so the local table stays otherwise empty — a `%local`-based label
+   FUNCTION so the local table stays otherwise empty - a `%local`-based label
    would make the table nonempty and the scope pin vacuous. */
 %macro cg2;
    data _null_;
@@ -55,7 +55,7 @@ data _null_;
    put "T2-OPEN=[&cgvar2]";
 run;
 
-/* T3 control — a PLAIN %goto is not computed and must NOT force the local
+/* T3 control - a PLAIN %goto is not computed and must NOT force the local
    scope: with an otherwise-empty table the var goes GLOBAL, exactly as ENV3. */
 %macro cg3;
    %goto done;
@@ -70,7 +70,7 @@ data _null_;
    put "T3-OPEN=[&cgvar3]";
 run;
 
-/* T4 control — a computed %GOTO in a COMMENT does not count. */
+/* T4 control - a computed %GOTO in a COMMENT does not count. */
 %macro cg4;
    /* %goto &commented; */
    data _null_;

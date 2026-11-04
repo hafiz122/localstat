@@ -1,10 +1,10 @@
 /* SQL-hardening: two fixes.
-   (1) BUG-sqlcalcgroupagg — `calculated <alias>` referencing an AGGREGATE alias
+   (1) BUG-sqlcalcgroupagg - `calculated <alias>` referencing an AGGREGATE alias
        under GROUP BY silently returned missing (substituteAggs can't reach a bare
        alias). Now the earlier SELECT items are bound so it resolves; chained
        calculated works too. SAS 9.4 SQL: CALCULATED references an already-computed
        column in the same query.
-   (2) BUG-sqlsetopcols — a set operator (no CORRESPONDING) with mismatched column
+   (2) BUG-sqlsetopcols - a set operator (no CORRESPONDING) with mismatched column
        counts PANICKED (ragged rows hit an appendRow assert). SAS 9.4 matches by
        position and pads the shorter arm with missing values. */
 data t; input g $ x; datalines;

@@ -1,7 +1,7 @@
 /* QA-tick133: the colon (=:) comparison modifier truncates the LONGER operand
    to the length of the shorter one, and it does so in BOTH operand orders
    (Language Reference: Concepts comparison-operators). Regression guard for the colon-compare length
-   handling — an uncovered boundary (existing coverage never put the short
+   handling - an uncovered boundary (existing coverage never put the short
    operand on the left, nor compared two equal-length values via =:). */
 data _null_;
   a = "ABCDEF";

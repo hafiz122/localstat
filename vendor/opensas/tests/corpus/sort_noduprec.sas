@@ -1,5 +1,5 @@
 /* PROC SORT NODUPREC removes fully-identical rows; DUPOUT= captures the removed
-   duplicates (NODUPKEY only dedups by key) — BUG-sortnoduprec */
+   duplicates (NODUPKEY only dedups by key) - BUG-sortnoduprec */
 data d;
   input id v;
   datalines;

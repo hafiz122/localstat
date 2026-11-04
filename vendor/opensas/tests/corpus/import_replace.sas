@@ -1,6 +1,6 @@
 /* BUG-importnoreplace: REPLACE still overwrites an existing OUT=, and a new
    OUT= imports without REPLACE. (The no-REPLACE-to-existing ERROR is pinned by
-   the captured-diag test in src/proc.zig — a failing step halts the run under
+   the captured-diag test in src/proc.zig - a failing step halts the run under
    errhalt, so its stdout would be empty here.) */
 data keep_me;
   important=1;

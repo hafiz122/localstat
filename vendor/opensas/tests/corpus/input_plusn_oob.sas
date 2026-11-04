@@ -8,11 +8,11 @@
    you use @ or + pointer controls with a value that moves the pointer to or past
    the end of the current record and the next value is to be read from the current
    column, SAS goes to column 1 of the next record to read it", with the
-   "went to a new line" NOTE. So the read FLOWS — it only stops if there is no
+   "went to a new line" NOTE. So the read FLOWS - it only stops if there is no
    next record, per printed p.178 ("If a DATA step tries to read another record
    after it reaches an end-of-file, then execution stops").
    oob1/oob2 have no following record, so the step ends and NO observation is
-   written — they used to emit one with the variable missing, which is MISSOVER's
+   written - they used to emit one with the variable missing, which is MISSOVER's
    documented behaviour (printed p.133) applied under FLOWOVER (printed p.132).
    flow1/flow2 are NEW and carry a following record, so they still prove the
    clamp does not crash AND pin the documented flowed value.

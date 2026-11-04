@@ -1,4 +1,4 @@
-/* QA tick357 — GAP-inoperators (14928a2c) taught the lexer a two-char munch
+/* QA tick357 - GAP-inoperators (14928a2c) taught the lexer a two-char munch
    starting at `=` (the legacy `=<` / `=>` spellings of LE / GE, Language Reference: Concepts p.127
    Table 6.4 footnotes 2 and 3). A maximal-munch rule on a character as common
    as `=` is the classic way to break a DISTANT, unrelated expression, and the
@@ -23,7 +23,7 @@ data w;
   neg_tight = -1;
   neg_expr  = -x;
   neg_sp    = -2;
-  /* `=*` : the sounds-like pair — parser_expr peeks `.eq` + `.star`, so the
+  /* `=*` : the sounds-like pair - parser_expr peeks `.eq` + `.star`, so the
      munch must not consume it */
   snd = (k =* "a");
   /* a SPACED `= <` is two tokens: SAS requires the legacy pair to be adjacent */
@@ -32,7 +32,7 @@ data w;
   cmt = /* c */ 7;
   /*=<*/ after_cmt = 8;
   /* the symbolic comparisons that share a first or second character with the
-     new pair — none may shift */
+     new pair - none may shift */
   le_mod = (x <= 2);
   ge_mod = (x >= 2);
   ne_hat = (x ^= 2);
@@ -52,7 +52,7 @@ proc print data=w noobs;
   var le_mod ge_mod ne_hat ne_til min_op max_op sub_neg sub_tight mul_neg pow_neg;
 run;
 
-/* a WHERE clause using the MODERN spellings must stay legal — the loudness the
+/* a WHERE clause using the MODERN spellings must stay legal - the loudness the
    landing added is keyed on the legacy spelling carried in token.text, so an
    empty-text `.le`/`.ge` must pass through untouched */
 data ww;

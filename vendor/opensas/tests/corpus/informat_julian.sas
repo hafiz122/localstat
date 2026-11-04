@@ -1,7 +1,7 @@
 /* BUG-julianinformat: JULIANw. as an INPUT-statement informat reads a packed
-   Julian date (yyddd / yyyyddd) to a SAS day — it was whitelisted as "known"
+   Julian date (yyddd / yyyyddd) to a SAS day - it was whitelisted as "known"
    with no read branch, so the digits silently parsed as a plain number.
-   (The INPUT() *function* half is dev-b's functions.zig routing — ticketed.) */
+   (The INPUT() *function* half is dev-b's functions.zig routing - ticketed.) */
 data _null_;
   infile datalines;
   input @1 a julian7. @9 b julian5.;

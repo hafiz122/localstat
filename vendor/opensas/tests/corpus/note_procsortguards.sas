@@ -1,5 +1,5 @@
 /* NOTE-procsortguards: RANK and STANDARD now run the shared MEANS/TRANSPOSE/
-   UNIVARIATE sortedness guard (BUG-meansbyunsorted) — an unsorted BY ERRORs
+   UNIVARIATE sortedness guard (BUG-meansbyunsorted) - an unsorted BY ERRORs
    "Data set X is not sorted in ascending sequence." instead of silently
    splitting a repeated key into contiguous runs and ranking/standardizing
    within each run (plausible-looking WRONG numbers at exit 0). The fail-loud
@@ -30,7 +30,7 @@ proc rank data=ad out=rd; by descending g; var x; ranks rx; run;
 proc print data=rd noobs; run;
 proc standard data=ad out=sd mean=0 std=1; by descending g; var x; run;
 proc print data=sd noobs; run;
-/* non-BY controls — pooled ranks 1..6 and z-scores -1 0 1, guard untouched */
+/* non-BY controls - pooled ranks 1..6 and z-scores -1 0 1, guard untouched */
 proc rank data=a out=rp; var x; ranks rx; run;
 proc print data=rp noobs; run;
 data c; input v @@; datalines;
@@ -40,7 +40,7 @@ run;
 proc standard data=c out=cz mean=0 std=1; var v; run;
 proc print data=cz noobs; run;
 /* fail-loud tripwire: `ad` is DESCENDING-sorted, so plain `by g` must ERROR
-   and stop the run — if the RANK guard is ever removed, the bogus per-run
+   and stop the run - if the RANK guard is ever removed, the bogus per-run
    ranks below leak to stdout and this fixture goes red (rank_guards
    precedent; the per-proc unsorted arms are pinned in-file in src/proc.zig). */
 proc rank data=ad out=bad; by g; var x; ranks rx; run;

@@ -7,7 +7,7 @@
    table. That is the BUG-wherene failure mode, in SQL, undetected.
 
    This fixture pins `<>` = NE in each clause that reaches the parser by a
-   different route — WHERE, HAVING, a join ON, a CASE arm and a SELECT item —
+   different route - WHERE, HAVING, a join ON, a CASE arm and a SELECT item -
    and checks each one against the mnemonic NE, which never had the bug. The
    DATA step is unaffected: there `<>` is still MAX (where_minmax pins that).
 
@@ -35,7 +35,7 @@ run;
 proc sql;
   /* WHERE: 1 and 5, not all three */
   select x from t where x <> 3;
-  /* the same predicate spelled NE — must agree row for row */
+  /* the same predicate spelled NE - must agree row for row */
   select x from t where x ne 3;
   /* compound: both operands filter */
   select x from t where x <> 3 and x <> 5;
@@ -47,7 +47,7 @@ proc sql;
   select x, case when x <> 3 then 'off' else 'on' end as st, (x <> 3) as flag from t;
 quit;
 
-/* the DATA step keeps the MAX meaning — `<>` is only NE in a WHERE-style
+/* the DATA step keeps the MAX meaning - `<>` is only NE in a WHERE-style
    context, which is what makes the SQL leak a real difference */
 data _null_;
   m = 2 <> 7;

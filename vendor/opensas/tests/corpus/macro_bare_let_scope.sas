@@ -1,6 +1,6 @@
 /* BUG-macrobareletscope: a bare %let of a BRAND-NEW name inside a macro is
    LOCAL to that invocation in SAS 9.4 (was leaking to global).
-   (a) sibling macros each %let i — no clobber, neither survives to global;
+   (a) sibling macros each %let i - no clobber, neither survives to global;
    (b) a bare %let of an EXISTING global still updates the global (no shadow);
    (c) a name an enclosing macro owns updates THERE, not a new inner local. */
 %macro a;

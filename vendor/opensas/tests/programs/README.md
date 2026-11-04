@@ -1,4 +1,4 @@
-# tests/programs — real-world program fixtures
+# tests/programs - real-world program fixtures
 
 Second corpus tier. Where `tests/corpus/*.sas` diffs **stdout**, these fixtures
 run a real **dataset-in → dataset-out** program and diff the **output dataset**.
@@ -17,7 +17,7 @@ tests/programs/<name>/
 
 - Row 1 = column names. Column order is significant (SAS variable order).
 - Character missing = empty field. Numeric missing = `.` (SAS convention).
-- Fields with leading/trailing spaces are quoted (e.g. `" A "`) — the raw data
+- Fields with leading/trailing spaces are quoted (e.g. `" A "`) - the raw data
   deliberately keeps padding so `strip()` is exercised.
 
 ## Runner
@@ -26,7 +26,7 @@ tests/programs/<name>/
 `libname target "output"` to those dirs, runs `program.sas`, then structurally
 diffs every `output/*.csv` against `expected/*.csv` (columns, order, values).
 
-## dm/ — CDISC SDTM Demographics
+## dm/ - CDISC SDTM Demographics
 
 Maps a raw `SUBJECTS` enrolment listing to the SDTM `DM` domain. Exercises
 LIBNAME, LENGTH, LABEL, `input()`/`put()` with `yymmdd10.`, `catx`, `yrdif`,

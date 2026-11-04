@@ -1,6 +1,6 @@
 /* BUG-charfnsnodomerr: the CHARACTER give-up arms are type-correct (that was
    BUG-charfnsmissingtype, pinned next door in charfns_missing_type) but they
-   were also DIAGNOSTICALLY SILENT — blank returned, no NOTE, _ERROR_ left 0 —
+   were also DIAGNOSTICALLY SILENT - blank returned, no NOTE, _ERROR_ left 0 -
    while their numeric siblings (sqrt(-1) & co.) were loud. Under fail-loud a
    silent give-up is the weaker behaviour, so the arms the SAS 9.4 Functions and
    CALL Routines: Reference says are DIAGNOSED now route through domErrChar:

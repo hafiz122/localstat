@@ -3,9 +3,9 @@
    that is given by the value of expression … If it is zero or negative, the
    pointer moves to column 1' (a non-integer is truncated first). The value
    routes through the SAME clamp `@n` and `@numeric-variable` already use
-   (io.zig clampCol) — both are pinned alongside as controls so the three
+   (io.zig clampCol) - both are pinned alongside as controls so the three
    forms cannot drift apart. `@(character-expression)` (the string-search
-   form) stays unimplemented and ERRORs loud — pinned in io.zig's in-file
+   form) stays unimplemented and ERRORs loud - pinned in io.zig's in-file
    test via the captured diagnostics reporter (corpus diffs stdout only). */
 
 data positive;                 /* @(1+2) → column 3 */
@@ -35,7 +35,7 @@ qwe
 run;
 
 data computed;                 /* a variable computed earlier in the same
-                                  step moves the pointer — p.168's own
+                                  step moves the pointer - p.168's own
                                   example shape `b=5; input @(b*3) name $10.;` */
   b = 2;
   input @(b*3) x $3.;          /* → column 6 */
@@ -71,7 +71,7 @@ datalines;
 ;
 run;
 
-data ctrl_varneg;              /* negative @var — the pre-existing clamp (BUG-atcol0crash) */
+data ctrl_varneg;              /* negative @var - the pre-existing clamp (BUG-atcol0crash) */
   n = -4;
   input @n x $3.;
   put "cvn=" x;

@@ -1,7 +1,7 @@
 /* GAP-printby-low-tick274 (doc-finder tick274 F4/F5 + LOW batch):
    1. ID∩VAR overlap keeps BOTH columns (SAS ID statement doc);
    2. a duplicated VAR entry also prints twice (VAR is positional);
-   3. SPLIT= implies LABEL — no `label` option, header still splits the label;
+   3. SPLIT= implies LABEL - no `label` option, header still splits the label;
    4. NOBYLINE sections BY groups without the `g=…` BY line.
    N / DOUBLE / ROUND / WIDTH= remain D-002 fail-loud (unit-tested in main.zig). */
 data d;

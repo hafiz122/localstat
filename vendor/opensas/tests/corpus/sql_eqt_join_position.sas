@@ -1,4 +1,4 @@
-/* GAP-sqleqtjoinlen — DECLINED AS DOC-UNDECIDABLE, current behaviour pinned.
+/* GAP-sqleqtjoinlen - DECLINED AS DOC-UNDECIDABLE, current behaviour pinned.
 
    This fixture does NOT assert conformance. It records an open question and
    guards the three positions against silent drift until an oracle settles it.
@@ -16,20 +16,20 @@
 
    (1) "the length of values is always used" has two coherent readings and the
        volume never disambiguates them:
-         (A) no truncation at all in join criteria — the whole values are
+         (A) no truncation at all in join criteria - the whole values are
              compared, so EQT degenerates to plain `=` there. The word "always",
              set against "the shortest length", leans this way, and it matches the
              engineering reason a TIP would exist (an equijoin key cannot carry a
              truncated comparison).
          (B) the truncation length is taken from the VALUES (padded to their
-             storage width) rather than from the column/expression — which for two
+             storage width) rather than from the column/expression - which for two
              column operands is the SAME number, making the TIP nearly vacuous.
        (A) DROPS rows that (B) keeps: case 1 below would lose the PQR/PQ row.
        Silently dropping observations is the failure class this project treats as
        worst, so it is not a coin to flip.
 
    (2) Even granting (A), "JOIN criteria" cannot be told apart from "a sub-setting
-       WHERE clause" for PROC SQL's most common join syntax — and the volume's own
+       WHERE clause" for PROC SQL's most common join syntax - and the volume's own
        vocabulary is what blocks it:
          printed p.341: "Specify the join criteria. The WHERE clause specifies the
            columns that join the tables." (a comma-join's WHERE *is* the join
@@ -55,15 +55,15 @@ data inv; length tag $3; tag='PQR'; output; tag='ZW'; output; run;
 data ord; length tag $4; tag='PQ';  output; tag='ZW'; output; run;
 
 proc sql;
-  title '1. explicit ON — "JOIN criteria" beyond doubt';
+  title '1. explicit ON - "JOIN criteria" beyond doubt';
   select inv.tag as itag, ord.tag as otag from inv join ord on inv.tag eqt ord.tag;
-  title '2. comma-join WHERE — the join criteria per p.341, a WHERE per the TIP';
+  title '2. comma-join WHERE - the join criteria per p.341, a WHERE per the TIP';
   select inv.tag as itag, ord.tag as otag from inv, ord where inv.tag eqt ord.tag;
-  title '3. sub-setting WHERE vs a literal — the doc-CONFIRMED half';
+  title '3. sub-setting WHERE vs a literal - the doc-CONFIRMED half';
   select tag from inv where tag eqt 'PQ';
   title '4. sub-setting WHERE, column vs column, one table';
   select tag from inv where tag eqt tag;
-  title '5. CONTROL: plain = , no truncation — what reading (A) would make 1';
+  title '5. CONTROL: plain = , no truncation - what reading (A) would make 1';
   select inv.tag as itag, ord.tag as otag from inv join ord on inv.tag = ord.tag;
 quit;
 title;

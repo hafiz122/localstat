@@ -1,8 +1,8 @@
 /* D-022 (BUG-xstmtsilentnoop): DM stays inert everywhere, but the FILE/OUT
-   redirection form is observable and NOTEs — see x_dm_note.sas. Read the
+   redirection form is observable and NOTEs - see x_dm_note.sas. Read the
    three statements below with that split in mind:
      line 1  open-code windowing commands  → silent, correct (nothing to observe;
-             "output" is the OUTPUT WINDOW, not an `out` redirection — the
+             "output" is the OUTPUT WINDOW, not an `out` redirection - the
              WHOLE-WORD predicate is what keeps this line quiet, and it is the
              negative control GH#83 part 2 must not regress).
      mid-step `dm log 'clear' editor;`     → silent, correct (windowing).

@@ -1,7 +1,7 @@
 /* PERF-arraydeclquad + PERF-setinflagquad: drops/keeps/retained membership is
-   hash-backed (was a linear scan per PDV var per row — O(N²) decl for a
+   hash-backed (was a linear scan per PDV var per row - O(N²) decl for a
    _temporary_ array of N) and setInFlags early-outs with no in= var. Pure
-   optimization — behavior must be byte-identical: exact case-insensitive
+   optimization - behavior must be byte-identical: exact case-insensitive
    match, pfx: wildcard fallback, in=/end= flags, temporary elems dropped. */
 data d1; do i = 1 to 2; x = i; output; end; run;
 data d2; do i = 3 to 4; x = i; output; end; run;

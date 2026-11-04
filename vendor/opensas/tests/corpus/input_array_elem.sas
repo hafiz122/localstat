@@ -1,5 +1,5 @@
 /* GAP-inputarrayelem (Language Reference: Concepts Table 21.5 row 1, p.516: "#n or / line pointer
-   control in the INPUT statement with a DO loop" — reading N records into an
+   control in the INPUT statement with a DO loop" - reading N records into an
    array inside a DO loop is the canonical realisation): an array-element
    reference `input v{i}` was rejected with a misleading "expected ';' after
    input", while PUT and assignment accepted the same reference. The subscript
@@ -23,7 +23,7 @@ datalines;
 ;
 proc print data=one; run;
 
-/* a character array works the same way, an informat may follow the subscript —
+/* a character array works the same way, an informat may follow the subscript -
    formatted reads take w COLUMNS, so the fields sit adjacent by width */
 data _null_;
    infile datalines;

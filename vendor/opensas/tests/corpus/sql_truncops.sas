@@ -1,4 +1,4 @@
-/* GAP-sqltruncops — PROC SQL's alphabetic truncated-comparison operators
+/* GAP-sqltruncops - PROC SQL's alphabetic truncated-comparison operators
    (SQL Procedure User's Guide 4th ed, Table 8.2 group 7, printed p.403-404;
    "Truncated String Comparison Operators", p.405: "Unlike the DATA step, PROC
    SQL does not support the colon operators (such as =:, >:, and <=:) for
@@ -8,13 +8,13 @@
    "Truncated" = the comparison is made over the length of the SHORTER
    operand (p.405: "truncating the longer string to be the same length as the
    shorter string"). This fixture pins each of EQT/NET/GTT/LTT/GET/LET against
-   its DATA-step =:-family equivalent — both route through the ONE prefix
-   compare (mkTruncCmp), so every pair below must list the SAME names — plus
+   its DATA-step =:-family equivalent - both route through the ONE prefix
+   compare (mkTruncCmp), so every pair below must list the SAME names - plus
    the shorter-operand rule (p.405's own example: 'TWOSTORY' eqt 'TWO' is
-   true) and the zero-length rule ('' eqt '' is false — the shared helper's
+   true) and the zero-length rule ('' eqt '' is false - the shared helper's
    guard, Language Reference: Concepts p.130).
 
-   Name-collision guard: GET/LET/NET are also plausible column names — the
+   Name-collision guard: GET/LET/NET are also plausible column names - the
    last block pins that a column named GET in operand position still resolves
    (only the infix word is an operator). */
 data names;

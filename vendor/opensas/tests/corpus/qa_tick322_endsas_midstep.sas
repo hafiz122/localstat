@@ -1,4 +1,4 @@
-/* QA tick322 F5 / BUG-endsasmidstep — ENDSAS is an ordinary step boundary
+/* QA tick322 F5 / BUG-endsasmidstep - ENDSAS is an ordinary step boundary
    that terminates the session NORMALLY (Language Reference: Concepts p.10/p.487), mid-step included:
    the step runs with the statements before it (the first listing prints),
    nothing after ENDSAS is even read, exit 0. Pre-fix the PROC loop's fail-loud

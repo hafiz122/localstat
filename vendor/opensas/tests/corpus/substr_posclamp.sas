@@ -1,5 +1,5 @@
 /* SUBSTR-posclamp: SUBSTR (read direction) with a NONPOSITIVE start position is
-   invalid in SAS 9.4 — it logs a NOTE (2nd arg invalid) and returns the WHOLE
+   invalid in SAS 9.4 - it logs a NOTE (2nd arg invalid) and returns the WHOLE
    remainder from the clamped start to the end, IGNORING the length argument.
    This is deliberately UNLIKE SUBSTRN (begins at char 1 with length reduced).
    Ref: SAS 9.4 Functions Reference, SUBSTRN comparison table (p.1535). */

@@ -1,12 +1,12 @@
-/* EPIC-charfixedwidth slice-1 REMAINDER (GH#31, HIGH silent-wrong — a
+/* EPIC-charfixedwidth slice-1 REMAINDER (GH#31, HIGH silent-wrong - a
    regression from the slice's runtime stamping, validator-probed on live
    SAS 9.4): SAS fixes an undeclared char variable's width at COMPILE time
-   from the first TEXTUAL occurrence — Language Reference: Concepts p.49,
+   from the first TEXTUAL occurrence - Language Reference: Concepts p.49,
    "Creating Variables": the first reference that gives a variable a length
    is its first occurrence in the DATA step, in SOURCE order, INCLUDING
    branches that never run. opensas stamped at the first EXECUTED literal
    instead, so the width was data-order dependent and dead code never
-   stamped — silent truncation at rc 0, no NOTE. The seven probes:
+   stamped - silent truncation at rc 0, no NOTE. The seven probes:
 
    P1  if/else ladder, THEN wider but executed second   -> $6: ab / abcdef
    P2  severity ladder, first row takes the last arm    -> $6: MILD/MODERA/SEVERE
@@ -21,7 +21,7 @@
    (charwidth_literal_fix.sas CTRL + charwidth_sql_nonregress.sas pin that
    boundary). (no PHI) */
 
-/* P1 — the GH#31 repro: the THEN branch is textually first ($6) even though
+/* P1 - the GH#31 repro: the THEN branch is textually first ($6) even though
    the ELSE executes first */
 data p1;
   do i = 1 to 2;
@@ -34,7 +34,7 @@ data p1;
   keep i y;
 run;
 
-/* P2 — the severity ladder: the first row takes MILD (the LAST arm), but
+/* P2 - the severity ladder: the first row takes MILD (the LAST arm), but
    SEVERE is textually first -> $6, so MODERATE renders MODERA */
 data p2in;
   input sev;
@@ -53,7 +53,7 @@ data p2;
   put 'P2 sev=' sev 'grade=' grade 'vl=' vl;
 run;
 
-/* P3 — dead code stamps: `if 0` never executes, its literal is still the
+/* P3 - dead code stamps: `if 0` never executes, its literal is still the
    first TEXTUAL occurrence -> $8, both live literals fit */
 data p3;
   if 0 then y = 'abcdefgh';
@@ -63,7 +63,7 @@ data p3;
   put 'P3 y=' y 'vl=' vl;
 run;
 
-/* P4 — CONTROL (correct before GH#31, pinned so a regression is loud): the
+/* P4 - CONTROL (correct before GH#31, pinned so a regression is loud): the
    short literal is textually first -> $2, the later branch's wider literal
    truncates */
 data p4;
@@ -73,7 +73,7 @@ data p4;
   put 'P4 y=' y 'vl=' vl;
 run;
 
-/* P5 — CONTROL (correct before GH#31, pinned): the retain init is textually
+/* P5 - CONTROL (correct before GH#31, pinned): the retain init is textually
    first -> $2, the later assignment truncates */
 data p5;
   retain y 'ab';
@@ -82,7 +82,7 @@ data p5;
   put 'P5 y=' y 'vl=' vl;
 run;
 
-/* P6 — CONTROL: then-branch literal is textually AND executably first; the
+/* P6 - CONTROL: then-branch literal is textually AND executably first; the
    stamp persists across rows (row 2's shorter literal fits, does not resize) */
 data p6;
   do i = 1 to 2;
@@ -95,7 +95,7 @@ data p6;
   keep i z;
 run;
 
-/* P7 — the retain twin of P5: the assignment is textually BEFORE the retain
+/* P7 - the retain twin of P5: the assignment is textually BEFORE the retain
    statement, so IT wins -> $6; slice-1 stamped the init literal in runtime
    order and left $2 */
 data p7;

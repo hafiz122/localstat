@@ -4,7 +4,7 @@
    returns from readList (BUG-inputlinehighwater). 4 records produced 4
    observations (sliding window) plus a fabricated all-missing EOF row, while
    the identical FLOWOVER program gave the correct 2. One construct, three
-   INFILE modes, one answer — pinned side by side so the two record-advance
+   INFILE modes, one answer - pinned side by side so the two record-advance
    paths cannot silently disagree again. (no PHI) */
 data fl;                                   /* default FLOWOVER */
   input #2 a 5. #1 b 5.;

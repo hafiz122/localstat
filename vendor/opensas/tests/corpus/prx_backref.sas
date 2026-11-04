@@ -1,7 +1,7 @@
 /* doc-finder tick133 (BUG-prxbackref): PRX backreferences \1-\9 are a documented
    SAS 9.4 Perl-regex feature. opensas parseEscape treated \<digit> as the literal
    digit, so a backreference pattern silently compiled to the WRONG pattern and
-   never matched the intended repeated text (silent-wrong — clinical worst class).
+   never matched the intended repeated text (silent-wrong - clinical worst class).
    prxmatch returns the 1-based match start, 0 = no match. Expected = real SAS. */
 data _null_;
   a=prxmatch('/(ab)\1/', 'zzababzz');   /* "abab" at col 3            */

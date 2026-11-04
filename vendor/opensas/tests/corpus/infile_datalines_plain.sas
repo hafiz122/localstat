@@ -1,5 +1,5 @@
 /* BUG-infiledatalines: `infile datalines;` with NO trailing options (DLM/DSD/…)
-   was mis-lexed — the lexer entered raw-line capture on any `datalines;` and
+   was mis-lexed - the lexer entered raw-line capture on any `datalines;` and
    swallowed the rest of the step (ParseError "expected a statement"). A datalines
    STATEMENT begins a statement (prev token `;`); the INFILE-device form is
    preceded by `infile`, so only the statement form should trigger raw capture.

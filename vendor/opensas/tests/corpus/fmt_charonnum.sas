@@ -1,5 +1,5 @@
 /* BUG-charfmtonnum: a `$` (character) format applied to a NUMERIC value must
-   FAIL LOUD — SAS 9.4 raises a compile-time error (a character format cannot
+   FAIL LOUD - SAS 9.4 raises a compile-time error (a character format cannot
    be used with a numeric variable) where opensas silently coerced the number
    to text (D-002). The ERROR goes to stderr (+ non-zero exit); stdout keeps
    the loud-then-fallback raw render, so the 3rd PUT prints the raw value.

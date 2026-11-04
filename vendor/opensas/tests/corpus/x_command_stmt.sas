@@ -1,4 +1,4 @@
-/* D-022 (BUG-xstmtsilentnoop): X is still inert — `somedir/sub` is NOT created —
+/* D-022 (BUG-xstmtsilentnoop): X is still inert - `somedir/sub` is NOT created -
    but the mid-step X below now emits `NOTE: X statement not executed …` on
    stderr. This golden is stdout-only, so it is unchanged; the NOTE text is
    pinned by the captured-reporter test in src/parser.zig and the rc-0 /

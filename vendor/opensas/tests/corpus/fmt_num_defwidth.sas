@@ -1,5 +1,5 @@
 /* NOTE-numfmtdefwidth: an UNMATCHED numeric user VALUE format value with no
-   explicit width and no OTHER= ignored the format's default width — the raw
+   explicit width and no OTHER= ignored the format's default width - the raw
    value came back with no padding. SAS right-justifies the raw value in the
    format's default width (the longest label's length). Numeric twin of the
    CHAR fix (tick78). Matched labels and an explicit width already worked. */

@@ -1,4 +1,4 @@
-/* DEC-abortrcvsD009 (2a57cc33, main.zig 2577) — the strongest of the six rows,
+/* DEC-abortrcvsD009 (2a57cc33, main.zig 2577) - the strongest of the six rows,
    and it needed no SAS doc: the SAME single ERROR line exited 2 from PROC PRINT
    and 1 from PROC MEANS.
 

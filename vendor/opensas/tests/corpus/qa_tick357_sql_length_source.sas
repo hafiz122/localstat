@@ -1,8 +1,8 @@
-/* QA tick357 — BUG-sqlselectlength (ee097ef0) added `applyLens`, which
+/* QA tick357 - BUG-sqlselectlength (ee097ef0) added `applyLens`, which
    TRUNCATES char cells IN PLACE on the Result rows. Result rows are built from
    the source dataset's cells, so the hazard this pins is aliasing: a
    `length=` on a SELECT item must shorten the RESULT only and must never reach
-   back and shorten the SOURCE table (the D-001 shared-writer failure class —
+   back and shorten the SOURCE table (the D-001 shared-writer failure class -
    scope a behavior change to the caller, never the shared storage).
 
    Also pinned: the SELECT-clause `length=` and the `char(n)` DDL width must
@@ -14,7 +14,7 @@ data lv;
   s = "zzyyxx"; output;
 run;
 
-/* 1. bare SELECT with length= — the printed result truncates */
+/* 1. bare SELECT with length= - the printed result truncates */
 proc sql;
   select s length=3 from lv;
 quit;
@@ -22,7 +22,7 @@ quit;
 /* 2. …and the SOURCE is untouched, at full width, immediately after */
 proc print data=lv noobs; run;
 
-/* 3. a SECOND unmodified select of the same column still sees 6 bytes — proves
+/* 3. a SECOND unmodified select of the same column still sees 6 bytes - proves
       the truncation did not persist into the table the first select read */
 proc sql;
   select s from lv;

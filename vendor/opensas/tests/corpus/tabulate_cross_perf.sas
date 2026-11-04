@@ -5,7 +5,7 @@
    (A quadratic-sized perf probe would be too slow for the corpus.)
    First table also pins per-element stat lists (GAP-tabulateforms #7): the
    prod levels carry only their own 7 stats, the All block only its (sum
-   pctsum) — the old union rendered all 8 under every block. */
+   pctsum) - the old union rendered all 8 under every block. */
 data d;
   input reg $ prod $ amt;
   datalines;

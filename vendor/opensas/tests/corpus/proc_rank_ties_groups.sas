@@ -1,4 +1,4 @@
-/* QA r24: PROC RANK uncovered surface — default (ties=mean), DESCENDING, GROUPS=.
+/* QA r24: PROC RANK uncovered surface - default (ties=mean), DESCENDING, GROUPS=.
    Ties share the average rank (2.5); GROUPS=4 = floor(rank*k/(n+1)). Verified
    against SAS 9.4 default TIES=MEAN. FRACTION fails loud (GAP-rankguards). */
 data d; input x @@; datalines;

@@ -1,4 +1,4 @@
-/* e8601dnz: E8601DNw./E8601DZw.d informats + the E8601DZw. format — GH#5a
+/* e8601dnz: E8601DNw./E8601DZw.d informats + the E8601DZw. format - GH#5a
    ISS-e8601dndz. DN (Informats Reference p.642: "The width of the input field
    must be 10") reads ISO yyyy-mm-dd as a midnight DATETIME; incomplete values
    are invalid data and read missing. DZ (p.645: w 20-35) reads the UTC-offset

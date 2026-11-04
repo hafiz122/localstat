@@ -1,15 +1,15 @@
-/* QA tick377 F3 — %SYSEVALF dropped EVERY comparison operator and returned the
+/* QA tick377 F3 - %SYSEVALF dropped EVERY comparison operator and returned the
    left operand, silently (pre-existing: identical on all three tick377
    baselines). The dictionary entry's own summary (Macro Language Reference,
    printed p.352, footer-verified): %SYSEVALF "Evaluates arithmetic and logical
    expressions using floating-point arithmetic", and printed p.91: "You must
    use the %SYSEVALF function to evaluate logical expressions containing
-   floating-point or missing values" — comparisons are the function's
+   floating-point or missing values" - comparisons are the function's
    documented reason to exist. The layer shares %EVAL's Cmp enum and Table 6.3
    spellings (matchCmpOp) with an f64 compare action. The loud-leftover half
-   (and/or/not gap-classed rc 2; garbage and `in` user-classed rc 1 — SAS
+   (and/or/not gap-classed rc 2; garbage and `in` user-classed rc 1 - SAS
    itself rejects IN in %SYSEVALF, Restriction printed p.353) is pinned by
-   unit tests in macro.zig — corpus diffs stdout only. */
+   unit tests in macro.zig - corpus diffs stdout only. */
 data _null_;
   s = "%sysevalf(1.5 ^= 2.5)"; put "NE_CARET=[" s "]";
   s = "%sysevalf(1.5 ne 2.5)"; put "NE_WORD=[" s "]";

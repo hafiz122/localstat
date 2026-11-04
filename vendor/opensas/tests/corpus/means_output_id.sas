@@ -1,4 +1,4 @@
-/* BUG-meansidnoop: PROC MEANS ID statement — each id var rides into OUTPUT as
+/* BUG-meansidnoop: PROC MEANS ID statement - each id var rides into OUTPUT as
    its within-group MAX (SAS semantics), at every _TYPE_ level; previously the
    statement had no parse branch and was silently discarded.
    (a) CLASS: id max per class level AND for the _TYPE_=0 overall row.

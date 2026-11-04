@@ -8,6 +8,9 @@ The source is vendored as a snapshot, including upstream tests, documentation, a
 
 Local changes:
 
+- Normalize literal em dashes to ASCII hyphens throughout the vendored snapshot,
+  including comments, diagnostic messages, documentation, and fixture output.
+  Matching expected messages and fixture results use the same punctuation.
 - `src/reg.zig`: bounded PROC REG parser, scaled pivoted Householder QR solver, text statistical output and analytical unit tests.
 - `src/root.zig`, `src/main.zig`: module/dispatch registration and report-title integration.
 - `src/main.zig`: nonzero CLI exit on missing/unreadable input; unsupported ODS destinations produce explicit diagnostic errors.

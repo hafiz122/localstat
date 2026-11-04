@@ -1,4 +1,4 @@
-/* QA regression (BUG-freqweight fixed): PROC FREQ WEIGHT statement — Frequency is
+/* QA regression (BUG-freqweight fixed): PROC FREQ WEIGHT statement - Frequency is
    the sum of weights per category, Percent over the weighted total. */
 data d;
   input cat $ wt;

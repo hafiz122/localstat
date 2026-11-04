@@ -1,5 +1,5 @@
 /* BUG-tabulatezerocrash: a 2-way cross (CLASS var in the column dim) over a
-   dataset filtered to 0 observations used to PANIC — the width math underflowed
+   dataset filtered to 0 observations used to PANIC - the width math underflowed
    `ndata - 1` on a usize when there were no column levels (SIGABRT, rc134).
    With no column levels there is no table to draw, so the cross renders nothing
    (mirroring PROC FREQ's empty-input no-op) and execution continues. A column

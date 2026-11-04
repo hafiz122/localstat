@@ -1,13 +1,13 @@
 //! Conformance corpus runner (`zig build corpus`). Runs the built `sas` binary
 //! over every `tests/corpus/*.sas`, diffs its stdout against the sibling
 //! `*.txt`, and prints `corpus: P/Q passing`. For each failure it surfaces the
-//! first unsupported feature the interpreter reported — a stderr line prefixed
-//! `UNSUPPORTED:` — else the first line where output diverged.
+//! first unsupported feature the interpreter reported - a stderr line prefixed
+//! `UNSUPPORTED:` - else the first line where output diverged.
 //!
 //! Every fixture's exit code is checked. A fixture that exits non-zero must
 //! declare it with an `expect-rc: N` marker in its header comment; NO MARKER
 //! MEANS 0, so an undeclared non-zero exit fails. (It was opt-in until all 70
-//! non-zero corpus fixtures were pinned — see `fixture_rc.zig` for why the
+//! non-zero corpus fixtures were pinned - see `fixture_rc.zig` for why the
 //! default flipped and `docs/findings/rc-pin-coverage.md` for the measurement.)
 //!
 //! This report drives the backlog (see manager.md §5), but it IS a gate: it
@@ -22,7 +22,7 @@ const fixture_rc = @import("fixture_rc.zig");
 
 const max_file: Io.Limit = .limited(1 << 20);
 
-// ponytail: interpreter↔harness contract — a stage that hits something it can't
+// ponytail: interpreter↔harness contract - a stage that hits something it can't
 // do prints one `UNSUPPORTED: <feature>` line to stderr and bails. The runner
 // only reads the first such line; that's what names the next backlog task.
 const unsupported_prefix = "UNSUPPORTED:";
@@ -54,14 +54,14 @@ pub fn main(init: std.process.Init) !void {
         defer gpa.free(txt_name);
 
         const expected = dir.readFileAlloc(io, txt_name, gpa, max_file) catch |e| {
-            std.debug.print("  {s}: SKIP — no expected {s} ({t})\n", .{ entry.name, txt_name, e });
+            std.debug.print("  {s}: SKIP - no expected {s} ({t})\n", .{ entry.name, txt_name, e });
             total -= 1;
             continue;
         };
         defer gpa.free(expected);
 
         const res = std.process.run(gpa, io, .{ .argv = &.{ bin, sas_path } }) catch |e| {
-            std.debug.print("  {s}: FAIL — could not run interpreter ({t})\n", .{ entry.name, e });
+            std.debug.print("  {s}: FAIL - could not run interpreter ({t})\n", .{ entry.name, e });
             continue;
         };
         defer gpa.free(res.stdout);
@@ -69,12 +69,12 @@ pub fn main(init: std.process.Init) !void {
 
         // The rc pin is checked before the diff: a fixture whose stdout matches
         // but whose exit code is wrong must FAIL (that combination is exactly
-        // what hid the D-009 inversions — see fixture_rc.zig).
+        // what hid the D-009 inversions - see fixture_rc.zig).
         const src = try dir.readFileAlloc(io, entry.name, gpa, max_file);
         defer gpa.free(src);
         if (try fixture_rc.mismatch(gpa, src, res.term)) |why| {
             defer gpa.free(why);
-            std.debug.print("  {s}: FAIL — {s}\n", .{ entry.name, why });
+            std.debug.print("  {s}: FAIL - {s}\n", .{ entry.name, why });
             continue;
         }
 
@@ -89,10 +89,10 @@ pub fn main(init: std.process.Init) !void {
         }
 
         if (firstUnsupported(res.stderr)) |feat| {
-            std.debug.print("  {s}: FAIL — first unsupported: {s}\n", .{ entry.name, feat });
+            std.debug.print("  {s}: FAIL - first unsupported: {s}\n", .{ entry.name, feat });
         } else {
             const d = firstDiffLine(norm_exp, norm_got);
-            std.debug.print("  {s}: FAIL — output differs (expected \"{s}\" | got \"{s}\")\n", .{ entry.name, d.expected, d.got });
+            std.debug.print("  {s}: FAIL - output differs (expected \"{s}\" | got \"{s}\")\n", .{ entry.name, d.expected, d.got });
         }
     }
 
@@ -170,6 +170,6 @@ test "firstDiffLine finds the first divergence" {
 
 test {
     // fixture_rc.zig's `test` blocks don't run unless referenced from a test
-    // root (modern zig runs only the root file's tests) — pull them in.
+    // root (modern zig runs only the root file's tests) - pull them in.
     _ = @import("fixture_rc.zig");
 }

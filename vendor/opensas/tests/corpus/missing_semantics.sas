@@ -1,5 +1,5 @@
 /* Missing-value & operator semantics verified against SAS 9.4 LangRef
-   ("Expressions" / "Missing Values") — doc-finder-tick153 audit:
+   ("Expressions" / "Missing Values") - doc-finder-tick153 audit:
    missing propagates through arithmetic (with NOTE), missing sorts below
    every number, special missings order ._ < . < .A < .Z, MIN/MAX operators
    do NOT skip missing (MIN/MAX functions do), SUM fn vs `+`, IN matches

@@ -1,4 +1,4 @@
-/* GAP-fmtwrite-unimpl: Dw.p (SAS 9.4 Formats Reference p.170 — default w 12,
+/* GAP-fmtwrite-unimpl: Dw.p (SAS 9.4 Formats Reference p.170 - default w 12,
    p default 3, p=0 -> 3). All six documented d10.4 rows: m >= p -> 1 decimal,
    m < p -> 5, right-justified in 10. */
 data _null_;

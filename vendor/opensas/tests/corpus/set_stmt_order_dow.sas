@@ -1,6 +1,6 @@
 /* BUG-setstmtorder regression net: a DOW loop (SET nested in a top-level
    DO UNTIL) is NOT a direct top-level driver, so it keeps node-driven
-   reads (DOWLOOP-impl) — the statement-order split must not touch it.
+   reads (DOWLOOP-impl) - the statement-order split must not touch it.
    One output row per BY group with the group sum accumulated across the
    inner reads. */
 data a; input k v; datalines;

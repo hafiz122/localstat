@@ -1,9 +1,9 @@
-//! Statement parser — tokens → `ast.Program` (a DATA-step statement list).
+//! Statement parser - tokens → `ast.Program` (a DATA-step statement list).
 //!
 //! Wraps the A1 expression parser (`parser_expr.Parser`): one shared cursor
 //! walks the whole token stream, so a statement keyword and the expressions
 //! inside it advance the same position. Statement keywords (IF/DO/OUTPUT/…) are
-//! plain `.name` tokens matched case-insensitively — SAS doesn't reserve them,
+//! plain `.name` tokens matched case-insensitively - SAS doesn't reserve them,
 //! and this parser follows the DATA-step convention that the leading word at a
 //! statement boundary is the keyword; anything else is an assignment target.
 //!
@@ -23,7 +23,7 @@ const lex = @import("lexer.zig");
 const pe = @import("parser_expr.zig");
 const sql = @import("sql.zig"); // reuse desugarPredicates so the WHERE stmt matches where= (GAP-wherestmtops)
 const format = @import("format.zig"); // constant-fold a numeric-literal PUT item (GAP-putnumliteral)
-const pdv = @import("pdv.zig"); // max_char_len — the declared-length cap (BUG-lengthcapnostore)
+const pdv = @import("pdv.zig"); // max_char_len - the declared-length cap (BUG-lengthcapnostore)
 const Value = @import("value.zig").Value;
 
 const Error = diag.Error;
@@ -32,7 +32,7 @@ const Token = lex.Token;
 /// BUG-putptroom: ceiling for PUT pointer controls (@n / +n / #n). SAS caps a
 /// line at LS=/LRECL (max 32767); beyond it we fail loud instead of padding or
 /// newline-emitting gigabytes (effective hang / OOM). ponytail: hard ceiling,
-/// not the live LINESIZE option — wire io.global_linesize in if exact LS
+/// not the live LINESIZE option - wire io.global_linesize in if exact LS
 /// truncation is ever needed.
 const max_put_ptr: usize = 32767;
 
@@ -42,7 +42,7 @@ const CharLen = struct { name: []const u8, len: usize };
 /// OPTIONS, FILENAME, ODS, LIBNAME. Used by main.segments' OPEN-CODE arm (a
 /// statement starting with one of these between steps is its own global
 /// segment). Mid-step the skip predicate is the narrower isMidStepSkippable
-/// (D-014a) — every member here is handled there: hoisted or pre-pass-bound.
+/// (D-014a) - every member here is handled there: hoisted or pre-pass-bound.
 pub fn isGlobalKw(text: []const u8) bool {
     if (std.ascii.eqlIgnoreCase(text, "options") or std.ascii.eqlIgnoreCase(text, "filename") or std.ascii.eqlIgnoreCase(text, "ods") or std.ascii.eqlIgnoreCase(text, "libname")) return true;
     const base: []const u8 = if (startsWithI(text, "title")) "title" else if (startsWithI(text, "footnote")) "footnote" else return false;
@@ -54,35 +54,35 @@ pub fn isGlobalKw(text: []const u8) bool {
 
 // ── D-014a layering (GAP-globalpredicatemismatch) ────────────────────────────
 // ONE home for every global-statement predicate, with real containment:
-//   isHoistedGlobalKw  ⊂  isGlobalKw   — mid-step: HOISTED by main.segments
+//   isHoistedGlobalKw  ⊂  isGlobalKw   - mid-step: HOISTED by main.segments
 //       into its own global segment before the step and EXECUTED, so skipping
 //       its leftover tokens inside the step is honest.
-//   isInertGlobalKw    ∩  isGlobalKw = {} — batch-UNOBSERVABLE wherever it
+//   isInertGlobalKw    ∩  isGlobalKw = {} - batch-UNOBSERVABLE wherever it
 //       appears (no SAS log, no graphics, one session), so accepting it
 //       silently can never change data or listings.
 // A PROC statement loop with a D-002 fail-loud skips exactly
 //   isMidStepSkippable(t) == isHoistedGlobalKw(t) or isInertGlobalKw(t) or LIBNAME
-// — what the top level actually HANDLES mid-step. LIBNAME is the one global
+// - what the top level actually HANDLES mid-step. LIBNAME is the one global
 // with a whole-program PRE-PASS: main.parseLibnames binds every libref and
-// preloads its datasets before step 1 runs, mid-step statements included — so
+// preloads its datasets before step 1 runs, mid-step statements included - so
 // by the time a loop skips the leftover tokens the statement HAS executed
 // (BUG-libnamemidstepboth: a mid-PROC libname both ran via the pre-pass AND
 // errored in the loop). ODS/FILENAME are hoisted (below) since
-// BUG-filenamemidstep: skipping them un-executed was a silent no-op — a
+// BUG-filenamemidstep: skipping them un-executed was a silent no-op - a
 // mid-DATA-step `filename f 'new';` re-bound nothing, so `file f;` kept
 // writing to the OLD path at exit 0 (the exact sin D-014a was amended for).
-// Every isGlobalKw member is now handled mid-step: hoisted ∪ pre-pass — the
+// Every isGlobalKw member is now handled mid-step: hoisted ∪ pre-pass - the
 // skip predicate and the handle predicate agree everywhere (D-014a closed).
 
 /// The mid-step globals main.segments hoists OUT of a DATA/PROC step into
 /// their own global segment (executed BEFORE the step): TITLE[n]/FOOTNOTE[n]/
 /// OPTIONS (render/exec state the step reads) and FILENAME/ODS
 /// (BUG-filenamemidstep). SAS runs global statements the moment they are
-/// encountered — i.e. during step COMPILATION, before the step executes — so
+/// encountered - i.e. during step COMPILATION, before the step executes - so
 /// binding a fileref / applying an ODS statement before the whole step runs
 /// is exactly the observable SAS order for FILE/INFILE (execution-time
 /// consumers). ODS destinations stay accepted no-ops and ODS OUTPUT/SELECT/
-/// EXCLUDE/TRACE stay loud — now in handleGlobal, mid-step included, instead
+/// EXCLUDE/TRACE stay loud - now in handleGlobal, mid-step included, instead
 /// of a mid-DATA silent swallow. NOT libname/x mid-step: libname has the
 /// pre-pass, x is a DATA-step statement (parseStmt). PROC SQL is excluded
 /// from the hoist scan (self-parses, GAP-titleinsql).
@@ -104,11 +104,11 @@ pub fn isHoistedGlobalKw(text: []const u8) bool {
 /// log family (SAS Global Statements: Reference); CHECKPOINT EXECUTE_ALWAYS
 /// Language Reference: Concepts p.181 (no-op unless checkpoint mode is on; no STEPCHKPT here); LOCK
 /// single-session always grants; AXIS/LEGEND/PATTERN/SYMBOL SAS/GRAPH, bare
-/// or numbered (SYMBOL255 max). NOT here: MISSING (Language Reference: Concepts p.106 — changes
-/// INPUT decoding → result-changing → loud) and ENDSAS (Language Reference: Concepts p.10/p.487 —
+/// or numbered (SYMBOL255 max). NOT here: MISSING (Language Reference: Concepts p.106 - changes
+/// INPUT decoding → result-changing → loud) and ENDSAS (Language Reference: Concepts p.10/p.487 -
 /// implemented as normal session termination, BUG-endsasexit).
 /// CAVEAT (D-022, BUG-xstmtsilentnoop): "cannot observe" is FALSE for DM's
-/// FILE/OUT log-redirection form, and for X (not in this set — parseStmtRaw
+/// FILE/OUT log-redirection form, and for X (not in this set - parseStmtRaw
 /// swallows it). Those two keep their inertness but emit a NOTE, so they are
 /// not a silent no-op; see noteUnexecuted below. Membership here is unchanged.
 pub fn isInertGlobalKw(text: []const u8) bool {
@@ -125,15 +125,15 @@ pub fn isInertGlobalKw(text: []const u8) bool {
     return false;
 }
 
-/// BUG-xstmtsilentnoop (GH#83 part 1) — D-022's emitter. `isInertGlobalKw`'s own
+/// BUG-xstmtsilentnoop (GH#83 part 1) - D-022's emitter. `isInertGlobalKw`'s own
 /// doc-comment justifies the set as "Real SAS global statements a batch
 /// interpreter CANNOT OBSERVE". That claim is true for RUN/QUIT, GOPTIONS,
 /// SASFILE, PAGE/SKIP and DM's windowing commands, and it is FALSE for exactly
 /// two things, which are what this notes:
-///   X                  — runs an OS command. `data _null_; x "mkdir /tmp/d"; run;`
+///   X                  - runs an OS command. `data _null_; x "mkdir /tmp/d"; run;`
 ///                        produced ZERO output at rc 0 and no directory: the
 ///                        side effect is on the FILESYSTEM, outside the session.
-///   DM … FILE/OUT …    — redirects the LOG or OUTPUT window to a FILE. A
+///   DM … FILE/OUT …    - redirects the LOG or OUTPUT window to a FILE. A
 ///                        downstream log check then reads a file nobody wrote.
 /// Both were a silent rc-0 no-op, which D-002 forbids ("clinical: silent success
 /// is the dangerous failure"). This is the D-014a shape exactly: satisfying the
@@ -143,20 +143,20 @@ pub fn isInertGlobalKw(text: []const u8) bool {
 /// A NOTE, and deliberately NOT an ERROR, on both halves:
 ///   - X NOT EXECUTING IS SETTLED and stays (jira `x_stmt` by design;
 ///     `docs/sas9.4.ebnf` x_stmt deliberately carries no `(* opensas *)`). The
-///     defect was the silence, not the inertness — so the fix is VISIBILITY.
+///     defect was the silence, not the inertness - so the fix is VISIBILITY.
 ///   - an ERROR would break every program that legitimately carries an X
 ///     statement, and because a step ERROR triggers syntax-check mode
 ///     (BUG-errhalt) it would then skip EVERY LATER STEP. That is the precise
 ///     failure D-014 was written after. A NOTE satisfies D-002 without touching
 ///     the exit code.
 /// Everything else DM does (clear, editor, windowing) has no observable effect
-/// in batch and STAYS SILENT — widening this to all of DM would put a NOTE on
+/// in batch and STAYS SILENT - widening this to all of DM would put a NOTE on
 /// the `dm 'log;clear'` autoexec idiom for nothing.
 ///
 /// ponytail: this covers the two PARSER sites (parseProgram's atGlobalStmt
 /// swallow and parseStmtRaw's x/dm arm); the OPEN-CODE sites live in main.zig
 /// (`isXStmt` → handleGlobal at :1142, isInertGlobalKw at :1148) and call the
-/// SAME emitter — exported for exactly that (GH#83 part 2,
+/// SAME emitter - exported for exactly that (GH#83 part 2,
 /// BUG-xstmtopencodesplit), never pre-exported as dead code.
 pub fn noteUnexecuted(diags: *diag.Diagnostics, toks: []const Token) error{OutOfMemory}!void {
     if (toks.len == 0 or toks[0].tag != .name) return;
@@ -168,11 +168,11 @@ pub fn noteUnexecuted(diags: *diag.Diagnostics, toks: []const Token) error{OutOf
 }
 
 /// True when a DM command list carries the FILE or OUT command word. The list is
-/// free text and reaches us in either shape — `dm log "file '&f' replace;"` puts
-/// it inside a STRING token, `dm log file f;` in bare name tokens — so scan every
+/// free text and reaches us in either shape - `dm log "file '&f' replace;"` puts
+/// it inside a STRING token, `dm log file f;` in bare name tokens - so scan every
 /// token's TEXT. WHOLE WORDS ONLY, and that is the load-bearing part: the
 /// `dm 'log;clear;output;clear'` idiom (pinned by open_code_stmt_allowlist)
-/// contains "out" inside "output", which is the OUTPUT WINDOW — pure windowing,
+/// contains "out" inside "output", which is the OUTPUT WINDOW - pure windowing,
 /// unobservable in batch, and it must stay silent.
 fn dmRedirectsToFile(toks: []const Token) bool {
     for (toks) |t| {
@@ -184,7 +184,7 @@ fn dmRedirectsToFile(toks: []const Token) bool {
 }
 
 /// THE mid-step skip predicate (D-014a: skip == what the top level handles
-/// mid-step — hoisted ∪ inert ∪ LIBNAME-via-pre-pass). See the layering note.
+/// mid-step - hoisted ∪ inert ∪ LIBNAME-via-pre-pass). See the layering note.
 pub fn isMidStepSkippable(text: []const u8) bool {
     return isHoistedGlobalKw(text) or isInertGlobalKw(text) or std.ascii.eqlIgnoreCase(text, "libname");
 }
@@ -193,11 +193,11 @@ fn startsWithI(text: []const u8, prefix: []const u8) bool {
     return text.len >= prefix.len and std.ascii.eqlIgnoreCase(text[0..prefix.len], prefix);
 }
 
-/// GAP guard (D-009): the syntax is valid SAS 9.4 opensas doesn't implement —
+/// GAP guard (D-009): the syntax is valid SAS 9.4 opensas doesn't implement -
 /// an opensas gap, exit 2 ("file an opensas issue"), not rc 1 ("fix your
 /// SAS"). Flag the gap, then fail with the usual loud ERROR (prx.zig
 /// loudUnsup's shape). ONLY for guards matching a SPECIFIC valid construct
-/// (a named modifier/keyword) — a catch-all that also swallows typos stays a
+/// (a named modifier/keyword) - a catch-all that also swallows typos stays a
 /// plain user-error `fail` (see audit-exitcodecontract.md §5).
 fn failGap(diags: *diag.Diagnostics, line: usize, comptime fmt: []const u8, args: anytype) Error {
     diag.markGap();
@@ -209,11 +209,11 @@ pub const Parser = struct {
     char_lens: std.ArrayList(CharLen) = .empty, // `length v $ n;` → truncate assigns to v
     sum_vars: std.ArrayList([]const u8) = .empty, // `var + expr;` accumulators → auto-retain 0
     // Vars carrying an EXPLICIT init (array element inits, RETAIN inits): the
-    // init IS the value — the sum statement's auto retain-0 must not overwrite
+    // init IS the value - the sum statement's auto retain-0 must not overwrite
     // it (QA tick377 F2: the retain-inits application moved later, exposing the
     // clobber). Recorded at array/retain parse time; registerSumVar skips these.
     // If the sum statement precedes the retain/array the skip misses and the
-    // retain-0 queues — harmless: statement order still lets the explicit init
+    // retain-0 queues - harmless: statement order still lets the explicit init
     // apply after it.
     explicit_init_vars: std.ArrayList([]const u8) = .empty,
     pending: std.ArrayList(ast.Stmt) = .empty, // statements to inject right after the current one
@@ -234,7 +234,7 @@ pub const Parser = struct {
         self.p.hashattr_n = &self.hashattr_n;
         // Fold `first.var` / `last.var` (which lex as name·dot·name) into a
         // single `.name` token so the expression parser reads them as one
-        // BY-group automatic variable — keeps this out of the lexer/expr parser.
+        // BY-group automatic variable - keeps this out of the lexer/expr parser.
         self.p.toks = try coalesceFirstLast(self.p.arena, self.p.toks);
         // Expand `of a{*}` (all-elements list in a function call) into
         // `a{1}, a{2}, …, a{n}` so the expression parser sees ordinary refs.
@@ -246,7 +246,7 @@ pub const Parser = struct {
         // variable's NAME reaches the function (the evaluator passes only its value).
         self.p.toks = try rewriteVMeta(self.p.arena, self.p.toks);
         // Desugar the numbered array-bound aliases `dim2(a)` → `dim(a, 2)`
-        // (GAP-arraybounds-batch) — the bound-folding machinery knows only the
+        // (GAP-arraybounds-batch) - the bound-folding machinery knows only the
         // two-arg form.
         self.p.toks = try rewriteBoundAliases(self.p.arena, self.p.toks);
         // Rewrite `do over arr; … end;` into `do _i_=lo to hi; … end;` with the bare
@@ -285,14 +285,14 @@ pub const Parser = struct {
             try stmts.insert(self.p.arena, 0, .{ .drop = names });
         }
         // Hoisted hash-attribute do-bound temps (`__hashattr_1`, …) are parser
-        // machinery — keep them out of the output dataset (GAP-hashnumitems).
+        // machinery - keep them out of the output dataset (GAP-hashnumitems).
         // One prefix wildcard covers every temp the hoists minted.
         if (self.hashattr_n > 0) {
             const names = try self.p.arena.alloc([]const u8, 1);
             names[0] = "__hashattr:";
             try stmts.insert(self.p.arena, 0, .{ .drop = names });
         }
-        // DO OVER desugars to `do _i_=lo to hi;` — SAS's implicit-array index `_I_`
+        // DO OVER desugars to `do _i_=lo to hi;` - SAS's implicit-array index `_I_`
         // is automatic and never emitted, so drop it from the output (BUG-dooverindex).
         if (self.has_doover) {
             const names = try self.p.arena.alloc([]const u8, 1);
@@ -312,7 +312,7 @@ pub const Parser = struct {
     pub fn parseStmt(self: *Parser) Error!ast.Stmt {
         // Nesting guard AT the choke point: every recursive statement path
         // (DO bodies, IF/ELSE branches, SELECT whens) routes through here, so
-        // one check covers them all — deep machine-generated nesting fails
+        // one check covers them all - deep machine-generated nesting fails
         // loud instead of overflowing the native stack
         // (BUG-stmtnest-deepguard; the old parseDo-only guard left parseIf's
         // else-if recursion unguarded). Shares the counter/ceiling of the
@@ -336,7 +336,7 @@ pub const Parser = struct {
 
     fn parseStmtRaw(self: *Parser) Error!ast.Stmt {
         const t = self.p.peek();
-        // A lone `;` (or `;;`) in statement position is the SAS null statement — a
+        // A lone `;` (or `;;`) in statement position is the SAS null statement - a
         // no-op, not an error. Lets a program degrade gracefully when a macro that
         // would have emitted a statement expands to nothing (PARSE-nullstmt).
         if (t.tag == .semicolon) {
@@ -355,18 +355,18 @@ pub const Parser = struct {
         }
 
         // A statement-position `IDENT =` is an assignment, even when IDENT collides
-        // with a statement keyword — `label = left(x);`, `format = …;`, `end = …;`
+        // with a statement keyword - `label = left(x);`, `format = …;`, `end = …;`
         // are ordinary variables in codelist/format-building steps. Route to the
         // assignment parser before the keyword dispatch so `label`/`format`/… aren't
         // misread as their statements (PARSE-starcomment).
         if (self.tokAt(1).tag == .eq) return self.parseAssign();
 
-        // `X <command>;` / `DM <command>;` — an OS command / display-manager command
+        // `X <command>;` / `DM <command>;` - an OS command / display-manager command
         // (SAS global stmts that may also sit inside a step, e.g. `X mkdir "&dir";` in
         // a `data _null_`, or `dm 'log;clear';` at the top of an Autoexec). Both keywords
         // are common variable names, so only when a command word/string follows (never
         // `x=`/`dm=`/`x+`/`x{i}`/`x.method`, all handled elsewhere). opensas: parsed and
-        // NOT executed, but no longer SILENT about it — see noteUnexecuted (D-022).
+        // NOT executed, but no longer SILENT about it - see noteUnexecuted (D-022).
         if ((self.atKw("x") or self.atKw("dm")) and (self.tokAt(1).tag == .name or self.tokAt(1).tag == .string)) {
             const from = self.p.pos;
             while (!self.p.check(.semicolon) and !self.p.check(.eof)) _ = self.p.advance();
@@ -388,7 +388,7 @@ pub const Parser = struct {
         if (self.atKw("where")) return self.parseWhere();
         if (self.atKw("select")) return self.parseSelect();
         if (self.atKw("declare") or self.atKw("dcl")) return self.parseDeclare();
-        // `h.method(...);` (statement form) — an object method call.
+        // `h.method(...);` (statement form) - an object method call.
         if (self.hashMethodAhead()) {
             const hop = try self.parseHashOp(null);
             _ = try self.p.expect(.semicolon, "';' after hash method call");
@@ -396,7 +396,7 @@ pub const Parser = struct {
         }
         if (self.atKw("by")) return .{ .by = try self.parseBy() };
         if (self.atKw("length")) return self.parseLength();
-        // `label v='text' v2='text2' …;` — variable display labels. Carried to exec
+        // `label v='text' v2='text2' …;` - variable display labels. Carried to exec
         // on the `.format` node with a NUL-prefixed fmt sentinel (see rideAsLabel).
         if (self.atKw("label")) {
             _ = self.p.advance(); // label
@@ -434,10 +434,10 @@ pub const Parser = struct {
             _ = try self.p.expect(.semicolon, "';' after stop");
             return .stop;
         }
-        // REPLACE / REMOVE — MODIFY-step obs control (FEAT-datamodify-rest). Bare
+        // REPLACE / REMOVE - MODIFY-step obs control (FEAT-datamodify-rest). Bare
         // form only: `replace`/`remove` are ordinary variable names too, so gate on
         // a bare `;` following (an `IDENT =` already routed to parseAssign above).
-        // Encoded as a \x00-sentinel OUTPUT node — no new AST variant needed; exec
+        // Encoded as a \x00-sentinel OUTPUT node - no new AST variant needed; exec
         // routes it to the MODIFY driver and fails loud outside a MODIFY step.
         if ((self.atKw("replace") or self.atKw("remove")) and self.tokAt(1).tag == .semicolon) {
             const kw = self.p.advance().text; // replace | remove
@@ -446,20 +446,20 @@ pub const Parser = struct {
             one[0] = if (std.ascii.eqlIgnoreCase(kw, "replace")) "\x00replace" else "\x00remove";
             return .{ .output = one };
         }
-        // Named form `REMOVE ds;` / `REPLACE ds;` — valid SAS in a multi-dataset
+        // Named form `REMOVE ds;` / `REPLACE ds;` - valid SAS in a multi-dataset
         // MODIFY step, but opensas implements the BARE form only (exec's MODIFY
         // driver routes no named target). Without this guard the dataset name
         // fell through to parseAssign → "expected '=' in assignment", a
         // diagnostic naming the WRONG construct (NOTE-removenamedds; the
         // GAP-liststmt precedent). Fail loud NAMING the statement (D-002).
-        // `remove = 5;` stays an ordinary assignment — gate on a NAME following.
+        // `remove = 5;` stays an ordinary assignment - gate on a NAME following.
         if ((self.atKw("replace") or self.atKw("remove")) and self.tokAt(1).tag == .name)
             return failGap(self.p.diags, self.p.peek().line, "{s} with a named data set is not supported (only the bare {s}; MODIFY-step form)", .{ self.p.peek().text, self.p.peek().text });
-        // MISSING — declares the characters raw numeric input reads as special
+        // MISSING - declares the characters raw numeric input reads as special
         // missing values (.A-.Z/._; Language Reference: Concepts printed p.519, a worked example shown
         // TWICE). VALID SAS 9.4 opensas doesn't implement → a NAMED gap, rc 2
         // (D-009/D-009b(i); BUG-missingstmtwrongclass). It used to fall through
-        // to parseAssign → "expected '=' in assignment" — rc 1 blaming the
+        // to parseAssign → "expected '=' in assignment" - rc 1 blaming the
         // WRONG construct (the NOTE-removenamedds / GAP-liststmt precedent).
         // `missing = 5;` routes to parseAssign on the `IDENT =` check above, so
         // a `missing` reaching here IS the statement. Same message as main.zig's
@@ -503,13 +503,13 @@ pub const Parser = struct {
     /// `abort [abend [n] | return [n] | n];` (BUG-abortreturncode, Language Reference: Concepts p.485-486).
     /// Plain `abort;` ends the DATA step with _ERROR_=1 (like STOP); ABEND /
     /// RETURN [n] / bare n terminate the WHOLE session with a process exit code.
-    /// `abort return;` (no n) is LEGAL — the syntax makes n optional (Statements
+    /// `abort return;` (no n) is LEGAL - the syntax makes n optional (Statements
     /// Ref printed p.16, marker "=== pdf 27 ===") and the doc's own z/OS example
     /// runs `if errcode=16 then abort return;` (printed p.19, marker "=== pdf 30
     /// ==="); RETURN without n "returns ... a condition code that indicates an
     /// error" (printed p.18, marker "=== pdf 29 ===") → default 1, the same
     /// default ABEND-no-n takes exec-side. Anything else (a stray word, a
-    /// NON-number after RETURN) is a hard parse ERROR — a silently-misparsed
+    /// NON-number after RETURN) is a hard parse ERROR - a silently-misparsed
     /// ABORT is a clinical fail-fast that never fires.
     fn parseAbort(self: *Parser) Error!ast.Stmt {
         _ = self.p.advance(); // abort
@@ -527,7 +527,7 @@ pub const Parser = struct {
             _ = self.p.advance();
             const n = try self.abortCode() orelse blk: {
                 // No n: legal ONLY at `;` (default rc 1, see the doc comment).
-                // A stray word here is the typo it always was — abortCode's
+                // A stray word here is the typo it always was - abortCode's
                 // null cannot tell the two apart, the semicolon check does.
                 if (!self.p.check(.semicolon))
                     return self.p.diags.fail(error.ParseError, self.p.peek().line, "ABORT RETURN requires a return code", .{});
@@ -551,7 +551,7 @@ pub const Parser = struct {
             return self.p.diags.fail(error.ParseError, self.p.peek().line, "ABORT return code must be an integer 0-255, got '{s}'", .{text});
     }
 
-    /// `call ROUTINE(args);` — a CALL statement. Parse `ROUTINE(args)` as a call
+    /// `call ROUTINE(args);` - a CALL statement. Parse `ROUTINE(args)` as a call
     /// expression (name + args) and wrap it; the executor dispatches on the name.
     /// ponytail: only CALL MISSING is implemented (see exec.runCall); other
     /// routines parse but are a NOTE-and-ignore at run time.
@@ -564,15 +564,15 @@ pub const Parser = struct {
         return .{ .call_ = e.call };
     }
 
-    /// `attrib v1 v2 length=[$]n [format=f] [informat=f] [label='…'] …;` — apply a
+    /// `attrib v1 v2 length=[$]n [format=f] [informat=f] [label='…'] …;` - apply a
     /// `$`-length (truncates assignments, like LENGTH), a FORMAT (display format,
-    /// like FORMAT) and an INFORMAT (read format, like INFORMAT — BUG-attribinformat:
+    /// like FORMAT) and an INFORMAT (read format, like INFORMAT - BUG-attribinformat:
     /// it rode home discarded, so `attrib d informat=date9.; input d;` read MISSING).
-    /// The informat rides the `.format` node with a \x01 sentinel — the same tag
+    /// The informat rides the `.format` node with a \x01 sentinel - the same tag
     /// scan() uses for a real INFORMAT statement, so attrs/patchInformats/INPUT all
     /// pick it up unchanged. Numeric `length=n` is applied too (GH#46).
     /// An EMPTY `format=`/`informat=` value is a user error here, not a silent
-    /// drop — see attribValueMissing (BUG-attribemptyvaluenoop).
+    /// drop - see attribValueMissing (BUG-attribemptyvaluenoop).
     fn parseAttrib(self: *Parser) Error!ast.Stmt {
         _ = self.p.advance(); // attrib
         var fmts: std.ArrayList(ast.FormatItem) = .empty;
@@ -587,7 +587,7 @@ pub const Parser = struct {
                 _ = self.p.advance(); // '='
                 if (eqi(opt, "length")) {
                     const is_char = self.p.eat(.dollar);
-                    // `length=$11.` — the customary SAS trailing dot (and the
+                    // `length=$11.` - the customary SAS trailing dot (and the
                     // macro-built `$40..` double dot) must not drop the width:
                     // it silently left EMPTY_* metadata columns at len 1 and
                     // no assignment ever truncated (GAP-charlength, gen2 CM).
@@ -605,12 +605,12 @@ pub const Parser = struct {
                         for (names.items) |nm| try fmts.append(self.p.arena, .{ .name = nm, .fmt = try rideAsLabel(self.p.arena, self.p.diags, nm, lbl, opt_tok.line) });
                     }
                 } else if (eqi(opt, "informat")) {
-                    // informat=spec — same \x01 sentinel the scan() .informat
+                    // informat=spec - same \x01 sentinel the scan() .informat
                     // handler tags, riding the .format node like label= does (\x00).
                     const spec = try self.tryFormatSpec() orelse return self.attribValueMissing(opt_tok, names.items[0]);
                     for (names.items) |nm| try fmts.append(self.p.arena, .{ .name = nm, .fmt = try std.fmt.allocPrint(self.p.arena, "\x01{s}", .{spec}) });
                 } else {
-                    // unknown ATTRIB option — consume the value, ignore it.
+                    // unknown ATTRIB option - consume the value, ignore it.
                     if (self.p.check(.string)) _ = self.p.advance() else if ((try self.tryFormatSpec()) == null) _ = self.p.advance();
                 }
             }
@@ -620,44 +620,44 @@ pub const Parser = struct {
         return .{ .drop = &[_][]const u8{} }; // length-only → inert (effect in char_lens)
     }
 
-    /// BUG-attribemptyvaluenoop — `attrib a format=;` / `attrib a informat=;` in a
+    /// BUG-attribemptyvaluenoop - `attrib a format=;` / `attrib a informat=;` in a
     /// DATA STEP. tryFormatSpec returns null at `;` (and at a name with no trailing
     /// dot), and both arms used to fall off the end UNRECORDED: the value vanished,
-    /// the OLD format stayed attached and the run exited 0 with zero diagnostics —
+    /// the OLD format stayed attached and the run exited 0 with zero diagnostics -
     /// the silent no-op D-002 forbids ("clinical: silent success is the dangerous
     /// failure"). This makes it LOUD.
     ///
-    /// WHY LOUD AND NOT "CLEAR THE ATTRIBUTE" — the empty spelling is real SAS, but
+    /// WHY LOUD AND NOT "CLEAR THE ATTRIBUTE" - the empty spelling is real SAS, but
     /// not HERE. Three doc facts, in order of weight:
     ///   1. Statements Ref printed p.36: "You can use ATTRIB in a PROC step, but the
     ///      rules are different." The only place SAS 9.4 documents `format=` with an
     ///      empty value is the PROC DATASETS MODIFY ATTRIB *option* (Procedures Guide
-    ///      printed p.691 Example 1, `attrib _all_ format=;` — SAS's own sample code,
+    ///      printed p.691 Example 1, `attrib _all_ format=;` - SAS's own sample code,
     ///      and what proc.zig's applyAttrib implements). p.36 rules that surface out
     ///      of the DATA step in one sentence, so importing it here would be inventing
     ///      syntax, not honouring a citation.
     ///   2. Statements Ref printed p.34 gives the DATA-step slots as `FORMAT=format`
-    ///      and `INFORMAT=informat` — value REQUIRED. The volume brackets what is
+    ///      and `INFORMAT=informat` - value REQUIRED. The volume brackets what is
     ///      optional (`LENGTH=<$>length` on the same page), so an unbracketed operand
     ///      is not an omission. `format=;` appears NOWHERE in the volume.
-    ///   3. The DOCUMENTED DATA-step removal is a BARE FORMAT/INFORMAT statement —
+    ///   3. The DOCUMENTED DATA-step removal is a BARE FORMAT/INFORMAT statement -
     ///      printed p.112: "To disassociate a format from a variable, use the variable
     ///      in a FORMAT statement without specifying a format … In a DATA step, place
     ///      this FORMAT statement after the SET statement", worked at printed p.115
     ///      Example 3 (`format x;`). That route is implemented (parseFormatList's
     ///      pending-at-`;` arm) and stays untouched, so the user is not left without a
-    ///      way to remove the attribute — the message names it.
+    ///      way to remove the attribute - the message names it.
     /// The D-015 shape decides the residual doubt: accepting an undocumented spelling
-    /// and quietly dropping a display format is a SILENT SUPERSET — a typo or an
+    /// and quietly dropping a display format is a SILENT SUPERSET - a typo or an
     /// empty macro variable would strip a date format and print 21929 instead of
     /// 15JAN2020, at rc 0. Loud costs one error message; silent costs a wrong number.
     ///
     /// rc 1, not rc 2 (D-009 / D-009b(ii)): by (1)+(2) this is not valid DATA-step
     /// SAS, so it is the USER's code that is wrong ("fix your SAS"), not an opensas
-    /// gap ("file an opensas issue") — hence a plain `fail`, never `failGap`.
+    /// gap ("file an opensas issue") - hence a plain `fail`, never `failGap`.
     ///
     /// ponytail: NOT absorbing the `"$."` clear sentinel (parser.zig's parseFormatList
-    /// ponytail) — a real clear needs an exec-side null-format path and exec.zig is
+    /// ponytail) - a real clear needs an exec-side null-format path and exec.zig is
     /// outside this task's ownership. Nothing here depends on it: the loud path never
     /// mints a sentinel. `label=` with a non-string value is the same silent-drop
     /// shape one arm above and is deliberately left for its own ticket.
@@ -668,12 +668,12 @@ pub const Parser = struct {
         return self.p.diags.fail(error.ParseError, opt_tok.line, "attrib {s}=: '{s}' is not a {s} specification (a {s} name needs its trailing '.', e.g. {s}.)", .{ opt, self.p.peek().text, opt, opt, self.p.peek().text });
     }
 
-    /// `infile "path" [DLM=|DELIMITER= "x"] [DSD] [FIRSTOBS=n];` — external text
+    /// `infile "path" [DLM=|DELIMITER= "x"] [DSD] [FIRSTOBS=n];` - external text
     /// input. DSD with no DLM defaults the delimiter to a comma.
     fn parseInfile(self: *Parser) Error!ast.Stmt {
         _ = self.p.advance(); // infile
         // INFILE naming the inline-data device (DATALINES/DATALINES4/CARDS/CARDS4)
-        // reads the embedded datalines block — with options (DLM=/DSD/FIRSTOBS=) —
+        // reads the embedded datalines block - with options (DLM=/DSD/FIRSTOBS=) -
         // instead of an external file (ISS-infiledevice). Otherwise a quoted path.
         var inf = ast.Infile{ .path = undefined };
         if (self.atKw("datalines") or self.atKw("datalines4") or self.atKw("cards") or self.atKw("cards4")) {
@@ -688,7 +688,7 @@ pub const Parser = struct {
                 _ = self.p.eat(.eq);
                 if (self.p.check(.string)) {
                     const d = self.p.advance().text;
-                    // BUG-dlmmultichar: DLM= is a LIST of single-char delimiters —
+                    // BUG-dlmmultichar: DLM= is a LIST of single-char delimiters -
                     // keep the whole string, not just the first byte. (The distinct
                     // "one multi-char delimiter" form DLMSTR= is unsupported and
                     // fails loud via the else branch below.)
@@ -702,7 +702,7 @@ pub const Parser = struct {
                 _ = self.p.eat(.eq);
                 if (self.p.check(.number)) inf.firstobs = std.fmt.parseInt(usize, self.p.advance().text, 10) catch 1;
             } else if (self.atKw("lrecl")) {
-                // ponytail: accept-and-ignore — we read full lines, so logical
+                // ponytail: accept-and-ignore - we read full lines, so logical
                 // record length has no runtime effect. Consume the value so it
                 // doesn't hit the fail-loud else (ISS-infilelrecl).
                 _ = self.p.advance();
@@ -721,19 +721,19 @@ pub const Parser = struct {
                 _ = self.p.advance();
                 inf.overflow = .stopover;
             } else if (self.atKw("end")) {
-                // END=variable (FEAT-infileend) — temp flag, 1 on the last record.
+                // END=variable (FEAT-infileend) - temp flag, 1 on the last record.
                 _ = self.p.advance();
                 _ = self.p.eat(.eq);
                 inf.end_var = (try self.p.expect(.name, "a variable name after END=")).text;
             } else if (self.atKw("obs")) {
-                // OBS=n (FEAT-infileobslinesize) — last record number read (1-based).
+                // OBS=n (FEAT-infileobslinesize) - last record number read (1-based).
                 _ = self.p.advance();
                 _ = self.p.eat(.eq);
                 const n = try self.p.expect(.number, "a record count after OBS=");
                 inf.obs = std.fmt.parseInt(usize, n.text, 10) catch
                     return self.p.diags.fail(error.ParseError, n.line, "INFILE OBS= expects an integer", .{});
             } else if (self.atKw("linesize") or self.atKw("ls")) {
-                // LINESIZE=/LS=n (FEAT-infileobslinesize) — cap each record at n columns.
+                // LINESIZE=/LS=n (FEAT-infileobslinesize) - cap each record at n columns.
                 _ = self.p.advance();
                 _ = self.p.eat(.eq);
                 const n = try self.p.expect(.number, "a length after LINESIZE=");
@@ -742,26 +742,26 @@ pub const Parser = struct {
             } else if (self.atKw("unbuffered") or self.atKw("unbuf")) {
                 // GAP-infileoptrc (3b): UNBUFFERED (alias UNBUF) is a documented
                 // INFILE option (Statements Ref printed p.138, marker
-                // "=== pdf 149 ===") opensas has not implemented — an opensas
+                // "=== pdf 149 ===") opensas has not implemented - an opensas
                 // gap → rc 2 (D-009/D-009b(i)), split out of the rc-1 typo
                 // catch-all below. Same loud ERROR text; only the rc moves.
                 return failGap(self.p.diags, self.p.peek().line, "INFILE option {s} is not supported", .{self.p.peek().text});
             } else if (self.atKw("eof")) {
                 // GAP-infileoptrc (3c): EOF=variable (printed p.130, marker
-                // "=== pdf 141 ===") — the doc's own prescribed substitute
+                // "=== pdf 141 ===") - the doc's own prescribed substitute
                 // where END= is invalid (DATALINES / multi-record INPUT).
                 // Same gap class, same split off the catch-all.
                 return failGap(self.p.diags, self.p.peek().line, "INFILE option {s} is not supported", .{self.p.peek().text});
             } else if (self.atKw("eov")) {
                 // GAP-infileeov: EOV=variable (printed p.130, marker
-                // "=== pdf 141 ===") — set to 1 when the first record of the
+                // "=== pdf 141 ===") - set to 1 when the first record of the
                 // next file in a concatenated series is read. Documented but
                 // unimplemented → same gap class as EOF= above, same split
                 // off the rc-1 typo catch-all. Same ERROR text; only rc moves.
                 return failGap(self.p.diags, self.p.peek().line, "INFILE option {s} is not supported", .{self.p.peek().text});
             } else if (self.atKw("nopad")) {
                 // NOPAD is the documented DEFAULT of the same PAD|NOPAD entry
-                // (printed p.135) — accept-and-ignore is truthful here, not a
+                // (printed p.135) - accept-and-ignore is truthful here, not a
                 // silent no-op: opensas never pads, so the option asks for
                 // exactly what happens (D-018: the split must be right in both
                 // directions; leaving the default at typo-rc would be the
@@ -775,20 +775,20 @@ pub const Parser = struct {
                 // (D-009/D-009b(i)), split off the rc-1 typo catch-all below.
                 // PAD deliberately stays loud rather than accept-and-ignore:
                 // it pads short records to LRECL=, and LRECL= is a no-op here,
-                // so there is nothing to pad TO (BUG-infilepadinert — loud
+                // so there is nothing to pad TO (BUG-infilepadinert - loud
                 // beats lying). Same ERROR text on both arms; only rc moves.
                 return failGap(self.p.diags, self.p.peek().line, "INFILE option {s} is not supported", .{self.p.peek().text});
             } else {
                 // House rule: an unrecognized INFILE option must FAIL LOUD, never a
-                // silent no-op — a swallowed record-boundary option (e.g. MISSOVER)
+                // silent no-op - a swallowed record-boundary option (e.g. MISSOVER)
                 // silently corrupts data (BUG-infilemissover).
-                // BUG-infilepadinert: PAD used to take this loud path too — it was
+                // BUG-infilepadinert: PAD used to take this loud path too - it was
                 // once parsed, stored, and never read, the lone silent hole in
                 // this wall (D-002); it is now the NAMED failGap arm above (rc 2),
                 // still loud, because it pads short records out to LRECL= and
                 // LRECL= is a documented accept-and-ignore no-op
                 // (ISS-infilelrecl), so there is nothing to pad TO until that
-                // lands — loud beats lying. (ast.Infile.pad is now vestigial;
+                // lands - loud beats lying. (ast.Infile.pad is now vestigial;
                 // ast.zig is another dev's file.)
                 const opt = self.p.peek();
                 return self.p.diags.fail(error.ParseError, opt.line, "INFILE option {s} is not supported", .{opt.text});
@@ -799,13 +799,13 @@ pub const Parser = struct {
         return .{ .infile = inf };
     }
 
-    /// `file "path" [DLM=|DELIMITER= "x"] [DSD];` — external text output for
+    /// `file "path" [DLM=|DELIMITER= "x"] [DSD];` - external text output for
     /// `put`. Mirrors parseInfile's option shape; an unknown option fails loud.
     fn parseFile(self: *Parser) Error!ast.Stmt {
         _ = self.p.advance(); // file
         // GAP-fileprint: unquoted PRINT/LOG fileref keywords (atKw matches a
         // .name token only, so a quoted "print" still parses as an external
-        // path below) — accepted, PUT routes to the normal output.
+        // path below) - accepted, PUT routes to the normal output.
         var f = if (self.atKw("print") or self.atKw("log"))
             ast.File{ .path = self.p.advance().text, .print_log = true }
         else
@@ -823,7 +823,7 @@ pub const Parser = struct {
                 f.dsd = true;
             } else {
                 // House rule: an unrecognized FILE option must FAIL LOUD, never a
-                // silent no-op — a swallowed DLM=/DSD silently misformats the
+                // silent no-op - a swallowed DLM=/DSD silently misformats the
                 // output file (BUG-fileopts).
                 const opt = self.p.peek();
                 return self.p.diags.fail(error.ParseError, opt.line, "FILE option {s} is not supported", .{opt.text});
@@ -852,7 +852,7 @@ pub const Parser = struct {
             _ = try self.p.expect(.semicolon, "';'");
             return .{ .substr_assign = .{ .target = v, .pos = pos, .len = len, .value = value } };
         }
-        // Sum statement `var + expr;` — an accumulator. Desugar to
+        // Sum statement `var + expr;` - an accumulator. Desugar to
         // `var = sum(var, expr)` (sum() treats a missing addend as 0) and record
         // `var` so parseProgram prepends `retain var 0;`.
         if (self.p.check(.plus)) {
@@ -868,20 +868,20 @@ pub const Parser = struct {
             return .{ .assign = .{ .target = target, .value = call } };
         }
         // Subscripted lvalue: `a{i} = expr;` / `a{i,j} = expr;` (GAP-multidimarray).
-        // `a(i) = expr;` too — SAS allows ()/{}/[] interchangeably; gate the paren
+        // `a(i) = expr;` too - SAS allows ()/{}/[] interchangeably; gate the paren
         // form on a declared array so a genuine call-looking LHS still errors
         // (GAP-arrayparenwrite; parseArraySubscript is paren-aware).
         if (self.p.check(.lbrace) or (self.p.check(.lparen) and self.p.lookupArray(target) != null)) {
             const name_tok: Token = .{ .tag = .name, .text = target, .line = self.p.peek().line };
             const r = try self.p.parseArraySubscript(name_tok);
-            // Array-element SUM statement `a[i] + expr;` — the subscripted analog
+            // Array-element SUM statement `a[i] + expr;` - the subscripted analog
             // of `var + expr;` (GAP-arraysum): retain the element across
             // iterations and add expr each execution. Desugar to
             // `a[i] = sum(a[i], expr)`; since the subscript is dynamic, register
             // EVERY element for `retain … 0` (registerSumVar skips elements with
-            // an explicit array init — that init is the value, the auto-zero
+            // an explicit array init - that init is the value, the auto-zero
             // must not clobber it). ponytail: special-list arrays (`array v{*} _numeric_`) have no static
-            // elements, so nothing is retained — add only if a real program hits it.
+            // elements, so nothing is retained - add only if a real program hits it.
             if (self.p.check(.plus)) {
                 _ = self.p.advance(); // '+'
                 const addend = try self.p.parseExpr();
@@ -908,18 +908,18 @@ pub const Parser = struct {
             } };
         }
         _ = try self.p.expect(.eq, "'=' in assignment");
-        // `rc = h.method(...);` — the RHS is a hash method call, not an expression
+        // `rc = h.method(...);` - the RHS is a hash method call, not an expression
         // (the evaluator can't see hash ops), so capture it as a statement with a
         // return-code target. Only when the call IS the whole RHS (followed by
-        // `;`) — `x = h.find() + 1;` is the expression form (GAP-hashinexpr) and
+        // `;`) - `x = h.find() + 1;` is the expression form (GAP-hashinexpr) and
         // falls through to parseExpr, which hoists the call.
         if (self.hashStmtAhead()) {
             const hop = try self.parseHashOp(target);
             _ = try self.p.expect(.semicolon, "';'");
             return .{ .hash_op = hop };
         }
-        // `h = _new_ hash(...);` / `hi = _new_ hiter('h');` — the RHS
-        // constructor forms (GAP-hashnew; GAP-hashnewhiter — Language Reference: Concepts p.624's
+        // `h = _new_ hash(...);` / `hi = _new_ hiter('h');` - the RHS
+        // constructor forms (GAP-hashnew; GAP-hashnewhiter - Language Reference: Concepts p.624's
         // verbatim two-step iterator instantiation, stated there as equivalent
         // to `declare hiter hi('h')`). Both desugar to the SAME hash_decl the
         // declare forms produce; exec treats them alike (one positional string
@@ -936,7 +936,7 @@ pub const Parser = struct {
         var value = try self.p.parseExpr();
         _ = try self.p.expect(.semicolon, "';'");
         // A `length v $ n;` variable truncates every char assignment to n bytes.
-        // Desugar to `__assignc(rhs, n)` (functions.zig) — char truncates like
+        // Desugar to `__assignc(rhs, n)` (functions.zig) - char truncates like
         // substr(rhs,1,n) did, but a NUMERIC rhs renders BESTn. right-justified
         // (Language Reference: Concepts p.124: assignment conversion uses the LHS length; substr's
         // BEST12 field blanked n<12) (BUG-numcharwidth).
@@ -944,7 +944,7 @@ pub const Parser = struct {
         return .{ .assign = .{ .target = target, .value = value } };
     }
 
-    /// `rename old=new old2=new2 …;` — the statement form of the `rename=(…)`
+    /// `rename old=new old2=new2 …;` - the statement form of the `rename=(…)`
     /// dataset option: rename variables in the step's output. Exec collects the
     /// pairs and applies them to the output dataset at finalize, reusing the
     /// dataset-option rename path (G-falsemarkers2).
@@ -961,25 +961,25 @@ pub const Parser = struct {
         return .{ .rename = try pairs.toOwnedSlice(self.p.arena) };
     }
 
-    /// `length v1 $ n1 v2 n2 …;` — records char lengths (with `$`) so assignments
+    /// `length v1 $ n1 v2 n2 …;` - records char lengths (with `$`) so assignments
     /// truncate; numeric lengths (GH#46) are carried via main.lengthVars into the
     /// PDV var's numlen, truncating each store to the high N of 8 IEEE bytes (a
     /// deliberate precision loss, not a no-op). Declarative → an inert node here.
     /// ponytail: must precede the assignments it governs (we parse top-down), and
-    /// truncation only — SAS also blank-pads a short value to n (put trims it).
+    /// truncation only - SAS also blank-pads a short value to n (put trims it).
     fn parseLength(self: *Parser) Error!ast.Stmt {
         const kw = self.p.advance(); // length
-        // `length v1 v2 … $ n  w1 … m;` — each group is a *list* of variables
+        // `length v1 v2 … $ n  w1 … m;` - each group is a *list* of variables
         // sharing one `$`/length spec. The `$` and length come after the whole
         // list, so collect every name first, then apply the length to all of them
         // (BUG-lenmulti: only the last was getting it).
         // ponytail: `length` also fixes SAS variable *order*, but that needs the
         // PDV pre-seeded at compile time (a `length` AST node the executor reads);
         // desugaring to runtime assignments would wipe SET-loaded values. Left as
-        // an inert node — dm runs with correct values, column order is a follow-up.
+        // an inert node - dm runs with correct values, column order is a follow-up.
         while (self.p.check(.name)) {
             var group: std.ArrayList([]const u8) = .empty;
-            // A group may use a numbered range `x1-x3` (GH#32) — same expander the
+            // A group may use a numbered range `x1-x3` (GH#32) - same expander the
             // keep=/drop= and parseNameList sides use, so `x01-x03` pads correctly.
             while (self.p.check(.name)) {
                 const name = self.p.advance().text;
@@ -1001,7 +1001,7 @@ pub const Parser = struct {
 
     /// A LENGTH width number, tolerant of the SAS trailing dot: `11`, `11.`
     /// (one number token or a number followed by stray dot tokens). null =
-    /// none written — distinct from an explicit `0`, which is out of range.
+    /// none written - distinct from an explicit `0`, which is out of range.
     fn lengthNumber(self: *Parser) ?usize {
         if (!self.p.check(.number)) return null;
         const n = std.fmt.parseInt(usize, std.mem.trimEnd(u8, self.p.advance().text, "."), 10) catch 0;
@@ -1011,7 +1011,7 @@ pub const Parser = struct {
 
     /// BUG-lengthcapnostore: reject an impossible declared length AT THE
     /// STATEMENT (LENGTH and ATTRIB both route here), so a store-free
-    /// `length y $40000; run;` is loud — SAS rejects the LENGTH statement
+    /// `length y $40000; run;` is loud - SAS rejects the LENGTH statement
     /// itself at compile time, no assignment needed (a metadata-driven shell
     /// generator emits declarations without any store).
     /// Complements pdv.setAt's cap (67a3c834), which stays: that one catches
@@ -1020,28 +1020,28 @@ pub const Parser = struct {
     /// one fires earlier for parser-stamped declarations, so the two never
     /// double-report. Same message text on both routes.
     /// Doc: LENGTH Statement, SAS 9.4 DATA Step Statements: Reference printed
-    /// p.217 (pdf 228 at the volume's +11 offset — verified: the "LENGTH
+    /// p.217 (pdf 228 at the volume's +11 offset - verified: the "LENGTH
     /// Statement 217" footer closes pdf 228): "For character variables, 1 to
     /// 32767 bytes under all operating environments"; ATTRIB LENGTH= repeats
-    /// it at printed p.34 (pdf 45 — "34 Chapter 2" footer). Numeric range is
+    /// it at printed p.34 (pdf 45 - "34 Chapter 2" footer). Numeric range is
     /// "2 to 8 bytes or 3 to 8 bytes, depending on your operating
     /// environment": the 8 cap is universal and checked.
     /// BUG-attrboundssilent: so are the FLOORS, which this function used to
     /// swallow under a blanket "minimum is platform-dependent" park. The
-    /// character minimum is NOT platform-dependent — "1 to 32767 bytes under
-    /// all operating environments" is the same doc sentence — and numeric 0/1
+    /// character minimum is NOT platform-dependent - "1 to 32767 bytes under
+    /// all operating environments" is the same doc sentence - and numeric 0/1
     /// are out of range on every platform the doc lists, z/OS included. An
     /// out-of-range length is a malformed program → rc 1 (D-009b(ii)), same
     /// class and wording shape as the two maximum errors above.
     fn checkDeclLen(self: *Parser, is_char: bool, len: ?usize, name: []const u8, line: usize) Error!void {
-        const l = len orelse return; // no width written (`length c $;`) — nothing to check
+        const l = len orelse return; // no width written (`length c $;`) - nothing to check
         if (is_char and l > pdv.max_char_len)
             return self.p.diags.fail(error.ParseError, line, "Character variable {s} has length {d}, over the SAS maximum character length 32767.", .{ name, l });
         if (!is_char and l > 8)
             return self.p.diags.fail(error.ParseError, line, "Numeric variable {s} has length {d}, over the SAS maximum numeric length 8.", .{ name, l });
         if (is_char and l == 0)
             return self.p.diags.fail(error.ParseError, line, "Character variable {s} has length {d}, under the SAS minimum character length 1.", .{ name, l });
-        // ponytail: numeric length 2 stays ACCEPTED — legal z/OS, illegal
+        // ponytail: numeric length 2 stays ACCEPTED - legal z/OS, illegal
         // UNIX/Windows; that ONE boundary really is platform-dependent (the
         // park the old comment over-applied to every lower bound). Reject 2
         // when a platform target is decided (oracle-unblocked-readings.md 4a).
@@ -1055,11 +1055,11 @@ pub const Parser = struct {
     }
 
     /// Record a sum-statement accumulator (dedup, case-insensitive) and queue
-    /// its `retain v 0;` into `pending` — injected right AFTER the statement,
+    /// its `retain v 0;` into `pending` - injected right AFTER the statement,
     /// so the compile-time PDV establishes the var at the SUM STATEMENT's
     /// textual position (first-mention: Language Reference: Concepts p.478 Fig. 20.2 lands TeamTotal
     /// AFTER the INPUT vars, and a SET/assignment preceding the sum statement
-    /// owns the earlier slots — QA tick377 F2, where the old step-TOP hoist
+    /// owns the earlier slots - QA tick377 F2, where the old step-TOP hoist
     /// pre-empted a second-SET POINT= lookup's columns).
     fn registerSumVar(self: *Parser, name: []const u8) Error!void {
         for (self.sum_vars.items) |n| if (std.ascii.eqlIgnoreCase(n, name)) return;
@@ -1072,7 +1072,7 @@ pub const Parser = struct {
         try self.pending.append(self.p.arena, .{ .retain = items });
     }
 
-    /// Wrap `value` in `__assignc(value, n)` — assignment-to-length-n-char-var
+    /// Wrap `value` in `__assignc(value, n)` - assignment-to-length-n-char-var
     /// semantics (see functions.zig); substr(rhs,1,n) was the old desugar but
     /// it slices the BEST12 field's blank left edge for a numeric rhs (n<12).
     fn truncate(self: *Parser, value: *const ast.Expr, n: usize) Error!*const ast.Expr {
@@ -1093,12 +1093,12 @@ pub const Parser = struct {
                 if (self.eatKw("else")) try self.mkStmt(try self.parseStmt()) else null;
             return .{ .if_ = .{ .cond = cond, .then_branch = then_branch, .else_branch = else_branch } };
         }
-        // subsetting `if c;` — both branches null
+        // subsetting `if c;` - both branches null
         _ = try self.p.expect(.semicolon, "';' or 'then'");
         return .{ .if_ = .{ .cond = cond, .then_branch = null, .else_branch = null } };
     }
 
-    /// `where expr;` — engine-level pre-read filter (exec.applyWhereStmt).
+    /// `where expr;` - engine-level pre-read filter (exec.applyWhereStmt).
     fn parseWhere(self: *Parser) Error!ast.Stmt {
         _ = self.p.advance(); // where
         // Grab the predicate token span up to the terminating ';' and route it
@@ -1120,17 +1120,17 @@ pub const Parser = struct {
         pp.where_ctx = true; // `<>` means NE in a WHERE expression (BUG-wherene)
         pp.arrays = self.p.arrays; // keep array refs resolvable, as the shared cursor did
         const cond = try pp.parseExpr();
-        // Fail LOUD on leftover tokens — an unparsed predicate must not silently
+        // Fail LOUD on leftover tokens - an unparsed predicate must not silently
         // filter nothing (fail-loud, mirrors io.applyWhere).
         if (pp.peek().tag != .eof)
             return self.p.diags.fail(error.ParseError, pp.peek().line, "unexpected token '{s}' in where predicate", .{pp.peek().text});
         // A dedicated node, NOT a subsetting-if: WHERE is an engine-level
         // pre-read filter, so end=/first./last. must see the filtered stream
-        // (exec.applyWhereStmt — GAP-vtabledisk fallout).
+        // (exec.applyWhereStmt - GAP-vtabledisk fallout).
         return .{ .where_ = cond };
     }
 
-    /// `select (sel); when (v…) s; … otherwise s; end;` — desugared to a nested
+    /// `select (sel); when (v…) s; … otherwise s; end;` - desugared to a nested
     /// if/then/else chain (only the first matching WHEN runs, then the OTHERWISE).
     /// A bare `select;` uses each WHEN's expression as the condition directly.
     fn parseSelect(self: *Parser) Error!ast.Stmt {
@@ -1147,14 +1147,14 @@ pub const Parser = struct {
         var whens: std.ArrayList(When) = .empty;
         var otherwise: ?*const ast.Stmt = null;
         while (!self.atKw("end") and !self.p.check(.eof)) {
-            // SAS 9.4: OTHERWISE must be the LAST clause — a WHEN (or a second
+            // SAS 9.4: OTHERWISE must be the LAST clause - a WHEN (or a second
             // OTHERWISE) after it is a syntax error, not an unreachable branch
             // (BUG-selectwhenafterother). One guard covers both.
             if (otherwise != null)
                 return self.p.diags.fail(error.ParseError, self.p.peek().line, "OTHERWISE must be the last clause in a SELECT block", .{});
             if (self.eatKw("otherwise")) {
                 // A bodyless `otherwise;` is VALID SAS: "do nothing for unmatched
-                // values" — it suppresses the no-match error (BUG-emptyotherwise).
+                // values" - it suppresses the no-match error (BUG-emptyotherwise).
                 // Desugar to a no-op branch (null_stmt) so the terminal else is a
                 // real statement, NOT the fail-loud select_nomatch node below.
                 otherwise = if (self.p.check(.semicolon)) blk: {
@@ -1178,7 +1178,7 @@ pub const Parser = struct {
         // fold right-to-left into `if c1 then s1; else if c2 then s2; … else oth;`.
         // No OTHERWISE → the terminal else must FAIL LOUD if reached: SAS errors and
         // stops the step when no WHEN matches and there is no OTHERWISE (BUG-selectnomatch).
-        // A bare `select;` (no WHENs, no OTHERWISE) is a genuine no-op — nothing to match.
+        // A bare `select;` (no WHENs, no OTHERWISE) is a genuine no-op - nothing to match.
         var else_b: ?*const ast.Stmt = otherwise orelse
             (if (whens.items.len == 0) null else try self.mkStmt(.select_nomatch));
         var k = whens.items.len;
@@ -1211,14 +1211,14 @@ pub const Parser = struct {
         return if (j < self.p.toks.len) self.p.toks[j] else self.p.toks[self.p.toks.len - 1];
     }
 
-    /// Does the cursor sit on `obj . method (` — an object method call? (`first.`/
+    /// Does the cursor sit on `obj . method (` - an object method call? (`first.`/
     /// `last.` were already coalesced into single name tokens, so they don't match.)
     fn hashMethodAhead(self: *Parser) bool {
         return self.p.check(.name) and self.tokAt(1).tag == .dot and
             self.tokAt(2).tag == .name and self.tokAt(3).tag == .lparen;
     }
 
-    /// Does the cursor sit on `obj . attribute` with NO `(` — a parenless hash
+    /// Does the cursor sit on `obj . attribute` with NO `(` - a parenless hash
     /// attribute reference (`n = h.num_items;`, Language Reference: Concepts p.623; GAP-hashnumitems)?
     /// The absent paren is what distinguishes it from the method-call form.
     fn hashAttrAhead(self: *Parser) bool {
@@ -1226,10 +1226,10 @@ pub const Parser = struct {
             self.tokAt(2).tag == .name and self.tokAt(3).tag != .lparen;
     }
 
-    /// `declare hash h(dataset:"x");` — only the `hash` object type for now.
+    /// `declare hash h(dataset:"x");` - only the `hash` object type for now.
     fn parseDeclare(self: *Parser) Error!ast.Stmt {
         _ = self.p.advance(); // declare / dcl
-        // `declare hash h(...)` or `declare hiter hi("h")` — both carry a name and
+        // `declare hash h(...)` or `declare hiter hi("h")` - both carry a name and
         // a paren arg list; the executor tells them apart (an hiter's sole arg is
         // the positional hash name).
         if (!self.eatKw("hash") and !self.eatKw("hiter"))
@@ -1241,7 +1241,7 @@ pub const Parser = struct {
         return .{ .hash_decl = .{ .name = name, .args = args } };
     }
 
-    /// Statement-form hash call after `=`: `rc = h.m(…);` — the call is the
+    /// Statement-form hash call after `=`: `rc = h.m(…);` - the call is the
     /// WHOLE rhs, i.e. followed by `;`. The attr form (`n = h.num_items;`) has
     /// no parens to balance.
     fn hashStmtAhead(self: *Parser) bool {
@@ -1261,7 +1261,7 @@ pub const Parser = struct {
         return self.tokAt(i + 1).tag == .semicolon;
     }
 
-    /// `obj . method ( args )` — leaves the cursor just past the `)`. The
+    /// `obj . method ( args )` - leaves the cursor just past the `)`. The
     /// attribute form `obj . attribute` (Language Reference: Concepts p.623: num_items, item_size)
     /// has no parens at all (GAP-hashnumitems) and yields an empty arg list.
     fn parseHashOp(self: *Parser, target: ?[]const u8) Error!ast.HashCall {
@@ -1276,7 +1276,7 @@ pub const Parser = struct {
         // Nesting depth is guarded once in parseStmt (BUG-stmtnest-deepguard).
         _ = self.p.advance(); // do
         // A combined `do i=… while(c)` / `until(c)` yields a guard to weave into
-        // the body (desugar to plain iter + `if … then leave;` — no new AST).
+        // the body (desugar to plain iter + `if … then leave;` - no new AST).
         var guard_cond: ?*const ast.Expr = null;
         var guard_until = false;
         var hoisted: std.ArrayList(ast.Stmt) = .empty; // hash-attr bound reads (GAP-hashnumitems)
@@ -1284,7 +1284,7 @@ pub const Parser = struct {
         const header = try self.parseDoHeader(&guard_cond, &guard_until, &hoisted, &loop_hoists);
         // A pure `do while(c)` / `do until(c)` whose guard hoisted a hash call
         // KEEPS exec's while_/until_ header (desugaring to a do-group would make
-        // the leave-guard a stray LEAVE — invalid SAS). Instead prime the temp:
+        // the leave-guard a stray LEAVE - invalid SAS). Instead prime the temp:
         // WHILE tests at the top, so run the call BEFORE the loop and re-arm it
         // at the bottom of the body; UNTIL tests at the bottom, so the call
         // belongs at the bottom of the body only. Each test then reads a fresh
@@ -1300,7 +1300,7 @@ pub const Parser = struct {
             else => {},
         };
         var body: std.ArrayList(ast.Stmt) = .empty;
-        // Combined `do i=… while(c)`: test at the top — `if not c then leave;`
+        // Combined `do i=… while(c)`: test at the top - `if not c then leave;`
         // before the body, with the guard's hoisted calls re-run first EVERY
         // iteration (leaving them to the statement-level drain would test one
         // stale temp forever).
@@ -1310,7 +1310,7 @@ pub const Parser = struct {
         };
         while (!self.atKw("end") and !self.p.check(.eof))
             try body.append(self.p.arena, try self.parseStmt());
-        // Combined UNTIL: test at the bottom — `if c then leave;` after the body.
+        // Combined UNTIL: test at the bottom - `if c then leave;` after the body.
         if (guard_cond) |c| if (guard_until) {
             try body.appendSlice(self.p.arena, loop_hoists.items);
             try body.append(self.p.arena, try self.leaveGuard(c, true));
@@ -1323,7 +1323,7 @@ pub const Parser = struct {
         if (hoisted.items.len == 0) return loop;
         // A hash-attribute bound (`do i = 1 to h.num_items;`) reads the attribute
         // via a hash_op hoisted BEFORE the loop into a temp the bound references
-        // (SAS evaluates the bounds once at loop entry — the hoist is exact).
+        // (SAS evaluates the bounds once at loop entry - the hoist is exact).
         var wrap: std.ArrayList(ast.Stmt) = .empty;
         try wrap.appendSlice(self.p.arena, hoisted.items);
         try wrap.append(self.p.arena, loop);
@@ -1365,7 +1365,7 @@ pub const Parser = struct {
             while (true) {
                 const start = try self.parseDoBound(hoisted);
                 // `to` and `by` may appear in EITHER order, and `by` may appear
-                // WITHOUT `to` (an open-ended counter loop) — GAP-dobynoto. SAS
+                // WITHOUT `to` (an open-ended counter loop) - GAP-dobynoto. SAS
                 // accepts `1 to 6 by 2`, `1 by 2 to 6`, and `1 by 1` alike.
                 var stop: ?*const ast.Expr = null;
                 var by: ?*const ast.Expr = null;
@@ -1394,7 +1394,7 @@ pub const Parser = struct {
             if (only and specs.items[0].stop != null) {
                 header = .{ .iter = .{ .name = name, .start = specs.items[0].start, .stop = specs.items[0].stop.?, .by = specs.items[0].by } };
             } else if (only and specs.items[0].by != null) {
-                // Open-ended `do i=start by step;` (no TO) — runs until an UNTIL/WHILE
+                // Open-ended `do i=start by step;` (no TO) - runs until an UNTIL/WHILE
                 // guard (or LEAVE) fires; else effectively unbounded, like SAS. exec
                 // has no open-ended iter, so synthesize a stop its
                 // `step>0 ? x<=stop : x>=stop` test won't reach first: stop =
@@ -1418,7 +1418,7 @@ pub const Parser = struct {
     }
 
     /// `if not c then leave;` (WHILE, `until=false`) or `if c then leave;`
-    /// (UNTIL, `until=true`) — the conditional-exit for a combined iterative DO.
+    /// (UNTIL, `until=true`) - the conditional-exit for a combined iterative DO.
     fn leaveGuard(self: *Parser, cond: *const ast.Expr, until: bool) Error!ast.Stmt {
         const leave_stmt = try self.p.arena.create(ast.Stmt);
         leave_stmt.* = .leave;
@@ -1444,7 +1444,7 @@ pub const Parser = struct {
             while (self.p.check(.name)) {
                 const name = self.p.advance().text;
                 // `a1-a3` numbered range (STMT-ranges). `-` followed by a
-                // non-name is an initial value, not a range — leave it for values.
+                // non-name is an initial value, not a range - leave it for values.
                 if (self.p.check(.minus) and self.peekNext().tag == .name) {
                     _ = self.p.advance(); // '-'
                     try expandRange(self.p.arena, &elems, name, self.p.advance().text);
@@ -1456,9 +1456,9 @@ pub const Parser = struct {
             // (GAP-retainpareninit): a bare list after the element-list keeps the
             // historical rule (a SINGLE value seeds EVERY element, GH#51; several
             // bind positionally), while a parenthesised `(v1 v2 …)` group binds
-            // STRICTLY positionally — `retain a b c (0)` inits only a (b,c stay
+            // STRICTLY positionally - `retain a b c (0)` inits only a (b,c stay
             // missing). MORE values than elements is a SAS ERROR (NOTE-retainexcessinit,
-            // mirrors the ARRAY fix BUG-arrayinitvalidate F1) — the excess used to be
+            // mirrors the ARRAY fix BUG-arrayinitvalidate F1) - the excess used to be
             // silently dropped. FEWER stays legal (elements past the value count get no
             // init).
             var vals: std.ArrayList(*const ast.Expr) = .empty;
@@ -1472,7 +1472,7 @@ pub const Parser = struct {
                     const v = try self.p.parseExpr();
                     // CONSTANTS ONLY, same hole and same rule as the ARRAY list
                     // (GH#81): `retain x (a);` with `a=5` used to give `x=.` at rc 0.
-                    // The BARE form below never had the hole — its `is_val` gate
+                    // The BARE form below never had the hole - its `is_val` gate
                     // already admits only number/dot/string tokens.
                     if (try self.badInitValue(v)) |what|
                         return self.p.diags.fail(error.ParseError, val_line, "{s} is not a valid initial value in the RETAIN statement; RETAIN initial values must be constants.", .{what});
@@ -1483,7 +1483,7 @@ pub const Parser = struct {
                 // trailing initial values for this element-list (a `-` here begins a
                 // negative literal, since the name-list above already ran out).
                 while (true) {
-                    // `retain t .A` — a special-missing init after a var NAME lexes as a
+                    // `retain t .A` - a special-missing init after a var NAME lexes as a
                     // plain `.` (member-access dot, empty text) + a one-letter NAME, since
                     // the lexer can't tell `.A` from `obj.field` context-free. In RETAIN
                     // value position there is no member access, so fold `. A` back into one
@@ -1527,22 +1527,22 @@ pub const Parser = struct {
                 try items.append(self.p.arena, .{ .name = "", .type = .num, .informat = "/" });
                 continue;
             }
-            // pointer controls: `@col` (column), `+n` (skip), `#n` (line) — a
+            // pointer controls: `@col` (column), `+n` (skip), `#n` (line) - a
             // position item (name = "") the reader applies; io tracks the column.
             // BUG-inputatvarptr: `@` followed by a number OR a variable NAME is a
-            // column pointer (`@n` reads the column from n's PDV value) — a
+            // column pointer (`@n` reads the column from n's PDV value) - a
             // trailing `@` line-hold is `@` with NO operand (directly before `;`).
             // ponytail: `+var`/`#var` siblings have the same number-only limit
             // (GAP-inputpointerguard: their valid forms fail as GAPS below, rc 2).
-            // GAP-inputatstring: `@'string'` adds a THIRD form — column pointer to
+            // GAP-inputatstring: `@'string'` adds a THIRD form - column pointer to
             // just after the next occurrence of the literal in the record. The
             // string token's text is quote-stripped, so re-wrap it: the quote in
             // the encoded spec is how io tells it from `@n`/`@var`.
-            // GAP-atexpression: `@(expression)` — the FOURTH `@` pointer form
+            // GAP-atexpression: `@(expression)` - the FOURTH `@` pointer form
             // (Statements printed p.168: 'moves the pointer to the column that is
             // given by the value of expression'; zero/negative → column 1, the SAME
             // clamp as @n/@numeric-variable). The AST rides the item (col_expr) and
-            // io.zig evaluates it per read — `b=5; input @(b*3) name $10.;` is the
+            // io.zig evaluates it per read - `b=5; input @(b*3) name $10.;` is the
             // doc's own example. (BUG-atcol0crash's loud parse of this form is now
             // a real implementation; the clamp it protected is clampCol's.)
             if (self.p.check(.at) and self.peekNext().tag == .lparen) {
@@ -1569,7 +1569,7 @@ pub const Parser = struct {
                 // valid SAS 9.4 INPUT pointer controls (Statements Table 2.3)
                 // opensas doesn't implement → gap (rc 2); anything else after `+`
                 // is not INPUT syntax → user error (rc 1). Same message either way
-                // (D-009). Only `+n` reads today — `+var` needs a backward-capable
+                // (D-009). Only `+n` reads today - `+var` needs a backward-capable
                 // input buffer, which is exec work, deliberately not this guard.
                 if (!self.p.check(.number)) {
                     if (self.p.check(.name) or self.p.check(.lparen))
@@ -1582,7 +1582,7 @@ pub const Parser = struct {
             }
             if (self.p.check(.hash)) {
                 const t = self.p.advance(); // '#'
-                // `#numeric-variable` / `#(expression)`: same split as `+` above —
+                // `#numeric-variable` / `#(expression)`: same split as `+` above -
                 // valid SAS 9.4 (Table 2.3 line pointer controls) → gap; else user
                 // error. `#var` additionally needs N=>1 line-buffer tracking (exec).
                 if (!self.p.check(.number)) {
@@ -1600,7 +1600,7 @@ pub const Parser = struct {
                 try items.append(self.p.arena, .{ .name = "", .type = .num, .informat = "@@" });
                 continue;
             }
-            // single trailing `@` — hold the input record for the next INPUT in this
+            // single trailing `@` - hold the input record for the next INPUT in this
             // same iteration (released when control returns to the top of the step).
             // A nameless `@` sentinel item the executor acts on (PG-atptr).
             if (self.p.eat(.at)) {
@@ -1610,7 +1610,7 @@ pub const Parser = struct {
             if (!self.p.check(.name)) break;
             const name_tok = self.p.advance();
             const name = name_tok.text;
-            // GAP-inputarrayelem: `input v{i}` — an array-element target, the
+            // GAP-inputarrayelem: `input v{i}` - an array-element target, the
             // shape Language Reference: Concepts Table 21.5 row 1 (p.516) names ("#n or / line pointer
             // control in the INPUT statement with a DO loop" reads N records
             // into array elements). Mirrors parsePut: the def + flat subscript
@@ -1633,9 +1633,9 @@ pub const Parser = struct {
                 arr_name = name;
             }
             // GAP-inputnumrange: a numbered range `Score1-Score3` expands via the
-            // shared expandRange helper (ARRAY/KEEP/PUT/OF all use it — the GH#32 /
+            // shared expandRange helper (ARRAY/KEEP/PUT/OF all use it - the GH#32 /
             // BUG-lengthrange precedent); every member inherits the item's
-            // modifiers. A NUMBER after the dash is not this — `var 1-5` is column
+            // modifiers. A NUMBER after the dash is not this - `var 1-5` is column
             // input, handled below.
             var range: ?std.ArrayList([]const u8) = null;
             if (arr_index == null and self.p.check(.minus) and self.peekNext().tag == .name) {
@@ -1645,7 +1645,7 @@ pub const Parser = struct {
             }
             var is_char = self.p.eat(.dollar);
             // INPUT error-suppression modifier `?`/`??` between the var and its
-            // informat (`input x ?? 3.;`) — twin of the INPUT() fn path
+            // informat (`input x ?? 3.;`) - twin of the INPUT() fn path
             // (parser_expr.zig, BUG-inputqq). SAS: `?` suppresses the invalid-data
             // NOTE, `??` also suppresses _ERROR_=1. Counted into item.suppress
             // (NOTE-inputinvalidnote made the read path emit them). (GAP-inputstmtqq)
@@ -1657,7 +1657,7 @@ pub const Parser = struct {
             var informat: ?[]const u8 = null;
             var list_mod = false;
             if (self.p.eat(.colon)) {
-                // `:informat.` list-input modifier — reconstruct the spec (it
+                // `:informat.` list-input modifier - reconstruct the spec (it
                 // tokenizes unevenly, e.g. `comma8.` = name+dot). The colon means
                 // list input (token-then-informat), NOT fixed-width (DATALINES-informat).
                 list_mod = true;
@@ -1669,14 +1669,14 @@ pub const Parser = struct {
                 const end = if (self.p.check(.number)) self.p.advance().text else start;
                 informat = try std.fmt.allocPrint(self.p.arena, "@{s}-{s}", .{ start, end });
                 // GAP-inputcoldecimal F10: the trailing `.decimals` parameter
-                // (`input x 1-5 .2;` — divide by 10^d when the field holds no
+                // (`input x 1-5 .2;` - divide by 10^d when the field holds no
                 // explicit decimal point) is VALID SAS (SAS 9.4 DATA Step
                 // Statements: Reference, INPUT Statement: Column, printed
                 // p.183: ".decimals specifies the power of 10 by which to
                 // divide the value. If the data contains decimal points, the
                 // .decimals value is ignored."). Applying the divisor is
                 // read-path work (exec/io), so it is refused HERE as a named
-                // gap, rc 2 (D-009/D-009b(i)) — it used to fall to "expected
+                // gap, rc 2 (D-009/D-009b(i)) - it used to fall to "expected
                 // ';' after input", rc 1 blaming punctuation. `.decimals` on
                 // a `$` item is not valid SAS → stays the user's rc 1.
                 if (!is_char and self.p.check(.number) and self.p.peek().text.len > 1 and self.p.peek().text[0] == '.')
@@ -1692,13 +1692,13 @@ pub const Parser = struct {
                 for (names.items) |nm| try items.append(self.p.arena, .{ .name = nm, .type = if (is_char) .char else .num, .informat = informat, .list_mod = list_mod, .suppress = suppress });
             } else {
                 // an array-element target carries an EMPTY name (the array's own
-                // name is not a PDV column — the compile-time pre-declare skips
+                // name is not a PDV column - the compile-time pre-declare skips
                 // nameless items; BUG-inputptrvar) plus the subscript/elements.
                 try items.append(self.p.arena, .{ .name = if (arr_index != null) "" else name, .type = if (is_char) .char else .num, .informat = informat, .list_mod = list_mod, .arr_index = arr_index, .arr_elements = arr_elements, .arr_name = arr_name, .suppress = suppress });
             }
         }
         // GAP-inputmods: name the unsupported modifier instead of a bare
-        // "expected ';'" — `&` (values with embedded blanks), `~` (quoted
+        // "expected ';'" - `&` (values with embedded blanks), `~` (quoted
         // values), named input `x=` each fail loud with their own message.
         // (`~` lexes as .caret; none of these can follow a complete INPUT item.)
         if (self.p.check(.amp))
@@ -1711,7 +1711,7 @@ pub const Parser = struct {
         return .{ .input = try items.toOwnedSlice(self.p.arena) };
     }
 
-    /// `array a{n} a1-a5 (10 20 …);` — dimension, member list (numbered ranges
+    /// `array a{n} a1-a5 (10 20 …);` - dimension, member list (numbered ranges
     /// expanded), optional parenthesised initial values. Registers the array so
     /// later `a{i}` expressions resolve. `_temporary_` gives the array anonymous
     /// members (synthesised from the dimension). ponytail: no `$`/`k*v` repeats.
@@ -1719,7 +1719,7 @@ pub const Parser = struct {
         _ = self.p.advance(); // array
         const name = (try self.p.expect(.name, "array name")).text;
         // Dimension delimiter: `{n}`/`[n]` (the lexer maps `{` and `[` to lbrace) OR
-        // `(n)`/`(*)` — SAS allows all three. The FIRST paren after the array name is
+        // `(n)`/`(*)` - SAS allows all three. The FIRST paren after the array name is
         // the dimension; the optional initial-value `(…)` list comes AFTER the element
         // list, so position disambiguates them (BUG-arrayparendim; real SDTM macro
         // libraries use `array bits (&n) &varlist;`).
@@ -1748,16 +1748,16 @@ pub const Parser = struct {
                             return self.p.diags.fail(error.ParseError, dim_line, "ARRAY {s}: upper bound {d} is below lower bound {d}", .{ name, hi, first });
                         try dims_list.append(self.p.arena, .{ .lo = first, .size = @intCast(hi - first + 1) });
                     } else if (self.p.eat(.star)) {
-                        try dims_list.append(self.p.arena, .{ .lo = first, .size = 0 }); // {lo:*} — inferred
+                        try dims_list.append(self.p.arena, .{ .lo = first, .size = 0 }); // {lo:*} - inferred
                     } else return self.p.diags.fail(error.ParseError, dim_line, "ARRAY {s}: expected an upper bound after ':'", .{name});
                 } else {
-                    // a bare `{n}` is an element COUNT — a negative one is nonsense
+                    // a bare `{n}` is an element COUNT - a negative one is nonsense
                     if (neg)
                         return self.p.diags.fail(error.ParseError, dim_line, "ARRAY {s}: negative dimension {d}; use lo:hi for a negative lower bound", .{name, first});
                     try dims_list.append(self.p.arena, .{ .lo = 1, .size = @intCast(first) }); // bare `{n}`
                 }
             } else if (!neg and self.p.eat(.star)) {
-                try dims_list.append(self.p.arena, .{ .lo = 1, .size = 0 }); // `{*}` — inferred
+                try dims_list.append(self.p.arena, .{ .lo = 1, .size = 0 }); // `{*}` - inferred
             } else return self.p.diags.fail(error.ParseError, dim_line, "ARRAY {s}: expected an array dimension", .{name});
             if (!self.p.eat(.comma)) break;
         }
@@ -1766,7 +1766,7 @@ pub const Parser = struct {
         else
             _ = try self.p.expect(.rbrace, "'}}' after array dimension");
 
-        // An inferred (`*`) size needs the member list to resolve — only makes sense
+        // An inferred (`*`) size needs the member list to resolve - only makes sense
         // for a single dimension (can't infer two unknowns). Fail loud otherwise.
         var inferred = false;
         for (dims_list.items) |d| if (d.size == 0) {
@@ -1780,7 +1780,7 @@ pub const Parser = struct {
             dim *= d.size;
         };
 
-        // optional `$ [len]` — a character array (its members are char, optionally
+        // optional `$ [len]` - a character array (its members are char, optionally
         // of a declared length).
         const is_char = self.p.eat(.dollar);
         var char_len: usize = 0;
@@ -1799,7 +1799,7 @@ pub const Parser = struct {
                 try elems.append(self.p.arena, try std.fmt.allocPrint(self.p.arena, "_temp_{s}_{d}", .{ name, k }));
             }
         } else if (self.p.check(.name) and specialArrName(self.p.peek().text) != null) {
-            // `array v{*} _numeric_ / _character_ / _all_` — members are every
+            // `array v{*} _numeric_ / _character_ / _all_` - members are every
             // matching PDV variable, which isn't known until exec (the PDV type set
             // is a runtime fact). Leave `elems` empty; the kind rides on the decl and
             // every reference, expanded against the live PDV at eval time (GH#48).
@@ -1824,7 +1824,7 @@ pub const Parser = struct {
         // (resolved against the PDV at exec).
         if (!inferred and !temporary and special == null and elems.items.len > 0 and elems.items.len != dim)
             return self.p.diags.fail(error.ParseError, dim_line, "ARRAY {s}: the number of variables in the variable list ({d}) does not correspond to the number of array elements ({d})", .{ name, elems.items.len, dim });
-        // initial values `(v1 v2 …)` — parsed before finalizing the member list so an
+        // initial values `(v1 v2 …)` - parsed before finalizing the member list so an
         // implicit-name array can size itself from them when the dimension is `*`.
         var inits: std.ArrayList(*const ast.Expr) = .empty;
         if (self.p.eat(.lparen)) {
@@ -1840,7 +1840,7 @@ pub const Parser = struct {
                 }
                 const val_line = self.p.peek().line;
                 var val = try self.p.parseExpr();
-                // CONSTANTS ONLY (GH#81) — checked BEFORE the `$len` desugar below,
+                // CONSTANTS ONLY (GH#81) - checked BEFORE the `$len` desugar below,
                 // which would otherwise wrap the node in a call and hide what it was.
                 // This also gives `array v[2] (1+1 2*3);` an honest diagnostic: the
                 // `1+1` is rejected as an expression instead of the old confusing
@@ -1850,7 +1850,7 @@ pub const Parser = struct {
                 // An explicit `$len` is authoritative: an init constant longer than
                 // it is TRUNCATED (and a shorter one padded) to the declared length,
                 // exactly like an assignment through the array (BUG-arraycharinitlen).
-                // Without a `$len` the length is inferred from the constants — leave
+                // Without a `$len` the length is inferred from the constants - leave
                 // them raw. Reuses the assignment desugar so init and assignment agree.
                 if (is_char and char_len > 0) val = try self.truncate(val, char_len);
                 var c: usize = 0;
@@ -1861,7 +1861,7 @@ pub const Parser = struct {
 
         // No explicit member list → SAS auto-generates `<name>1 … <name>N`, where N
         // is the declared dimension (or the initial-value count for `{*}`). Without
-        // this the `array a{n} (inits)` form produced ZERO elements — silent
+        // this the `array a{n} (inits)` form produced ZERO elements - silent
         // data-loss (BUG-arrayimplinit).
         if (elems.items.len == 0 and !temporary and special == null) {
             const need = if (dim > 0) dim else inits.items.len;
@@ -1895,20 +1895,20 @@ pub const Parser = struct {
         var cur_line: usize = 1; // notional PUT line, for `#n` (GAP-putcolptr)
         while (!self.p.check(.semicolon) and !self.p.check(.eof)) {
             const t = self.p.peek();
-            // OVERPRINT directive (overstrike the previous line) — a PUT keyword, not
+            // OVERPRINT directive (overstrike the previous line) - a PUT keyword, not
             // a variable. Unsupported → fail loud like the sibling @(expr)/-C/@@
             // directives, rather than misreading it as an uninitialized var "overprint".
             if (t.tag == .name and eqi(t.text, "overprint"))
                 return failGap(self.p.diags, t.line, "PUT OVERPRINT is not supported yet", .{});
             // BUG-hashattrput: a hash ATTRIBUTE reference (`put h.num_items …`) is
-            // not PUT-item syntax — extend the statement/expression guard
+            // not PUT-item syntax - extend the statement/expression guard
             // (hashAttrAhead) here. Without it the `.` bound a bogus "." format
             // to `h` and the attribute became a SECOND item, printing
             // `. num_items=.` with two NOTE-only diagnostics (silent-wrong),
             // while `n = h.num_items;` in assignment position works.
             if (t.tag == .name and self.hashAttrAhead())
-                return self.p.diags.fail(error.ParseError, t.line, "put: object attribute {s}.{s} is not valid here — read it into a variable first (n = {s}.{s};)", .{ t.text, self.tokAt(2).text, t.text, self.tokAt(2).text });
-            // `+n` (relative column pointer) — move the pointer n columns right.
+                return self.p.diags.fail(error.ParseError, t.line, "put: object attribute {s}.{s} is not valid here - read it into a variable first (n = {s}.{s};)", .{ t.text, self.tokAt(2).text, t.text, self.tokAt(2).text });
+            // `+n` (relative column pointer) - move the pointer n columns right.
             // The buffer is append-only and forward, so "move right n" is exactly
             // "emit n spaces" and suppress the default inter-item space. Desugared
             // to a literal so exec needs no new item kind (GAP-putcolptr). ponytail:
@@ -1932,13 +1932,13 @@ pub const Parser = struct {
                 try items.append(self.p.arena, .{ .literal = pad });
                 continue;
             }
-            // `#n` (line pointer) — move to line n. Forward-only in an append buffer:
+            // `#n` (line pointer) - move to line n. Forward-only in an append buffer:
             // emit (n - current) newlines. n == current is a no-op; n < current can't
             // rewind, so fail loud rather than silently misplace output (GAP-putcolptr).
             if (t.tag == .hash) {
                 _ = self.p.advance(); // '#'
                 // `#numeric-variable` / `#(expression)`: same split as `+`
-                // above — valid SAS 9.4 (Table 2.5) → gap; else user error.
+                // above - valid SAS 9.4 (Table 2.5) → gap; else user error.
                 if (!self.p.check(.number)) {
                     if (self.p.check(.name) or self.p.check(.lparen))
                         return failGap(self.p.diags, t.line, "put: only an integer #n line pointer is supported", .{});
@@ -1952,7 +1952,7 @@ pub const Parser = struct {
                 while (cur_line < n) : (cur_line += 1) try items.append(self.p.arena, .newline);
                 continue;
             }
-            // `-R` / `-L` alignment modifier — right/left-justify the PRECEDING item's
+            // `-R` / `-L` alignment modifier - right/left-justify the PRECEDING item's
             // formatted field within its width (GAP-putalign). Carried into exec by a
             // leading marker byte on the item's fmt ('>' right, '<' left); exec peels
             // it. ponytail: `-C` (center) is not supported → fail loud, not dropped.
@@ -1969,7 +1969,7 @@ pub const Parser = struct {
                     continue;
                 }
             }
-            // `put x1-x3;` — a numbered variable-RANGE list expands to x1 x2 x3, the
+            // `put x1-x3;` - a numbered variable-RANGE list expands to x1 x2 x3, the
             // SAME expander INPUT/KEEP/ARRAY/FORMAT route through (BUG-putvarrange).
             // Gated on a digit-suffixed endpoint so the `-R`/`-L` alignment modifier
             // (handled above) and any non-numbered `name`-`name` never divert here.
@@ -1986,7 +1986,7 @@ pub const Parser = struct {
                 for (names.items) |nm| try items.append(self.p.arena, .{ .variable = .{ .name = nm, .fmt = null } });
                 continue;
             }
-            // `put (varlist)(format-list);` — grouped format list. The format-list
+            // `put (varlist)(format-list);` - grouped format list. The format-list
             // is a CYCLIC stream of pointer-controls (+n/@n: emitted, non-consuming)
             // and format specs (each consumes ONE variable; `=` = named output).
             // Expanded here into individual PUT items so runPut needs no new render
@@ -2022,7 +2022,7 @@ pub const Parser = struct {
                     if (g.tag == .plus) {
                         _ = self.p.advance(); // '+'
                         // group format-list `+var`/`+(expr)`: same split as the
-                        // top-level `+` guard — valid SAS 9.4 (Table 2.5, and
+                        // top-level `+` guard - valid SAS 9.4 (Table 2.5, and
                         // p.293 allows pointer controls in a format-list) → gap.
                         if (!self.p.check(.number)) {
                             if (self.p.check(.name) or self.p.check(.lparen))
@@ -2087,7 +2087,7 @@ pub const Parser = struct {
                     cur_line += 1;
                     break :blk .newline;
                 },
-                // `@n` / `@(expression)` column pointer — position the output column
+                // `@n` / `@(expression)` column pointer - position the output column
                 // before the next item. ponytail: a trailing `@`/`@@` output-line hold
                 // and `@'string'` still fail loud (no silent drop).
                 .at => blk: {
@@ -2106,12 +2106,12 @@ pub const Parser = struct {
                     // are valid SAS 9.4 (Statements Table 2.5; the `@@` sibling
                     // below is already failGap) → gap, rc 2. `@'string'` string
                     // search is INPUT-only (Table 2.3), not PUT syntax → user
-                    // error, rc 1 — same decision GAP-atexpression-put made for
+                    // error, rc 1 - same decision GAP-atexpression-put made for
                     // `@(character-expression)`. Same message either way (D-009).
                     if (!self.p.check(.number)) {
                         if (self.p.check(.name) or self.p.check(.semicolon))
-                            return failGap(self.p.diags, t.line, "put: only an integer @n or @(expression) column pointer is supported — no trailing-@ line hold or @'string' search", .{});
-                        return self.p.diags.fail(error.ParseError, t.line, "put: only an integer @n or @(expression) column pointer is supported — no trailing-@ line hold or @'string' search", .{});
+                            return failGap(self.p.diags, t.line, "put: only an integer @n or @(expression) column pointer is supported - no trailing-@ line hold or @'string' search", .{});
+                        return self.p.diags.fail(error.ParseError, t.line, "put: only an integer @n or @(expression) column pointer is supported - no trailing-@ line hold or @'string' search", .{});
                     }
                     const n = std.fmt.parseInt(usize, self.p.advance().text, 10) catch 0;
                     if (n > max_put_ptr)
@@ -2122,19 +2122,19 @@ pub const Parser = struct {
                 // optional format: `put x 8.2`
                 .name => blk: {
                     _ = self.p.advance();
-                    // array element ref `a[i]` / whole array `a[*]` — brackets/braces
+                    // array element ref `a[i]` / whole array `a[*]` - brackets/braces
                     // both lex as lbrace (BUG-putarrayref).
                     if (self.p.check(.lbrace)) if (self.p.lookupArray(t.text)) |def| {
-                        // `a{*}` — the whole array (null index). Peek past `{` for the star.
+                        // `a{*}` - the whole array (null index). Peek past `{` for the star.
                         if (self.p.pos + 1 < self.p.toks.len and self.p.toks[self.p.pos + 1].tag == .star) {
                             _ = self.p.advance(); // '[' / '{'
                             _ = self.p.advance(); // '*'
                             _ = try self.p.expect(.rbrace, "']' / '}}' after array subscript");
                             break :blk .{ .array_elem = .{ .name = t.text, .elements = def.elements, .index = null, .special = def.special } };
                         }
-                        // `a{i}` / `a{i,j}` — fold to a flat index (GAP-multidimarray).
+                        // `a{i}` / `a{i,j}` - fold to a flat index (GAP-multidimarray).
                         const r = try self.p.parseArraySubscript(t);
-                        // `put a[i]=;` — named output: a trailing `=` marks it, same
+                        // `put a[i]=;` - named output: a trailing `=` marks it, same
                         // as a plain `x=` item (FEAT-putarraynamed). `a[*]=` is not
                         // consumed → stays fail-loud like any stray `=`.
                         const named = self.p.eat(.eq);
@@ -2147,13 +2147,13 @@ pub const Parser = struct {
                     if (self.p.eat(.eq)) break :blk .{ .named = .{ .name = t.text, .fmt = try self.tryFormatSpec() } };
                     break :blk .{ .variable = .{ .name = t.text, .fmt = try self.tryModifiedList(t) } };
                 },
-                // A bare NUMERIC literal is a value operand — SAS formats/writes it
+                // A bare NUMERIC literal is a value operand - SAS formats/writes it
                 // (`put 42 best8.;` → "      42", `put 3.14 5.2;` → " 3.14"). The value
                 // is constant, so fold it here through the SAME format engine exec uses
-                // for `put x fmt.`, emitting a plain literal — output is byte-identical
+                // for `put x fmt.`, emitting a plain literal - output is byte-identical
                 // and needs no new PutItem/exec kind (GAP-putnumliteral). ponytail: the
                 // trailing-format detection reuses tryFormatSpec (shared with the
-                // variable case), so a rare `put 1 2 3;` reads "2"/"3" as formats — same
+                // variable case), so a rare `put 1 2 3;` reads "2"/"3" as formats - same
                 // ceiling the variable operand already has.
                 .number => blk: {
                     const x = std.fmt.parseFloat(f64, t.text) catch
@@ -2175,7 +2175,7 @@ pub const Parser = struct {
         return .{ .put = try items.toOwnedSlice(self.p.arena) };
     }
 
-    /// `format v1 v2 fmt1 v3 fmt2 …;` — a format applies to every variable named
+    /// `format v1 v2 fmt1 v3 fmt2 …;` - a format applies to every variable named
     /// since the previous one. `informat` shares this shape.
     fn parseFormatList(self: *Parser, comptime kw: []const u8) Error![]const ast.FormatItem {
         _ = self.p.advance(); // keyword
@@ -2187,7 +2187,7 @@ pub const Parser = struct {
                 pending.clearRetainingCapacity();
             } else if (self.p.check(.name)) {
                 const name = self.p.advance().text;
-                // numbered range `d1-d3` (GAP-formatvarrange) — the same
+                // numbered range `d1-d3` (GAP-formatvarrange) - the same
                 // expander KEEP/ARRAY/RETAIN route through.
                 if (self.p.check(.minus) and self.peekNext().tag == .name) {
                     _ = self.p.advance(); // '-'
@@ -2200,9 +2200,9 @@ pub const Parser = struct {
                 return self.p.diags.fail(error.ParseError, t.line, "unexpected token in " ++ kw ++ " statement", .{});
             }
         }
-        // Names still pending at `;` got NO format spec — SAS's removal form:
+        // Names still pending at `;` got NO format spec - SAS's removal form:
         // `format x;` CLEARS x's format (reverts to default), not a no-op
-        // (BUG-formatremoval — these used to be dropped, keeping the old
+        // (BUG-formatremoval - these used to be dropped, keeping the old
         // format). Emitted through the existing FormatItem plumbing:
         //   FORMAT   → "$.": renders the default for BOTH types via the
         //              unmodified format engine (char verbatim; num → valToStr
@@ -2211,7 +2211,7 @@ pub const Parser = struct {
         //              patchInformats skips (len > 1 required), so a later
         //              bare `input x;` reads default; applyAttrs blanks the
         //              var's stored informat.
-        // ponytail: parser-only (task owns parser.zig) — exec's null-format
+        // ponytail: parser-only (task owns parser.zig) - exec's null-format
         // path is unreachable from the AST, so x's format metadata reads "$.",
         // not a true none (CONTENTS/VFORMAT show it); a clear as a var's FIRST
         // mention guesses char; a same-step informat assign still wins
@@ -2225,14 +2225,14 @@ pub const Parser = struct {
 
     /// If the tokens at the cursor spell a format spec, consume them and return
     /// the reconstructed spec string; otherwise consume nothing and return null.
-    /// Specs tokenize unevenly — `8.2` is one number, `comma10.2` is name+".2",
-    /// `date9.` is name+dot — so we stitch the pieces back into a string.
+    /// Specs tokenize unevenly - `8.2` is one number, `comma10.2` is name+".2",
+    /// `date9.` is name+dot - so we stitch the pieces back into a string.
     /// A PUT item's trailing format, allowing the `:` MODIFIED LIST OUTPUT
     /// modifier in front of it (GAP-putcolonformat).
     ///
     /// SAS 9.4 DATA Step Statements ref, "PUT Statement: List". Printed p.297
-    /// gives the syntax slot — `PUT <pointer-control> variable < : | ~> format.
-    /// <@ | @@>;` — and printed p.298 (pdf 309; that page's own footer reads
+    /// gives the syntax slot - `PUT <pointer-control> variable < : | ~> format.
+    /// <@ | @@>;` - and printed p.298 (pdf 309; that page's own footer reads
     /// "298 Chapter 2 / Dictionary of SAS DATA Step Statements") defines it:
     ///
     ///   :  enables you to specify a format that the PUT statement uses to write
@@ -2243,16 +2243,16 @@ pub const Parser = struct {
     /// conflated: INPUT's (printed p.193) governs WHERE READING STOPS ("reads
     /// the value from the next non-blank column until the pointer reaches the
     /// next blank column…"), PUT's governs blank-stripping on OUTPUT. The
-    /// volumes never cross-reference them — each `:` entry only "See"s its own
-    /// side's details section — so the parallel is structural, not semantic.
+    /// volumes never cross-reference them - each `:` entry only "See"s its own
+    /// side's details section - so the parallel is structural, not semantic.
     ///
     /// Carried into exec as a ':' MARKER BYTE on the format string, the same
     /// convention `-R`/`-L` already uses ('>'/'<', attachAlign + exec.peelAlign).
     /// attachAlign PREPENDS, so an aligned modified-list item reads ">:fmt" and
-    /// exec peels align first, then the colon — no new AST field, no new item
-    /// kind. `~` is the modifier's only documented sibling (p.298 — quotes the
+    /// exec peels align first, then the colon - no new AST field, no new item
+    /// kind. `~` is the modifier's only documented sibling (p.298 - quotes the
     /// value, requires the DSD option in the FILE statement). Its DSD quoting
-    /// lives in exec.zig, so it is NOT implemented here — but the lexer keeps
+    /// lives in exec.zig, so it is NOT implemented here - but the lexer keeps
     /// the source byte on .caret's `text`, so the parser names it as its own
     /// GAP arm (rc 2) instead of letting it fall into the typo catch-all. A
     /// `^` in the same slot IS a typo and keeps rc 1 (GAP-puttildemodifier).
@@ -2260,7 +2260,7 @@ pub const Parser = struct {
         if (self.p.check(.caret) and std.mem.eql(u8, self.p.peek().text, "~"))
             return failGap(self.p.diags, t.line, "put: the '~' modifier (DSD-quoted modified list output) is not supported", .{});
         if (!self.p.eat(.colon)) return self.tryFormatSpec();
-        // p.297's syntax slot is `< : | ~> format.` — the format is not optional
+        // p.297's syntax slot is `< : | ~> format.` - the format is not optional
         // after the modifier, so a bare `put x : ;` is a user error (rc 1), not a
         // silently-dropped modifier.
         const spec = try self.tryFormatSpec() orelse
@@ -2303,7 +2303,7 @@ pub const Parser = struct {
         return if (j < self.p.toks.len) self.p.toks[j] else self.p.toks[self.p.toks.len - 1];
     }
 
-    /// A one-character NAME token spelling a special-missing letter (`A`-`Z`/`_`) —
+    /// A one-character NAME token spelling a special-missing letter (`A`-`Z`/`_`) -
     /// the tail of a `.A` split by the lexer into `.` + name (BUG-retaininitspecialmiss).
     fn isMissLetter(tk: Token) bool {
         return tk.tag == .name and tk.text.len == 1 and
@@ -2314,12 +2314,12 @@ pub const Parser = struct {
     /// SAS 9.4 DATA Step Statements printed p.24: "(initial-value-list) gives
     /// initial values for the corresponding elements in the array. The values for
     /// elements can be numbers or character strings." The disambiguating example is
-    /// printed p.26 Ex.3 — `array test2{*} $ a1 a2 a3 ('a','b','c');` puts the
+    /// printed p.26 Ex.3 - `array test2{*} $ a1 a2 a3 ('a','b','c');` puts the
     /// variable NAMES outside the parentheses and the constants inside.
     ///
     /// Both lists used to call `parseExpr` and accept whatever came back, so
     /// `array v[2](a1 a2);` silently declared phantom `v1`/`v2` seeded from an
-    /// unevaluatable variable read (missing) and left `a1`/`a2` untouched — stderr
+    /// unevaluatable variable read (missing) and left `a1`/`a2` untouched - stderr
     /// empty, rc 0 (GH#81). Same hole in `retain x (a);`. Returns null when `e` is
     /// a legal constant, else the phrase naming what it actually is, for the
     /// diagnostic. A signed literal (`-1`) folds to a constant, so `.neg` rides.
@@ -2346,11 +2346,11 @@ pub const Parser = struct {
     // ── shared bits ─────────────────────────────────────────────────────────
 
     /// Consume a leading keyword, then bare names until `;`. Serves output,
-    /// drop and keep (all "keyword name* ;"). With `vars` set (drop/keep — the
+    /// drop and keep (all "keyword name* ;"). With `vars` set (drop/keep - the
     /// entries name PDV variables, not datasets) two list shorthands apply:
     /// a name-prefix colon wildcard `pfx:` is kept as a single "pfx:" entry
     /// that exec's nameIn prefix-matches against the PDV (GAP-dropcolon), and
-    /// a numbered range `a1-a3` expands via expandRange — the same helper the
+    /// a numbered range `a1-a3` expands via expandRange - the same helper the
     /// keep=/drop= dataset-option side uses (STMT-ranges, bd905b6).
     fn parseNameList(self: *Parser, comptime kw: []const u8, comptime vars: bool) Error![]const []const u8 {
         _ = self.p.advance(); // keyword
@@ -2371,8 +2371,8 @@ pub const Parser = struct {
     }
 
     /// DATA-step `BY [descending] var { [descending] var } [notsorted] ;`.
-    /// The list itself is scanned by scanByList — the SAME scanner the
-    /// PROC-statement BY routes through (GAP-procbydescending) — so the two
+    /// The list itself is scanned by scanByList - the SAME scanner the
+    /// PROC-statement BY routes through (GAP-procbydescending) - so the two
     /// contexts can never disagree about DESCENDING/NOTSORTED again.
     fn parseBy(self: *Parser) Error![]const []const u8 {
         _ = self.p.advance(); // by
@@ -2385,9 +2385,9 @@ pub const Parser = struct {
     /// above) and PROC-statement BY (proc.parseProcBy) both call here, sharing
     /// one wire encoding so no third parser can drift. SAS 9.4 Statements ref
     /// p.39-43: `BY <DESCENDING> variable-1 <…<DESCENDING> variable-n>
-    /// <NOTSORTED> <GROUPFORMAT>;` — DESCENDING is PER-VARIABLE (applies to the
+    /// <NOTSORTED> <GROUPFORMAT>;` - DESCENDING is PER-VARIABLE (applies to the
     /// variable immediately after it, Example 2 p.43), NOTSORTED is
-    /// statement-wide (drops the sorted-input requirement — groups then form
+    /// statement-wide (drops the sorted-input requirement - groups then form
     /// on CONSECUTIVE equal values, p.41). Leaves the cursor ON the
     /// list-terminating token; the caller consumes its `;`.
     /// The AST keeps `.by` a plain name list, so the modifiers ride as
@@ -2398,8 +2398,8 @@ pub const Parser = struct {
     /// GROUPFORMAT (group on FORMATTED values) still fails loud
     /// (GAP-bygroupformat): exec groups on raw values, so accepting it would
     /// silently draw wrong BY-group boundaries whenever a format collapses
-    /// distinct raw values. (It is DATA-step-only syntax anyway — Statements
-    /// ref p.40 restriction — so the PROC path must never accept it either.)
+    /// distinct raw values. (It is DATA-step-only syntax anyway - Statements
+    /// ref p.40 restriction - so the PROC path must never accept it either.)
     pub fn scanByList(arena: std.mem.Allocator, diags: *diag.Diagnostics, toks: []const Token, i: *usize) Error![]const []const u8 {
         var names: std.ArrayList([]const u8) = .empty;
         var descending = false;
@@ -2415,7 +2415,7 @@ pub const Parser = struct {
                 notsorted = true;
                 continue;
             }
-            // a keyword, not a variable — else it becomes a phantom BY var
+            // a keyword, not a variable - else it becomes a phantom BY var
             if (eqi(t.text, "groupformat"))
                 return failGap(diags, t.line, "BY GROUPFORMAT is not yet supported (formatted-value BY grouping)", .{});
             if (descending) {
@@ -2427,7 +2427,7 @@ pub const Parser = struct {
         }
         if (descending)
             return diags.fail(error.ParseError, if (i.* < toks.len) toks[i.*].line else 0, "BY DESCENDING must be followed by a variable name", .{});
-        // `by;` / `by notsorted;` — zero variables. sas9.4.ebnf by_stmt requires
+        // `by;` / `by notsorted;` - zero variables. sas9.4.ebnf by_stmt requires
         // >= 1 var, so this is a USER error (rc 1, D-009b), never a silent no-op
         // of the whole BY mechanism (BUG-bystmtempty). A macro spelling
         // (`by &bv;` with an empty &bv) lands here too: expansion is textual
@@ -2440,15 +2440,15 @@ pub const Parser = struct {
 
     /// `set`/`merge` source list, where each source may carry input dataset
     /// options: `src(keep=… drop=… rename=(…) where=(…) in=x)`. The AST holds only
-    /// dataset names, so the options ride along inside the name string —
-    /// `"src(keep=a b)"` — and the executor splits + applies them at read time.
+    /// dataset names, so the options ride along inside the name string -
+    /// `"src(keep=a b)"` - and the executor splits + applies them at read time.
     fn parseDatasetRefs(self: *Parser, comptime kw: []const u8) Error![]const []const u8 {
         _ = self.p.advance(); // keyword
         self.has_set = true; // set/merge read rows via io.loadRow, which sets `_setobs_`
         var names: std.ArrayList([]const u8) = .empty;
         while (self.p.check(.name)) {
             var base = self.p.advance().text;
-            // statement option `opt = var` (nobs=/end=/point=) — NOT a dataset name
+            // statement option `opt = var` (nobs=/end=/point=) - NOT a dataset name
             if (self.p.check(.eq)) {
                 _ = self.p.advance(); // '='
                 const optvar = if (self.p.check(.name)) self.p.advance().text else "";
@@ -2462,13 +2462,13 @@ pub const Parser = struct {
                     (std.ascii.eqlIgnoreCase(base, "end") or std.ascii.eqlIgnoreCase(base, "point")))
                 {
                     // Pass end=/point= to exec as a NUL-sentinel entry in the name list
-                    // (BUG-setend / BUG-setpoint) — exec pulls these out before resolving
+                    // (BUG-setend / BUG-setpoint) - exec pulls these out before resolving
                     // datasets. Keeps the `.set` AST a plain name list (ast.zig untouched).
                     try names.append(self.p.arena, try std.fmt.allocPrint(self.p.arena, "\x00{s}={s}", .{ base, optvar }));
                 } else if (optvar.len > 0 and std.mem.eql(u8, kw, "update") and
                     std.ascii.eqlIgnoreCase(base, "updatemode"))
                 {
-                    // GAP-updatemode: UPDATEMODE=MISSINGCHECK (default — a missing
+                    // GAP-updatemode: UPDATEMODE=MISSINGCHECK (default - a missing
                     // transaction value keeps the master) | NOMISSINGCHECK (missing
                     // overwrites). Rides to exec as a NUL-sentinel like end=/point=
                     // (the AST stays a plain name list); only NOMISSINGCHECK needs
@@ -2483,16 +2483,16 @@ pub const Parser = struct {
                     // GAP-modifykey: KEY= is keyed/indexed direct access (SET and
                     // MODIFY). opensas has no dataset-index layer at all (no INDEX=/
                     // INDEX CREATE, no key→row map, no _IORC_) and building one is
-                    // out of scope — so fail loud with a clear indexed-access
+                    // out of scope - so fail loud with a clear indexed-access
                     // diagnostic, never the generic unknown-option arm (and never a
                     // silent sequential read).
                     return failGap(self.p.diags, self.p.peek().line, "{s} KEY= (indexed access) is not supported yet", .{kw});
                 } else
                     // Any other `name=var` statement option (CUROBS=, …) would be
-                    // silently DROPPED here (BUG-setunknownopt) — `set m curobs=c;`
+                    // silently DROPPED here (BUG-setunknownopt) - `set m curobs=c;`
                     // then reads sequentially instead of a keyed lookup → plausible-but-wrong
                     // output at rc=0. Fail loud; keyed execution is a separate exec.zig
-                    // feature. (A missing var, `nobs=;`, lands here too — also an error.)
+                    // feature. (A missing var, `nobs=;`, lands here too - also an error.)
                     return self.p.diags.fail(error.ParseError, self.p.peek().line, kw ++ " option {s}= is not supported", .{base});
                 continue;
             }
@@ -2506,7 +2506,7 @@ pub const Parser = struct {
                 const member = self.p.advance().text;
                 base = try std.fmt.allocPrint(self.p.arena, "{s}.{s}", .{ base, member });
             }
-            // Prefix-wildcard list `name:` — all members of the active library whose
+            // Prefix-wildcard list `name:` - all members of the active library whose
             // names start with `name` (ISS-setdslist). The parser can't enumerate the
             // library, so emit a `\x00prefix=…` sentinel that exec expands at read time
             // (like the end=/point= sentinels).
@@ -2515,11 +2515,11 @@ pub const Parser = struct {
                 try names.append(self.p.arena, try std.fmt.allocPrint(self.p.arena, "\x00prefix={s}", .{base}));
                 continue;
             }
-            // Numbered-range list `name1 - nameN` — the inclusive sequence sharing the
+            // Numbered-range list `name1 - nameN` - the inclusive sequence sharing the
             // same non-numeric prefix (ISS-setdslist), reusing the var-list range
             // expander. Purely syntactic. ponytail: one-level endpoints only; a
             // `lib.a1-lib.a5` libref range would need the dot folded on the high
-            // endpoint too — add when the corpus hits it.
+            // endpoint too - add when the corpus hits it.
             if (self.p.check(.minus) and self.tokAt(1).tag == .name) {
                 _ = self.p.advance(); // '-'
                 const hi = self.p.advance().text;
@@ -2537,7 +2537,7 @@ pub const Parser = struct {
     }
 
     /// Consume a balanced `( … )` (cursor on the `(`) and re-serialize its tokens
-    /// to a space-separated, re-lexable string — so the executor can tokenize the
+    /// to a space-separated, re-lexable string - so the executor can tokenize the
     /// options back out of the encoded dataset name.
     fn serializeParens(self: *Parser) Error![]const u8 {
         _ = self.p.advance(); // '('
@@ -2554,7 +2554,7 @@ pub const Parser = struct {
             }
             if (t.tag == .string) {
                 // Re-quote a string literal so it survives re-lexing as a string,
-                // not a bare name — a char `where=(v in ("A","B"))` option would
+                // not a bare name - a char `where=(v in ("A","B"))` option would
                 // otherwise lose its values (BUG-datawhere-char). ponytail: no
                 // escaping of an embedded quote (rare in a dataset-option string).
                 try buf.append(self.p.arena, '"');
@@ -2600,7 +2600,7 @@ pub const Parser = struct {
     }
 
     /// At a global statement keyword the top level HANDLES mid-step
-    /// (D-014a, parser.isMidStepSkippable — BUG-filenamemidstep): hoisted
+    /// (D-014a, parser.isMidStepSkippable - BUG-filenamemidstep): hoisted
     /// globals (TITLE[n]/FOOTNOTE[n]/OPTIONS/FILENAME/ODS) EXECUTE via
     /// main.segments before the step, LIBNAME via the parseLibnames
     /// pre-pass, so skipping the leftover tokens here is honest. This used
@@ -2610,13 +2610,13 @@ pub const Parser = struct {
     /// path at exit 0 (QA tick336 F1, silent wrong data). The x command
     /// form IS handled (parseStmt).
     /// NOTE-pagemidstep (QA tick322 F6): the batch-unobservable inert set
-    /// (isInertGlobalKw — PAGE/SKIP Language Reference: Concepts p.209, GOPTIONS/DM/SASFILE/…) is
+    /// (isInertGlobalKw - PAGE/SKIP Language Reference: Concepts p.209, GOPTIONS/DM/SASFILE/…) is
     /// accepted in open code and mid-PROC, so agree here too (D-014a):
     /// pre-fix a mid-DATA-step `page;` fell through to parseAssign and died
     /// with the misleading "expected '=' in assignment", naming the wrong
     /// construct. POSITIVE-match guard: the inert statement's second token
     /// is only ever `;` (page;), a name (goptions reset=all), a string
-    /// (dm 'cmd') or a number (skip 3) — anything else is a real DATA-step
+    /// (dm 'cmd') or a number (skip 3) - anything else is a real DATA-step
     /// construct that owns the keyword as an identifier: `page = 5;`
     /// assignment, `skip:` a GOTO label (ctl_goto), `h.remove()` a call.
     fn atGlobalStmt(self: *Parser) bool {
@@ -2671,7 +2671,7 @@ fn attachAlign(arena: std.mem.Allocator, item: *ast.PutItem, marker: u8) Error!b
     return true;
 }
 
-/// The ARRAY special-list keywords — `array v{*} _numeric_;` and friends — whose
+/// The ARRAY special-list keywords - `array v{*} _numeric_;` and friends - whose
 /// members are resolved against the live PDV at exec time (GH#48). null = a plain
 /// member name.
 fn specialArrName(name: []const u8) ?ast.SpecialArr {
@@ -2682,7 +2682,7 @@ fn specialArrName(name: []const u8) ?ast.SpecialArr {
 }
 
 /// A token's source text, for re-serializing dataset options back into a string.
-/// null = a token this can't re-serialize; the caller must fail LOUD — the old
+/// null = a token this can't re-serialize; the caller must fail LOUD - the old
 /// `else => ""` silently dropped operators, so `where=(x <> 3)` re-lexed as
 /// `where=(x 3)` and filtered nothing (QA-audit42).
 fn tokenText(t: Token) ?[]const u8 {
@@ -2716,7 +2716,7 @@ fn tokenText(t: Token) ?[]const u8 {
 }
 
 /// Rewrite `of NAME { * }` (an all-elements function-call list) into
-/// `NAME{1}, NAME{2}, …, NAME{dim}` — ordinary array refs the expression parser
+/// `NAME{1}, NAME{2}, …, NAME{dim}` - ordinary array refs the expression parser
 /// already handles. The dimension comes from a pre-scan of `array NAME { n }`.
 /// ponytail: only the `{*}` form; `of a-b` / `of a b c` var-lists aren't expanded.
 /// Rewrite each `do over ARR; BODY end;` into `do _dooverK_ = LO to HI; BODY' end;`,
@@ -2724,7 +2724,7 @@ fn tokenText(t: Token) ?[]const u8 {
 /// `ARR{_dooverK_}`. Iterates to a fixpoint so nested/multiple do-overs expand.
 /// SAS 9.4 DO-statement doc: "DO OVER array-name" iterates the array's
 /// LBOUND..HBOUND with an implicit index, and the unsubscripted array name in
-/// the body refers to the current element — the desugar reproduces exactly
+/// the body refers to the current element - the desugar reproduces exactly
 /// that. Bounds come from the declaration: `array a{n}` → 1..n, `array a{lo:hi}`
 /// → lo..hi (FEAT-doover). A `do over` of anything else (undeclared name,
 /// non-array variable, `{*}`/multi-dim/negative-bound arrays) fails LOUD
@@ -2773,7 +2773,7 @@ fn expandDoOver(a: std.mem.Allocator, diags: *diag.Diagnostics, toks_in: []const
                     if (start != null) break;
                     // `do over` of a non-array (or an array form the scan above
                     // can't bound) must not slip through to the confusing
-                    // "expected '=' in do loop" — fail LOUD here (FEAT-doover, D-002).
+                    // "expected '=' in do loop" - fail LOUD here (FEAT-doover, D-002).
                     if (!known)
                         return diags.fail(error.ParseError, toks[i].line, "DO OVER {s}: not a declared one-dimensional array with constant bounds", .{toks[i + 2].text});
                 }
@@ -2799,7 +2799,7 @@ fn expandDoOver(a: std.mem.Allocator, diags: *diag.Diagnostics, toks_in: []const
 
         // The index is SAS's automatic implicit-array variable `_I_`: a body/step
         // may read it (legal SAS), and it is dropped from the output by the caller.
-        // ponytail: a single shared `_i_` — nested DO OVER (do-over inside do-over)
+        // ponytail: a single shared `_i_` - nested DO OVER (do-over inside do-over)
         // would collide, but SAS itself reuses `_I_` for nested implicit arrays and
         // no corpus program nests them; do-over inside a plain DO is fine (distinct
         // index names). Give each loop a unique index if a nested case ever appears.
@@ -2850,7 +2850,7 @@ fn expandArrayStars(a: std.mem.Allocator, toks: []const Token) Error![]const Tok
             if (dl.len == 1 and dl[0].size == 0) dl[0].size = countMembers(toks, memberStart(toks, scan.after));
             var ok = dl.len > 0;
             for (dl) |d| if (d.size == 0) {
-                ok = false; // an unresolved size (multi-dim `*`) — parseArray fails loud
+                ok = false; // an unresolved size (multi-dim `*`) - parseArray fails loud
             };
             if (ok) try dims.append(a, .{ .name = toks[i + 1].text, .dims = dl });
         }
@@ -2921,7 +2921,7 @@ fn expandArrayStars(a: std.mem.Allocator, toks: []const Token) Error![]const Tok
 
 /// A variable label carried on a `.format` FormatItem: NUL-prefixed so exec can tell
 /// it apart from a real format spec (which is always printable). See exec's `.format`.
-/// BUG-attrboundssilent (4b): the 256-byte cap is enforced here — the single
+/// BUG-attrboundssilent (4b): the 256-byte cap is enforced here - the single
 /// choke point BOTH label producers (LABEL statement, ATTRIB LABEL=) route
 /// through. LABEL Statement, Statements Ref printed p.207 (marker
 /// "=== pdf 218 ===", footer "LABEL Statement 207"): "text-string specifies a
@@ -2955,7 +2955,7 @@ fn vMetaX(name: []const u8) ?[]const u8 {
 /// dimension as a digit suffix on the function name; parser_expr's bound folding
 /// (isBoundFn) knows only the two-arg form, so strip the suffix from the name and
 /// insert `, N` before the call's close paren.
-/// ponytail: rewrites ANY `dimN(`/`hboundN(`/`lboundN(` name token — an ARRAY
+/// ponytail: rewrites ANY `dimN(`/`hboundN(`/`lboundN(` name token - an ARRAY
 /// named e.g. `dim1` subscripted with parens (`dim1(i)`) would be mis-rewritten
 /// (SAS shares that name ambiguity). Upgrade path: a call-site desugar in
 /// parser_expr where the array table is known.
@@ -3077,20 +3077,20 @@ fn expandOf(a: std.mem.Allocator, toks: []const Token, diags: *diag.Diagnostics)
             var first = true;
             while (i < toks.len and toks[i].tag != .rparen and toks[i].tag != .comma) {
                 // A colon NOT immediately after a name (`of :`, `of x1-x:`) is
-                // not the prefix form — malformed SAS: rc 1 (D-009), not a gap.
+                // not the prefix form - malformed SAS: rc 1 (D-009), not a gap.
                 if (toks[i].tag == .colon)
                     return diags.fail(error.ParseError, toks[i].line, "unexpected ':' in an OF variable list (the name-prefix form is written sum(of x:))", .{});
                 if (toks[i].tag != .name) {
                     i += 1;
                     continue;
                 }
-                // `sum(of x:)` — the name-PREFIX list (Language Reference: Concepts printed p.70
+                // `sum(of x:)` - the name-PREFIX list (Language Reference: Concepts printed p.70
                 // Table 4.5: "Function(OF x:) Performs the function on all the
                 // variables that begin with 'x'"; funcref printed p.6: OF's
                 // variable-list "can be any form of a SAS variable list").
                 // This pre-pass has no PDV to expand the prefix against, so
-                // wrap it in a synthetic `__ofprefix("x")` argument — the
-                // `__dimchk` pattern — for eval to expand at call time beside
+                // wrap it in a synthetic `__ofprefix("x")` argument - the
+                // `__dimchk` pattern - for eval to expand at call time beside
                 // `of _numeric_`. A CALL node, not a bare `x:` variable, so
                 // exec's uninitialized-var scan sees a string and stays quiet.
                 if (i + 1 < toks.len and toks[i + 1].tag == .colon) {
@@ -3173,13 +3173,13 @@ fn scanStarDims(a: std.mem.Allocator, toks: []const Token, brace: usize) Error!?
                     try list.append(a, .{ .lo = first, .size = if (hi >= first) @intCast(hi - first + 1) else 0 });
                 } else if (j < toks.len and toks[j].tag == .star) {
                     j += 1;
-                    try list.append(a, .{ .lo = first, .size = 0 }); // lo:* — inferred
+                    try list.append(a, .{ .lo = first, .size = 0 }); // lo:* - inferred
                 } else return null;
-            } else if (neg) return null // a bare negative count is nonsense — parseArray fails loud
+            } else if (neg) return null // a bare negative count is nonsense - parseArray fails loud
             else try list.append(a, .{ .lo = 1, .size = @intCast(first) });
         } else if (!neg and j < toks.len and toks[j].tag == .star) {
             j += 1;
-            try list.append(a, .{ .lo = 1, .size = 0 }); // * — inferred
+            try list.append(a, .{ .lo = 1, .size = 0 }); // * - inferred
         } else return null;
         if (j < toks.len and toks[j].tag == .comma) {
             j += 1;
@@ -3277,7 +3277,7 @@ fn splitNumSuffix(s: []const u8) struct { num: usize, digits: usize } {
 }
 
 /// Merge each `first`/`last` · `.` · name run into one `.name` token whose text
-/// is `first.<var>` — the BY-group automatic variable. Everything else passes
+/// is `first.<var>` - the BY-group automatic variable. Everything else passes
 /// through untouched; returns the input slice unchanged when no run is present.
 fn coalesceFirstLast(a: std.mem.Allocator, toks: []const Token) Error![]const Token {
     var i: usize = 0;
@@ -3333,7 +3333,7 @@ test "BUG-lengthcapnostore: an over-long DECLARED length errors at the statement
     const a = arena.allocator();
 
     // The residual this fixes: a store-free declaration slipped through silent.
-    // Loud now, via the captured reporter (D-003) — never a spawned abort.
+    // Loud now, via the captured reporter (D-003) - never a spawned abort.
     var d1 = diag.Diagnostics.init(a);
     try testing.expectError(error.ParseError, prog(a, &d1, "length y $40000;"));
     try testing.expect(d1.hasErrors());
@@ -3345,12 +3345,12 @@ test "BUG-lengthcapnostore: an over-long DECLARED length errors at the statement
     try testing.expect(d2.hasErrors());
 
     // Regression guard on 67a3c834: the with-a-store case stays loud (now at
-    // the statement, one step earlier than setAt — same message text).
+    // the statement, one step earlier than setAt - same message text).
     var d3 = diag.Diagnostics.init(a);
     try testing.expectError(error.ParseError, prog(a, &d3, "length x $40000; x='hi';"));
     try testing.expect(d3.hasErrors());
 
-    // Boundary controls — exactly at the cap is legal, one over is not.
+    // Boundary controls - exactly at the cap is legal, one over is not.
     var d4 = diag.Diagnostics.init(a);
     _ = try prog(a, &d4, "length a $32766 b $32767; attrib c length=$32767;");
     try testing.expect(!d4.hasErrors());
@@ -3375,7 +3375,7 @@ test "BUG-attribemptyvaluenoop: a DATA-step empty format=/informat= is LOUD, not
 
     // Both empty forms used to fall off the end of parseAttrib unrecorded: the
     // spec vanished, the old attribute stayed, rc 0, zero diagnostics (D-002).
-    // Loud now via the captured reporter (D-003) — never a spawned abort.
+    // Loud now via the captured reporter (D-003) - never a spawned abort.
     var d1 = diag.Diagnostics.init(a);
     try testing.expectError(error.ParseError, prog(a, &d1, "attrib v format=;"));
     try testing.expect(d1.hasErrors());
@@ -3390,14 +3390,14 @@ test "BUG-attribemptyvaluenoop: a DATA-step empty format=/informat= is LOUD, not
     try testing.expect(std.mem.indexOf(u8, d2.list.items[0].message, "'informat v;'") != null);
 
     // rc 1, not rc 2 (D-009): invalid DATA-step SAS is the USER's error, so the
-    // gap flag must stay DOWN. gapHit() is process-global — reset first.
+    // gap flag must stay DOWN. gapHit() is process-global - reset first.
     diag.resetGap();
     var d3 = diag.Diagnostics.init(a);
     try testing.expectError(error.ParseError, prog(a, &d3, "attrib v format=;"));
     try testing.expect(!diag.gapHit());
 
     // Same arm, other shape: a format NAME with no trailing dot is not a spec
-    // either (tryFormatSpec returns null there too) — it was the same silent
+    // either (tryFormatSpec returns null there too) - it was the same silent
     // drop, and it gets its own message naming what it saw.
     var d4 = diag.Diagnostics.init(a);
     try testing.expectError(error.ParseError, prog(a, &d4, "attrib v format=myfmt;"));
@@ -3425,9 +3425,9 @@ test "BUG-attrboundssilent: declared-length floors and the 256-byte label cap fa
     defer arena.deinit();
     const a = arena.allocator();
 
-    // 4a — the floors an upper-bounds-only checkDeclLen swallowed. Captured
+    // 4a - the floors an upper-bounds-only checkDeclLen swallowed. Captured
     // reporter (D-003), and each is a USER error: rc 1, never gap-tagged
-    // (D-009b(ii) — `length c $0` is not valid SAS on ANY platform).
+    // (D-009b(ii) - `length c $0` is not valid SAS on ANY platform).
     const lows = [_][]const u8{
         "length c $0;", // char: "1 to 32767 bytes under all operating environments"
         "attrib c length=$0;", // ATTRIB spelling of the same declaration (p.34)
@@ -3444,7 +3444,7 @@ test "BUG-attrboundssilent: declared-length floors and the 256-byte label cap fa
         try testing.expectEqual(@as(u8, 1), diag.exitCode(diag.gapHit(), d.hasErrors()));
     }
 
-    // 4b — the 256-byte label cap through BOTH producers (LABEL statement and
+    // 4b - the 256-byte label cap through BOTH producers (LABEL statement and
     // ATTRIB LABEL=), which funnel through rideAsLabel. Guarding one call
     // site would leave the sibling broken.
     const l257 = "X" ** 257;
@@ -3460,21 +3460,21 @@ test "BUG-attrboundssilent: declared-length floors and the 256-byte label cap fa
     }
 
     // Boundary controls (the D-014 lesson: over-rejecting a legal program is
-    // the worse regression). In-range edges — also pinned end-to-end by the
-    // attr_bounds_doc corpus fixture, which must not move — and the no-width
+    // the worse regression). In-range edges - also pinned end-to-end by the
+    // attr_bounds_doc corpus fixture, which must not move - and the no-width
     // forms (`length e $;` is a legal width-less char declaration, distinct
     // from an explicit `$0` now that lengthNumber returns ?usize).
     var ok = diag.Diagnostics.init(a);
     _ = try prog(a, &ok, "length a $1 b $32767 c 3 d 8; length e $; length f;");
     try testing.expect(!ok.hasErrors());
-    // Exactly 256 label bytes stays legal — the legal edge a 257 check must
+    // Exactly 256 label bytes stays legal - the legal edge a 257 check must
     // not trip over.
     const ok_src = try std.fmt.allocPrint(a, "label v = '{s}';", .{"L" ** 256});
     var ok3 = diag.Diagnostics.init(a);
     _ = try prog(a, &ok3, ok_src);
     try testing.expect(!ok3.hasErrors());
     // numeric 2: the ONE genuinely platform-dependent boundary (legal z/OS,
-    // illegal UNIX/Windows) stays parked — pinned ACCEPTED here so flipping
+    // illegal UNIX/Windows) stays parked - pinned ACCEPTED here so flipping
     // the park is a conscious test edit, but deliberately NOT a corpus golden.
     var ok2 = diag.Diagnostics.init(a);
     _ = try prog(a, &ok2, "length g 2;");
@@ -3514,7 +3514,7 @@ test "array: parenthesized init `(count * value)` repeat form + mixes, `[..]` di
 
     // SAS initializes array members from a parenthesized list after the dimension/
     // element list, including the `n * value` repetition (SAS Concepts: ARRAY
-    // statement — an initialized array is also implicitly RETAINed). `[..]` bracket
+    // statement - an initialized array is also implicitly RETAINed). `[..]` bracket
     // dimension too (a real max-length utility uses `array maxi[&n] (&n * 1);`).
     const src =
         \\array x[3] (3 * 0);
@@ -3605,7 +3605,7 @@ test "array: multi-dimensional {lo1:hi1, lo2:hi2} folds m{i,j} to a row-major fl
     try testing.expectError(error.ParseError, prog(a, &diags, "array s{2,*} s1-s6;"));
 }
 
-test "array/retain initial values are CONSTANTS ONLY — a variable or expression fails LOUD (GH#81 ISS-arrayinitnonconst)" {
+test "array/retain initial values are CONSTANTS ONLY - a variable or expression fails LOUD (GH#81 ISS-arrayinitnonconst)" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -3615,7 +3615,7 @@ test "array/retain initial values are CONSTANTS ONLY — a variable or expressio
     // the variable NAMES outside the parentheses. `array v[2](a1 a2);` used to
     // parse clean and declare phantom v1/v2 seeded from an unevaluated variable
     // read, leaving a1/a2 untouched at rc 0. Same hole in `retain x (a);`.
-    // rc CLASS: the user wrote invalid SAS → 1, not 2 (D-009, and D-009b(ii) —
+    // rc CLASS: the user wrote invalid SAS → 1, not 2 (D-009, and D-009b(ii) -
     // the rc reports the class in real-SAS terms).
     const bad = [_]struct { src: []const u8, needle: []const u8 }{
         .{ .src = "array v[2](a1 a2);", .needle = "The variable a1 is not a valid initial value for the array v" },
@@ -3677,7 +3677,7 @@ test "infile: record-boundary options parse; an unknown option fails loud (BUG-i
 
     // an unrecognized INFILE option is a hard error, not a silent no-op.
     try testing.expectError(error.ParseError, prog(a, &diags, "infile datalines wombat;"));
-    // BUG-infilepadinert: PAD was accepted and never read — a silent no-op, the
+    // BUG-infilepadinert: PAD was accepted and never read - a silent no-op, the
     // one hole in the fail-loud wall (D-002). It pads to LRECL=, which is itself
     // inert (ISS-infilelrecl), so loud-unsupported is the honest behavior.
     try testing.expectError(error.ParseError, prog(a, &diags, "infile datalines pad;"));
@@ -3732,7 +3732,7 @@ test "file: DLM=/DSD options parse; an unknown option fails loud (BUG-fileopts)"
     try testing.expectError(error.ParseError, prog(a, &diags, "file \"x.txt\" wombat;"));
 }
 
-/// Fold a purely-numeric expression tree to its value — a 20-line helper so the
+/// Fold a purely-numeric expression tree to its value - a 20-line helper so the
 /// multi-dim parser test can assert the flat-index arithmetic without an evaluator.
 fn evalConst(e: *const ast.Expr) f64 {
     return switch (e.*) {
@@ -3753,7 +3753,7 @@ test "array: parenthesized (n) dimension parses like {n}/[n]; init paren still f
     const a = arena.allocator();
     var diags = diag.Diagnostics.init(a);
 
-    // `(n)` dim + element list; and `(n)` dim + element list + trailing `(init)` —
+    // `(n)` dim + element list; and `(n)` dim + element list + trailing `(init)` -
     // position disambiguates the dim paren (before elements) from the init paren.
     const p = try prog(a, &diags, "array bits (3) b1-b3;\narray v (3) v1-v3 (10 20 30);");
     const d0 = p[0].array;
@@ -3774,7 +3774,7 @@ test "do over ARR desugars to an iterative array loop (ARR-doover)" {
     var diags = diag.Diagnostics.init(a);
 
     const p = try prog(a, &diags, "array a{3} a1-a3 (5 10 15);\ndo over a; a = a + 1; end;");
-    // a `drop _i_;` is prepended (the implicit index is not emitted) — find the DO
+    // a `drop _i_;` is prepended (the implicit index is not emitted) - find the DO
     var dov: @TypeOf(p[0].do_) = undefined;
     for (p) |st| if (st == .do_) {
         dov = st.do_;
@@ -3824,7 +3824,7 @@ test "abort variants parse distinctly; junk fails LOUD (BUG-abortreturncode)" {
     try testing.expectEqual(@as(?u8, 9), p[3].abort.abend);
     try testing.expectEqual(@as(u8, 8), p[4].abort.n);
     try testing.expectEqual(@as(u8, 3), p[5].abort.n);
-    // `abort return;` (no n) is LEGAL — the syntax's <n> is optional and the
+    // `abort return;` (no n) is LEGAL - the syntax's <n> is optional and the
     // doc's own z/OS example runs it bare; no-n RETURN = "a condition code
     // that indicates an error" → default 1, ABEND-no-n's exec-side default
     // (GAP-ebnfholes-tick356; Statements Ref printed p.16/18/19).
@@ -3834,7 +3834,7 @@ test "abort variants parse distinctly; junk fails LOUD (BUG-abortreturncode)" {
     var d2 = diag.Diagnostics.init(a);
     try testing.expectError(error.ParseError, prog(a, &d2, "abort banana;"));
     try testing.expect(d2.hasErrors());
-    // a NON-number after RETURN stays the loud typo it always was — the no-n
+    // a NON-number after RETURN stays the loud typo it always was - the no-n
     // default fires only at `;` (a silently-misparsed ABORT is a fail-fast
     // that never fires).
     var d3 = diag.Diagnostics.init(a);
@@ -3918,7 +3918,7 @@ test "UPDATE / MODIFY parse into dataset-ref lists (G-update)" {
     const a = arena.allocator();
     var diags = diag.Diagnostics.init(a);
 
-    // update/modify read rows, so a leading `_setobs_` drop is injected — find
+    // update/modify read rows, so a leading `_setobs_` drop is injected - find
     // the statements by tag rather than by a fixed index.
     const p = try prog(a, &diags, "update master trans; by id; modify master;");
     var upd: ?[]const []const u8 = null;
@@ -3972,7 +3972,7 @@ test "MODIFY/SET KEY= fails LOUD with a clear indexed-access message (GAP-modify
     var diags = diag.Diagnostics.init(a);
 
     // KEY= is recognized as a statement option (never parsed as a dataset/variable)
-    // and rejected with a specific indexed-access diagnostic — opensas has no
+    // and rejected with a specific indexed-access diagnostic - opensas has no
     // dataset-index layer to build the keyed lookup on. Assert via the CAPTURED
     // reporter, never a spawned process.
     try testing.expectError(error.ParseError, prog(a, &diags, "modify master key=id;"));
@@ -3995,7 +3995,7 @@ test "NOTE-removenamedds: named REMOVE/REPLACE fails loud NAMING the statement" 
     const a = arena.allocator();
 
     // `remove a;` used to fall through to parseAssign → "expected '=' in
-    // assignment" — the wrong construct entirely. Assert via the CAPTURED
+    // assignment" - the wrong construct entirely. Assert via the CAPTURED
     // reporter, never a spawned process (D-003).
     var diags = diag.Diagnostics.init(a);
     try testing.expectError(error.ParseError, prog(a, &diags, "remove a;"));
@@ -4005,7 +4005,7 @@ test "NOTE-removenamedds: named REMOVE/REPLACE fails loud NAMING the statement" 
     try testing.expectError(error.ParseError, prog(a, &diags2, "replace a;"));
     try testing.expect(std.mem.indexOf(u8, diags2.list.items[diags2.list.items.len - 1].message, "replace with a named data set") != null);
 
-    // bare `remove;` (the MODIFY form) still parses — the two must not disagree
+    // bare `remove;` (the MODIFY form) still parses - the two must not disagree
     var diags3 = diag.Diagnostics.init(a);
     _ = try prog(a, &diags3, "remove;");
     try testing.expect(!diags3.hasErrors());
@@ -4022,7 +4022,7 @@ test "BUG-missingstmtwrongclass: DATA-step MISSING is a NAMED rc-2 gap, not an a
     const a = arena.allocator();
 
     // `missing A B;` used to fall through to parseAssign → "expected '=' in
-    // assignment" — rc 1 naming the WRONG construct. Now it names MISSING and
+    // assignment" - rc 1 naming the WRONG construct. Now it names MISSING and
     // flags the gap (rc 2, D-009/D-009b(i)). Assert via the CAPTURED reporter,
     // never a spawned process (D-003).
     diag.resetGap();
@@ -4043,7 +4043,7 @@ test "GAP-inputcoldecimal F10: column input `.decimals` is a NAMED rc-2 gap (pri
     const a = arena.allocator();
 
     // `input x 1-5 .2;` used to die "expected ';' after input" (rc 1, blaming
-    // punctuation) — the parameter is VALID SAS (SAS 9.4 DATA Step Statements:
+    // punctuation) - the parameter is VALID SAS (SAS 9.4 DATA Step Statements:
     // Reference, INPUT Statement: Column, printed p.183). Now it names the
     // parameter and flags the gap (rc 2, D-009/D-009b(i)).
     diag.resetGap();
@@ -4052,7 +4052,7 @@ test "GAP-inputcoldecimal F10: column input `.decimals` is a NAMED rc-2 gap (pri
     try testing.expectEqualStrings("input: the column-input .decimals parameter (input x 1-5 .2;) is not supported", diags.list.items[diags.list.items.len - 1].message);
     try testing.expectEqual(@as(u8, 2), diag.exitCode(diag.gapHit(), diags.hasErrors()));
 
-    // the plain column range still parses — no parameter consumed, no gap
+    // the plain column range still parses - no parameter consumed, no gap
     diag.resetGap();
     var diags2 = diag.Diagnostics.init(a);
     _ = try prog(a, &diags2, "input x 1-5 y $ 6-10;");
@@ -4330,9 +4330,9 @@ test "sum statement desugars to retain 0 + var = sum(var, expr)" {
     try testing.expectEqual(@as(usize, 2), asn.value.call.args.len);
     try testing.expectEqualStrings("total", asn.value.call.args[0].variable);
     try testing.expectEqualStrings("x", asn.value.call.args[1].variable);
-    // one retain 0 rides right AFTER the first sum statement (deduped — the
+    // one retain 0 rides right AFTER the first sum statement (deduped - the
     // second adds none): the var's PDV slot belongs at the sum statement's
-    // textual position (first-mention, Language Reference: Concepts p.478 Fig. 20.2 — QA tick377 F2),
+    // textual position (first-mention, Language Reference: Concepts p.478 Fig. 20.2 - QA tick377 F2),
     // not hoisted to the top of the step.
     try testing.expect(p[1] == .retain);
     try testing.expectEqual(@as(usize, 1), p[1].retain.len);
@@ -4351,7 +4351,7 @@ test "length statement truncates char assignments via __assignc desugar" {
     // stmt 0 is the inert length node (empty drop)
     try testing.expect(p[0] == .drop);
     try testing.expectEqual(@as(usize, 0), p[0].drop.len);
-    // stmt 1: code = __assignc("ABCDEF", 3)  — truncation desugar (was substr;
+    // stmt 1: code = __assignc("ABCDEF", 3)  - truncation desugar (was substr;
     // __assignc also renders a numeric rhs BESTn. right-justified, BUG-numcharwidth)
     const asn = p[1].assign;
     try testing.expectEqualStrings("code", asn.target);
@@ -4369,7 +4369,7 @@ test "length applies to EVERY var in a multi-var group (BUG-lenmulti)" {
     const a = arena.allocator();
     var diags = diag.Diagnostics.init(a);
 
-    // `length a b c $ 3;` — all three must truncate, not just c.
+    // `length a b c $ 3;` - all three must truncate, not just c.
     const p = try prog(a, &diags, "length a b c $ 3; a = \"hello\"; b = \"world\"; c = \"abcde\";");
     for (p[1..4]) |s| {
         try testing.expectEqualStrings("__assignc", s.assign.value.call.name); // each wrapped
@@ -4433,7 +4433,7 @@ test "input &/~/x= and put trailing @/@@ fail loud, naming the modifier (GAP-inp
     const a = arena.allocator();
     var diags = diag.Diagnostics.init(a);
 
-    // Each unsupported modifier is a hard ERROR whose message names it —
+    // Each unsupported modifier is a hard ERROR whose message names it -
     // never a bare "expected ';'" that hides WHAT failed.
     try testing.expectError(error.ParseError, prog(a, &diags, "input x & $;"));
     try testing.expectEqualStrings("input: the & modifier (list input of values with embedded blanks) is not supported", diags.list.items[diags.list.items.len - 1].message);
@@ -4442,13 +4442,13 @@ test "input &/~/x= and put trailing @/@@ fail loud, naming the modifier (GAP-inp
     try testing.expectError(error.ParseError, prog(a, &diags, "input x=;"));
     try testing.expectEqualStrings("input: named input (x=) is not supported", diags.list.items[diags.list.items.len - 1].message);
     try testing.expectError(error.ParseError, prog(a, &diags, "put x @;"));
-    try testing.expectEqualStrings("put: only an integer @n or @(expression) column pointer is supported — no trailing-@ line hold or @'string' search", diags.list.items[diags.list.items.len - 1].message);
+    try testing.expectEqualStrings("put: only an integer @n or @(expression) column pointer is supported - no trailing-@ line hold or @'string' search", diags.list.items[diags.list.items.len - 1].message);
     // GAP-atexpression-put landed `@(expression)` (Statements printed p.269) but
     // NOT its `@numeric-variable` neighbour one entry above (`a=15; put @a name
-    // $10.;`) — that stays a LOUD gap, pinned here so it can never start silently
+    // $10.;`) - that stays a LOUD gap, pinned here so it can never start silently
     // meaning something else. `@(a)` is the supported spelling of the same thing.
     try testing.expectError(error.ParseError, prog(a, &diags, "put @a x;"));
-    try testing.expectEqualStrings("put: only an integer @n or @(expression) column pointer is supported — no trailing-@ line hold or @'string' search", diags.list.items[diags.list.items.len - 1].message);
+    try testing.expectEqualStrings("put: only an integer @n or @(expression) column pointer is supported - no trailing-@ line hold or @'string' search", diags.list.items[diags.list.items.len - 1].message);
     _ = try prog(a, &diags, "put @(a) x; put @(a*3+1) x; put @(1+2) 'lit';"); // the parenthesised form parses
     try testing.expectError(error.ParseError, prog(a, &diags, "put x @@;"));
     try testing.expectEqualStrings("put: trailing @@ (output line hold across iterations) is not supported", diags.list.items[diags.list.items.len - 1].message);
@@ -4464,7 +4464,7 @@ test "put OVERPRINT directive fails loud, not a phantom uninit var (BUG-putoverp
     const a = arena.allocator();
     var diags = diag.Diagnostics.init(a);
 
-    // OVERPRINT is a PUT directive keyword — reject at the item position rather
+    // OVERPRINT is a PUT directive keyword - reject at the item position rather
     // than parse it as an uninitialized variable "overprint" (bogus '.').
     try testing.expectError(error.ParseError, prog(a, &diags, "put overprint \"x\";"));
     try testing.expectEqualStrings("PUT OVERPRINT is not supported yet", diags.list.items[diags.list.items.len - 1].message);
@@ -4478,7 +4478,7 @@ test "D-009: a recognized-but-unsupported syntax gap exits 2, a real syntax erro
     defer arena.deinit();
     const a = arena.allocator();
 
-    // Each of these is VALID SAS 9.4 opensas doesn't implement — an opensas
+    // Each of these is VALID SAS 9.4 opensas doesn't implement - an opensas
     // gap (failGap → markGap) → exit 2, "file an opensas issue". The parse
     // still fails LOUD with the same ERROR message; only the rc signal moves
     // 1 → 2. Pinned against exitCode directly because no fixture surface can
@@ -4494,15 +4494,15 @@ test "D-009: a recognized-but-unsupported syntax gap exits 2, a real syntax erro
         "remove a;", // named REMOVE (multi-dataset MODIFY form)
         // BUG-missingstmtwrongclass: the MISSING statement (Language Reference: Concepts printed
         // p.519, a worked example TWICE) is valid SAS opensas doesn't
-        // implement — named rc-2 gap, never the rc-1 "expected '=' in
+        // implement - named rc-2 gap, never the rc-1 "expected '=' in
         // assignment" fall-through. Message pinned in the dedicated test below.
         "missing A B;", // MISSING statement, DATA-step site
         // GAP-inputcoldecimal F10: column input's trailing `.decimals`
-        // parameter (printed p.183) is valid SAS — named rc-2 gap, never the
+        // parameter (printed p.183) is valid SAS - named rc-2 gap, never the
         // rc-1 "expected ';' after input" fall-through.
         "input x 1-5 .2;", // INPUT column-input .decimals parameter
         "array m[2,3] m1-m6; d = dim(m, y);", // runtime dim index (parser_expr)
-        // GAP-putptrslice: the PUT pointer-control family — each valid SAS 9.4
+        // GAP-putptrslice: the PUT pointer-control family - each valid SAS 9.4
         // (Statements Table 2.5; format-list pointer controls per p.293) but
         // unimplemented, so the conflated guards SPLIT: these recognized forms
         // route to failGap while the catch-all arms below stay rc 1.
@@ -4515,7 +4515,7 @@ test "D-009: a recognized-but-unsupported syntax gap exits 2, a real syntax erro
         "put (a b)(@(x) 4. 5.);", // group format-list @(expression)
         "put @x a;", // @numeric-variable
         "put a @;", // trailing @ output line hold
-        // GAP-inputpointerguard: INPUT's `+`/`#` pointer guards — same split as
+        // GAP-inputpointerguard: INPUT's `+`/`#` pointer guards - same split as
         // the PUT family above, against Statements Table 2.3 (INPUT pointer
         // controls, printed p.174). These used to fall THROUGH the guard to
         // `expected ';'` (rc 1 blaming punctuation); now failGap, rc 2.
@@ -4524,18 +4524,18 @@ test "D-009: a recognized-but-unsupported syntax gap exits 2, a real syntax erro
         "input #x a;", // #numeric-variable
         "input #(x) a;", // #(expression)
         // GAP-infileoptrc (3b/3c): INFILE UNBUFFERED/UNBUF (printed p.138) and
-        // EOF= (printed p.130) are documented options opensas hasn't written —
+        // EOF= (printed p.130) are documented options opensas hasn't written -
         // split out of the INFILE catch-all, which keeps rc 1 for typos only.
         "infile \"f\" unbuffered;", // INFILE UNBUFFERED
         "infile \"f\" unbuf;", // alias UNBUF
         "infile \"f\" eof=done;", // INFILE EOF=variable
         "infile datalines eof=done;", // instream spelling of the same gap
-        // GAP-infileeov: EOV=variable (same printed p.130 entry as EOF=) —
+        // GAP-infileeov: EOV=variable (same printed p.130 entry as EOF=) -
         // the leftover of that landing, now pinned at the same rc 2.
         "infile \"f\" eov=v;", // INFILE EOV=variable
         "infile datalines eov=v;", // instream spelling
         // GAP-ebnfholes-tick356: PAD (printed p.135, marker "=== pdf 146 ===")
-        // and DLMSTR= (printed p.128, marker "=== pdf 139 ===") — documented,
+        // and DLMSTR= (printed p.128, marker "=== pdf 139 ===") - documented,
         // unimplemented, same split off the catch-all. NOPAD, the documented
         // DEFAULT of the same entry, is accepted-inert (pinned below at rc 0).
         "infile \"f\" pad;", // INFILE PAD
@@ -4551,26 +4551,26 @@ test "D-009: a recognized-but-unsupported syntax gap exits 2, a real syntax erro
     }
 
     // The SAME five pointer guards keep rc 1 for what real SAS 9.4 also
-    // rejects — a typo must not be re-tagged as a gap (D-009b: rc reports the
+    // rejects - a typo must not be re-tagged as a gap (D-009b: rc reports the
     // class in real-SAS terms). `@'string'` string search is INPUT-only
-    // (Table 2.3, not in PUT's Table 2.5) — same decision GAP-atexpression-put
+    // (Table 2.3, not in PUT's Table 2.5) - same decision GAP-atexpression-put
     // made for `@(character-expression)`; the rest are plain garbage.
     const user_errors = [_][]const u8{
         "put +'a' x;", // no `+'string'` form exists
         "put #'a' x;", // no `#'string'` form exists
         "put (a b)(+'a' 4. 5.);", // group garbage
         "put (a b)(@'a' 4. 5.);", // group `@'string'`
-        "put @'ab' a;", // @'character-string' — INPUT-only
+        "put @'ab' a;", // @'character-string' - INPUT-only
         // GAP-inputpointerguard: the SAME two INPUT guards keep rc 1 for what
-        // real SAS 9.4 also rejects — Table 2.3 has no `+'string'`/`#'string'`
+        // real SAS 9.4 also rejects - Table 2.3 has no `+'string'`/`#'string'`
         // form (only `@'character-string'` exists, and opensas implements it).
         "input +'a' x;", // no `+'string'` form exists
         "input #'a' x;", // no `#'string'` form exists
-        "infile \"f\" unbuff;", // typo of UNBUFFERED — the catch-all keeps rc 1
-        "infile \"f\" eoff=x;", // typo of EOF= — same
-        "infile \"f\" eovv=v;", // typo of EOV= — same (EOV= itself is pinned above)
-        "infile \"f\" padd;", // typo of PAD — the catch-all keeps rc 1
-        "infile \"f\" dlmstrr='x';", // typo of DLMSTR= — same
+        "infile \"f\" unbuff;", // typo of UNBUFFERED - the catch-all keeps rc 1
+        "infile \"f\" eoff=x;", // typo of EOF= - same
+        "infile \"f\" eovv=v;", // typo of EOV= - same (EOV= itself is pinned above)
+        "infile \"f\" padd;", // typo of PAD - the catch-all keeps rc 1
+        "infile \"f\" dlmstrr='x';", // typo of DLMSTR= - same
         "s = sum(of :);", // a colon NOT after a name is not the prefix form (GAP-ofcolonprefix)
     };
     for (user_errors) |src| {
@@ -4592,13 +4592,13 @@ test "D-009: a recognized-but-unsupported syntax gap exits 2, a real syntax erro
     _ = try prog(a, &d0, "y = 1;");
     try testing.expectEqual(@as(u8, 0), diag.exitCode(diag.gapHit(), d0.hasErrors()));
     // `@'string'` IS a documented INPUT pointer control (Table 2.3,
-    // `@'character-string'` — the flip side of it being rc 1 in PUT) and
+    // `@'character-string'` - the flip side of it being rc 1 in PUT) and
     // opensas implements it (GAP-inputatstring): a clean parse, rc 0.
     diag.resetGap();
     var d0b = diag.Diagnostics.init(a);
     _ = try prog(a, &d0b, "input @'ab' a;");
     try testing.expectEqual(@as(u8, 0), diag.exitCode(diag.gapHit(), d0b.hasErrors()));
-    // NOPAD — the documented DEFAULT of the PAD|NOPAD entry (printed p.135):
+    // NOPAD - the documented DEFAULT of the PAD|NOPAD entry (printed p.135):
     // accepted-inert, not a gap and not a typo → clean parse, rc 0.
     diag.resetGap();
     var d0c = diag.Diagnostics.init(a);
@@ -4618,7 +4618,7 @@ test "hash: declare + method calls parse to hash nodes" {
 
     try testing.expectEqualStrings("h", p[0].hash_decl.name);
 
-    const m = p[1].hash_op; // h.defineKey("k")  — statement form, no target
+    const m = p[1].hash_op; // h.defineKey("k")  - statement form, no target
     try testing.expect(m.target == null);
     try testing.expectEqualStrings("h", m.obj);
     try testing.expectEqualStrings("defineKey", m.method);
@@ -4626,7 +4626,7 @@ test "hash: declare + method calls parse to hash nodes" {
     try testing.expect(m.args[0].name == null); // positional
     try testing.expectEqualStrings("k", m.args[0].value.str);
 
-    const f = p[2].hash_op; // rc = h.find(key: 1)  — expression form, target rc
+    const f = p[2].hash_op; // rc = h.find(key: 1)  - expression form, target rc
     try testing.expectEqualStrings("rc", f.target.?);
     try testing.expectEqualStrings("find", f.method);
     try testing.expectEqualStrings("key", f.args[0].name.?); // named
@@ -4642,13 +4642,13 @@ test "hash: `h = _new_ hash(...)` desugars to hash_decl; other _new_ targets fai
     const p = try prog(a, &diags, "declare hash h; h = _new_ hash(ordered:'a');");
     try testing.expectEqual(@as(usize, 2), p.len);
     try testing.expectEqual(@as(usize, 0), p[0].hash_decl.args.len); // bare declare
-    const c = p[1].hash_decl; // the _new_ assignment — same AST as `declare hash h(...)`
+    const c = p[1].hash_decl; // the _new_ assignment - same AST as `declare hash h(...)`
     try testing.expectEqualStrings("h", c.name);
     try testing.expectEqual(@as(usize, 1), c.args.len);
     try testing.expectEqualStrings("ordered", c.args[0].name.?);
 
     // `_new_ hiter('h')` desugars to the SAME hash_decl `declare hiter
-    // hi('h')` produces (GAP-hashnewhiter — Language Reference: Concepts p.624 states the equivalence);
+    // hi('h')` produces (GAP-hashnewhiter - Language Reference: Concepts p.624 states the equivalence);
     // the two spellings cannot drift because there is one AST and one exec path.
     const hi1 = try prog(a, &diags, "declare hiter hi('h');");
     const hi2 = try prog(a, &diags, "hi = _new_ hiter('h');");
@@ -4665,7 +4665,7 @@ test "hash attributes: parenless num_items/item_size parse as hash ops; do-bound
     const a = arena.allocator();
     var diags = diag.Diagnostics.init(a);
 
-    // `n = h.num_items;` — the parenless attribute form (Language Reference: Concepts p.623) is a hash
+    // `n = h.num_items;` - the parenless attribute form (Language Reference: Concepts p.623) is a hash
     // op with an empty arg list, no longer a hard parse error.
     const p = try prog(a, &diags, "n = h.num_items; s = h.item_size; m = h.num_items();");
     try testing.expectEqual(@as(usize, 3), p.len);
@@ -4676,11 +4676,11 @@ test "hash attributes: parenless num_items/item_size parse as hash ops; do-bound
     try testing.expectEqual(@as(usize, 0), attr.args.len);
     try testing.expectEqualStrings("item_size", p[1].hash_op.method);
     try testing.expectEqual(@as(usize, 0), p[1].hash_op.args.len);
-    // the paren method form keeps working — same shape
+    // the paren method form keeps working - same shape
     try testing.expectEqualStrings("num_items", p[2].hash_op.method);
     try testing.expectEqual(@as(usize, 0), p[2].hash_op.args.len);
 
-    // `do i = 1 to h.num_items;` — the attribute read is hoisted before the
+    // `do i = 1 to h.num_items;` - the attribute read is hoisted before the
     // loop into a temp the bound references; a prefix drop keeps the temp out
     // of the output dataset.
     const q = try prog(a, &diags, "do i = 1 to h.num_items; x = i; end;");
@@ -4704,7 +4704,7 @@ test "BUG-hashattrput: a hash attribute in a PUT item fails loud (not two NOTE-o
     const a = arena.allocator();
 
     // `put h.num_items=;` and the parenless list form both used to mis-parse
-    // into `.variable h` + a second item — plausible output, NOTE-only
+    // into `.variable h` + a second item - plausible output, NOTE-only
     // diagnostics. Now the same loud failure `h.num_items` gets anywhere else.
     var d1 = diag.Diagnostics.init(a);
     try testing.expectError(error.ParseError, prog(a, &d1, "put h.num_items=;"));
@@ -4750,7 +4750,7 @@ test "var_list: the name: prefix form in an OF argument parses to a synthetic __
     try testing.expectEqualStrings("x", two[0].call.args[0].str);
     try testing.expectEqualStrings("y", two[1].call.args[0].str);
 
-    // a colon NOT after a name is not the prefix form — still loud (rc 1).
+    // a colon NOT after a name is not the prefix form - still loud (rc 1).
     var d3 = diag.Diagnostics.init(a);
     try testing.expectError(error.ParseError, prog(a, &d3, "s = sum(of :);"));
     // the previously honored forms are untouched.
@@ -4765,7 +4765,7 @@ test "where parses to its own pre-read node; select to an if/else chain" {
     var diags = diag.Diagnostics.init(a);
 
     // where → a dedicated engine-filter node (NOT a subsetting if: end=/first./
-    // last. must see the filtered stream — exec.applyWhereStmt)
+    // last. must see the filtered stream - exec.applyWhereStmt)
     const w = try prog(a, &diags, "where x > 10;");
     try testing.expect(w[0] == .where_);
     try testing.expect(w[0].where_.binary.op == .gt);
@@ -4799,7 +4799,7 @@ test "GAP-batch-qa107: DATA-step BY DESCENDING/NOTSORTED parse to sentinel-encod
     defer arena.deinit();
     const a = arena.allocator();
 
-    // plain ascending BY still parses cleanly (baseline — no regression).
+    // plain ascending BY still parses cleanly (baseline - no regression).
     {
         var diags = diag.Diagnostics.init(a);
         const p = try prog(a, &diags, "by k1 k2;");
@@ -4816,7 +4816,7 @@ test "GAP-batch-qa107: DATA-step BY DESCENDING/NOTSORTED parse to sentinel-encod
         try testing.expectEqual(@as(usize, 1), p[0].by.len);
         try testing.expectEqualStrings("\x00Dk", p[0].by[0]);
     }
-    // mixed: `by a descending b;` — a plain, b descending.
+    // mixed: `by a descending b;` - a plain, b descending.
     {
         var diags = diag.Diagnostics.init(a);
         const p = try prog(a, &diags, "by a descending b;");
@@ -4847,7 +4847,7 @@ test "GAP-arraybounds-batch: negative array lower bound parses and folds bounds"
     const a = arena.allocator();
     var diags = diag.Diagnostics.init(a);
 
-    // array b[-2:2] — 5 members; lbound/hbound/dim const-fold to -2/2/5.
+    // array b[-2:2] - 5 members; lbound/hbound/dim const-fold to -2/2/5.
     const p = try prog(a, &diags, "array b[-2:2] b1-b5; l = lbound(b); h = hbound(b); d = dim(b);");
     try testing.expect(!diags.hasErrors());
     try testing.expectEqual(@as(usize, 5), p[0].array.elements.len);
@@ -4859,7 +4859,7 @@ test "GAP-arraybounds-batch: negative array lower bound parses and folds bounds"
     const q = try prog(a, &diags, "array c[-5:-2] c1-c4;");
     try testing.expectEqual(@as(usize, 4), q[0].array.elements.len);
     try testing.expectError(error.ParseError, prog(a, &diags, "array d[2:-2] d1-d4;"));
-    // a bare negative count `{-3}` is nonsense — fail loud, not a silent dim.
+    // a bare negative count `{-3}` is nonsense - fail loud, not a silent dim.
     try testing.expectError(error.ParseError, prog(a, &diags, "array e[-3] e1-e3;"));
 }
 
@@ -4891,7 +4891,7 @@ test "GAP-bygroupformat: BY GROUPFORMAT fails loud, not a phantom var" {
     defer arena.deinit();
     const a = arena.allocator();
 
-    // plain ascending BY still parses cleanly (baseline — no regression).
+    // plain ascending BY still parses cleanly (baseline - no regression).
     {
         var diags = diag.Diagnostics.init(a);
         const p = try prog(a, &diags, "by age;");
@@ -4907,7 +4907,7 @@ test "GAP-bygroupformat: BY GROUPFORMAT fails loud, not a phantom var" {
         try testing.expect(diags.hasErrors());
         try testing.expect(std.mem.indexOf(u8, try diags.render(), "GROUPFORMAT is not yet supported") != null);
     }
-    // trailing position too; and BY DESCENDING now parses (GAP-batch-qa107) —
+    // trailing position too; and BY DESCENDING now parses (GAP-batch-qa107) -
     // it no longer trips the loud error and never reaches the GROUPFORMAT arm.
     {
         var diags = diag.Diagnostics.init(a);
@@ -4927,7 +4927,7 @@ test "BUG-bystmtempty: `by;` (zero variables) fails loud rc-1-side; legal BY for
     defer arena.deinit();
     const a = arena.allocator();
 
-    // `by;` — the literal empty spelling. EBNF by_stmt requires >= 1 var, so
+    // `by;` - the literal empty spelling. EBNF by_stmt requires >= 1 var, so
     // this is a user error (ParseError → rc 1, D-009b), never a silent no-op.
     {
         var diags = diag.Diagnostics.init(a);
@@ -4935,7 +4935,7 @@ test "BUG-bystmtempty: `by;` (zero variables) fails loud rc-1-side; legal BY for
         try testing.expect(diags.hasErrors());
         try testing.expect(std.mem.indexOf(u8, try diags.render(), "BY statement requires at least one variable") != null);
     }
-    // `by notsorted;` — NOTSORTED is a modifier, not a variable: still zero
+    // `by notsorted;` - NOTSORTED is a modifier, not a variable: still zero
     // vars, still an error (and the sentinel must not mask the check).
     {
         var diags = diag.Diagnostics.init(a);
@@ -4971,7 +4971,7 @@ test "deep-nested DO fails loud past the ceiling, not a segfault (BUG-stmtnest-d
     defer arena.deinit();
     const a = arena.allocator();
 
-    // `do; do; … x=1; … end; end;` a few hundred levels past the ceiling — the
+    // `do; do; … x=1; … end; end;` a few hundred levels past the ceiling - the
     // guard trips (captured ParseError) long before the native stack overflows.
     const n = pe.Parser.max_depth + 200;
     var src: std.ArrayList(u8) = .empty;
@@ -4984,7 +4984,7 @@ test "deep-nested DO fails loud past the ceiling, not a segfault (BUG-stmtnest-d
     try testing.expect(diags.hasErrors());
 
     // The else-if chain recurses parseStmt→parseIf→parseStmt with no DO at
-    // all — the old parseDo-only guard missed it entirely (segfault).
+    // all - the old parseDo-only guard missed it entirely (segfault).
     var chain: std.ArrayList(u8) = .empty;
     try chain.appendSlice(a, "if x then y = 1; ");
     for (0..n) |_| try chain.appendSlice(a, "else if x then y = 1; ");
@@ -4992,7 +4992,7 @@ test "deep-nested DO fails loud past the ceiling, not a segfault (BUG-stmtnest-d
     try testing.expectError(error.ParseError, prog(a, &d3, chain.items));
     try testing.expect(d3.hasErrors());
 
-    // A reasonably-nested DO (50 deep) still parses fine — guard isn't too tight.
+    // A reasonably-nested DO (50 deep) still parses fine - guard isn't too tight.
     var ok_src: std.ArrayList(u8) = .empty;
     for (0..50) |_| try ok_src.appendSlice(a, "do; ");
     try ok_src.appendSlice(a, "x = 1; ");
@@ -5083,7 +5083,7 @@ test "array: explicit dimension must match the explicit member count (BUG-arrayd
 }
 
 test "global-statement predicates: D-014a layering holds (hoisted ⊂ global; inert ∩ global = ∅; skippable == hoisted ∪ inert ∪ libname)" {
-    // BUG-filenamemidstep: filename/ods joined the hoist — every isGlobalKw
+    // BUG-filenamemidstep: filename/ods joined the hoist - every isGlobalKw
     // member is now EXECUTED mid-step (hoisted ∪ pre-pass), so no skip arm
     // anywhere can silent-no-op one (D-014a closed).
     const hoisted = [_][]const u8{ "title", "TITLE2", "footnote", "footnote10", "options", "filename", "ods" };
@@ -5096,7 +5096,7 @@ test "global-statement predicates: D-014a layering holds (hoisted ⊂ global; in
         try testing.expect(isMidStepSkippable(t));
     }
     // LIBNAME: never hoisted, but EXECUTED mid-step by the up-front
-    // parseLibnames pre-pass — skipping the leftover tokens is honest
+    // parseLibnames pre-pass - skipping the leftover tokens is honest
     // (BUG-libnamemidstepboth: it both ran and errored).
     try testing.expect(isGlobalKw("libname"));
     try testing.expect(!isHoistedGlobalKw("libname"));
@@ -5124,14 +5124,14 @@ test "NOTE-pagemidstep: inert globals parse clean mid-DATA-step; `page = 5;` sta
     // QA tick322 F6: `page;` mid-DATA-step fell through to parseAssign and
     // died with "expected '=' in assignment", naming the wrong construct.
     // The inert set is accepted in open code (Language Reference: Concepts p.209 log-only family),
-    // so agree here (D-014a) — all batch-unobservable, they leave NO ast.
+    // so agree here (D-014a) - all batch-unobservable, they leave NO ast.
     var ok = diag.Diagnostics.init(a);
     const p = try prog(a, &ok, "x = 1; page; skip; goptions reset=all; symbol1 v=dot; lock; y = 2;");
     try testing.expect(!ok.hasErrors());
     try testing.expectEqual(@as(usize, 2), p.len); // only the two assignments
 
     // positive control: `page = 5;` is a plain ASSIGNMENT and `skip:` a GOTO
-    // LABEL (ctl_goto.sas pins it end-to-end) — the positive-match guard
+    // LABEL (ctl_goto.sas pins it end-to-end) - the positive-match guard
     // keeps identifiers that merely SHARE an inert keyword out of the swallow.
     var d2 = diag.Diagnostics.init(a);
     const q = try prog(a, &d2, "page = 5; goto skip; skip: y = 2;");
@@ -5143,7 +5143,7 @@ test "NOTE-pagemidstep: inert globals parse clean mid-DATA-step; `page = 5;` sta
     try testing.expectEqualStrings("skip", q[2].label);
 
     // a genuinely unknown statement mid-DATA-step STILL fails loud (the
-    // point of the original fix — the inert agreement must not widen).
+    // point of the original fix - the inert agreement must not widen).
     var d3 = diag.Diagnostics.init(a);
     try testing.expectError(error.ParseError, prog(a, &d3, "zzzq 5;"));
     try testing.expect(d3.hasErrors());
@@ -5155,9 +5155,9 @@ test "BUG-xstmtsilentnoop: X and DM-to-a-FILE emit a NOTE instead of vanishing; 
     const a = arena.allocator();
 
     // X: an OS command with a FILESYSTEM side effect. It stays UNEXECUTED (settled
-    // by design), but the silence was the D-002 violation — `x "mkdir /tmp/d";`
+    // by design), but the silence was the D-002 violation - `x "mkdir /tmp/d";`
     // produced zero output at rc 0 and no directory.
-    // Quoted form only — the bare-name command form is accepted here today but
+    // Quoted form only - the bare-name command form is accepted here today but
     // whether it STAYS accepted is GH#83 part 2's call (it owns main.zig, where
     // the open-code recognizer disagrees with this one), so nothing here pins it.
     for ([_][]const u8{"x \"mkdir /tmp/d\";"}) |src| {
@@ -5167,7 +5167,7 @@ test "BUG-xstmtsilentnoop: X and DM-to-a-FILE emit a NOTE instead of vanishing; 
         try testing.expect(p[0] == .null_stmt);
         try testing.expectEqual(@as(usize, 1), d.count());
         // A NOTE, NOT an error: an ERROR here would errhalt (BUG-errhalt) and skip
-        // every later step of any program that legitimately carries an X — the D-014
+        // every later step of any program that legitimately carries an X - the D-014
         // failure. The exit code must not move.
         try testing.expectEqual(diag.Severity.note, d.list.items[0].severity);
         try testing.expect(!d.hasErrors());
@@ -5175,7 +5175,7 @@ test "BUG-xstmtsilentnoop: X and DM-to-a-FILE emit a NOTE instead of vanishing; 
     }
 
     // DM's log/output REDIRECTION form is the other observable member: a downstream
-    // log check reads a file nobody wrote. Both spellings — command inside a string,
+    // log check reads a file nobody wrote. Both spellings - command inside a string,
     // and bare name tokens.
     for ([_][]const u8{ "dm log \"file '/tmp/f.log' replace;\";", "dm log file f;", "dm 'out;file x'; " }) |src| {
         var d = diag.Diagnostics.init(a);
@@ -5186,7 +5186,7 @@ test "BUG-xstmtsilentnoop: X and DM-to-a-FILE emit a NOTE instead of vanishing; 
     }
 
     // NEGATIVE CONTROL, and the load-bearing one: everything the inert set is
-    // genuinely justified by ("cannot observe") must STAY SILENT — most of all
+    // genuinely justified by ("cannot observe") must STAY SILENT - most of all
     // `dm 'log;clear;output;clear'`, whose "output" contains "out". A substring
     // match would have noted the commonest DM idiom in the corpus for nothing.
     var d2 = diag.Diagnostics.init(a);

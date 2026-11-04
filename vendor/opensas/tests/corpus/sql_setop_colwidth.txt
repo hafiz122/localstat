@@ -1,8 +1,8 @@
-narrow arm first — the wide value must survive whole
+narrow arm first - the wide value must survive whole
 b       lb
 ABC      3
 ABCDEF   6
-wide arm first — same result column width, same values
+wide arm first - same result column width, same values
 b       lb
 ABCDEF   6
 ABC      3

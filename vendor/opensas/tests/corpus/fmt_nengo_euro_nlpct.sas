@@ -1,26 +1,26 @@
-/* GAP-fmtwrite-unimpl (remainder) — the last two write-side format groups.
+/* GAP-fmtwrite-unimpl (remainder) - the last two write-side format groups.
    NENGOw. (SAS 9.4 Formats Reference p.257): Japanese era date `e.yymmdd`;
    the five documented widths of the entry's own example (15342 = 02JAN2002
    = Heisei 14), the era boundaries (Showa 64 ends 07JAN1989, Heisei 1 begins
    08JAN1989; Heisei 31 ends 30APR2019, Reiwa 1 begins 01MAY2019; Meiji 45
    ends 29JUL1912, Taisho 1 begins 30JUL1912), pre-Meiji → asterisks (doc
    silent), missing → left-justified dot (Alignment: Left).
-   EUROw.d/EUROXw.d (pp.215/218): NOT locale-driven — the DOLLAR/DOLLARX
+   EUROw.d/EUROXw.d (pp.215/218): NOT locale-driven - the DOLLAR/DOLLARX
    twins with a leading E; the w=6 default-length log's fit ladder drops the
    SYMBOL before the grouping (55,555 not E55555), BESTw separators NOT
    swapped under EUROX (7.78E6).
    NLPCTIw.d (p.417) / NLPCTNw.d (p.418): the two locale-INVARIANT percent
-   formats — NLPCTI's comma/period separators are pinned by the Comparisons
+   formats - NLPCTI's comma/period separators are pinned by the Comparisons
    paragraph and shown identical under en_US and German_Germany in the NLPCT
    entry's own example; NLPCTN has no separators and a documented trailing
    blank (p.418 Tip).
    STILL LOUD (parked): NLPCT (p.415) and NLPCTP (p.419) have locale-specific
    separators; NLMNYI's (p.410) international-code position is locale-dependent;
-   every NLMNI<ccy> entry says "The output value depends on the locale" —
+   every NLMNI<ccy> entry says "The output value depends on the locale" -
    opensas has no LOCALE= option, so any rendering would be a guessed symbol.
    YEN does not exist in the 9.4 reference at all (D-015).
    GAP-gapsexitingone §5f (D-009): the parked names are DOCUMENTED SAS 9.4
-   formats, so their refusal is an opensas gap and this program now exits 2 —
+   formats, so their refusal is an opensas gap and this program now exits 2 -
    a legitimate golden change from the old rc-1 pin, the rc the epic exists
    to fix (rc 1 told a downstream agent to "fix" valid SAS). YEN stays an
    rc-1 typo; its arm is pinned separately in rc_fmt_bogus_typo.sas (one run,

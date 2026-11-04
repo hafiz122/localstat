@@ -22,7 +22,7 @@
     Variables all equal: 0
     Variables with unequal values: 1
     Total unequal values: 1
-  NOTE: 1 variable(s) not compared — type differs between base and compare: x
+  NOTE: 1 variable(s) not compared - type differs between base and compare: x
 
   Value Comparison Results
 

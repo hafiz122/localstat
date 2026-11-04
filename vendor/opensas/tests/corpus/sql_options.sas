@@ -8,17 +8,17 @@ data d;
   do i = 1 to 5; x = i * 10; output; end;
 run;
 
-/* F2 OUTOBS= — a 5-row select prints only the first 2 rows. */
+/* F2 OUTOBS= - a 5-row select prints only the first 2 rows. */
 proc sql outobs=2;
   select i, x from d;
 quit;
 
-/* F3 INOBS= — only the first 2 source rows are read, so count(*) = 2. */
+/* F3 INOBS= - only the first 2 source rows are read, so count(*) = 2. */
 proc sql inobs=2;
   select count(*) as n from d;
 quit;
 
-/* F1 NOEXEC — CREATE is syntax-checked but NOT executed (table stays absent) and
+/* F1 NOEXEC - CREATE is syntax-checked but NOT executed (table stays absent) and
    the SELECT is validated but prints nothing; RESET EXEC re-enables execution, so
    `made` IS created. */
 proc sql noexec;
@@ -34,7 +34,7 @@ data checks;
 run;
 proc print data=checks; run;
 
-/* F4 — an unrecognized option fails loud (ERROR to stderr, the run aborts). The
+/* F4 - an unrecognized option fails loud (ERROR to stderr, the run aborts). The
    select below must therefore never print; if the option were silently accepted
    (the bug) its rows would appear and this fixture's stdout would diverge. */
 proc sql zzzbogus=42;

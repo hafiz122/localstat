@@ -1,5 +1,5 @@
 /* BUG-meansbypooled: PROC MEANS silently IGNORED the BY statement whenever
-   there was MORE THAN ONE analysis variable or a CLASS statement — it printed
+   there was MORE THAN ONE analysis variable or a CLASS statement - it printed
    ONE pooled table over ALL observations (a: N=4 Mean=25, b: N=4 Mean=250).
    SAS 9.4 prints one table PER BY GROUP: g=1 → a N=2 Mean=15, b Mean=150;
    g=2 → a N=2 Mean=35, b Mean=350. Same for CLASS: one class table per group. */

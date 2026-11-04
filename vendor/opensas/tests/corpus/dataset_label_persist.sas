@@ -1,6 +1,6 @@
 /* F8: the DATASET label persists through a libname round-trip. Before the
    fix `modify d (label=…)` set Dataset.label in memory but NO persistence
-   path consumed it — the sas7bdat writer emits no label subheader and the
+   path consumed it - the sas7bdat writer emits no label subheader and the
    .labels sidecar iterated only columns, so a fresh session could never
    recover the label (SDTM domain descriptions ride on it into define.xml).
    The sidecar now carries the dataset label as a reserved `*`-named record

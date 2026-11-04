@@ -13,7 +13,7 @@
    of 56, and the COLLATE function returns the first 56 characters of the ASCII
    collating sequence. The remainder of the 200-character string is padded with
    spaces." First 56 characters = positions 0..55, so the empty slot IS position
-   0 — documented, working usage, not a give-up and not worth a NOTE.
+   0 - documented, working usage, not a give-up and not worth a NOTE.
 
    opensas returned a one-blank string for it (length 1) while the spelled-out
    collate(0,,56) returned the right 56. The two must agree.
@@ -22,7 +22,7 @@
    printable window (positions 48.. are the digits, the same run p.522's
    Example 1 shows collate(48,,10) returning) rather than dumping raw bytes.
 
-   An EXPLICIT missing start — collate(.) — is a different thing and still gives
+   An EXPLICIT missing start - collate(.) - is a different thing and still gives
    up as a blank CHARACTER (BUG-charfnsmissingtype); the parser fills an omitted
    slot with an empty string, so the two are distinguishable. */
 data _null_;
@@ -55,6 +55,6 @@ data _null_;
   tag = vtype(dot);
   put ldot= 'dot vtype=' tag;
 
-  /* every line above is documented usage — nothing may flag */
+  /* every line above is documented usage - nothing may flag */
   put _error_=;
 run;

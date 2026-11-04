@@ -1,14 +1,14 @@
-/* BUG-declaredobjnamevalue — a declared object's NAME used as a VALUE resolved
+/* BUG-declaredobjnamevalue - a declared object's NAME used as a VALUE resolved
    to missing, silently, at exit 0.
 
    `declare hash inner();` makes `inner` an OBJECT REFERENCE, not a variable:
-   SAS 9.4 Component Objects: Reference, Third Edition, printed p.12 — "The
+   SAS 9.4 Component Objects: Reference, Third Edition, printed p.12 - "The
    DECLARE statement tells the compiler that the object reference myhash is of
    type hash. At this point, you have declared only the object reference
    myhash." So the name has no numeric or character value to read, and
    `x = inner + 1;` is invalid SAS.
 
-   opensas resolved it to numeric missing and exited 0 — a fabricated value, the
+   opensas resolved it to numeric missing and exited 0 - a fabricated value, the
    worst failure class here (D-002). Found while fixing BUG-hashofhashexplicit
    (00d3cd1b), and MEASURED there to be general rather than hash-specific: the
    `h.add(key: 1, data: inner)` symptom that surfaced it is only one expression
@@ -31,7 +31,7 @@
    rejecting every name in a step that declares an object:
      - step 1 declares a hash AND a hash iterator, works them end to end, and
        computes with ordinary variables whose names merely RESEMBLE them;
-     - step 2 uses h / hi / inner as ordinary variables — the objects list is
+     - step 2 uses h / hi / inner as ordinary variables - the objects list is
        per-step, so a name declared in a DIFFERENT step must not start erroring.
 
    One error, last (BUG-errhalt).
@@ -75,7 +75,7 @@ proc print data=later noobs;
 run;
 
 data _null_;
-  /* NO hash call anywhere — the root is general expression resolution */
+  /* NO hash call anywhere - the root is general expression resolution */
   declare hash inner();
   x = inner + 1;
   put "arith x=" x;

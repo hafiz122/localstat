@@ -21,7 +21,7 @@ q
 
 8
 9
-4 where=: 10 untouched, 21, 31 — 3 rows
+4 where=: 10 untouched, 21, 31 - 3 rows
  x
 
 10

@@ -1,10 +1,10 @@
 /* BUG-hashoutputnametrim (GAP-hashmed-tick293 F7): h.output(dataset: <expr>)
-   TRIMS the computed member name. nm is $8, so 'w'||nm arrives blank-padded —
+   TRIMS the computed member name. nm is $8, so 'w'||nm arrives blank-padded -
    pre-fix the member was literally 'woo     ', created at rc=0 and UNREACHABLE
    by any later step. The options branch of the same function already trimmed
    (two paths, one function); the plain branch now agrees. The fail-loud halves
    (invalid member name rc=1; defineData of a nonexistent variable, p.613) are
-   pinned by the BUG-hashoutputnametrim/BUG-hashdefinenovar exec.zig tests —
+   pinned by the BUG-hashoutputnametrim/BUG-hashdefinenovar exec.zig tests -
    their ERRORs trip the run-level errhalt, so they cannot share this fixture. */
 data _null_;
   length k d 8 nm $8;

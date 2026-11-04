@@ -18,7 +18,7 @@ run;
 
 proc print data=e; run;
 
-/* retain range with a shared init, and a negative init after a range —
+/* retain range with a shared init, and a negative init after a range -
    `-` before a name is a range, before a number an initial value */
 data r;
   retain s1-s2 0 neg -5;

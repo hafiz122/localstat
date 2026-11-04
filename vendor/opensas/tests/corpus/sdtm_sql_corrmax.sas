@@ -1,4 +1,4 @@
-/* Each arm's peak subject (value equals the arm's max — correlated subquery) */
+/* Each arm's peak subject (value equals the arm's max - correlated subquery) */
 data lb; input ARM $ USUBJID $ AVAL; datalines;
 DRUG 01-001 30
 DRUG 01-002 55

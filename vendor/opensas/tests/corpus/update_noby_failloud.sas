@@ -1,10 +1,10 @@
 /* BUG-updatenoby: UPDATE (and MODIFY) with a transaction dataset but NO BY
    statement used to collapse all rows into one artificial group and apply
-   transactions positionally — arbitrary, silent-wrong output on a common
+   transactions positionally - arbitrary, silent-wrong output on a common
    user error. SAS 9.4 errors "The BY statement is required for the UPDATE
    statement" and produces no dataset. The valid UPDATE-with-BY below proves
    transactions still apply (a `.` in the transaction leaves the master value
-   intact); the no-BY step then fails LOUD — ERROR to the log, no dataset, no
+   intact); the no-BY step then fails LOUD - ERROR to the log, no dataset, no
    stdout (per BUG-errhalt later steps are skipped after a step ERROR). If the
    guard regresses, a bogus positional-update listing appears here and
    mismatches.

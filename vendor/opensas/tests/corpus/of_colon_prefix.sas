@@ -1,17 +1,17 @@
-/* GAP-ofcolonprefix: `sum(of x:)` — the name-prefix variable list in OF
+/* GAP-ofcolonprefix: `sum(of x:)` - the name-prefix variable list in OF
    context. Language Reference: Concepts printed p.70 Table 4.5: "Function(OF x:) Performs the
    function on all the variables that begin with 'x'"; funcref printed p.6:
    OF's variable-list "can be any form of a SAS variable list". The parser
    defers the prefix to eval as a synthetic __ofprefix("x") argument (the
    __dimchk pattern), expanded against the runtime PDV beside `of _numeric_`
-   — the SAME expansion site, not a second expander. */
+   - the SAME expansion site, not a second expander. */
 data _null_;
   x1 = 10; x2 = 20; x3 = 30; y = 99;
-  s = sum(of x:);        /* 60 — y is not swept in */
-  m = mean(of X:);       /* 20 — the prefix match is case-insensitive */
+  s = sum(of x:);        /* 60 - y is not swept in */
+  m = mean(of X:);       /* 20 - the prefix match is case-insensitive */
   n = n(of x:);          /* 3 */
-  u = sum(of x: y);      /* 159 — prefix mixed with a plain name */
-  v = sum(of x:, of y);  /* 159 — comma-separated OF lists */
+  u = sum(of x: y);      /* 159 - prefix mixed with a plain name */
+  v = sum(of x:, of y);  /* 159 - comma-separated OF lists */
   put s= m= n= u= v=;
 run;
 

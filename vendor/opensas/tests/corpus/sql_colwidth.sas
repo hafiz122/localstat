@@ -1,4 +1,4 @@
-/* BUG-sqlcolwidthloss — a column's DECLARED char width survives PROC SQL.
+/* BUG-sqlcolwidthloss - a column's DECLARED char width survives PROC SQL.
 
    The SQL row loader used to bind column values into the PDV with the name and
    type only, dropping the column's declared LENGTH, so the two surfaces
@@ -10,7 +10,7 @@
      "If you do not specify these attributes, then PROC SQL uses attributes that
       are already saved in the table or, if no attributes are saved, then it uses
       the default attributes."
-   So a SELECTed column keeps its saved width — under an alias too — and an
+   So a SELECTed column keeps its saved width - under an alias too - and an
    explicit SELECT `length=n` (printed p.368) overrides it. opensas stores char
    values UNPADDED where SAS blank-pads to the declared length (printed p.362,
    BTRIM note: a length-10 variable holding 'xxabcxx' is stored "with three
@@ -45,13 +45,13 @@ quit;
 
 /* ── per column SOURCE: which width does each kind of SELECT item carry? ── */
 proc sql;
-  /* a plain column, and the same column under an alias — p.37: 4 and 4 */
+  /* a plain column, and the same column under an alias - p.37: 4 and 4 */
   select lengthc(b) as plain, lengthc(bb) as aliased from
     (select b, b as bb from src);
-  /* an explicit LENGTH= overrides the saved width — p.368: 2 */
+  /* an explicit LENGTH= overrides the saved width - p.368: 2 */
   select lengthc(b) as with_len from (select b length=2 from src);
   /* DOC-SILENT: computed / aggregate / CASE / literal keep the value width.
-     One query each — mixing an aggregate with a char expression takes the
+     One query each - mixing an aggregate with a char expression takes the
      remerge path, whose char computed columns are typed numeric today (a
      separate pre-existing defect: it renders BEST12, filed not pinned). */
   select lengthc(ub) as computed  from (select upcase(b) as ub from src);
@@ -77,7 +77,7 @@ run;
 /* SQL Procedure printed p.218 is explicit that PROC SQL needs TRIM for this:
    "the SELECT clause uses the TRIM function to remove trailing spaces from the
    data in the FirstName column, and then concatenates the data with a single
-   space" — the blanks ride into the concatenation unless trimmed. Same rule as
+   space" - the blanks ride into the concatenation unless trimmed. Same rule as
    the DATA step's (Language Reference: Concepts p.49, BUG-concatnopad). */
 data _null_; set src;
   cat = b||'!'; tr = trim(b)||'!';
@@ -97,7 +97,7 @@ quit;
    step's `=:` reads b's declared width (4 -> compares 'ABC' with 'AB ' -> 0)
    while PROC SQL's EQT trims first (2 -> compares 'AB' with 'AB' -> 1). Only
    the DATA-step half consults the width this fixture restores, and it already
-   had it, so both halves are unchanged — pinned here so a future width change
+   had it, so both halves are unchanged - pinned here so a future width change
    cannot move them silently (NOTE-sqltruncblanks, 8fb0467b). */
 data _null_; set src;
   e1=(a =: b); e2=(a >: b); e3=(a <: b); e4=(a >=: b); e5=(a <=: b); e6=(a ^=: b);

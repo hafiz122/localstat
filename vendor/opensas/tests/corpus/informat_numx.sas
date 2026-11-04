@@ -1,4 +1,4 @@
-/* BUG-numxinformat: NUMXw.d reads the European convention — COMMA is the
+/* BUG-numxinformat: NUMXw.d reads the European convention - COMMA is the
    decimal separator, PERIOD the (ignored) grouping separator; mirror of
    COMMAw.d. Hand-verified: numx8.2 on '12,5' -> 12.5 (explicit decimal comma
    wins over d); on '1.234,56' -> 1234.56 (period dropped, comma = decimal);

@@ -1,5 +1,5 @@
-/* %eval integer arithmetic resolves to text everywhere it appears — %let RHS, a
-   DATA-step expression, and inside an %if guard — instead of leaking `%eval(...)`
+/* %eval integer arithmetic resolves to text everywhere it appears - %let RHS, a
+   DATA-step expression, and inside an %if guard - instead of leaking `%eval(...)`
    to the lexer. Feature confirm for MEVAL. */
 %let n = %eval(2 + 3);
 %let m = %eval(10 - 4 * 2);

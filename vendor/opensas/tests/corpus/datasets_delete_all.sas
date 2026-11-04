@@ -14,7 +14,7 @@ data _null_;
   put "after_all=" e1 e2 e3;
 run;
 
-/* control — a named single-member DELETE removes only DROPME; KEEPME survives */
+/* control - a named single-member DELETE removes only DROPME; KEEPME survives */
 data dropme; v = 9; run;
 data keepme; v = 7; run;
 proc datasets library=work nolist;

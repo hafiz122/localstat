@@ -1,8 +1,8 @@
-/* e8601dt_width: E8601DTw. honors its width — GH#2 ISS-e8601dt-width.
+/* e8601dt_width: E8601DTw. honors its width - GH#2 ISS-e8601dt-width.
    Formats and Informats Reference pp.200-201: w Default 19, Range 16-26; at
    w=16 SAS assumes the seconds are 0 and omits them. Padding side is
    RUNTIME-verified (GH#11 ISS-e8601rightalign): every padded width
-   RIGHT-justifies (LEADING blanks) — the entry's `Alignment: Left` header
+   RIGHT-justifies (LEADING blanks) - the entry's `Alignment: Left` header
    field is not oracle (decisions.md D-025). The informat twin (pp.643-644)
    slices to w the same way, so e8601dt16. reads the seconds as 00.
    The "|" pins the field width: no blank may move across it. Invented data. */
@@ -19,7 +19,7 @@ run;
 /* GH#11 discriminator (the issue's probe program): length() returns the
    position of the last non-blank, so leading padding pins len=w (16/19/20/26)
    where trailing padding collapses w>19 to 19; $quote30. prints the stored
-   value verbatim — real SAS puts all 7 blanks INSIDE the opening quote. */
+   value verbatim - real SAS puts all 7 blanks INSIDE the opening quote. */
 data _null_;
   base = '16jan2025:13:53:00'dt;
   f16 = put(base, e8601dt16.);

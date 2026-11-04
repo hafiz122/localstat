@@ -1,5 +1,5 @@
 /* FEAT-procreport rest4: `_c<n>_` absolute column references in a COMPUTE
-   expression — reference a report column by its 1-based COLUMN-list position.
+   expression - reference a report column by its 1-based COLUMN-list position.
    Here _c1_ and _c2_ are columns a and b; the computed column mixes an absolute
    ref with a named ref to prove they compose. */
 data d;

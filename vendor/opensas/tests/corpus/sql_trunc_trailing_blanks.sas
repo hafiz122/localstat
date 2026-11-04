@@ -7,8 +7,8 @@
       TRIMS TRAILING BLANKS from the string values before it truncates
       comparisons."
 
-   So the DATA step's `=:` family keeps the storage-length rule (LENGTHC) —
-   that half was already conformant and must not move — while PROC SQL's
+   So the DATA step's `=:` family keeps the storage-length rule (LENGTHC) -
+   that half was already conformant and must not move - while PROC SQL's
    EQT/GTT/LTT/GET/LET/NET trim first, which is LENGTHN.
 
    The two only disagree when the SHORTER operand carries trailing blanks, so
@@ -23,8 +23,8 @@ run;
 
 data _null_;
   /* DATA step: the storage-length rule, trailing blanks INCLUDED */
-  blanks = ('ABC' =: 'AB  ');   /* 0 — the shorter operand's blanks count */
-  plain  = ('ABC' =: 'AB');     /* 1 — no trailing blanks, rules agree */
+  blanks = ('ABC' =: 'AB  ');   /* 0 - the shorter operand's blanks count */
+  plain  = ('ABC' =: 'AB');     /* 1 - no trailing blanks, rules agree */
   gt     = ('ABC' >: 'AB  ');
   ne     = ('ABC' ^=: 'AB  ');
   put 'DATA eq blanks = ' blanks;

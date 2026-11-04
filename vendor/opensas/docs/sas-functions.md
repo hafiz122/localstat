@@ -1,4 +1,4 @@
-# SAS 9.4 Functions & CALL Routines — coverage checklist
+# SAS 9.4 Functions & CALL Routines - coverage checklist
 
 Target (Phase F): implement **all 615** functions/CALL routines in
 the SAS Functions and CALL Routines reference (the Dictionary, pp.210-1709). This file is the
@@ -6,7 +6,7 @@ tracker: `[x]` = implemented in opensas with a fixture; `[ ]` = TODO.
 When a dev implements a function they read ONLY that function's Dictionary page
 for exact semantics, add a corpus fixture, and tick it here.
 
-**Coverage: 468/468 feasible (100%) — 147 marked [~] N/A (Git/SOAP/MODULE/file-I/O/memory/OS); 615 total documented**
+**Coverage: 468/468 feasible (100%) - 147 marked [~] N/A (Git/SOAP/MODULE/file-I/O/memory/OS); 615 total documented**
 
 Truly out-of-scope for a CSV/in-memory interpreter (memory PEEK/POKE, external
 DB/file engines, Git, GTL-only) may be marked `[~]` N/A with a one-line reason;
@@ -17,16 +17,16 @@ they don't block 100% of the *feasible* set.
 > **Reading one function's spec (avoid context rot):** do NOT open the whole
 > manual. Find the function's page in the reference and read ONLY it.
 
-> **Both unblock levers LANDED — zero `[ ]` remain (Phase-F-final, bfa2039):**
+> **Both unblock levers LANDED - zero `[ ]` remain (Phase-F-final, bfa2039):**
 > - **CALL routines (lever 1):** DONE. Mutation dispatch lives in `exec.runCall`
 >   (out-arg write-back incl. array elements); RNG stream state (Lehmer +
 >   MT19937 via CALL STREAMINIT) lives in evaluator state; PRX routines dispatch
 >   via `src/prx.zig`. Landed as Phase-F-callbatch (1413261 …) + Phase-F-final
 >   (f7708fc, 18f855f, bfa2039). Fixtures: call_combinatorics, call_ran,
 >   call_prx, call_softmax_vnext, call_allcombi_stream, call_tanh_logistic.
-> - **V-format/informat functions (lever 2):** DONE — VFORMAT*/VINFORMAT*/
+> - **V-format/informat functions (lever 2):** DONE - VFORMAT*/VINFORMAT*/
 >   VARINFMT/VARLABEL read eager attributes (fixture v_format_label).
-> - INTCINDEX: SAS-specific WEEK-of-year numbering (WEEKU/V) — not verifiable here.
+> - INTCINDEX: SAS-specific WEEK-of-year numbering (WEEKU/V) - not verifiable here.
 
 
 - [x] ABS
@@ -70,7 +70,7 @@ they don't block 100% of the *feasible* set.
 - [x] BRSHIFT
 - [x] BXOR
 - [x] BYTE
-- [x] CALL   (the CALL statement — routines dispatched via exec runCall; the specific CALL routines are itemized below)
+- [x] CALL   (the CALL statement - routines dispatched via exec runCall; the specific CALL routines are itemized below)
 - [x] CALL ALLCOMB
 - [x] CALL ALLCOMBI   (Phase-F-final; fixture call_allcombi_stream)
 - [x] CALL ALLPERM
@@ -78,9 +78,9 @@ they don't block 100% of the *feasible* set.
 - [x] CALL CATT
 - [x] CALL CATX
 - [~] CALL COMPCOST   (N/A: COMPGED cost matrix (niche tuning))
-- [~] CALL EXECUTE   (engine, not a value-returning routine: queues generated SAS code. GH#13 — the argument is macro-processed AT CALL TIME and only the SAS statements it generates are deferred to the step boundary, the two timings Macro Language Ref printed p.123 "CALL EXECUTE Routine Timing Details" prescribes; fixture call_execute_macro. Residual, loud at rc 2: %NRSTR/%STR-quoted text, whose whole point is deferring resolution PAST the queue drain — the drain lexes, it does not macro-process)
+- [~] CALL EXECUTE   (engine, not a value-returning routine: queues generated SAS code. GH#13 - the argument is macro-processed AT CALL TIME and only the SAS statements it generates are deferred to the step boundary, the two timings Macro Language Ref printed p.123 "CALL EXECUTE Routine Timing Details" prescribes; fixture call_execute_macro. Residual, loud at rc 2: %NRSTR/%STR-quoted text, whose whole point is deferring resolution PAST the queue drain - the drain lexes, it does not macro-process)
 - [x] CALL GRAYCODE   (Phase-F-callbatch; fixture call_combinatorics)
-- [~] CALL IS8601_CONVERT   (GH#50: only 'dt/dt'→'du' — two datetimes → duration seconds = later−earlier; every other from/to combo fails loud. Full model still absent: P-string durations with calendar Y/M components, the other interval forms (dt/du, du/dt), 6-component decomposition, calendar-aware duration arithmetic — disproportionate multi-mode build, full [x] deferred)
+- [~] CALL IS8601_CONVERT   (GH#50: only 'dt/dt'→'du' - two datetimes → duration seconds = later−earlier; every other from/to combo fails loud. Full model still absent: P-string durations with calendar Y/M components, the other interval forms (dt/du, du/dt), 6-component decomposition, calendar-aware duration arithmetic - disproportionate multi-mode build, full [x] deferred)
 - [x] CALL LABEL   (already implemented + tested; Phase-F-callbatch)
 - [x] CALL LEXCOMB
 - [x] CALL LEXCOMBI   (Phase-F-callbatch; fixture call_combinatorics)
@@ -110,7 +110,7 @@ they don't block 100% of the *feasible* set.
 - [x] CALL RANTRI   (draw into last arg, seed in place; Phase-F-callbatch; fixture call_ran)
 - [x] CALL RANUNI   (already implemented + tested; Phase-F-callbatch)
 - [x] CALL SCAN
-- [~] CALL SET   (N/A: SCL dsid binding — niche)
+- [~] CALL SET   (N/A: SCL dsid binding - niche)
 - [~] CALL SLEEP   (N/A: wall-clock/OS)
 - [x] CALL SOFTMAX   (in place; Phase-F-callbatch; fixture call_softmax_vnext)
 - [x] CALL SORT   (Phase-F-callbatch; fixture call_combinatorics)
@@ -136,7 +136,7 @@ they don't block 100% of the *feasible* set.
 - [x] CDF
 - [x] CEIL
 - [x] CEILZ
-- [~] CEXIST   (N/A: no catalog store — catalogs unsupported; always 0)
+- [~] CEXIST   (N/A: no catalog store - catalogs unsupported; always 0)
 - [x] CHAR
 - [x] CHOOSEC
 - [x] CHOOSEN
@@ -204,7 +204,7 @@ they don't block 100% of the *feasible* set.
 - [~] DOPEN   (N/A: external directory I/O)
 - [~] DOPTNAME   (N/A: external directory I/O)
 - [~] DOPTNUM   (N/A: external directory I/O)
-- [~] DOSUBL   (N/A: submits SAS code — engine)
+- [~] DOSUBL   (N/A: submits SAS code - engine)
 - [~] DREAD   (N/A: external directory I/O)
 - [x] DROPNOTE
 - [x] DSNAME
@@ -359,7 +359,7 @@ they don't block 100% of the *feasible* set.
 - [x] INPUTC
 - [x] INPUTN
 - [x] INT
-- [x] INTCINDEX   (cycle index — week-of-year for day/week, month/qtr of year; time not modeled; fixture tests/corpus/intcindex)
+- [x] INTCINDEX   (cycle index - week-of-year for day/week, month/qtr of year; time not modeled; fixture tests/corpus/intcindex)
 - [x] INTCK
 - [x] INTCYCLE
 - [x] INTFIT
@@ -459,7 +459,7 @@ they don't block 100% of the *feasible* set.
 - [x] NWKDOM
 - [x] OPEN
 - [x] ORDINAL
-- [x] PATHNAME   (libref → bound LIBNAME dir via dsfns map; filerefs blank until a FILENAME store exists — GAP-pathname)
+- [x] PATHNAME   (libref → bound LIBNAME dir via dsfns map; filerefs blank until a FILENAME store exists - GAP-pathname)
 - [x] PCTL
 - [x] PDF
 - [~] PEEK   (N/A: reads raw memory)
@@ -521,7 +521,7 @@ they don't block 100% of the *feasible* set.
 - [x] ROUNDE
 - [x] ROUNDZ
 - [x] SAVING
-- [x] SAVINGS   (doc-exact: base,init,amount,number,dep-iv,cmp-iv,date1,rate1,…; verified vs PDF p.1460 — BUG-savingstv QA repro was malformed; fixture fin_savings_timevalue)
+- [x] SAVINGS   (doc-exact: base,init,amount,number,dep-iv,cmp-iv,date1,rate1,…; verified vs PDF p.1460 - BUG-savingstv QA repro was malformed; fixture fin_savings_timevalue)
 - [x] SCAN
 - [x] SDF
 - [x] SEC
@@ -573,7 +573,7 @@ they don't block 100% of the *feasible* set.
 - [x] TANH
 - [x] TIME
 - [x] TIMEPART
-- [x] TIMEVALUE   (doc-exact: base,ref,amount,cmp-iv,date1,rate1,…; verified vs PDF p.1564 — BUG-savingstv; fixture fin_savings_timevalue)
+- [x] TIMEVALUE   (doc-exact: base,ref,amount,cmp-iv,date1,rate1,…; verified vs PDF p.1564 - BUG-savingstv; fixture fin_savings_timevalue)
 - [x] TINV
 - [x] TNONCT
 - [x] TODAY
@@ -605,7 +605,7 @@ they don't block 100% of the *feasible* set.
 - [x] VARNAME
 - [x] VARNUM
 - [~] VARRAY   (N/A: array definitions live in the parser/exec; no array-name table reachable from functions.zig. Unblock: dev1 expose an array registry)
-- [~] VARRAYX   (N/A: as VARRAY — no array registry reachable)
+- [~] VARRAYX   (N/A: as VARRAY - no array registry reachable)
 - [x] VARTYPE
 - [x] VERIFY
 - [x] VFORMAT    (by-ref var format; parser rewrites → VFORMATX; fixture vfunc_format_nonx)
@@ -615,9 +615,9 @@ they don't block 100% of the *feasible* set.
 - [x] VFORMATNX  (fixture varattr_vfuncs)
 - [x] VFORMATW   (format width; fixture vfunc_format_nonx)
 - [x] VFORMATWX  (fixture varattr_vfuncs)
-- [x] VFORMATX   (format from pdv.Var, else the SET source column via libColFmt — BUG-vformatxlabel; fixtures varattr_vfuncs, v_format_label)
-- [~] VINARRAY   (N/A: as VARRAY — no array registry reachable)
-- [~] VINARRAYX   (N/A: as VARRAY — no array registry reachable)
+- [x] VFORMATX   (format from pdv.Var, else the SET source column via libColFmt - BUG-vformatxlabel; fixtures varattr_vfuncs, v_format_label)
+- [~] VINARRAY   (N/A: as VARRAY - no array registry reachable)
+- [~] VINARRAYX   (N/A: as VARRAY - no array registry reachable)
 - [x] VINFORMAT  (by-ref var informat; parser rewrites → VINFORMATX; fixture vfunc_informat)
 - [x] VINFORMATD (informat decimals; fixture vfunc_informat)
 - [x] VINFORMATDX (fixture vfunc_informat)
@@ -627,7 +627,7 @@ they don't block 100% of the *feasible* set.
 - [x] VINFORMATWX (fixture vfunc_informat)
 - [x] VINFORMATX (informat from pdv.Var; fixture vfunc_informat)
 - [x] VLABEL
-- [x] VLABELX   (label from Library store, else the SET source column — BUG-vformatxlabel; fixture v_format_label)
+- [x] VLABELX   (label from Library store, else the SET source column - BUG-vformatxlabel; fixture v_format_label)
 - [x] VLENGTH   (declared storage length via PDV; numeric=8; fixture tests/corpus/vlength)
 - [x] VLENGTHX   (declared length via pdv.Var.len; fixture vlength)
 - [x] VNAME
@@ -635,7 +635,7 @@ they don't block 100% of the *feasible* set.
 - [x] VTYPE
 - [x] VTYPEX
 - [x] VVALUE   (fixture tests/corpus/vvalue)
-- [x] VVALUEX   (by-name via PDV, format falls back to the SET source column — BUG-vformatxlabel; fixtures vvalue, v_format_label)
+- [x] VVALUEX   (by-name via PDV, format falls back to the SET source column - BUG-vformatxlabel; fixtures vvalue, v_format_label)
 - [x] WEEK
 - [x] WEEKDAY
 - [x] WHICHC

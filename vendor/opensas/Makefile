@@ -1,4 +1,4 @@
-# Cross-compile the `opensas` binary. Zig cross-compiles natively — no external
+# Cross-compile the `opensas` binary. Zig cross-compiles natively - no external
 # toolchain. Output: dist/<triple>/opensas[.exe]. Override OPT=Debug for debug builds.
 OPT ?= ReleaseFast
 

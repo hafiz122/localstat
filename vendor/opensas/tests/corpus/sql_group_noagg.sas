@@ -1,5 +1,5 @@
 /* BUG-sqlgroupnoagg: a GROUP BY with no summary function anywhere in the query
-   must act as ORDER BY (all rows, ordered by the group keys — not one arbitrary
+   must act as ORDER BY (all rows, ordered by the group keys - not one arbitrary
    row per group); an aggregate appearing ONLY in HAVING must still trigger
    grouping/remerge. */
 data emp;
@@ -16,6 +16,6 @@ proc sql;
   select name, dept from emp group by dept;
   /* aggregate only in HAVING: depts with more than one row */
   select dept from emp group by dept having count(*) > 1;
-  /* HAVING aggregate + detail columns: remerge — rows above their dept mean */
+  /* HAVING aggregate + detail columns: remerge - rows above their dept mean */
   select id, dept, sal from emp group by dept having sal > avg(sal);
 quit;

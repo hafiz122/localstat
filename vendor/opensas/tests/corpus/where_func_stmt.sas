@@ -1,5 +1,5 @@
 /* BUG-wherefunc (WHERE statement half): a where STATEMENT predicate calling a
-   function silently misfiltered since 8b9b473 — applyWhereStmt's evaluator had
+   function silently misfiltered since 8b9b473 - applyWhereStmt's evaluator had
    no call_fn and a junk diags sink, so upcase(...) evaluated to missing: char
    compares passed EVERY row, numeric compares dropped every row, exit 0. */
 data src;

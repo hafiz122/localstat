@@ -1,6 +1,6 @@
 /* GAP-xportio-low F11: an XPORT label over the v5 nlabel field's 40 chars
    truncates at EXACTLY 40 (format-forced; SAS labels run to 256) and the
-   write WARNS — the loud half is pinned by xport.zig's in-file test with a
+   write WARNS - the loud half is pinned by xport.zig's in-file test with a
    captured reporter (the warning rides stderr, which the corpus does not
    diff). This pins the visible half end-to-end: write → read back fresh →
    CONTENTS shows the label at exactly 40 characters. */

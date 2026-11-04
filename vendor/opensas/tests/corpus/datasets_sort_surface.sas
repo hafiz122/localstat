@@ -1,7 +1,7 @@
 /* GAP-dsmgmt-tick262-264 (doc-finder tick262, F5/F6/F7): DATASETS/SORT surface.
    The fail-loud halves (COPY/SAVE/EXCHANGE/AGE naming themselves, BY
    GROUPFORMAT naming the option, CONTENTS DATA=_ALL_ naming the whole-library
-   gap) are pinned by the GAP-dsmgmt-tick262-264 test in src/proc.zig — a green
+   gap) are pinned by the GAP-dsmgmt-tick262-264 test in src/proc.zig - a green
    corpus run cannot contain an ERROR. This fixture is the POSITIVE control:
    every implemented sub-statement below must keep working, and a mid-step
    TITLE/FOOTNOTE/OPTIONS inside PROC DATASETS is hoisted by main.zig and its

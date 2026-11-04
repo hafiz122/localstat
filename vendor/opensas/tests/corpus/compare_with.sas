@@ -1,5 +1,5 @@
 /* PROC COMPARE WITH (BUG-comparewith): the WITH statement pairs positionally
-   with VAR — base.VAR[k] vs compare.WITH[k] — so differently-named columns
+   with VAR - base.VAR[k] vs compare.WITH[k] - so differently-named columns
    (prod.height vs qc.ht) are actually compared. Differing values must be
    reported; before the fix WITH was dropped and this printed a false
    "all values compared are exactly equal" (silent wrong on a QC tool). */

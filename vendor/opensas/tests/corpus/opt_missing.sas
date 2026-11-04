@@ -14,8 +14,8 @@ proc print data=a; run;
 data _null_;
   x = .;
   y = ._;
-  put x;  /* X — list-PUT honors MISSING= too */
-  put y;  /* _ — special missing unaffected */
+  put x;  /* X - list-PUT honors MISSING= too */
+  put y;  /* _ - special missing unaffected */
 run;
 
 options missing='.';  /* reset to the default */

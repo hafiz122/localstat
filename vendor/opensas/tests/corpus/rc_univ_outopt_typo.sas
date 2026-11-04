@@ -1,4 +1,4 @@
-/* GAP-gapsexitingone §5b re-verdict — `pctlpt=33` is not a documented
+/* GAP-gapsexitingone §5b re-verdict - `pctlpt=33` is not a documented
    PROC UNIVARIATE OUTPUT keyword (Table 4.14 + the percentile-options),
    so it is the USER's typo, exit 1. Gap twin: rc_univ_outopt_gap.sas.
    expect-rc: 1 */

@@ -4,12 +4,12 @@
    `constraintsOf` returns only the NEWEST registry entry for a Dataset, so
    runAlter has to re-register `old ++ new` as one list. Drop the `old` half and
    every constraint declared at CREATE TABLE silently stops being enforced the
-   moment anyone ALTERs the table — a table that quietly loses its integrity
+   moment anyone ALTERs the table - a table that quietly loses its integrity
    constraints is worse than one that never had them, because the DDL says it
    does. That block predates this fix, but a table-level ADD CONSTRAINT is a new
    way to reach it, so the direction with the regression risk is pinned here.
 
-   The error below is c1, declared at CREATE — it must STILL fire after the ALTER
+   The error below is c1, declared at CREATE - it must STILL fire after the ALTER
    added c2. (c2 firing is the same mechanism pinned by
    sql_alter_constraint_enforced.sas.) One erroring step, last, per BUG-errhalt.
 

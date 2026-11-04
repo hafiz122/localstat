@@ -2,7 +2,7 @@
 
    main's `loadLibInputs` deliberately does NOT preload a `data <libref.x>`
    OUTPUT target, so a member written by an EARLIER RUN is invisible to
-   `lib.find` — and that is precisely the clinical case, a failing rerun of
+   `lib.find` - and that is precisely the clinical case, a failing rerun of
    yesterday's program silently emptying yesterday's data set. The in-Library
    check alone does not cover it; the fix reuses BUG-existdisk's disk probe.
 
@@ -16,7 +16,7 @@
    rows. Re-runnable: PROC COPY rewrites the 3 observations every run.
 
    BUG-nofixturepinsrc: this fixture's POINT is that the run fails while the
-   data survives, so the exit code is half of what it asserts — and until now
+   data survives, so the exit code is half of what it asserts - and until now
    the runner ignored it, so "the outputs are right" would have passed even at
    rc 0. A step error is the user's SAS being wrong: D-009 rc 1.
    expect-rc: 1 */
@@ -36,7 +36,7 @@ proc copy in=work out=target;
   select survivor;
 run;
 
-/* FAILING STEP, LAST — the undefined-GOTO compile-time gate (exec.zig:3916). */
+/* FAILING STEP, LAST - the undefined-GOTO compile-time gate (exec.zig:3916). */
 data target.survivor;
   length z 8;
   goto nowhere;

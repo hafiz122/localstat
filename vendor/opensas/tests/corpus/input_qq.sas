@@ -1,4 +1,4 @@
-/* BUG-inputqq: the ?/?? error-suppression modifier in input(str, ?? informat.) —
+/* BUG-inputqq: the ?/?? error-suppression modifier in input(str, ?? informat.) -
    the canonical SDTM --ORRES→--STRESN char→numeric conversion, silently missing
    for non-numeric. Was LexError: unexpected character '?'. `?` skips the message,
    `??` also skips _ERROR_; opensas input() is silent-missing regardless. */

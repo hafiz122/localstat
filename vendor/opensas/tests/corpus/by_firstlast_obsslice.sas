@@ -1,8 +1,8 @@
 /* Language Reference: Concepts Ch.22 "BY-Group Processing in the DATA Step" (pp.534-535, p.538
-   Example 3) + Ch.4 Table 4.6 (p.72) — stated rules opensas already gets RIGHT
+   Example 3) + Ch.4 Table 4.6 (p.72) - stated rules opensas already gets RIGHT
    that nothing else in the corpus pinned (doc-finder tick300).
    Deliberately EXCLUDES the statement-form RENAME across multiple output data
-   sets (Table 4.6: statements "effect all output data sets") — that is this
+   sets (Table 4.6: statements "effect all output data sets") - that is this
    pass's HIGH finding, and pinning today's output would DEFEND the bug.
    Also avoids the `put var=` named form: it echoes the reference-site case
    rather than the stored name (this pass's LOW), so a PUT-based golden here

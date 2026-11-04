@@ -1,8 +1,8 @@
-/* QA tick356 BANKED POSITIVE CONTROL — INPUT record/column pointer seams.
+/* QA tick356 BANKED POSITIVE CONTROL - INPUT record/column pointer seams.
    Every shape below was hand-probed this tick and is CONFORMANT today; it is
    pinned so the concurrent INPUT/io churn cannot quietly move it.
 
-   Doc: Language Reference: Concepts p.516-517 "Reading Raw Data with the INPUT Statement" — the
+   Doc: Language Reference: Concepts p.516-517 "Reading Raw Data with the INPUT Statement" - the
    @ column pointer, the #n line pointer, trailing @ for a file with varying
    record layouts, and the MISSOVER/TRUNCOVER options table.
 
@@ -15,7 +15,7 @@
    Every END= block here reads DATALINES, and DATA Step Statements ref printed
    p.130 restricts END= for "the DATALINES statement … or an INPUT statement
    that reads multiple input data records", with printed p.138 giving the
-   behaviour — instream data means UNBUFFERED is in effect, and "SAS never sets
+   behaviour - instream data means UNBUFFERED is in effect, and "SAS never sets
    the END= variable to 1". This fixture was banked as a POSITIVE CONTROL after
    hand-probing, but the probe was checked against Language Reference: Concepts' INFILE-option table
    rather than the Statements ref's END= entry, so it certified as conformant a
@@ -25,7 +25,7 @@
 
 /* S1 the one-record-per-iteration shapes: plain read, OBS= cap, FIRSTOBS=
    start. These read DATALINES, so END= is restricted (p.130/p.138) and the
-   flag stays 0 on every record INCLUDING the final one — the OBS=/FIRSTOBS=
+   flag stays 0 on every record INCLUDING the final one - the OBS=/FIRSTOBS=
    compositions are what this block still pins. END= reaching 1 where it is
    legal lives in infile_end.sas block 2 (external file, single INPUT). */
 data _null_; infile datalines truncover end=e;
@@ -61,7 +61,7 @@ run;
 /* S4 the varying-record-layout look-ahead idiom (Language Reference: Concepts p.517 row 2): a bare
    `input @;` holds the record AND publishes it to _INFILE_, so the IF can
    pick the layout before any variable is read. This is the shape F2 breaks
-   the moment the same step also writes to _INFILE_ — pinned here in its
+   the moment the same step also writes to _INFILE_ - pinned here in its
    working form as the regression tripwire. */
 data _null_; infile datalines truncover;
   input @;

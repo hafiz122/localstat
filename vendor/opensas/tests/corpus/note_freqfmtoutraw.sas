@@ -1,9 +1,9 @@
 /* NOTE-freqfmtoutraw (qa tick191 F2): OUT= stores the RAW class value with the
-   format ATTACHED — never the formatted label STRING (a descriptor must not
+   format ATTACHED - never the formatted label STRING (a descriptor must not
    disagree with the value it describes; a proc must not retype a column just
    because it carries a format). Pinned through three surfaces: PRINT still
    renders the labels, CONTENTS shows Num + the attached format, and a DATA-step
-   read-back does ARITHMETIC on the class var — the surface that proves the
+   read-back does ARITHMETIC on the class var - the surface that proves the
    type. The collapsed bf. arm proves SAS stores the LOWEST internal value of a
    format-combined group (Base SAS 9.4 Procedures Guide, PROC MEANS CLASS stmt
    Tip, printed p.1496). Siblings sharing the groupFormats rewrite are pinned

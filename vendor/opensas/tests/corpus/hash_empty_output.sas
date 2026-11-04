@@ -25,6 +25,6 @@ data _null_;
   h2.defineData('v');
   h2.defineDone();
   k=1; v='x'; h2.add();
-  rc = h2.output(); /* no dataset: — loud ERROR, rc=1 */
+  rc = h2.output(); /* no dataset: - loud ERROR, rc=1 */
   put 'nods rc=' rc;
 run;

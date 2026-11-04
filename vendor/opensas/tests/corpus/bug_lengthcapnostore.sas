@@ -1,9 +1,9 @@
 /* BUG-lengthcapnostore: a declared character length over 32767 was silently
-   accepted when nothing was ever stored into the variable — the 67a3c834 cap
+   accepted when nothing was ever stored into the variable - the 67a3c834 cap
    sits at pdv.setAt (STORE time), so `length y $40000; run;` slipped through.
    Real SAS rejects the LENGTH statement itself at compile time, store or no
    store (LENGTH Statement, SAS 9.4 DATA Step Statements: Reference printed
-   p.217 — pdf 228 at the volume's +11 offset, verified by the "LENGTH
+   p.217 - pdf 228 at the volume's +11 offset, verified by the "LENGTH
    Statement 217" footer closing pdf 228: "For character variables, 1 to
    32767 bytes under all operating environments"). The declaration is now
    rejected AT THE STATEMENT (parser.zig checkDeclLen, shared with ATTRIB);

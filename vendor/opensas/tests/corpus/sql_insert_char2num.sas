@@ -1,5 +1,5 @@
 /* BUG-sqltypeconsistency: INSERT/UPDATE of a char value into a NUMERIC column
-   converts the SAS way (implicit w. informat) — no ERROR, never the raw text
+   converts the SAS way (implicit w. informat) - no ERROR, never the raw text
    in a num cell: '12.5' -> 12.5 and '3.25' -> 3.25 with the "converted" NOTE;
    'abc' -> missing after the converted + "Invalid numeric data" NOTE pair.
    The NOTEs go to stderr; stdout shows the converted/missing values. */

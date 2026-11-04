@@ -1,4 +1,4 @@
-/* GAP-fileio-batch-rest (pi-en): SET END= — the classic clinical idiom
+/* GAP-fileio-batch-rest (pi-en): SET END= - the classic clinical idiom
    `set x end=last; if last then …` fires on the FINAL obs only, and `last`
    is a data-step temp: dropped from the output dataset like _N_. */
 data x;

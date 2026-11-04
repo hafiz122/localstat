@@ -1,4 +1,4 @@
-/* PROC COMPARE: clinical double-programming QC — production vs validation. When
+/* PROC COMPARE: clinical double-programming QC - production vs validation. When
    the two datasets match, COMPARE reports all values exactly equal. */
 data prod;
   input id x y;

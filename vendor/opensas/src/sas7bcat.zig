@@ -1,4 +1,4 @@
-//! sas7bcat (`.sas7bcat`) reader — the native SAS *format catalog*: the user
+//! sas7bcat (`.sas7bcat`) reader - the native SAS *format catalog*: the user
 //! Modified by LocalStat to bound physical pages, reject cyclic block chains,
 //! and validate attacker-controlled entry counts before allocation.
 //!
@@ -6,21 +6,21 @@
 //! FMTSEARCH=`, so `put(x, YESNO.)` decodes to a label instead of failing loud
 //! (GH#34). Same undocumented container family as sas7bdat (magic, header,
 //! pages), so this reuses that header/32-bit-LE approach and diverges only in
-//! the payload — a chain of value-label BLOCKS indexed by XLSR pointers. Ported
+//! the payload - a chain of value-label BLOCKS indexed by XLSR pointers. Ported
 //! from readstat's readstat_sas7bcat_read.c (WizardMac/ReadStat, MIT License,
 //! Copyright (c) 2013-2016 Evan Miller); every parsed
 //! (name → {value:label}) is verified byte-exact against pyreadstat's
 //! read_sas7bcat oracle for testdata/formats.sas7bcat (see the test below).
 //!
 //! Layout, top-down:
-//!   header — shares sas7bdat's magic (one byte differs: +15 is 0x63 not 0x60),
+//!   header - shares sas7bdat's magic (one byte differs: +15 is 0x63 not 0x60),
 //!     endianness/word-size flags, header_size/page_size/page_count.
-//!   index — page index 1 carries XLSR records (one per format) at offset
+//!   index - page index 1 carries XLSR records (one per format) at offset
 //!     856+2·pad1; each XLSR whose byte[50+pad1]=='O' points (page,pos) at a block.
-//!   block — a chain of segments across pages: a 16-byte link header
+//!   block - a chain of segments across pages: a 16-byte link header
 //!     (next_page@0, next_pos@4, seg_len@6) then seg_len payload bytes,
 //!     concatenated until next_page/pos are 0.
-//!   payload — at +8 the 8-char short NAME (`$`-prefixed ⇒ char keys); label
+//!   payload - at +8 the 8-char short NAME (`$`-prefixed ⇒ char keys); label
 //!     count at +42(+pad); then `count` VALUE entries followed by `count` LABEL
 //!     entries, cross-linked by a label-index u32 inside each value entry.
 //!
@@ -28,12 +28,12 @@
 //! formats only.
 //!   - u64 (byte-32 == 0x33) / big-endian → error.Unsupported (mirrors sas7bdat.zig).
 //!   - SAS "special missing" numeric keys (.A–.Z / ._ / plain .) decode to the
-//!     matching missing Value — the stored double is the sas7bdat on-disk NaN
+//!     matching missing Value - the stored double is the sas7bdat on-disk NaN
 //!     (0xFFFF<~ascii>00…) bitwise-NOTed, so BE byte 2 is the ASCII letter
 //!     itself; format.zig matches a missing value against such a key bit-exactly
-//!     (NOTE-sas7bcatspecialmiss — was silently DROPPED, wrong label for .A–.Z).
+//!     (NOTE-sas7bcatspecialmiss - was silently DROPPED, wrong label for .A–.Z).
 //!   - PICTURE/INFORMAT/JUST entries carry no value-label payload here, so they
-//!     simply contribute no entries — never mis-decoded.
+//!     simply contribute no entries - never mis-decoded.
 
 const std = @import("std");
 const format = @import("format.zig");
@@ -69,7 +69,7 @@ pub fn read(a: std.mem.Allocator, bytes: []const u8) Error![]const format.UserFm
 
     // Collect block pointers ((page<<32)|pos) from the XLSR index. The index
     // lives on page 1; later pages (from index 3) may hold more (marked "XLSR"
-    // at +16) — the corpus catalog fits page 1, but the sweep is cheap.
+    // at +16) - the corpus catalog fits page 1, but the sweep is cheap.
     var bptrs: std.ArrayList(u64) = .empty;
     defer bptrs.deinit(a);
     {
@@ -93,7 +93,7 @@ pub fn read(a: std.mem.Allocator, bytes: []const u8) Error![]const format.UserFm
         const block = try readBlock(a, bytes, header_size, page_size, page_count, start_page, start_pos, &catalog_work_bytes);
         if (parseBlock(a, block) catch |e| switch (e) {
             error.OutOfMemory => return error.OutOfMemory,
-            else => return error.Unsupported, // malformed block — fail loud
+            else => return error.Unsupported, // malformed block - fail loud
         }) |uf| try cats.append(a, uf);
     }
     return cats.toOwnedSlice(a);
@@ -262,7 +262,7 @@ fn rd32(b: []const u8, o: usize) usize {
 
 test "read formats.sas7bcat: matches pyreadstat oracle exactly (GH#34)" {
     // Oracle (pyreadstat.read_sas7bcat): $GENDER {f:Female, m:Male},
-    // WORKSHOP {1.0:R, 2.0:SAS}. A REAL haven-authored catalog — it cannot share
+    // WORKSHOP {1.0:R, 2.0:SAS}. A REAL haven-authored catalog - it cannot share
     // a wrong offset assumption with this reader (the sas7bdat GH#31 lesson).
     const t = std.testing;
     const bytes = @embedFile("testdata/formats.sas7bcat");
@@ -272,7 +272,7 @@ test "read formats.sas7bcat: matches pyreadstat oracle exactly (GH#34)" {
 
     try t.expectEqual(@as(usize, 2), cats.len);
 
-    // $GENDER — char keys.
+    // $GENDER - char keys.
     const g = cats[0];
     try t.expectEqualStrings("GENDER", g.name);
     try t.expect(g.is_char);
@@ -282,7 +282,7 @@ test "read formats.sas7bcat: matches pyreadstat oracle exactly (GH#34)" {
     try t.expectEqualStrings("m", g.entries[1].skey);
     try t.expectEqualStrings("Male", g.entries[1].label);
 
-    // WORKSHOP — numeric keys (1→R, 2→SAS), stored big-endian & negated.
+    // WORKSHOP - numeric keys (1→R, 2→SAS), stored big-endian & negated.
     const w = cats[1];
     try t.expectEqualStrings("WORKSHOP", w.name);
     try t.expect(!w.is_char);

@@ -1,5 +1,5 @@
 /* GAP-tabulateopts (QA tick176): the 2-way CROSS path (runTabulateCross) also
-   honors ORDER=/LABEL/KEYLABEL and the TABLE `/ box='…'` corner text — a distinct
+   honors ORDER=/LABEL/KEYLABEL and the TABLE `/ box='…'` corner text - a distinct
    code path from the 1-way fixture (tab_order_label). ORDER=DATA keeps the row
    levels in first-appearance order (a then b); LABEL heads the row column; KEYLABEL
    renames the Sum heading under every column-class level; box fills the corner. */

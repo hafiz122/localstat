@@ -1,13 +1,13 @@
 /* BUG-sumvarorderinput: a sum statement FOLLOWING an INPUT does not hoist its
    accumulator ahead of the INPUT's variables. Verified already conformant at
    8805ad49 (which moved the auto `retain v 0;` from a step-TOP hoist to right
-   after the sum statement); this fixture exists because NOTHING pinned it —
+   after the sum statement); this fixture exists because NOTHING pinned it -
    the raw-INPUT half of the ordering rule had no corpus coverage, so it could
    regress silently.
 
    REPORT 1 pins the Language Reference: Concepts Chapter 20 rule ("Processing
    a DATA Step: A Walk-through", printed p.481, page marker verified). The
-   source order there is INPUT first, sum statement second — which is the
+   source order there is INPUT first, sum statement second - which is the
    deciding detail, since the whole question is first-mention ORDER. Its
    Figure 20.6 / Figure 20.8 print the result with the accumulator as the LAST
    column, after every INPUT variable, and the drop= variable gone. The same
@@ -18,7 +18,7 @@
    by the order in which the variables are defined in the DATA step").
    Report 3 is the minimal repro shape from the ticket.
 
-   REPORT 4 IS THE CONVERSE AND IT IS *NOT* DOC-SETTLED — pinned to make the
+   REPORT 4 IS THE CONVERSE AND IT IS *NOT* DOC-SETTLED - pinned to make the
    asymmetry visible, NOT to bless it. With the sum statement BEFORE the INPUT,
    opensas still emits `Runner Pts Cnt`; p.47's textual rule argues for
    `Cnt Runner Pts`, the way `retain t 0; set a;` orders t first. The 9.4

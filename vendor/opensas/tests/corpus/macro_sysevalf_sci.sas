@@ -1,5 +1,5 @@
 /* %sysevalf handles floating-point scientific notation (e/E with optional sign),
-   not just plain decimals — regression guard for BUG-sysevalfsci. */
+   not just plain decimals - regression guard for BUG-sysevalfsci. */
 %let a = %sysevalf(1e10);
 %let b = %sysevalf(2 + 1e3);
 %let c = %sysevalf(1.5e3);

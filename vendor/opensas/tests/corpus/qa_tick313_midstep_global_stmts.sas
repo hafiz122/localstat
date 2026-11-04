@@ -1,9 +1,9 @@
-/* QA tick312 F2 / GAP-globalpredicatemismatch — POSITIVE CONTROL: a global
+/* QA tick312 F2 / GAP-globalpredicatemismatch - POSITIVE CONTROL: a global
    statement that top level accepts (hoisted TITLE/FOOTNOTE/OPTIONS, or the
-   batch-unobservable inert set) must be accepted MID-PROC too — real SAS
+   batch-unobservable inert set) must be accepted MID-PROC too - real SAS
    executes global statements wherever they appear. Pre-fix the PROC statement
    loops used parser.isGlobalKw as their skip predicate while the hoist used
-   main.isMidStepGlobal and open code used main.isInertOpenCode — three
+   main.isMidStepGlobal and open code used main.isInertOpenCode - three
    disagreeing keyword lists (D-014a): GOPTIONS/SASFILE/PAGE/DM mid-PROC were
    "not supported" at exit 2 (fatal inside, harmless outside), while
    ODS/LIBNAME/FILENAME mid-PROC were silently skipped but never executed

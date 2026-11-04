@@ -1,4 +1,4 @@
-/* qa tick143 — verified-correct GREEN regression: PROC FREQ two-way crosstab
+/* qa tick143 - verified-correct GREEN regression: PROC FREQ two-way crosstab
    with WEIGHT (freq/row-pct/col-pct/total math) and a WHERE stmt referencing a
    column named like a keyword ("id"), which PROC FREQ parses correctly (the
    keyword-as-identifier collision is PROC-PRINT/REPORT-specific, not FREQ).

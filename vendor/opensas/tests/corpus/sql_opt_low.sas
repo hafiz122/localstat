@@ -6,7 +6,7 @@ data d;
   do i = 1 to 3; x = i * 10; output; end;
 run;
 
-/* F5 NOPRINT — no listing from either select; &m proves the rows were still
+/* F5 NOPRINT - no listing from either select; &m proves the rows were still
    computed and INTO still bound the macro var. */
 proc sql noprint;
   select max(x) into :m from d;
@@ -28,12 +28,12 @@ proc sql;
   select i from d;
 quit;
 
-/* F6 NUMBER — the listing carries a leading Row column. */
+/* F6 NUMBER - the listing carries a leading Row column. */
 proc sql number;
   select i, x from d;
 quit;
 
-/* F7 FEEDBACK — the star-expanded statement is echoed before the listing. */
+/* F7 FEEDBACK - the star-expanded statement is echoed before the listing. */
 proc sql feedback;
   select * from d;
 quit;

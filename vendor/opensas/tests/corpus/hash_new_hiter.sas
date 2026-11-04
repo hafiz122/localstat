@@ -1,5 +1,5 @@
-/* GAP-hashnewhiter (Language Reference: Concepts p.624): `hi = _new_ hiter('h');` — the two-step
-   iterator instantiation — must produce the identical object the
+/* GAP-hashnewhiter (Language Reference: Concepts p.624): `hi = _new_ hiter('h');` - the two-step
+   iterator instantiation - must produce the identical object the
    `declare hiter hi('h');` one-step form produces. Pinned side by side. */
 data _null_;
   length k d 8;

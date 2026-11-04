@@ -1,6 +1,6 @@
 /* BUG-dateblanksep + BUG-inputdatestmtblank: the DATEw./MMDDYYw./DDMMYYw./YYMMDDw.
-   informats accept BLANK-separated components — `16 mar 2012` under date11.,
-   `03 15 2012` under mmddyy10. — as well as the packed and `/`-separated forms.
+   informats accept BLANK-separated components - `16 mar 2012` under date11.,
+   `03 15 2012` under mmddyy10. - as well as the packed and `/`-separated forms.
    Hand-verified SAS days (days since 01JAN1960 = 0, cross-checked with `date -u`):
      15MAR2012 = 19067   16MAR2012 = 19068
    `16 mar 12` (2-digit year) lands on 2012 via YEARCUTOFF=1926. */

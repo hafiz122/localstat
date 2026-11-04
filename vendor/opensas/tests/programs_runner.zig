@@ -6,12 +6,12 @@
 //! `sas` binary there (cwd = the fixture dir, so the program's
 //! `libname source "inputs"` / `libname target "output"` resolve), then
 //! structurally diffs every `expected/*.csv` against the produced `output/*.csv`
-//! — column names + order, row count, and cell values (numeric-normalized, so
-//! `40` == `40.0`) — not a byte diff. Prints `programs: P/Q passing`.
+//! - column names + order, row count, and cell values (numeric-normalized, so
+//! `40` == `40.0`) - not a byte diff. Prints `programs: P/Q passing`.
 //!
 //! Every `program.sas`'s exit code is checked. One that exits non-zero must
 //! declare it with an `expect-rc: N` marker in its header comment; NO MARKER
-//! MEANS 0. This suite needed no migration when the default flipped — it had
+//! MEANS 0. This suite needed no migration when the default flipped - it had
 //! two non-zero programs and both were already pinned (see `fixture_rc.zig`).
 //!
 //! It IS a gate (like the corpus runner): it exits 1 when any fixture fails.
@@ -62,7 +62,7 @@ pub fn main(init: std.process.Init) !void {
         total += 1;
 
         if (try runProgram(gpa, io, bin, pdir, programs_dir, entry.name, src)) |reason| {
-            std.debug.print("  {s}: FAIL — {s}\n", .{ entry.name, reason });
+            std.debug.print("  {s}: FAIL - {s}\n", .{ entry.name, reason });
         } else {
             pass += 1;
         }
@@ -111,7 +111,7 @@ fn runProgram(gpa: std.mem.Allocator, io: Io, bin: []const u8, pdir: Io.Dir, pro
 
 /// Spawn the child, retrying transient failures: on a cold cache the runner
 /// races the still-parallel build, and the freshly-linked `sas` exe can be
-/// briefly missing/unexecutable at spawn time (INFRA-programsflake — the
+/// briefly missing/unexecutable at spawn time (INFRA-programsflake - the
 /// first-run ~129/168 flake). Back off and retry before calling it a failure.
 /// ponytail: fixed 10×100ms = 1s worst case per program; raise if it ever
 /// flakes on a genuinely slower machine.
@@ -133,7 +133,7 @@ fn runWithRetry(gpa: std.mem.Allocator, io: Io, bin: []const u8, dir_path: []con
 
 /// Structural CSV diff. Returns null when the tables match (header names
 /// case-insensitively, in order; same row count; cell values, numeric-aware),
-/// else a reason. Not a byte diff — quoting/line-endings/numeric spelling don't
+/// else a reason. Not a byte diff - quoting/line-endings/numeric spelling don't
 /// matter, only the parsed structure.
 /// ponytail: naive header case-insensitivity + numeric normalization; no format
 /// awareness (e.g. `1e2` vs `100` matches, `01JAN2020` vs a serial would not).

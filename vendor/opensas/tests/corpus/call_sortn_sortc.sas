@@ -1,4 +1,4 @@
-/* QA r24: CALL SORTN / CALL SORTC uncovered surface — in-place ascending sort of
+/* QA r24: CALL SORTN / CALL SORTC uncovered surface - in-place ascending sort of
    the argument list. Numeric missing sorts first; char sorts by collation.
    Verified against SAS 9.4. */
 data _null_;

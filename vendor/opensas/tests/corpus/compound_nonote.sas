@@ -1,5 +1,5 @@
 /* GAP-compoundnonote: out-of-range COMPOUND args now log the invalid-argument
-   NOTE (Functions and CALL Routines: Reference p.544) and return missing — the
+   NOTE (Functions and CALL Routines: Reference p.544) and return missing - the
    NOTE is on stderr, so it is asserted via captured diagnostics in numfns.zig's
    test block; this fixture pins that the RESULTS are missing and valid calls are
    unchanged. The valid call keeps the manual's printed arguments because its

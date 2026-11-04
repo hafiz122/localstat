@@ -1,5 +1,5 @@
 /* BUG-meansstmtreplace: in PROC MEANS/SUMMARY a REPEATED VAR / CLASS / BY / ID
-   statement REPLACES the prior one (SAS 9.4: last statement wins) — opensas used
+   statement REPLACES the prior one (SAS 9.4: last statement wins) - opensas used
    to APPEND, so `var a; var b;` analyzed BOTH a and b and `class x; class y;`
    kept both class vars (extra _TYPE_ levels). Step 1 must analyze ONLY b; step 2
    must group by ONLY y (one _TYPE_=1 level, no x levels); step 3 proves the

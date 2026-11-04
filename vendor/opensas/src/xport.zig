@@ -1,18 +1,18 @@
-//! XPORT v5 (`.xpt`) reader — the openly-documented SAS Transport file format
+//! XPORT v5 (`.xpt`) reader - the openly-documented SAS Transport file format
 //! (TS-140). A stream of 80-byte header records framing byte-packed descriptor
 //! and observation data:
 //!
 //!   LIBRARY header  (80) + 2 real header records (160)
-//!   MEMBER  header  (80)  — NAMESTR size (140) at offset 74
+//!   MEMBER  header  (80)  - NAMESTR size (140) at offset 74
 //!   DSCRPTR header  (80)
 //!   member descriptor     (2 records, 160)
-//!   NAMESTR header  (80)  — variable count at offset 54
+//!   NAMESTR header  (80)  - variable count at offset 54
 //!   NAMESTR records       (nvars × 140 bytes, contiguous, padded to 80)
 //!   OBS     header  (80)
 //!   observations          (obs_len bytes each, to the next member header
 //!                          or EOF, padded to 80)
 //!
-//! …and that MEMBER…OBS block may REPEAT — a transport file is a library.
+//! …and that MEMBER…OBS block may REPEAT - a transport file is a library.
 //!
 //! A NAMESTR gives each variable's type (1=numeric, 2=char), length, 8-char
 //! name, 40-char label, and format/informat (8-char name + width + decimals):
@@ -42,7 +42,7 @@ const Var = struct {
 };
 
 /// ponytail: NotXport doubles as the writer's loud-refusal tag (a specific
-/// ERROR is reported first) — main's write path switches on exactly these two.
+/// ERROR is reported first) - main's write path switches on exactly these two.
 pub const Error = error{ NotXport, OutOfMemory };
 
 /// Parse an XPORT v5 file into a Dataset named `name`.
@@ -59,7 +59,7 @@ pub fn read(a: std.mem.Allocator, bytes: []const u8, name: []const u8) Error!*Da
     const nvars = parseNum(bytes[p + 54 .. p + 58]) orelse return error.NotXport;
     p += 80;
 
-    // NAMESTR records — a contiguous stream of `nvars` × `namestr_size` bytes.
+    // NAMESTR records - a contiguous stream of `nvars` × `namestr_size` bytes.
     const vars = try a.alloc(Var, nvars);
     var obs_len: usize = 0;
     for (0..nvars) |i| {
@@ -97,14 +97,14 @@ pub fn read(a: std.mem.Allocator, bytes: []const u8, name: []const u8) Error!*Da
     if (obs_len == 0) return ds;
 
     // F7(b): the observation section ends at the NEXT member's header. The V5
-    // format is a LIBRARY — repeated MEMBER sections are legal — and sections
+    // format is a LIBRARY - repeated MEMBER sections are legal - and sections
     // are 80-aligned, so a following member starts with a "HEADER RECORD***…"
     // signature on an 80-byte boundary. Without this bound the walk decoded
     // member 2's headers as garbage observations appended to member 1 (the
     // trailing blank padding is shorter than one obs record, so the all-blank
     // break never fired). Member 1 reads back with exactly its own rows;
     // exposing later members as datasets is not supported (one member per
-    // libref file — the same line as the writer).
+    // libref file - the same line as the writer).
     var obs_end = bytes.len;
     var b = p;
     while (b + 20 <= bytes.len) : (b += 80) {
@@ -133,11 +133,11 @@ pub fn read(a: std.mem.Allocator, bytes: []const u8, name: []const u8) Error!*Da
         try ds.rows.append(a, cells);
     }
     // GAP-xportio-low F13: a non-blank tail after the last full observation
-    // is a TRUNCATED/damaged file — v5 carries no observation count, so a cut
+    // is a TRUNCATED/damaged file - v5 carries no observation count, so a cut
     // landing exactly on a record boundary is format-undetectable, but a
     // partial trailing record is real damage. Fail LOUD (the libname load
     // path renders NotXport as "damaged or truncated", NOTE-truncreadmsg)
-    // instead of silently returning the surviving rows. Basis: HOUSE RULE —
+    // instead of silently returning the surviving rows. Basis: HOUSE RULE -
     // TS-140 is silent on truncation. The all-blank break stays unchecked:
     // an all-zero-numeric observation is all-zero bytes, genuinely ambiguous
     // with padding in v5 (ponytail ceiling, pre-existing).
@@ -146,7 +146,7 @@ pub fn read(a: std.mem.Allocator, bytes: []const u8, name: []const u8) Error!*Da
     return ds;
 }
 
-/// Serialize a Dataset to XPORT v5 bytes — the inverse of `read`, byte-compatible
+/// Serialize a Dataset to XPORT v5 bytes - the inverse of `read`, byte-compatible
 /// with it (and with SAS PROC CIMPORT / the FDA submission format). A char var's
 /// NAMESTR length is its DECLARED length (Column.len from a LENGTH statement);
 /// with no declaration the widest value stands in (min 1, BUG-xportmeta). Label,
@@ -161,7 +161,7 @@ pub fn write(a: std.mem.Allocator, ds: *const Dataset) Error![]const u8 {
 /// (BUG-xportwritefidelity): truncation WARNINGs, the out-of-range NOTE and
 /// the refusal ERRORs land in `diags` (tests capture the reporter); with null
 /// they print to stderr, SAS-log style. A REFUSED write (name collision, char
-/// length > 32767) reports the ERROR and returns NotXport — no partial file.
+/// length > 32767) reports the ERROR and returns NotXport - no partial file.
 pub fn writeReport(a: std.mem.Allocator, ds: *const Dataset, diags: ?*diag.Diagnostics) Error![]const u8 {
     const nvars = ds.columns.items.len;
     // per-var length + position; numerics 8, chars = declared length (≥ data max)
@@ -176,9 +176,9 @@ pub fn writeReport(a: std.mem.Allocator, ds: *const Dataset, diags: ?*diag.Diagn
                 mx = @max(mx, trimTrail(row[i].str).len);
             };
             // declared char LENGTH wins (BUG-xportmeta); the data max can only
-            // ever WIDEN it — a value wider than declared must not truncate.
+            // ever WIDEN it - a value wider than declared must not truncate.
             lens[i] = @max(c.len orelse 0, mx);
-            // F5: nlng is a u16 NAMESTR field and SAS caps char vars at 32767 —
+            // F5: nlng is a u16 NAMESTR field and SAS caps char vars at 32767 -
             // refuse LOUDLY instead of @intCast-panicking the process.
             if (lens[i] > 32767) {
                 loud(diags, .err, "XPORT: variable '{s}' has length {d}, over the V5 transport maximum character length 32767", .{ c.name, lens[i] });
@@ -186,15 +186,15 @@ pub fn writeReport(a: std.mem.Allocator, ds: *const Dataset, diags: ?*diag.Diagn
             }
         }
         obs_len += lens[i];
-        // F3: names >8 truncate to the 8-char NAMESTR field — warn per
+        // F3: names >8 truncate to the 8-char NAMESTR field - warn per
         // truncation, and REFUSE when two variables collapse to the same field
         // (the file would silently merge them; one var's data would vanish).
-        // ponytail: O(n²) pair scan — nvars is a 4-digit field, tiny.
+        // ponytail: O(n²) pair scan - nvars is a 4-digit field, tiny.
         if (c.name.len > 8)
             loud(diags, .warning, "XPORT: variable name '{s}' truncated to 8 characters ('{s}')", .{ c.name, c.name[0..8] });
         for (ds.columns.items[0..i]) |p| {
             if (std.ascii.eqlIgnoreCase(p.name[0..@min(8, p.name.len)], c.name[0..@min(8, c.name.len)])) {
-                loud(diags, .err, "XPORT: variables '{s}' and '{s}' share the 8-character NAMESTR name '{s}' — refusing to write a file that would merge them", .{ p.name, c.name, c.name[0..@min(8, c.name.len)] });
+                loud(diags, .err, "XPORT: variables '{s}' and '{s}' share the 8-character NAMESTR name '{s}' - refusing to write a file that would merge them", .{ p.name, c.name, c.name[0..@min(8, c.name.len)] });
                 return error.NotXport;
             }
         }
@@ -218,19 +218,19 @@ pub fn writeReport(a: std.mem.Allocator, ds: *const Dataset, diags: ?*diag.Diagn
     try rec80(a, &buf, try std.fmt.allocPrint(a, "SAS     {s}SASDATA 9.4     openSAS                          {s}", .{ mem, dt }));
     try rec80(a, &buf, dt ++ (" " ** 64));
 
-    // NAMESTR header — 4-digit variable count at offset 54
+    // NAMESTR header - 4-digit variable count at offset 54
     try rec80(a, &buf, try std.fmt.allocPrint(a, "HEADER RECORD*******NAMESTR HEADER RECORD!!!!!!!000000{d:0>4}00000000000000000000  ", .{nvars}));
 
     // NAMESTR records: 140 bytes each (type, length, name, label, format,
-    // informat, position — the TS-140 offsets in the file-top comment)
+    // informat, position - the TS-140 offsets in the file-top comment)
     const namestr_start = buf.items.len;
     var pos: usize = 0;
     for (ds.columns.items, 0..) |c, i| {
         var ns = [_]u8{0} ** 140;
-        // GAP-xportio-low F12: TS-140's text fields are blank-padded ASCII —
+        // GAP-xportio-low F12: TS-140's text fields are blank-padded ASCII -
         // a REAL SAS 9.1 NAMESTR (tests/programs/xport_read/inputs/te.xpt,
         // XP_PRO) blank-pads nlabel/nform/niform even when unset; only the
-        // 88..140 tail is NUL. We NUL-padded all three — readable here, but
+        // 88..140 tail is NUL. We NUL-padded all three - readable here, but
         // strict validators (Pinnacle 21, the actual submission gate) can
         // flag NUL text fields. Seed the three text fields to blanks; the
         // value writes below overwrite them.
@@ -245,8 +245,8 @@ pub fn writeReport(a: std.mem.Allocator, ds: *const Dataset, diags: ?*diag.Diagn
         @memcpy(ns[8..16], &nm);
         if (c.label) |l| { // nlabel: ≤40, blank-padded (v5 truncates longer)
             @memcpy(ns[16 .. 16 + @min(40, l.len)], l[0..@min(40, l.len)]);
-            // GAP-xportio-low F11: a >40 label truncates — format-forced (the
-            // v5 nlabel field IS 40; SAS labels run to 256) — but never
+            // GAP-xportio-low F11: a >40 label truncates - format-forced (the
+            // v5 nlabel field IS 40; SAS labels run to 256) - but never
             // silently: same loud WARNING pattern as F3 names. House rule:
             // TS-140 does not say whether CPORT warns, and silent alteration
             // is the worst failure class.
@@ -286,7 +286,7 @@ pub fn writeReport(a: std.mem.Allocator, ds: *const Dataset, diags: ?*diag.Diagn
             }
         }
     }
-    // F2: ONE note per file, not one per cell — the values rode out as plain
+    // F2: ONE note per file, not one per cell - the values rode out as plain
     // missing, never exponent-wrapped to the opposite extreme.
     if (out_of_range > 0)
         loud(diags, .note, "XPORT: {d} numeric value(s) outside the IBM S/360 float range were written as missing", .{out_of_range});
@@ -309,7 +309,7 @@ fn putBe16(b: []u8, v: u16) void {
 
 /// Split an opensas format spec ("DOLLAR10.2", "$3.") into the NAMESTR triple:
 /// 8-byte blank-padded name (char formats keep their `$`), width, decimals.
-/// Names >8 chars truncate — the v5 field's own limit; returns true then so the
+/// Names >8 chars truncate - the v5 field's own limit; returns true then so the
 /// caller can WARN (F3).
 fn putFmt(name_f: []u8, w_f: []u8, d_f: []u8, spec_text: []const u8) bool {
     const s = format.parseSpec(spec_text);
@@ -343,7 +343,7 @@ fn putBe32(b: []u8, v: u32) void {
 }
 
 /// One loud diagnostic from the writer: into `diags` when a reporter is
-/// threaded (tests capture it — never spawn an aborting process in a test),
+/// threaded (tests capture it - never spawn an aborting process in a test),
 /// else to stderr SAS-log style (main renders its own diags there too, and the
 /// corpus diffs stdout only). Never silent.
 fn loud(diags: ?*diag.Diagnostics, sev: diag.Severity, comptime fmt: []const u8, args: anytype) void {
@@ -355,10 +355,10 @@ fn loud(diags: ?*diag.Diagnostics, sev: diag.Severity, comptime fmt: []const u8,
 }
 
 /// f64 → 8-byte IBM System/360 hex float (the inverse of `ibmToValue`). A missing
-/// value writes its TS-140 indicator in byte 0 with a zero mantissa — `.` for a
+/// value writes its TS-140 indicator in byte 0 with a zero mantissa - `.` for a
 /// plain missing, the `_`/`A`–`Z` letter of a special missing (F1; the reader
 /// already decodes these). 0 is all-zero bytes. Returns true when `v` falls
-/// outside the S/360 range (biased exponent 0..127) — byte 0 is then `.`
+/// outside the S/360 range (biased exponent 0..127) - byte 0 is then `.`
 /// (missing) and the caller logs ONE note per file (F2): masking the exponent
 /// would silently wrap 1e300 into 5.5e-9 baked into the file.
 fn valueToIbm(out: *[8]u8, v: Value) bool {
@@ -373,7 +373,7 @@ fn valueToIbm(out: *[8]u8, v: Value) bool {
         return false;
     }
     if (x == 0) return false; // all-zero bytes
-    if (!std.math.isFinite(x)) { // ±Inf — outside the S/360 range (F2)
+    if (!std.math.isFinite(x)) { // ±Inf - outside the S/360 range (F2)
         out[0] = '.';
         return true;
     }
@@ -387,7 +387,7 @@ fn valueToIbm(out: *[8]u8, v: Value) bool {
         e += 1;
     }
     const biased = e + 64;
-    if (biased < 0 or biased > 127) { // F2: guard BEFORE the field write — never mask
+    if (biased < 0 or biased > 127) { // F2: guard BEFORE the field write - never mask
         out[0] = '.';
         return true;
     }
@@ -549,7 +549,7 @@ test "XPORT write: in-range IBM floats stay exact, out-of-range NOTE + missing (
     try t.expect(!valueToIbm(&f, .{ .num = 0.5 }));
     try t.expectEqual([8]u8{ 0x40, 0x80, 0, 0, 0, 0, 0, 0 }, f);
 
-    // out-of-range: flagged, written as plain missing — never exponent-wrapped
+    // out-of-range: flagged, written as plain missing - never exponent-wrapped
     for ([_]f64{ 1e300, -1e300, 1e-300, std.math.inf(f64), -std.math.inf(f64) }) |x| {
         try t.expect(valueToIbm(&f, .{ .num = x }));
         try t.expectEqual([8]u8{ '.', 0, 0, 0, 0, 0, 0, 0 }, f);
@@ -586,7 +586,7 @@ test "XPORT write: 8-char name truncation warns, collision refuses (F3)" {
     try t.expect(diags.hasErrors());
     try t.expect(std.mem.indexOf(u8, diags.list.items[diags.count() - 1].message, "merge") != null);
 
-    // truncation alone: WARNING, the write still succeeds — no merge
+    // truncation alone: WARNING, the write still succeeds - no merge
     var ds2 = Dataset.init(a, "d");
     _ = try ds2.addColumn("longname01", .num);
     _ = try ds2.addColumn("ok", .num);
@@ -625,7 +625,7 @@ test "XPORT write: char length > 32767 refuses loudly, never panics (F5)" {
 
     var ds = Dataset.init(a, "d");
     _ = try ds.addColumn("big", .char);
-    ds.setLen("big", 70000); // over the SAS 32767 char cap — was an @intCast panic
+    ds.setLen("big", 70000); // over the SAS 32767 char cap - was an @intCast panic
     try ds.appendRow(&.{.{ .str = "x" }});
     var diags = diag.Diagnostics.init(a);
     try t.expectError(error.NotXport, writeReport(a, &ds, &diags));
@@ -633,7 +633,7 @@ test "XPORT write: char length > 32767 refuses loudly, never panics (F5)" {
     try t.expect(std.mem.indexOf(u8, diags.list.items[0].message, "32767") != null);
 }
 
-test "XPORT read stops at the member boundary — member 1 exact, no garbage rows (F7)" {
+test "XPORT read stops at the member boundary - member 1 exact, no garbage rows (F7)" {
     const t = std.testing;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
@@ -674,7 +674,7 @@ test "XPORT read: a truncated file's partial trailing record is LOUD, never part
     const a = arena.allocator();
 
     // 100 rows × 2 numerics → obs_len 16, 1600 bytes (80-aligned, no padding).
-    // The bytes are our own writer's — truncating VALID bytes cannot mirror a
+    // The bytes are our own writer's - truncating VALID bytes cannot mirror a
     // writer bug; the assertion is purely about the reader refusing a cut.
     var ds = Dataset.init(a, "big");
     _ = try ds.addColumn("i", .num);
@@ -684,13 +684,13 @@ test "XPORT read: a truncated file's partial trailing record is LOUD, never part
     const obs_start = bytes.len - 1600;
 
     // cut 5 bytes INTO the 100th observation (its IBM-float bytes are
-    // non-blank): the whole READ fails — the surviving 99 rows are never
+    // non-blank): the whole READ fails - the surviving 99 rows are never
     // silently returned as if complete (the audit's repro: 100 rows cut to
     // 2/3 → 45 rows, exit 0).
     try t.expectError(error.NotXport, read(a, bytes[0 .. obs_start + 99 * 16 + 5], "big"));
 
     // a cut exactly on a record boundary is format-undetectable (v5 has no
-    // observation count) — pinned as the known ceiling, not a feature
+    // observation count) - pinned as the known ceiling, not a feature
     const back = try read(a, bytes[0 .. obs_start + 99 * 16], "big");
     try t.expectEqual(@as(usize, 99), back.rows.items.len);
 
@@ -704,7 +704,7 @@ test "XPORT write: unset NAMESTR text fields are blank-padded like a real SAS NA
     defer arena.deinit();
     const a = arena.allocator();
 
-    // Byte basis: tests/programs/xport_read/inputs/te.xpt — a REAL SAS 9.1
+    // Byte basis: tests/programs/xport_read/inputs/te.xpt - a REAL SAS 9.1
     // (XP_PRO) transport file, not our own writer's output: unset
     // nlabel/nform/niform are BLANK-padded, only the 88..140 tail is NUL.
     var ds = Dataset.init(a, "d");

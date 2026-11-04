@@ -1,7 +1,7 @@
 /* PERF-sqlcommajoin correctness fixture: a comma-join whose equijoin predicates
    sit in WHERE must hash-join via the pushed col=col conjuncts (was: the full
-   cartesian product materialized before the WHERE filter — O(N^2)/O(N^3)
-   time+RAM). Pure optimization — rows + order must be byte-identical to the
+   cartesian product materialized before the WHERE filter - O(N^2)/O(N^3)
+   time+RAM). Pure optimization - rows + order must be byte-identical to the
    old nested-loop path. Covers: duplicate keys both sides (bucket order),
    keys present on one side only (dropped), a residual non-equality WHERE term
    (partial push), a 3-way chain, char keys, and missing=missing matches.

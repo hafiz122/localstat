@@ -1,5 +1,5 @@
 /* BUG-epochoverproduce triage fixture: the full EPOCH-derivation pipeline shape
-   end-to-end on synthetic data — CALL SYMPUT -> %do bound, six prefixed/id
+   end-to-end on synthetic data - CALL SYMPUT -> %do bound, six prefixed/id
    transposes, dtc2dt full+dead partial-date branches (compile-time PDV vars),
    SE-window %do-OUTPUT matching, and the three-key OBSID merge. Exactly one
    output row per event, correct EPOCH each. This chain took five dominoes

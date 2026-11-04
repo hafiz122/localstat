@@ -1,6 +1,6 @@
 /* doc-finder tick151: regression guard for CHARACTER-family edge behaviors
    verified SAS-9.4-correct during the tick151 audit (positions, blank/length
-   handling, quoting). NOT a bug repro — these all match the SAS Functions
+   handling, quoting). NOT a bug repro - these all match the SAS Functions
    Reference; pins them so a refactor can't silently regress them. */
 data _null_;
   /* SUBSTRN: positions outside [1,len] are ignored, window still counts */

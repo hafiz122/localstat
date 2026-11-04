@@ -1,5 +1,5 @@
 /* GAP-inoperators (2/3): the right operand of IN may be an ARRAY NAME instead
-   of a parenthesised value list — "You can also use the IN operator to search
+   of a parenthesised value list - "You can also use the IN operator to search
    an array" (Language Reference: Concepts p.128 numeric, p.130 character). The test is membership over
    the array's ELEMENTS, so it is the same OR-of-equalities the list form
    desugars to; element order cannot matter and a NOT IN is the AND of the
@@ -7,15 +7,15 @@
 
    The first two steps pin the shape Language Reference: Concepts illustrates at
    Example Code 6.2 / 6.3: probe a value the array lacks (0), assign it to one
-   element, probe again (1) — once for a numeric array, once for a character
-   array. 6.2's `array a{10} (2*1:5)` repeat-of-a-range init is not used here —
+   element, probe again (1) - once for a numeric array, once for a character
+   array. 6.2's `array a{10} (2*1:5)` repeat-of-a-range init is not used here -
    that init syntax is a separate gap, not this one.
 
    Edge cases pinned below: a probe that matches nothing, a _temporary_ array
    (anonymous members), a missing probe against a missing element, and IN: over
    an array. `x in <name-that-is-not-an-array>` stays the loud "expected '('
    after IN", and an `array v{*} _numeric_` right operand is loud too (its
-   members are a runtime fact) — both are captured-diagnostics tests in
+   members are a runtime fact) - both are captured-diagnostics tests in
    parser_expr.zig. */
 
 /* numeric array: probe absent, then present after an element assignment */
@@ -61,7 +61,7 @@ data _null_;
   array names{2} $4 ('LUKA','PERO');
   hasmiss = . in gaps;      /* missing = missing, so a missing probe is found */
   nomiss  = 6 in gaps;
-  pfx     = 'LU' in: names;  /* IN: over an array — prefix compare per element */
+  pfx     = 'LU' in: names;  /* IN: over an array - prefix compare per element */
   nopfx   = 'QQ' in: names;
   put hasmiss= nomiss= pfx= nopfx=;
 run;

@@ -6,7 +6,7 @@
    existing informats for the variables in variable-list".
    Pins: ONE trailing spec applies to EVERY listed var (a and b get 8.2), a
    spec-less statement strips (c loses COMMA8.), and a var the statement
-   never lists keeps its informat (d keeps BEST12.) — while the Format
+   never lists keeps its informat (d keeps BEST12.) - while the Format
    column stays as the DATA step left it throughout. CONTENTS pins the
    Informat column. The loud paths (unknown variable rc 1, statement outside
    a MODIFY RUN group rc 2) live in proc.zig's unit test. */

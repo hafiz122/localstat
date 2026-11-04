@@ -1,6 +1,6 @@
 /* BUG-univnmissweightbasis: the missing count's EXCLUSION BASIS with a WEIGHT
    variable. Base SAS 9.4 Procedures Guide: Statistical Procedures, printed
-   p.408 (`=== pdf 411 ===`, offset +3, running header FOLLOWS the marker —
+   p.408 (`=== pdf 411 ===`, offset +3, running header FOLLOWS the marker -
    D-020) carries TWO DIFFERENT exclusion lists:
 
      list 1 (the ANALYSIS):  FREQ missing-or-nonpositive and WEIGHT missing
@@ -10,7 +10,7 @@
                              EXCLNPWGT**.
 
    So without EXCLNPWGT an obs with a missing WEIGHT leaves the analysis (N)
-   but stays in the count basis — and a PRESENT value there is not missing.
+   but stays in the count basis - and a PRESENT value there is not missing.
    `nmiss = total - N` is correct in every other case and wrong exactly here:
    it counts row 7 below (x=7 present, wt missing) as missing → 5, not 4.
    The fix counts missing analysis cells directly; the basis's own
@@ -24,7 +24,7 @@
      * WEIGHT, no EXCLNPWGT  (THE BUG)  -> n=3 nmiss=4   (was nmiss=5: row 7's
         x=7 is present; N drops it, the basis does not; 3+4=7 != 8 is the
         doc's own asymmetry, not an arithmetic slip)
-     * WEIGHT + EXCLNPWGT (via MEANS — UNIVARIATE rejects the option loud,
+     * WEIGHT + EXCLNPWGT (via MEANS - UNIVARIATE rejects the option loud,
        a separate gap)                -> n=2 nmiss=2, _FREQ_=4 (rows leave
         the denominator entirely; unchanged by the fix)
      * nonpositive WEIGHT both ways    -> in the same columns: x=3/wt=0 stays

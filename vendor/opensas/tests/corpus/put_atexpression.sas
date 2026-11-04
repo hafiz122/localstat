@@ -1,4 +1,4 @@
-/* GAP-atexpression-put: PUT `@(expression)` column pointer — the PUT twin of
+/* GAP-atexpression-put: PUT `@(expression)` column pointer - the PUT twin of
    INPUT's form landed by GAP-atexpression.
 
    Statements printed p.269 (PDF index = printed + 11; the entry sits on pdf
@@ -8,11 +8,11 @@
    truncates the decimal value and uses only the integer value. If it is zero,
    the pointer moves to column 1.'
 
-   WORDING NOTE — the PUT entry drops the word "negative" that INPUT's p.168
+   WORDING NOTE - the PUT entry drops the word "negative" that INPUT's p.168
    entry and PUT's OWN `@numeric-variable` sibling one entry above both carry
    ('If n is zero or negative, the pointer moves to column 1'). That is an
    omission, not a different rule: both PUT entries declare 'Range a positive
-   integer', and every pointer control on p.269-270 floors at column 1 — even
+   integer', and every pointer control on p.269-270 floors at column 1 - even
    `+numeric-variable`, which moves BACKWARD, says 'If the current column
    position becomes less than 1, the pointer moves to column 1'. So negative
    clamps to 1 here too, through io.zig's ONE clampCol that `@n`,
@@ -20,7 +20,7 @@
    `@n` PUT control below is pinned on the same shape so the two forms cannot
    drift apart.
 
-   PREMISE CORRECTED: PUT has only TWO `@` column-pointer forms in opensas —
+   PREMISE CORRECTED: PUT has only TWO `@` column-pointer forms in opensas -
    the literal `@n` and (now) `@(expression)`. p.269's `@numeric-variable`
    entry (`a=15; put @a name $10.;`) is a SEPARATE, still-open gap: it fails
    LOUD at parse, and that loud failure is pinned in parser.zig's in-file test
@@ -28,7 +28,7 @@
    supported spelling of the same thing and is the runtime-value control here.
 
    `@(character-expression)` (SAS's other parenthesised form, the string
-   search) stays unimplemented and ERRORs loud on BOTH statements — pinned in
+   search) stays unimplemented and ERRORs loud on BOTH statements - pinned in
    exec.zig's in-file test via the captured diagnostics reporter, since the
    corpus diffs stdout only. */
 

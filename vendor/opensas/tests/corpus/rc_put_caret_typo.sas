@@ -1,4 +1,4 @@
-/* GAP-puttildemodifier — a `^` in PUT's modifier slot is NOT the documented
+/* GAP-puttildemodifier - a `^` in PUT's modifier slot is NOT the documented
    `~` modifier and not any other PUT construct: it is the USER's typo, exit 1
    via the untouched "unexpected item in put statement" catch-all. The lexer
    maps both bytes to .caret but now keeps the source byte in `text`, so the

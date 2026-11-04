@@ -1,8 +1,8 @@
-/* ORACLE-unblocked-batch item 4 (GAP-attrprop-low-tick272 F8/F9) — the two
+/* ORACLE-unblocked-batch item 4 (GAP-attrprop-low-tick272 F8/F9) - the two
    attribute BOUNDS the SAS 9.4 DATA Step Statements: Reference actually states.
    Both page numbers were verified against the "=== pdf N ===" markers rather
    than taken from the board line, which named the entry TITLE pages (215/206)
-   instead of the pages carrying the text (217/207) — the classic footer trap.
+   instead of the pages carrying the text (217/207) - the classic footer trap.
 
      LENGTH Statement, printed p.217 (marker "=== pdf 228 ==="; the footer
      "LENGTH Statement 217" closes that same pdf page):
@@ -23,7 +23,7 @@
    This fixture pins ONLY the IN-RANGE boundaries, which opensas gets right:
    numeric 3 and 8, character 1 and 32767, and a label of exactly 256 bytes.
    The OUT-OF-RANGE lower bounds (`length n 2`, `length n 1`, `length n 0`,
-   `length c $0`) are silently swallowed today and that is a real defect — it
+   `length c $0`) are silently swallowed today and that is a real defect - it
    is written up in docs/findings/oracle-unblocked-readings.md item 4, NOT
    pinned here, because a red fixture would break the shared gate. When that
    lands, this file is the boundary guard that stops the new check from

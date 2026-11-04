@@ -1,7 +1,7 @@
 /* BUG-printfmtstmt: a FORMAT statement inside PROC PRINT applies that format to
    the named column(s) when rendering (it was silently ignored, printing the raw
    value, before). Several var/format pairs share one statement (SAS shape:
-   `format a fmt1. b fmt2.;`). The override is per-print — a later PROC PRINT
+   `format a fmt1. b fmt2.;`). The override is per-print - a later PROC PRINT
    without a FORMAT statement shows the raw values again. */
 data w;
   x = 0.5;

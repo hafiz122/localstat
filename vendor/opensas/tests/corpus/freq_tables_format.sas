@@ -1,6 +1,6 @@
 /* NOTE-freqtablesfmt (doc-finder tick185 + tick167:176): a FORMAT on a PROC
    FREQ TABLES var (and a PROC MEANS CLASS var) groups + displays by the
-   FORMATTED value — raw values sharing a label collapse into one level.
+   FORMATTED value - raw values sharing a label collapse into one level.
    `tables sex` (no format) is the raw-value control. */
 data d;
   input age sex $ wt @@;

@@ -1,6 +1,6 @@
 /* BUG-inputcharnodollar: a BARE `input nm;` (list input, no `$`/informat) on a
    variable ALREADY declared CHARACTER (LENGTH/ATTRIB) reads a CHAR token per the
-   declared type — not a numeric read (which turned "ABC" into missing). Explicit
+   declared type - not a numeric read (which turned "ABC" into missing). Explicit
    `$`, colon informats, and numeric bare reads are unchanged; a declared $8
    truncates a longer token to the declared length. */
 data d;

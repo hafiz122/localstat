@@ -1,4 +1,4 @@
-/* GAP-macrogotocomputed — a COMPUTED %GOTO destination.
+/* GAP-macrogotocomputed - a COMPUTED %GOTO destination.
 
    SAS 9.4 Macro Language: Reference, Fifth Edition, printed p.396 (pdf 411),
    "%GOTO Macro Statement", Required Argument `label`: "is either the name of the
@@ -8,7 +8,7 @@
    variable reference standing where the label name would go. Footnote: "A computed %GOTO contains % or & and resolves to a label."
 
    Was: handleGoto read the operand with isNameChar only, so it stopped dead at
-   the `&` and the target was the EMPTY string — which process() can never match,
+   the `&` and the target was the EMPTY string - which process() can never match,
    so the empty target swallowed the whole rest of the macro body and the run
    still exited 0. Two DATA steps vanished with only "WARNING: %goto label :
    not found" (note the empty label) to show for it.
@@ -19,7 +19,7 @@
    against the captured reporter.
    expect-rc: 1 */
 
-/* ── 1. `%goto &var;` — the p.396 form. ─────────────────────────────────────── */
+/* ── 1. `%goto &var;` - the p.396 form. ─────────────────────────────────────── */
 %macro cg_amp;
   %local jump;
   %let jump = landing;
@@ -30,7 +30,7 @@ data _null_; put "T1-OK-reached-landing"; run;
 %mend;
 %cg_amp
 
-/* ── 2. `%goto %mac;` — a macro CALL generating the label text. The CAUTION on
+/* ── 2. `%goto %mac;` - a macro CALL generating the label text. The CAUTION on
    printed p.396 is that no % precedes the LABEL NAME; a % here is a macro
    invocation whose RESULT is the label, which is the other half of the
    footnote's "contains % or &". ─────────────────────────────────────────── */
@@ -44,7 +44,7 @@ data _null_; put "T2-OK-reached-ender"; run;
 %cg_call
 
 /* ── 3. Indirect: the label is assembled from two references, and picked at
-   run time — the reason a computed %GOTO exists at all. ──────────────────── */
+   run time - the reason a computed %GOTO exists at all. ──────────────────── */
 %macro cg_pick(n);
   %local stem;
   %let stem = leg;
@@ -59,7 +59,7 @@ data _null_; put "T3-OK-leg2"; run;
 %cg_pick(1)
 %cg_pick(2)
 
-/* ── 4. NULL destination: printed p.500 — "A macro variable was used as the
+/* ── 4. NULL destination: printed p.500 - "A macro variable was used as the
    label in a %GOTO statement but has a null value" → "Error: The %GOTO statement
    has no target. The statement will be ignored." IGNORED is load-bearing: the
    body after it must SURVIVE. Before the fix every %goto with an unreadable
@@ -81,7 +81,7 @@ data _null_; put "T5-OK-body-survived-bad-label"; run;
 %mend;
 %cg_badname
 
-/* ── 6. CONTROLS — the pre-existing literal-label paths must be untouched. ── */
+/* ── 6. CONTROLS - the pre-existing literal-label paths must be untouched. ── */
 %macro cg_lit(flag);
   %if &flag = 1 %then %goto skip;
 data _null_; put "T6-OK-goto-not-taken"; run;

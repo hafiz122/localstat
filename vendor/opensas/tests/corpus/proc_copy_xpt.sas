@@ -1,6 +1,6 @@
 /* GAP-proccopy(a): PROC COPY writes the selected member as XPORT v5 through
    the out= libref, eagerly. The out path uses Windows `\` separators (as the
-   study programs do) — parseLibnames normalizes them. Round-trip through a
+   study programs do) - parseLibnames normalizes them. Round-trip through a
    read libname proves the file and its BARE member name (not `work.ae`). */
 data ae;
   input usubjid $ aeterm $;

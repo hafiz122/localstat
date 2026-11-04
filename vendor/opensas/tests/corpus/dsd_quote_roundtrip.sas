@@ -1,5 +1,5 @@
 /* BUG-dsddoublequote: the FILE DSD writer escapes an embedded quote as "" and
-   quotes a value containing the delimiter (Language Reference: Concepts Table 21.4 p.509) — so the
+   quotes a value containing the delimiter (Language Reference: Concepts Table 21.4 p.509) - so the
    INFILE DSD reader must collapse "" back to one " and keep every following
    field aligned. The file opensas writes, opensas reads back unchanged.
    (PROC IMPORT's reader already had this rule; INFILE DSD was the lone holdout.) */

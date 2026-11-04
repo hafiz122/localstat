@@ -1,7 +1,7 @@
-/* BUG-dlmmultichar: INFILE DLM= is a LIST of single-char delimiters — EACH byte
+/* BUG-dlmmultichar: INFILE DLM= is a LIST of single-char delimiters - EACH byte
    is an independent delimiter, not just the first. `dlm='|;'` must split a record
    on '|' AND ';'. (Previously only the first char was used; the rest fell into the
-   data.) DLMSTR= — the distinct one-multi-char-delimiter form — stays fail-loud.
+   data.) DLMSTR= - the distinct one-multi-char-delimiter form - stays fail-loud.
    Locks three cases: multichar split, single-char narrowing, DSD-missing. (no PHI) */
 data multi;
   infile datalines dlm='|;';
@@ -13,7 +13,7 @@ one|two;three
 run;
 proc print data=multi noobs; run;
 
-/* Narrowing lock: single-char DLM=',' must NOT treat ';' as a delimiter — the
+/* Narrowing lock: single-char DLM=',' must NOT treat ';' as a delimiter - the
    ';' stays inside the field. */
 data single;
   infile datalines dlm=',';

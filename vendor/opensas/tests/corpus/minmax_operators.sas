@@ -1,5 +1,5 @@
 /* GAP-minmaxop: the `><` (MIN) and `<>` (MAX) operators, plus the MIN/MAX infix
-   word forms. Group I precedence — binds tighter than * / , looser than ** ;
+   word forms. Group I precedence - binds tighter than * / , looser than ** ;
    a missing value ranks lowest (unlike the min()/max() functions). */
 data _null_;
   sa = 5 >< 3;  sb = 5 <> 3;

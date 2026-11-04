@@ -6,10 +6,10 @@
    d=22100 = 04JUL2020 (a Saturday). */
 data _null_;
   d = 22100;
-  put "MONYY="    d monyy.;    /* JUL20   — default 5, 2-digit year */
-  put "MONYY7="   d monyy7.;   /* JUL2020 — explicit width unchanged */
-  put "JULIAN="   d julian.;   /* 20186   — default 5, yyddd        */
-  put "JULIAN7="  d julian7.;  /* 2020186 — explicit width unchanged */
+  put "MONYY="    d monyy.;    /* JUL20   - default 5, 2-digit year */
+  put "MONYY7="   d monyy7.;   /* JUL2020 - explicit width unchanged */
+  put "JULIAN="   d julian.;   /* 20186   - default 5, yyddd        */
+  put "JULIAN7="  d julian7.;  /* 2020186 - explicit width unchanged */
   put "WORDDATE=" d worddate.; /* right-justified in 18 */
   put "WEEKDATE=" d weekdate.; /* right-justified in 29 */
   put "WORDDATX=" d worddatx.; /* right-justified in 18 */

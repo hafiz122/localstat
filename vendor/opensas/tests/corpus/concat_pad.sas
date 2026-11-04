@@ -1,5 +1,5 @@
 /* BUG-concatnopad: `||` on a fixed-length char VARIABLE pads the operand to
-   its declared length (trailing blanks included) before concatenating —
+   its declared length (trailing blanks included) before concatenating -
    Language Reference: Concepts p.49: that padding is exactly why TRIM is needed. A literal keeps its
    own width; only declared char variables pad. */
 data _null_;
@@ -9,7 +9,7 @@ data _null_;
   length a $3 b $3; a = "x"; b = "y";
   d = a || b; e = length(d); ec = lengthc(d);
   /* d stores "x  y  " (6 bytes incl. padding); LENGTH() trims trailing blanks
-     (4), LENGTHC() counts them (6) — both observe the padding. */
+     (4), LENGTHC() counts them (6) - both observe the padding. */
   put "abcat=<" d "> len=" e " lenC=" ec;
   /* literal operands are NOT padded; explicit blanks survive as-is */
   lit = "a " || "b"; m = length(lit);
@@ -17,7 +17,7 @@ data _null_;
   /* an undeclared-width char var keeps its raw stored value */
   plain = "xy"; p = plain || "!"; q = length(p);
   put "plain=<" p "> len=" q;
-  /* trim() still strips the padding — the SAS idiom keeps working */
+  /* trim() still strips the padding - the SAS idiom keeps working */
   tr = trim(t) || "!"; z = length(tr);
   put "trim=<" tr "> len=" z;
 run;

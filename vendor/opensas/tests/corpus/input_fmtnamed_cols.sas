@@ -1,13 +1,13 @@
 /* BUG-inputfmtnamedtoken (Language Reference: Concepts p.515 "Formatted Input", Table 21.2 rows 1-2):
    a NAMED numeric informat without a colon (comma5., time8., bz4., percent5.,
-   hex4.) is a FORMATTED read of w columns — NOT a whitespace token. Adjacent
+   hex4.) is a FORMATTED read of w columns - NOT a whitespace token. Adjacent
    fields used to MERGE (`1,1321,187` -> score1=11321187, score2 missing) and
    the byte cursor desynced every following variable (hex4. read the right
    VALUE off the wrong columns). Three oracles agree: the doc, the same record
    under `@n` pointer controls, and the INPUT() function. The `:` form still
    tokenizes (modified list input). */
 
-/* the doc's p.515 program with the fields adjacent — what formatted input is FOR */
+/* the doc's p.515 program with the fields adjacent - what formatted input is FOR */
 data scores;
    infile datalines truncover;
    input name $12. score1 comma5. score2 comma5.;

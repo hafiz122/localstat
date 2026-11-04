@@ -33,11 +33,11 @@ const pow10 = fns.pow10;
 const weekNumber = fns.weekNumber;
 
 /// NOTE-bitwisemisserror: a MISSING arg to a bitwise op yields missing AND
-/// _ERROR_=1 — the value was already right, but a program branching on _ERROR_
+/// _ERROR_=1 - the value was already right, but a program branching on _ERROR_
 /// never saw the flag. Same NOTE + PDV-setError mechanism as domErr
 /// (MISC-fnseterror).
 /// NOTE-bitrangenote: the OUT-OF-RANGE (non-missing) arg used to keep a plain
-/// SILENT missing, and bitwise_exact.sas pinned that silence — but the pin
+/// SILENT missing, and bitwise_exact.sas pinned that silence - but the pin
 /// predates this repo being able to grep the functions reference. BAND p.265–266
 /// prints "Range: An integer value between 0 and (2^32)–1 inclusive" (BNOT
 /// p.278–279, BOR p.279 the same bounds), and the volume's general rule at p.6
@@ -49,10 +49,10 @@ const weekNumber = fns.weekNumber;
 /// one the entries state themselves ("If either argument contains a missing
 /// value, the function returns a missing value and sets _ERROR_ equal to 1").
 /// NOTE-bitshiftcount: BLSHIFT/BRSHIFT argument-2 has a TIGHTER documented
-/// range, "0 to 31, inclusive" (BLSHIFT p.278, BRSHIFT p.280) — a count of 32+
+/// range, "0 to 31, inclusive" (BLSHIFT p.278, BRSHIFT p.280) - a count of 32+
 /// passed toU32 and silently masked (& 31), so blshift(1,32) computed 1<<0=1,
 /// a plausible wrong number. The p.6 rule reaches it too: domErr, below.
-/// The RESULT is missing either way — this adds the diagnostic, never a value.
+/// The RESULT is missing either way - this adds the diagnostic, never a value.
 /// ponytail: still nothing here about a non-integer IN range (`band(1.9,3)`);
 /// that is NOTE-bitfracround and the entries genuinely do not say, so it keeps
 /// rounding via toU32 until an oracle settles it.
@@ -73,7 +73,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const x = toNum(args[0]);
         if (isMiss(x)) return Value.missing;
         // BUG-sqrtmoderror: route through domErr (NOTE + _ERROR_=1 + missing),
-        // same invalid-arg path as LOG — was NOTE-only, so `if _error_` never fired.
+        // same invalid-arg path as LOG - was NOTE-only, so `if _error_` never fired.
         if (x < 0) return domErr(ev, name);
         return numVal(@sqrt(x));
     }
@@ -89,8 +89,8 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         // fuzz first, so boundaries round UP: round(1.045,0.01)=1.05.
         const q = x / unit;
         // ponytail: nudge is relative to |q| (to clear the ~|q|·1e-16 division
-        // error) but CAPPED under 0.5, so a tiny unit — where |q| is huge, e.g.
-        // 97/1e-10 = 9.7e11 — can never jump to a neighbouring integer and inject
+        // error) but CAPPED under 0.5, so a tiny unit - where |q| is huge, e.g.
+        // 97/1e-10 = 9.7e11 - can never jump to a neighbouring integer and inject
         // FP noise (GH#47). Cap only bites for |q|≳1e10, where q's own ULP already
         // exceeds the unit and rounding to it is meaningless anyway.
         const nudge = std.math.copysign(@min(@abs(q) * 1e-11, 0.1), q);
@@ -109,7 +109,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const r = x - @trunc(x / y) * y; // remainder, sign of x
         // SAS MOD fuzz: a remainder within 1e-12 relative of 0 or of |y| is FP
         // dust → exactly 0 (mod(0.3,0.1)=0). MODZ is the un-fuzzed form.
-        // Scale is |y| (remainders are bounded by |y|), NOT |x| — an |x|-scaled
+        // Scale is |y| (remainders are bounded by |y|), NOT |x| - an |x|-scaled
         // tolerance would snap exact integer remainders (mod(1e15,3)=1) to 0.
         const tol = 1e-12 * @abs(y);
         if (@abs(r) <= tol or @abs(@abs(r) - @abs(y)) <= tol) return numVal(0);
@@ -136,7 +136,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const n = toNum(args[0]);
         if (isMiss(n)) return Value.missing;
         if (n < 0 or n != @trunc(n)) return domErr(ev, name);
-        // COMB multinomial: comb(n, r1, r2, …) = n!/(r1!…rk!(n−Σr)!) — ways to split n
+        // COMB multinomial: comb(n, r1, r2, …) = n!/(r1!…rk!(n−Σr)!) - ways to split n
         // items into the given group sizes, computed as ∏ comb(remaining, ri)
         // (BUG-combmulti). PERM has no multinomial form.
         if (eqi(name, "comb") and args.len >= 3) {
@@ -212,7 +212,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
             break :blk if (s.len > 0) std.ascii.toUpper(s[0]) else 'U';
         } else 'U';
         // NOTE-weekbaddesc: an invalid descriptor letter was silently treated
-        // as 'U' — the user asked for a week-numbering rule that doesn't exist
+        // as 'U' - the user asked for a week-numbering rule that doesn't exist
         // and got a plausible number from a different one. Fail loud naming it
         // (D-002), same NOTE + _ERROR_=1 + missing mechanism as domErr.
         if (desc != 'U' and desc != 'V' and desc != 'W') {
@@ -268,7 +268,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     }
     if (eqi(name, "divide")) {
         // x/y, missing propagates. ponytail: SAS's ODS special-missing values
-        // (.I=+inf, .M=-inf) aren't modeled — we have no distinct special missings.
+        // (.I=+inf, .M=-inf) aren't modeled - we have no distinct special missings.
         if (args.len != 2) return badArity(ev, name, "2", args.len);
         const x = toNum(args[0]);
         const y = toNum(args[1]);
@@ -310,7 +310,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     }
 
     // ── scalar special / rounding / financial
-    if (eqi(name, "rounde")) { // round to nearest multiple of unit; ties to even (fuzzed — doc p.1453)
+    if (eqi(name, "rounde")) { // round to nearest multiple of unit; ties to even (fuzzed - doc p.1453)
         if (args.len < 1 or args.len > 2) return badArity(ev, name, "1 or 2", args.len);
         const x = toNum(args[0]);
         if (isMiss(x)) return Value.missing;
@@ -320,7 +320,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const q = x / unit;
         const fl = @floor(q);
         var frac = q - fl;
-        // NOTE-roundefuzz (doc p.1453): ROUNDE fuzzes — "approximately halfway"
+        // NOTE-roundefuzz (doc p.1453): ROUNDE fuzzes - "approximately halfway"
         // snaps to the tie, THEN ties-to-even. A decimal .xx5 boundary divides
         // to one ULP off the tie (8.075/0.01 → 807.4999999999999) and must tie
         // → 808, not round down to 807. Two-sided: for negative x the division
@@ -545,7 +545,7 @@ test "NOTE-weekbaddesc: WEEK with an invalid descriptor letter fails loud (NOTE 
         }
     }.f;
 
-    // 'Q' is not a week-numbering rule: loud, naming the descriptor — was
+    // 'Q' is not a week-numbering rule: loud, naming the descriptor - was
     // silently treated as 'U' and returned a plausible week number.
     const bad = (try dispatch(&e, "week", &.{ nv(21915), sv("Q") })).?;
     try t.expect(bad.isMissing());
@@ -592,7 +592,7 @@ test "NOTE-bitwisemisserror + NOTE-bitrangenote: a missing OR out-of-range bitwi
     // SILENT missing, and this test pinned that. The pin predates the functions
     // reference being greppable here: BAND p.265–266 prints "Range: An integer
     // value between 0 and (2^32)–1 inclusive", and p.6 makes an argument outside
-    // a printed range invalid — note + _ERROR_=1 + missing. Same VALUES (missing),
+    // a printed range invalid - note + _ERROR_=1 + missing. Same VALUES (missing),
     // now with the diagnostic; the two rows tests/corpus/bitwise_exact.sas
     // exercises are exactly these, and its expected stdout is unchanged because
     // notes go to stderr.
@@ -605,7 +605,7 @@ test "NOTE-bitwisemisserror + NOTE-bitrangenote: a missing OR out-of-range bitwi
         try t.expect(std.mem.indexOf(u8, d.message, "out of domain") != null);
 
     // NOTE-bitshiftcount: the shift COUNT's own range is 0–31 (BLSHIFT p.278,
-    // BRSHIFT p.280) — 32+ passed toU32 and silently masked (& 31), computing a
+    // BRSHIFT p.280) - 32+ passed toU32 and silently masked (& 31), computing a
     // plausible wrong shift (blshift(1,32) was 1<<0=1). Now domErr per p.6.
     for ([_][]const u8{ "blshift", "brshift" }) |name| {
         h.pdv.set("_error_", .{ .num = 0 }) catch unreachable;
@@ -616,7 +616,7 @@ test "NOTE-bitwisemisserror + NOTE-bitrangenote: a missing OR out-of-range bitwi
     for (h.diags.list.items[8..]) |d|
         try t.expect(std.mem.indexOf(u8, d.message, "out of domain") != null);
 
-    // valid calls unaffected — boundary counts 31 and 0 stay exact.
+    // valid calls unaffected - boundary counts 31 and 0 stay exact.
     try t.expectEqual(@as(f64, 5), (try dispatch(&e, "band", &.{ nv(0x0F), nv(0x05) })).?.num);
     try t.expectEqual(@as(f64, 2147483648), (try dispatch(&e, "blshift", &.{ nv(1), nv(31) })).?.num);
     try t.expectEqual(@as(f64, 8), (try dispatch(&e, "brshift", &.{ nv(8), nv(0) })).?.num);
@@ -641,15 +641,15 @@ test "NOTE-roundefuzz: ROUNDE fuzzes the approximately-halfway case to the tie, 
     // the tie, exactly representable: ties-to-even (also corpus-pinned).
     try t.expectEqual(@as(f64, 2), try r1(&e, 2.5));
     try t.expectEqual(@as(f64, 4), try r1(&e, 3.5));
-    // below-tie: decimal .xx5 boundaries divide to one ULP UNDER the tie —
+    // below-tie: decimal .xx5 boundaries divide to one ULP UNDER the tie -
     // fuzzed to the tie, then even (807 is odd → 808; without fuzz this is 8.07).
     try t.expectEqual(@as(f64, 8.08), try r2(&e, 8.075, 0.01));
     try t.expectEqual(@as(f64, 1.0), try r2(&e, 1.005, 0.01)); // 100 even → stays
     try t.expectEqual(@as(f64, 0.28), try r2(&e, 0.285, 0.01)); // 28 even → stays
     // above-tie: one ULP OVER the tie from below (negative x flips the division
-    // error's side) — two-sided snap, even multiple −808, not nearest −807.
+    // error's side) - two-sided snap, even multiple −808, not nearest −807.
     try t.expectEqual(@as(f64, -8.08), try r2(&e, -8.075, 0.01));
-    // genuinely off the tie by more than the fuzz: plain nearest, NO tie path —
+    // genuinely off the tie by more than the fuzz: plain nearest, NO tie path -
     // 2.5000000001 rounds UP to odd 3 (tie-to-even would give 2);
     // 3.4999999999 rounds DOWN to odd 3 (a fuzzy snap would give even 4).
     try t.expectEqual(@as(f64, 3), try r1(&e, 2.5000000001));

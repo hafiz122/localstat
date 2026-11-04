@@ -1,4 +1,4 @@
-/* QA tick152 — regression lock for BUG-percentfit reduce-then-asterisk ladder.
+/* QA tick152 - regression lock for BUG-percentfit reduce-then-asterisk ladder.
    PERCENT/NEGPAREN/E must fit the field: reduce decimals, else fill with `*`;
    in-width forms stay byte-identical. Pins the re-pinned denormal E outputs. */
 data _null_;

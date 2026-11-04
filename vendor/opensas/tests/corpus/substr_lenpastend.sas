@@ -1,5 +1,5 @@
 /* NOTE-substrlenpastend: SUBSTR (read) with a positive LENGTH that runs past the
-   end of the string is invalid in SAS 9.4 — it logs a NOTE (3rd arg invalid) and
+   end of the string is invalid in SAS 9.4 - it logs a NOTE (3rd arg invalid) and
    sets _ERROR_=1, while still returning the clamped remainder. Sibling of
    NOTE-substrpastend (position past end). Exact fit and no-length stay clean.
    Ref: SAS 9.4 Functions Reference, SUBSTR (p.1533). */

@@ -1,4 +1,4 @@
-/* BUG-execmissdistinct: special missings are DISTINCT values in SAS — exec.zig
+/* BUG-execmissdistinct: special missings are DISTINCT values in SAS - exec.zig
    collapsed every NaN into one bucket for hash keys and MERGE BY (.A equaled .).
    Rank ._ < . < .A < ... < .Z < numbers (Language Reference: Concepts p.107 / Table 5.1).
    SQL-side twin: BUG-sqlmissdistinct (e6a705c). */

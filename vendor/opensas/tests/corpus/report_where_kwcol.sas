@@ -10,7 +10,7 @@ run;
    SAS filters normally: rows with by>1 → 2,3. Same guard as BUG-printwherekw. */
 proc report data=a nowd; column by v; define by/display; where by>1; run;
 /* a keyword-named column works without the WHERE too (no regression of the
-   reportby guard: a real BY statement still fails loud — see the by-group
+   reportby guard: a real BY statement still fails loud - see the by-group
    fixtures); here `break` is just a column. */
 data b; input break v; datalines;
 1 100

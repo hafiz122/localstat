@@ -2,7 +2,7 @@
    SAS 9.4 SQL Procedure, "Combining Queries with Set Operators": OUTER UNION
    concatenates ALL rows of both queries and, WITHOUT CORRESPONDING, keeps ALL
    columns of both (it does NOT overlay same-named columns or align by position
-   — that is plain UNION). Each input row fills only its own query's columns;
+   - that is plain UNION). Each input row fills only its own query's columns;
    the other columns are missing. OUTER UNION CORR (CORRESPONDING) overlays
    same-named columns (align by name) while still concatenating every row. */
 data one;

@@ -1,7 +1,7 @@
 /* BUG-setinputinert (doc-finder tick305 F2): a step with BOTH a SET and an
-   INPUT made the INPUT a total silent no-op — every INPUT variable missing on
+   INPUT made the INPUT a total silent no-op - every INPUT variable missing on
    every observation at exit 0. Language Reference: Concepts p.477 step 3: "You can use an INPUT,
-   MERGE, SET, MODIFY, or UPDATE statement to read a record" — the five are
+   MERGE, SET, MODIFY, or UPDATE statement to read a record" - the five are
    peers; p.489: "DATA steps can use a combination of some or all of the
    sources"; Table 20.4's last row: the step stops when EOF is reached by ANY
    data-reading statement. */

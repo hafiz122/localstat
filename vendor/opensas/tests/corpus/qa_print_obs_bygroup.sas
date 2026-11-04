@@ -1,4 +1,4 @@
-/* QA tick155: extends BUG-printobsnum (cf0f179) past the shipped fixture —
+/* QA tick155: extends BUG-printobsnum (cf0f179) past the shipped fixture -
    PROC PRINT's Obs column = physical source obs number under BY-group printing
    (on a SORTed dataset the numbers are the new sorted positions), a BY-group
    WHERE sub-select (non-contiguous Obs per group), and a second dataset (Obs

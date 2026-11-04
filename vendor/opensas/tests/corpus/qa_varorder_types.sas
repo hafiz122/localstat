@@ -1,7 +1,7 @@
 /* QA tick284 lock for BUG-varorder-setretain (40e503c). The fix pre-declares a
    RETAIN/sum var that PRECEDES the SET as a NUMERIC guess so it owns the earlier
    PDV slot (SAS first-mention order). This fixture locks the other half: that
-   guess must NEVER survive — the SET source column's TYPE, LENGTH, FORMAT and
+   guess must NEVER survive - the SET source column's TYPE, LENGTH, FORMAT and
    LABEL still win. A refactor that stopped correcting the guess would silently
    turn character data numeric (data corruption, not a missing feature), and the
    order-only fixture var_order_setretain would not notice. */

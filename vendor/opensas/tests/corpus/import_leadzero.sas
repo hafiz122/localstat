@@ -1,5 +1,5 @@
 /* BUG-importleadingzero (GH#29, D-026): an ALL-DIGIT column with leading
-   zeros types NUMERIC under PROC IMPORT — live SAS 9.4 EFI assigns informat
+   zeros types NUMERIC under PROC IMPORT - live SAS 9.4 EFI assigns informat
    best32. and reads 0001 as 1 (validated repro: contents Type=Num, print
    1/2). Pins the overturn of the old hasLeadingZero keep-char choice. */
 data _null_;

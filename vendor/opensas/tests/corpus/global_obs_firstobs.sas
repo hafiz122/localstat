@@ -2,7 +2,7 @@
    (Language Reference: Concepts p.247). A per-dataset option overrides; obs=max resets.
    BUG-globalobsproc: the bound re-applies on the PROC's own input read, so
    printing sub2 (obs 2-4 of base) under firstobs=2 obs=4 shows sub2 obs 2-4
-   (values 3,4) — SAS bounds EVERY read, DATA-step SET and PROC alike. */
+   (values 3,4) - SAS bounds EVERY read, DATA-step SET and PROC alike. */
 data base;
   do id = 1 to 10;
     output;

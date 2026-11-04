@@ -11,7 +11,7 @@ data have;
 ;
 run;
 
-/* control: no BY / no FREQ — plain pooled table */
+/* control: no BY / no FREQ - plain pooled table */
 proc tabulate data=have;
   class trt;
   table trt, sales*sum;

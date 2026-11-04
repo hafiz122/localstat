@@ -1,8 +1,8 @@
-/* GAP-gapsexitingone §5c — the unknown-CALL-routine catch-all was SPLIT.
+/* GAP-gapsexitingone §5c - the unknown-CALL-routine catch-all was SPLIT.
 
    CALL COMPCOST has its own entry in the SAS 9.4 Functions and CALL Routines
    reference, so it is valid SAS opensas has not written: an opensas GAP →
-   rc 2. rc_call_routine_typo.sas pins the other arm — a MISSPELLED routine
+   rc 2. rc_call_routine_typo.sas pins the other arm - a MISSPELLED routine
    name stays rc 1, because telling a user who typed `call symptu(...)` to
    file an opensas issue is exactly the failure this contract exists to stop.
 

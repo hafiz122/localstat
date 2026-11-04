@@ -8,7 +8,7 @@ data d;
 ;
 run;
 
-/* BUG-freqtablesparen: a parenthesized variable group in TABLES expands —
+/* BUG-freqtablesparen: a parenthesized variable group in TABLES expands -
    `tables (a b);` = `tables a b;` (two one-way tables), never silently
    dropped. */
 proc freq data=d;

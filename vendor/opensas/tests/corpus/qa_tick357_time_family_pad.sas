@@ -1,6 +1,6 @@
-/* QA tick357 — renderTod now ROUTES THROUGH renderTime (938e89b8,
+/* QA tick357 - renderTod now ROUTES THROUGH renderTime (938e89b8,
    NOTE-todhourpad/NOTE-todfloorfrac). renderTime is SHARED by TIME, NLTIME and
-   E8601TM, and its `zero_pad_hour` flag is exactly the thing TOD flipped — so a
+   E8601TM, and its `zero_pad_hour` flag is exactly the thing TOD flipped - so a
    future edit to that shared body can silently move a sibling format that no
    TOD fixture would notice. This pins the WHOLE family on one input, so the
    siblings are a positive control for any later renderTime change.
@@ -17,10 +17,10 @@
    five keep the bare single-digit hour. That contrast is the invariant here.
 
    AMENDED (NOTE-timedefwidth): that invariant is about ZERO-padding and still
-   holds — but it is NOT about field width, and `time_def` originally pinned the
+   holds - but it is NOT about field width, and `time_def` originally pinned the
    wrong thing. SAS 9.4 Formats and Informats: Reference p.478 gives TIMEw.d
    `w Default 8`, and p.479 says twice that a single-digit hour gets a LEADING
-   BLANK. So width-less `time.` is `time8.` — ` 5:23:54`, not `5:23:54`. The
+   BLANK. So width-less `time.` is `time8.` - ` 5:23:54`, not `5:23:54`. The
    Language Reference: Concepts p.147 row above does not contradict that: a table CELL cannot render
    leading whitespace, exactly as the Formats entry's own inline example
    ("writes 9:00 instead of 09:00") cannot. TOD zero-pads, TIME blank-pads. */
@@ -36,7 +36,7 @@ data t;
   time_def = put(x, time.);
   tod_def  = put(x, tod.);
   /* the OTHER zero-padding renderTime caller (ISO) and the OTHER blank-padding
-     one (NL) — neither may drift when TOD's flag is touched */
+     one (NL) - neither may drift when TOD's flag is touched */
   iso      = put(x, e8601tm8.);
   nltime   = put(x, nltime.);
 run;

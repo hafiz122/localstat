@@ -1,6 +1,6 @@
-/* BUG-univdatasetopts — PROC UNIVARIATE's header had no data=x(…) arm: the
+/* BUG-univdatasetopts - PROC UNIVARIATE's header had no data=x(…) arm: the
    paren group hit the option catch-all, rc 1 with a degenerate empty-name
-   message, on valid SAS. Now skipped as a group so procInput APPLIES it —
+   message, on valid SAS. Now skipped as a group so procInput APPLIES it -
    the where=(age>28) filter must give N=2, not 3. */
 data have;
   input name $ age;

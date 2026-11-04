@@ -1,20 +1,20 @@
-//! The PDV (Program Data Vector) — the DATA step's working row.
+//! The PDV (Program Data Vector) - the DATA step's working row.
 //!
 //! One `Pdv` is the single buffer the executor (C1) reads and writes as it
 //! runs statements over an observation: `x = a + 1;` reads `a`'s cell and
-//! writes `x`'s. Variables are an *ordered* set of named cells — order is the
+//! writes `x`'s. Variables are an *ordered* set of named cells - order is the
 //! order SAS first saw each name, and it is the order `output` snapshots into
 //! a `Dataset` (see dataset.zig) and PROC PRINT shows columns.
 //!
 //! A variable has a fixed type (`num`/`char`), set when it is first mentioned;
-//! its cell holds the current `Value`, which is *missing-of-type* until set —
+//! its cell holds the current `Value`, which is *missing-of-type* until set -
 //! numeric `.` or a blank char string. SAS names are case-insensitive, and
 //! per the house rule that comparison is the consumer's job, the lookup here
 //! (`indexOf`) is where that case-folding actually happens.
 //!
 //! Arena-backed: the arena owns variable names (and any char bytes a caller
-//! chooses to route through it). Retain/reset *policy* — which cells survive
-//! into the next iteration — is the executor's overlay; the PDV only offers
+//! chooses to route through it). Retain/reset *policy* - which cells survive
+//! into the next iteration - is the executor's overlay; the PDV only offers
 //! the mechanism (`reset`).
 
 const std = @import("std");
@@ -26,9 +26,9 @@ pub const VarType = enum { num, char };
 
 /// SAS caps a character variable's length at 32767 bytes: LENGTH Statement,
 /// SAS 9.4 DATA Step Statements: Reference, printed p.217 (pdf 228 at the
-/// volume's +11 offset) — "For character variables, 1 to 32767 bytes under
+/// volume's +11 offset) - "For character variables, 1 to 32767 bytes under
 /// all operating environments"; ATTRIB's LENGTH= repeats it, printed p.34
-/// (pdf 45). Enforced LOUD at the store (setAt) — see the comment there.
+/// (pdf 45). Enforced LOUD at the store (setAt) - see the comment there.
 pub const max_char_len: usize = 32767;
 
 /// The default cell for a freshly-declared variable of this type: numeric
@@ -48,7 +48,7 @@ fn typeOf(v: Value) VarType {
 }
 
 /// The width of a `$…w…` character format/informat spec, or null when the spec
-/// is absent, numeric, or carries no width (`$yn.`) — stampLiteralLen's
+/// is absent, numeric, or carries no width (`$yn.`) - stampLiteralLen's
 /// FORMAT/INFORMAT-created-width guard (GH#27 slice).
 fn charSpecWidth(spec: ?[]const u8) ?usize {
     const s = spec orelse return null;
@@ -58,7 +58,7 @@ fn charSpecWidth(spec: ?[]const u8) ?usize {
 }
 
 /// SAS AUTOMATIC num→char conversion (Language Reference: Concepts p.124, BUG-numcharwidth): BESTw.
-/// RIGHT-JUSTIFIED in a w-wide field — `n||"x"` converts n with w=12
+/// RIGHT-JUSTIFIED in a w-wide field - `n||"x"` converts n with w=12
 /// (`"           5x"`); assignment `c = n` into a length-n char var uses BESTn.
 /// Explicit conversions (PUT with a format, the CAT family) never come here.
 /// The single home for the pad, D-001 spirit (sasParseFloat is the char→num
@@ -74,9 +74,9 @@ pub fn numToChar(arena: std.mem.Allocator, x: f64, w: usize) std.mem.Allocator.E
 
 /// Parse a string as SAS's plain `w.` numeric informat does: optional surrounding
 /// blanks, optional sign, decimal digits with at most one point, an optional E
-/// exponent — and NOTHING else. Zig's `std.fmt.parseFloat` additionally accepts hex
+/// exponent - and NOTHING else. Zig's `std.fmt.parseFloat` additionally accepts hex
 /// floats (`0x1F`), digit underscores (`1_000`), binary (`0b101`) and `inf`/`nan`,
-/// none of which the `w.` informat allows — SAS yields MISSING for those, so bare
+/// none of which the `w.` informat allows - SAS yields MISSING for those, so bare
 /// parseFloat read them as real numbers (BUG-charnum-parsefloat). We validate the
 /// strict grammar first, then delegate to parseFloat for the value (the validated
 /// string is plain decimal, so no extended syntax can slip through). null → missing.
@@ -92,7 +92,7 @@ pub fn sasParseFloat(raw: []const u8) ?f64 {
         i += 1;
         while (i < s.len and s[i] >= '0' and s[i] <= '9') : (i += 1) mant += 1;
     }
-    if (mant == 0) return null; // "", "+", ".", "e5" — no digit in the mantissa
+    if (mant == 0) return null; // "", "+", ".", "e5" - no digit in the mantissa
     if (i < s.len and (s[i] == 'e' or s[i] == 'E')) {
         i += 1;
         if (i < s.len and (s[i] == '+' or s[i] == '-')) i += 1;
@@ -120,14 +120,14 @@ pub const Var = struct {
     format: ?[]const u8 = null, // associated display format (FORMAT / ATTRIB statement)
     informat: ?[]const u8 = null, // associated read informat (INFORMAT / ATTRIB statement)
     label: ?[]const u8 = null, // variable label (LABEL / ATTRIB statement)
-    len: usize = 0, // declared (allocated) char length; 0 = none (VLENGTH — BUG-vlength)
+    len: usize = 0, // declared (allocated) char length; 0 = none (VLENGTH - BUG-vlength)
     numlen: usize = 0, // declared numeric byte-length 3..7 (LENGTH/ATTRIB); 0/8 = full f64 (GH#46)
     // Declared by the compile-time pass with a STATICALLY-GUESSED type
     // (BUG-pdvcompilevars); the first runtime write corrects the type and
     // clears this, so executed paths keep exact runtime typing.
     guessed: bool = false,
     // The over-cap char-length ERROR (max_char_len) fires ONCE per var, not
-    // per row — loadRow writes by slot on every row of every source.
+    // per row - loadRow writes by slot on every row of every source.
     len_err_reported: bool = false,
 };
 
@@ -163,12 +163,12 @@ pub const Pdv = struct {
     }
 
     /// Declare a variable, returning its slot index. Idempotent: a name already
-    /// present keeps its slot and its type — a variable's type is fixed at its
+    /// present keeps its slot and its type - a variable's type is fixed at its
     /// first mention (`input x $;`, `length`, or first assignment), so a later
     /// `define` with a different type is ignored here (that mismatch is the
     /// executor's diagnostic to raise, not the PDV's). One exception: a var
     /// whose type was only a compile-time GUESS (`declare`) adopts the first
-    /// CERTAIN type — a zero-row SET source's schema must beat the `v="99"`
+    /// CERTAIN type - a zero-row SET source's schema must beat the `v="99"`
     /// guess, else the var lands char and every golden numeric goes missing
     /// (TRIAGE-gen2values: EG VISITNUM).
     pub fn define(self: *Pdv, name: []const u8, t: VarType) !usize {
@@ -196,7 +196,7 @@ pub const Pdv = struct {
     /// Declare a variable at COMPILE time with a statically-GUESSED type
     /// (BUG-pdvcompilevars). Same idempotence as `define`, but a variable this
     /// creates is marked `guessed` so the first runtime `set` can correct the
-    /// type — a certain `define` (input/length/SET schema) is never disturbed.
+    /// type - a certain `define` (input/length/SET schema) is never disturbed.
     pub fn declare(self: *Pdv, name: []const u8, t: VarType) !usize {
         if (self.indexOf(name)) |i| return i;
         const i = try self.define(name, t);
@@ -205,7 +205,7 @@ pub const Pdv = struct {
     }
 
     /// Write `name`'s cell, auto-declaring it (type inferred from `v`) if new.
-    /// An existing variable keeps its declared type — a compile-time guess is
+    /// An existing variable keeps its declared type - a compile-time guess is
     /// corrected inside `define`. A character value written to a certainly-
     /// NUMERIC variable converts the SAS way (implicit BEST input: blanks or
     /// unparsable → missing), so `VISITNUM = put(v, fmt.)` yields 99, not a
@@ -217,29 +217,29 @@ pub const Pdv = struct {
         try self.setAt(i, v);
     }
 
-    /// `set` by slot index — no name lookup (PERF-loadrowdual: io.loadRow's
+    /// `set` by slot index - no name lookup (PERF-loadrowdual: io.loadRow's
     /// readback loop resolves column→slot once per source via `define`, then
     /// writes by slot on every row). Identical coercion semantics to `set`;
-    /// the var at `i` already exists (slots are stable — `vars` is
+    /// the var at `i` already exists (slots are stable - `vars` is
     /// append-only), so no auto-declare or guess-correction happens here.
     pub fn setAt(self: *Pdv, i: usize, v: Value) std.mem.Allocator.Error!void {
         const vr = &self.vars.items[i];
         // GAP-xportio-low: a declared char length over max_char_len is a loud
         // ERROR, never a silently over-long cell (the root of the XPORT
-        // writer's F5 refusal — such a length must not exist in the PDV at
+        // writer's F5 refusal - such a length must not exist in the PDV at
         // all). The store is the choke point EVERY length entry point
         // converges on: LENGTH/ATTRIB stamps, SET-source carries (GH#72),
         // XPORT/sas7bdat reader lens. The executor's error gate then halts
         // the step, as for the seedDeclVar conflicts. ponytail: rejecting a
         // store-FREE `length x $40000; run;` belongs to parser.zig/exec.zig
-        // (outside this ticket's ownership) — every DATA path is covered
+        // (outside this ticket's ownership) - every DATA path is covered
         // here, which is where silent corruption would ride.
         if (vr.type == .char and vr.len > max_char_len and !vr.len_err_reported) {
             vr.len_err_reported = true;
             if (self.diags) |d|
                 try d.report(.err, 0, "Character variable {s} has length {d}, over the SAS maximum character length 32767.", .{ vr.name, vr.len });
         }
-        // A declared char LENGTH truncates every write, as in SAS — parse-time
+        // A declared char LENGTH truncates every write, as in SAS - parse-time
         // substr-wrapping covers LENGTH/ATTRIB statements, but a width carried
         // in from a SET source's schema (the EMPTY_* metadata idiom) is only
         // known here (GAP-charlength).
@@ -250,21 +250,21 @@ pub const Pdv = struct {
         if (vr.type == .num and v == .str) {
             // SAS implicit char→numeric conversion: it converts and CONTINUES,
             // but it is never silent (Language Reference: Concepts "Automatic Numeric-Character
-            // Conversion") — a run that drops a mistyped assignment to missing
+            // Conversion") - a run that drops a mistyped assignment to missing
             // with exit 0 is the worst failure class for clinical data
             // (ISS-charnumassign). Emit the same NOTEs SAS logs, then store.
             const conv = parseNum(v.str);
-            // A blank string is a valid representation of numeric missing — only
+            // A blank string is a valid representation of numeric missing - only
             // non-blank text that won't parse is an actual invalid conversion.
             const invalid = std.mem.trim(u8, v.str, " ").len > 0 and conv.isMissing();
             if (self.diags) |d| {
-                // ponytail: no source position — the store layer (`set`/`setAt`)
+                // ponytail: no source position - the store layer (`set`/`setAt`)
                 // is shared by exec/io/sql/functions callers and threading a
                 // statement line through it is a cross-file refactor, so SAS's
                 // "at line N column M." tail (Language Reference: Concepts Example Code 4.1) is OMITTED,
                 // not frozen at 0/0 (GH#78, NOTE-invalidnumdataloc). NOTEs go to
                 // stderr (not the corpus diff). SAS aggregates the "converted"
-                // note by place; this fires once per conversion — dedupe by
+                // note by place; this fires once per conversion - dedupe by
                 // location if wide *DTC studies make the stderr log volume a
                 // problem.
                 try d.note(0, "Character values have been converted to numeric values at the places given by: (Line):(Column).", .{});
@@ -274,7 +274,7 @@ pub const Pdv = struct {
             vr.value = conv; // write BEFORE the _error_ set below: that set may
             // append/realloc `vars` and invalidate `vr`.
             // SAS sets the DATA-step automatic `_ERROR_=1` the moment an invalid
-            // char→num conversion happens (Language Reference: Concepts p.111/124) — live in-step, so a
+            // char→num conversion happens (Language Reference: Concepts p.111/124) - live in-step, so a
             // later `put _error_` in the same iteration sees it. `_ERROR_` is a
             // plain PDV var; the executor resets it to 0 at the top of each
             // iteration (CHARNUM-errorvar).
@@ -282,7 +282,7 @@ pub const Pdv = struct {
             return;
         }
         // A declared numeric LENGTH < 8 stores only the high N bytes of the
-        // 8-byte IEEE double, zeroing the low 8−N — SAS's deliberate precision
+        // 8-byte IEEE double, zeroing the low 8−N - SAS's deliberate precision
         // loss (GH#46). Bit-mask on store; missing (non-finite NaN) is left
         // untouched so it stays missing-of-type.
         if (vr.type == .num and vr.numlen > 0 and vr.numlen < 8 and v == .num and std.math.isFinite(v.num)) {
@@ -292,15 +292,15 @@ pub const Pdv = struct {
         // num→char on STORE: a char var receiving a numeric cell. Two callers,
         // both wanting the COMPACT (left-justified) value:
         // (a) SET/MERGE/UPDATE loads where CSV type inference read a really-char
-        //     column as numeric (the GH#69/#70 leniency — real SDTM ID columns):
+        //     column as numeric (the GH#69/#70 leniency - real SDTM ID columns):
         //     the SAS-truthful rendering is the value AS IF it had been char all
-        //     along, i.e. unpadded — the real-SAS-derived goldens pin it;
+        //     along, i.e. unpadded - the real-SAS-derived goldens pin it;
         // (b) a true `c = n` assignment to a char var whose length the PARSER
-        //     didn't know (ATTRIB/schema-seeded) — same rendering opensas always
+        //     didn't know (ATTRIB/schema-seeded) - same rendering opensas always
         //     gave. A `length`-declared target never reaches here: the parser
         //     desugars it to __assignc, which renders BESTn. right-justified
         //     (Language Reference: Concepts p.124, BUG-numcharwidth).
-        // Stored as a real char cell (was: raw .num cell in a char var — a later
+        // Stored as a real char cell (was: raw .num cell in a char var - a later
         // numeric read then skipped the char→num NOTE pair). The conversion
         // NOTE still fires (GH#74).
         if (vr.type == .char and v == .num) {
@@ -314,36 +314,36 @@ pub const Pdv = struct {
 
     /// EPIC-charfixedwidth (GH#27 slice 1, GH#31 remainder): fix an UNDECLARED
     /// char variable's storage width from a char LITERAL. SAS fixes a
-    /// variable's width at COMPILE time — `y="n/a"; x="abcdef"; y=x;` leaves y
-    /// $3 and the third statement truncates to `abc` — where opensas re-derived
+    /// variable's width at COMPILE time - `y="n/a"; x="abcdef"; y=x;` leaves y
+    /// $3 and the third statement truncates to `abc` - where opensas re-derived
     /// width from every stored value, growing AND shrinking per assignment (the
     /// silent-wrong this kills). First length wins, so a later `y="n/a"` after
     /// `y="abcdef"` keeps $6 (Language Reference: Concepts p.49). Called only
     /// with the literal's own bytes, from callers whose AST proves the operand
     /// is a BARE `.str`: the pre-execution whole-step walk (exec.zig
-    /// stampTextualWidths, GH#31 — SOURCE order, retain inits at their own
+    /// stampTextualWidths, GH#31 - SOURCE order, retain inits at their own
     /// position, dead branches included) and the two runtime store sites it
     /// kept as the fallback for runtime-typed shapes. A computed char value
     /// (SQL CASE, function result, concat) never reaches here, which is what
     /// keeps this clear of the REVERTED width-on-first-assign attempt's
-    /// casualty class ('small'→'sma', 'CARDIAC DISORDERS'→'DISOR' — jira
+    /// casualty class ('small'→'sma', 'CARDIAC DISORDERS'→'DISOR' - jira
     /// EPIC-charfixedwidth). The width is then in place for every LATER
     /// store: setAt's truncate branch (above) and vlengthx/contentsLen's
     /// declared-len branches read it unchanged. No-op when the var is
     /// numeric, absent, or already carries a width (LENGTH/ATTRIB seed,
     /// SET-schema carry, an earlier literal).
     /// ponytail: a literal over max_char_len keeps the float (SAS refuses it
-    /// before the step runs — out of this slice).
+    /// before the step runs - out of this slice).
     pub fn stampLiteralLen(self: *Pdv, name: []const u8, lit: []const u8) void {
         const i = self.indexOf(name) orelse return; // caller stored first: the var exists
         const vr = &self.vars.items[i];
         if (vr.type != .char or vr.len != 0) return;
         // A var CREATED by a FORMAT/INFORMAT statement takes the spec's WIDTH as
-        // its length (Language Reference: Concepts p.72 — BUG-informatwidth); that width
+        // its length (Language Reference: Concepts p.72 - BUG-informatwidth); that width
         // source outranks the literal and must not be stamped over. It rides the
         // attached spec, not vr.len (descriptor-only), so consult both. Timing
         // matches SAS's creation rule: the spec is attached before the store
-        // exactly when its statement preceded the assignment — a format/informat
+        // exactly when its statement preceded the assignment - a format/informat
         // attached AFTER the var exists never re-lengths it (p.51), and there the
         // stamp below still fires.
         if (charSpecWidth(vr.format) != null) return;
@@ -355,7 +355,7 @@ pub const Pdv = struct {
     /// Keep the high `n` bytes (n=3..7) of the 8-byte IEEE double, zeroing the
     /// low 8−n (big-endian view: `bits & (~0 << 8*(8−n))`). len5 of 36.6 →
     /// 40424CCCCC000000 = 36.59999990463257 (validated GH#46). pub so PROC
-    /// APPEND's FORCE store reconciliation reuses it (BUG-appendcharwidth) —
+    /// APPEND's FORCE store reconciliation reuses it (BUG-appendcharwidth) -
     /// this is the source of truth; exec.zig's truncBySet keeps a local copy.
     pub fn truncNum(x: f64, n: usize) f64 {
         const shift: u6 = @intCast(8 * (8 - n));
@@ -364,7 +364,7 @@ pub const Pdv = struct {
     }
 
     /// Associate a display format with `name` (FORMAT / ATTRIB); no-op if the
-    /// variable is not (yet) defined — the caller re-tries once it exists.
+    /// variable is not (yet) defined - the caller re-tries once it exists.
     pub fn setFormat(self: *Pdv, name: []const u8, fmt: []const u8) void {
         if (self.indexOf(name)) |i| self.vars.items[i].format = fmt;
     }
@@ -394,7 +394,7 @@ pub const Pdv = struct {
         return if (self.indexOf(name)) |i| self.vars.items[i].label else null;
     }
 
-    /// Reset every cell to its type's missing value — the mechanism the
+    /// Reset every cell to its type's missing value - the mechanism the
     /// executor uses at the top of each DATA-step iteration. Retained variables
     /// are the executor's overlay: it re-applies their kept values after.
     pub fn reset(self: *Pdv) void {
@@ -418,7 +418,7 @@ test "define/get/set, case-insensitive names" {
 
     // set writes through, re-declaring type stays fixed
     try pdv.set("age", .{ .num = 42 });
-    _ = try pdv.define("AGE", .char); // ignored — Age is already numeric
+    _ = try pdv.define("AGE", .char); // ignored - Age is already numeric
     try std.testing.expectEqual(@as(f64, 42), pdv.get("age").?.num);
     try std.testing.expect(pdv.indexOf("age").? == 0); // still the first slot
 
@@ -509,7 +509,7 @@ test "GAP-xportio-low: a char length over the SAS 32767 cap is a LOUD ERROR on s
     var pdv = Pdv.init(arena.allocator());
     pdv.diags = &diags; // the executor wires this in Executor.init
 
-    // a `length x $40000;` stamp — LENGTH Statement, Statements Ref printed
+    // a `length x $40000;` stamp - LENGTH Statement, Statements Ref printed
     // p.217: "For character variables, 1 to 32767 bytes under all operating
     // environments."
     const i = try pdv.define("x", .char);
@@ -525,7 +525,7 @@ test "GAP-xportio-low: a char length over the SAS 32767 cap is a LOUD ERROR on s
     try pdv.setAt(i, .{ .str = "def" });
     try std.testing.expectEqual(@as(usize, 1), diags.count());
 
-    // exactly at the cap is legal SAS — no diagnostic
+    // exactly at the cap is legal SAS - no diagnostic
     const j = try pdv.define("y", .char);
     pdv.vars.items[j].len = 32767;
     try pdv.set("y", .{ .str = "ok" });
@@ -584,7 +584,7 @@ test "TRIAGE-gen2values: certain define corrects a guess; char->num assignment c
     // EG's VISITNUM shape: the compile pass guesses char from `v = put(...)`,
     // then a source schema (MERGE/UPDATE pre-declare) certainly says numeric.
     const i = try pdv.declare("v", .char);
-    _ = try pdv.define("v", .num); // certain — must beat the guess
+    _ = try pdv.define("v", .num); // certain - must beat the guess
     try std.testing.expectEqual(VarType.num, pdv.vars.items[i].type);
     try std.testing.expect(pdv.get("v").?.isMissing());
 
@@ -621,7 +621,7 @@ test "ISS-charnumassign: char→numeric assignment is LOUD, never silent" {
     try std.testing.expect(std.mem.indexOf(u8, diags.list.items[1].message, "Invalid numeric data, 'hello'") != null);
 
     // a valid numeric string still converts to the number, with the "converted"
-    // note only (no invalid-data note) — must not regress n="123" → 123.
+    // note only (no invalid-data note) - must not regress n="123" → 123.
     try pdv.set("n", .{ .str = "123" });
     try std.testing.expectEqual(@as(f64, 123), pdv.get("n").?.num);
     try std.testing.expectEqual(@as(usize, 3), diags.count());
@@ -640,7 +640,7 @@ test "NOTE-invalidnumdataloc: invalid-data NOTE omits the position, never freeze
     pdv.diags = &diags;
 
     // The PDV store has no statement context, so SAS's "at line N column M."
-    // tail is honestly absent — the captured reporter proves nothing frozen
+    // tail is honestly absent - the captured reporter proves nothing frozen
     // rides in the message or the rendered log.
     _ = try pdv.define("n", .num);
     try pdv.set("n", .{ .str = "hello" });
@@ -666,7 +666,7 @@ test "CHARNUM-errorvar: an invalid char→num conversion sets _ERROR_=1, live in
     try pdv.set("n", .{ .str = "123" });
     try std.testing.expectEqual(@as(f64, 0), pdv.get("_error_").?.num);
 
-    // a blank string is valid missing — still no error.
+    // a blank string is valid missing - still no error.
     try pdv.set("n", .{ .str = "  " });
     try std.testing.expectEqual(@as(f64, 0), pdv.get("_error_").?.num);
 
@@ -753,7 +753,7 @@ test "BUG-numcharwidth: numToChar is BESTw. RIGHT-JUSTIFIED; set() converts num�
     const sm = Value.parseSpecialMissing(".A").?;
     try std.testing.expectEqualStrings("           A", try numToChar(a, sm.num, 12)); // ISS-specialmiss-tochar
 
-    // set(): a numeric stored into a char var becomes a COMPACT char cell —
+    // set(): a numeric stored into a char var becomes a COMPACT char cell -
     // the SET-load leniency (GH#69/#70: CSV read a really-char ID as numeric;
     // the value renders as if it had been char all along, real-SAS goldens pin
     // it). BESTn. padding lives in __assignc (parser-known `length` targets).
@@ -800,7 +800,7 @@ test "GH#27 slice: stampLiteralLen fixes an undeclared char width at the first l
     pdv.stampLiteralLen("d", "hi");
     try std.testing.expectEqual(@as(usize, 8), pdv.vars.items[pdv.indexOf("d").?].len);
 
-    // a FORMAT/INFORMAT-created width rides the spec, not len — outranks too
+    // a FORMAT/INFORMAT-created width rides the spec, not len - outranks too
     // (BUG-informatwidth: `format f $char8.; f="hi";` is $8, not $2)
     try pdv.set("f", .{ .str = "hi" });
     pdv.vars.items[pdv.indexOf("f").?].format = "$char8.";

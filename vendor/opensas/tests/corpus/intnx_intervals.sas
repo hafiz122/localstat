@@ -1,4 +1,4 @@
-/* GAP-intnxintervals: INTNX/INTCK route through parseInterval — WEEKDAY,
+/* GAP-intnxintervals: INTNX/INTCK route through parseInterval - WEEKDAY,
    SEMIYEAR/SEMIMONTH/TENDAY in INTCK, DT/time intervals, multipliers (MONTH2),
    and shift-index (QTR.2, YEAR.3, MONTH2.2) all recognised. */
 data _null_;

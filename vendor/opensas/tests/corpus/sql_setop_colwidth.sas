@@ -1,4 +1,4 @@
-/* BUG-sqlcolwidthloss, set-op half — a UNION's result column takes the WIDEST
+/* BUG-sqlcolwidthloss, set-op half - a UNION's result column takes the WIDEST
    arm's declared char width, not the left arm's.
 
    SQL Procedure User's Guide, printed p.397-398, Table 8.1 "Resolving Different
@@ -6,7 +6,7 @@
    VAR1 in NewTable is the maximum length of VAR1 across both sources".
 
    This is load-bearing, not cosmetic: a SELECT-clause width TRUNCATES the stored
-   value (BUG-sqlselectlength / GAP-sqldatatypewidth — and printed p.268 says
+   value (BUG-sqlselectlength / GAP-sqldatatypewidth - and printed p.268 says
    the values "are either truncated or padded with blanks (if character data) as
    necessary to meet the specified length attribute"). Carrying only the LEFT
    arm's width therefore SILENTLY DESTROYED the right arm's longer values:
@@ -17,9 +17,9 @@ data t1; length b $3; b='ABC';    output; run;
 data t2; length b $6; b='ABCDEF'; output; run;
 
 proc sql;
-  title 'narrow arm first — the wide value must survive whole';
+  title 'narrow arm first - the wide value must survive whole';
   select b, lengthc(b) as lb from t1 union all select b, lengthc(b) as lb from t2;
-  title 'wide arm first — same result column width, same values';
+  title 'wide arm first - same result column width, same values';
   select b, lengthc(b) as lb from t2 union all select b, lengthc(b) as lb from t1;
 quit;
 

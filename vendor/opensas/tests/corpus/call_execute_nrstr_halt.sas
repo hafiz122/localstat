@@ -8,7 +8,7 @@
    CALL EXECUTE statement executes). opensas still cannot honour it (the macro
    facility is gone when the queue drains, FEAT-callexecute/D-002), so CLAUDE.md
    governs: an unsupported feature must error visibly, NEVER no-op. A loud ERROR
-   the step then ignores IS a no-op — the step ran every row and wrote its
+   the step then ignores IS a no-op - the step ran every row and wrote its
    output while the queued work never happened.
 
    There is no continuing-class reading. Language Reference: Concepts printed p.172-174 defines that
@@ -17,9 +17,9 @@
    p.174-175 Example Code 8.6 path: "stopped processing this step" + "Data set
    … was not replaced".
 
-   Severity is UNCHANGED and was already maximal — report(.err) sets
+   Severity is UNCHANGED and was already maximal - report(.err) sets
    hasStepErrors(), which errhalt-skips every later step AND every queued
-   fragment — so the only behavioural delta is that the step no longer replaces
+   fragment - so the only behavioural delta is that the step no longer replaces
    an output member. Probed pre-fix on a clean-rebuilt binary.
 
    Failing step LAST (BUG-errhalt errhalt-skips later steps). The captured
@@ -39,7 +39,7 @@ data _null_;
   call execute('data _null_; put "deferred ran"; run;');
 run;
 
-/* FAILING STEP, LAST: nothing below the CALL EXECUTE runs — no PUT, no row. */
+/* FAILING STEP, LAST: nothing below the CALL EXECUTE runs - no PUT, no row. */
 data never_written;
   set visits;
   call execute('%nrstr(%tally_visit(1))');

@@ -1,9 +1,9 @@
-/* QA tick377 cross-landing sweep — BUG-hashkeytypesilent (58bff301) pins the
+/* QA tick377 cross-landing sweep - BUG-hashkeytypesilent (58bff301) pins the
    half of the guard that must NOT fire. The guard lives in collectArgs, the one
    funnel all five keyed methods route through, so an over-eager predicate there
    would turn every legitimate lookup miss into a hard ERROR. SAS 9.4 Component
    Objects: Reference pins the type-match sentence on each keyed method's KEY:
-   argument; a MISS is not a type error — it returns rc=160038 and writes
+   argument; a MISS is not a type error - it returns rc=160038 and writes
    NOTHING to the log, which is what the reference's own
    `rc = h.find(); if rc ne 0 then ...` idiom depends on.
 
@@ -15,14 +15,14 @@
    at aeac429a and re-verified on live master.
 
    1  explicit KEY: form, numeric key, miss and hit
-   2  implicit form (no argument tags) — reads the defined variables' own PDV
+   2  implicit form (no argument tags) - reads the defined variables' own PDV
       values, so it matches by construction and is deliberately NOT type-checked
-   3  dataset:-sourced keys — the declared type comes from the source column
-   4  hiter traversal — untouched by the guard
+   3  dataset:-sourced keys - the declared type comes from the source column
+   4  hiter traversal - untouched by the guard
    5  MISSING numeric key (`.`) and BLANK character key: a SAS numeric missing is
       still a NUMERIC value, so these must lookup normally, not trip the guard
    6  an UNINITIALIZED name as the key: type unknown, no check, plain miss
-   7  CHECK / REMOVE / REF / REPLACE — the other keyed methods on the same funnel */
+   7  CHECK / REMOVE / REF / REPLACE - the other keyed methods on the same funnel */
 
 data src; length k 8 v $10; k=1; v='one'; output; k=2; v='two'; output; run;
 
@@ -43,7 +43,7 @@ data _null_;
   /* 5: a numeric missing is a NUMERIC value */
   rc = h.find(key: .); put "MISSING_KEY_MISS=" rc;
 
-  /* 6: an uninitialized name — declared type unknown, no check */
+  /* 6: an uninitialized name - declared type unknown, no check */
   rc = h.find(key: neverset); put "UNINIT_KEY_MISS=" rc;
 
   /* 7: the rest of the keyed funnel */

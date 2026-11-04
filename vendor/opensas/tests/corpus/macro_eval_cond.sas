@@ -1,15 +1,15 @@
 /* QL-C contract fixture: pins the %if/%do %while condition semantics that the
    old string-splitting evaluator (evalBool, "Path A") defined and that the
-   consolidated %eval parser must preserve — every line here survived the merge
+   consolidated %eval parser must preserve - every line here survived the merge
    bit-identically except the g-block, where %eval GAINED string compares.
 
    Semantics under contract:
    - comparison is numeric when BOTH operands parse as numbers (floats included),
      else lexical (std.mem.order, case-sensitive);
-   - bare leaf truthiness: nonzero INTEGER is true, 0 false, EMPTY leaf false —
+   - bare leaf truthiness: nonzero INTEGER is true, 0 false, EMPTY leaf false -
      a bare NON-numeric leaf (text or float) is the loud %EVAL character-operand
      ERROR since BUG-ifbaretruthy (manager call: %if agrees with %eval; the loud
-     half is pinned by in-file tests in macro.zig, not here — green fixtures only);
+     half is pinned by in-file tests in macro.zig, not here - green fixtures only);
    - not/^/~, parenthesised groups, and/or (+ | for or);
    - a mnemonic cmp with an empty operand still compares ("" ne "" is false).
 
@@ -23,7 +23,7 @@
 
 /* -- string compares, all six mnemonics + symbols ------------------------- */
 /* %global: post BUG-macrobareletscope a bare %let in a macro is LOCAL (SAS
-   9.4) — result vars read at open code must be declared global. */
+   9.4) - result vars read at open code must be declared global. */
 %macro strcmp;
   %global s1 s2 s3 s4 s5 s6 s7 s8;
   %if abc = abc %then %let s1=EQ; %else %let s1=BUG;
@@ -61,7 +61,7 @@ run;
   %if not(1 = 2) %then %let t5=NOTPAREN; %else %let t5=BUG;
   %if (1 = 1 or 2 = 1) and 3 = 3 %then %let t6=GROUP; %else %let t6=BUG;
   %if 0 | 1 %then %let t7=ORBAR; %else %let t7=BUG;
-  /* empty leaf (empty var — the `%if &flag` guard idiom) is silently FALSE */
+  /* empty leaf (empty var - the `%if &flag` guard idiom) is silently FALSE */
   %let e=;
   %if &e %then %let t8=BUG; %else %let t8=EMPTY-FALSE;
 %mend;
@@ -95,7 +95,7 @@ data _null_;
 run;
 
 /* -- %eval string compares: real lexical compares since the QL-C merge (the
-   pre-merge parser DROPPED operand words, degrading both sides to 0 — g2 was
+   pre-merge parser DROPPED operand words, degrading both sides to 0 - g2 was
    trivially 1 and g3 was 0). */
 data _null_;
   put "g1=%eval(abc = abc)";

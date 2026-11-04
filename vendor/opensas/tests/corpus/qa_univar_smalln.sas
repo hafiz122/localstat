@@ -1,4 +1,4 @@
-/* QA tick120: small odd-n (n=9) PROC UNIVARIATE — pins Definition-5 quantile
+/* QA tick120: small odd-n (n=9) PROC UNIVARIATE - pins Definition-5 quantile
    interpolation at the boundaries (Q1/median/Q3) + moments on an explicit
    value list. Complements univar_large (n=5000 listing). Hand-verified:
    sorted 1,1,2,3,4,5,6,8,9 → Q1=2 (np=2.25→x3), Median=4 (x5), Q3=6 (np=6.75→x7),

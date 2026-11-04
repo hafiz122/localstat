@@ -7,4 +7,4 @@
    expect-rc: 1 */
 data _null_; put 'CONTROL'; run;
 data a; length x $40000; x='hi'; run;
-data _null_; put 'STORED SILENTLY — REGRESSED'; run;
+data _null_; put 'STORED SILENTLY - REGRESSED'; run;

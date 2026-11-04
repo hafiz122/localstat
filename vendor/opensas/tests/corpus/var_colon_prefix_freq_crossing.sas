@@ -1,4 +1,4 @@
-/* GAP-varcolonprefix-procs: PROC FREQ's TABLES is THE hard case — a prefix
+/* GAP-varcolonprefix-procs: PROC FREQ's TABLES is THE hard case - a prefix
    INSIDE a `*` crossing has its own expansion question, and the doc is
    silent on it: Statistical Procedures 6th ed. printed p.103 (a request is
    "one variable name or several variable names separated by asterisks")

@@ -1,5 +1,5 @@
 /* Control for BUG-importleadingzero (GH#29, D-026): a MIXED column
-   (0001/12/abc) stays CHARACTER — `abc` forces it — while an all-digit
+   (0001/12/abc) stays CHARACTER - `abc` forces it - while an all-digit
    zero-padded column goes NUMERIC. Live SAS and the old keep-char choice
    agree on the mixed case; this pins that the GH#29 fix did not overreach. */
 data _null_;

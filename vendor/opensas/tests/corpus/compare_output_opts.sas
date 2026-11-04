@@ -1,9 +1,9 @@
 /* PROC COMPARE output-shaping options (NOTE-compareoptsnoop). Before the fix
-   NOVALUES / NOSUMMARY / BRIEF were parsed then ignored — every one printed the
+   NOVALUES / NOSUMMARY / BRIEF were parsed then ignored - every one printed the
    full report. Each must now suppress its part of the report:
-     NOVALUES  — summaries only, no value-difference detail
-     NOSUMMARY — value differences only, no summary sections
-     BRIEF     — compact: header + value differences, no summaries
+     NOVALUES  - summaries only, no value-difference detail
+     NOSUMMARY - value differences only, no summary sections
+     BRIEF     - compact: header + value differences, no summaries
    A plain COMPARE (no options) still prints the full report unchanged.
    One known difference: x in obs 2 (20 vs 25). */
 data prod;
@@ -31,7 +31,7 @@ run;
 proc compare base=prod compare=qc nosummary;
 run;
 
-/* BRIEF: compact — header + value differences, no summaries */
+/* BRIEF: compact - header + value differences, no summaries */
 proc compare base=prod compare=qc brief;
 run;
 

@@ -1,4 +1,4 @@
-/* GAP-date11informat: DATE11. informat READ side — the hyphenated DD-MON-YYYY
+/* GAP-date11informat: DATE11. informat READ side - the hyphenated DD-MON-YYYY
    form parses (hyphens are separators); the packed DDMONYYYY form still reads.
    15MAR2020 = SAS day 21989. */
 data _null_;

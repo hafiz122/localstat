@@ -1,10 +1,10 @@
 /* QA tick284 OVER-STRICT lock for BUG-transposeoptswallow (471645f): PROC
    TRANSPOSE now ERRORs on an unknown header option / sub-statement, and a false
-   ERROR is expensive — syntax-check mode (BUG-errhalt) then skips EVERY later
+   ERROR is expensive - syntax-check mode (BUG-errhalt) then skips EVERY later
    step of the program. This fixture is the positive control: every option and
    statement below is VALID SAS 9.4 TRANSPOSE syntax and must keep running.
    (Two forms were known-broken by that landing and were absent here: a
-   mid-step TITLE/FOOTNOTE/OPTIONS and a QUOTED prefix=/name= value — fixed
+   mid-step TITLE/FOOTNOTE/OPTIONS and a QUOTED prefix=/name= value - fixed
    by BUG-transposeglobalstmt / BUG-transposeoptquoted, both included below.) */
 proc format; value grpf 1='Alpha' 2='Beta'; run;
 
@@ -45,7 +45,7 @@ run;
 proc print data=o3; run;
 
 /* F1 (BUG-transposeglobalstmt): a mid-step TITLE/FOOTNOTE/OPTIONS is legal SAS
-   inside a PROC — main.zig hoists it and leaves the tokens in the step, which
+   inside a PROC - main.zig hoists it and leaves the tokens in the step, which
    TRANSPOSE must skip, never ERROR on (the ERROR killed every later step via
    BUG-errhalt). The trailing PRINT proves the program keeps running. */
 proc transpose data=src out=o4;
@@ -59,7 +59,7 @@ proc print data=o4; run;
 /* F4 (BUG-transposeoptquoted): a QUOTED prefix=/name= value must be accepted,
    consistent with suffix=/label=/delimiter= which always took quotes
    (DELIMITER=<'>delim<'> is documented quotable in SAS 9.4; whether SAS itself
-   quotes PREFIX= is needs-oracle — the five options behave the same either
+   quotes PREFIX= is needs-oracle - the five options behave the same either
    way). The title/footnote from the previous step persist, as SAS does. */
 proc transpose data=src out=o5 prefix="Q" name='_src_';
   var v w;

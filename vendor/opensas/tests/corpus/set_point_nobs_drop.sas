@@ -1,10 +1,10 @@
-/* BUG-setpointtemp: the SET point=/nobs= vars are TEMPORARY control vars — SAS
+/* BUG-setpointtemp: the SET point=/nobs= vars are TEMPORARY control vars - SAS
    drops them from the output schema (only <have>'s vars survive), while POINT=
    random access still reads obs p and nobs= still bounds the loop up front.
    want below must have columns k x ONLY (no p, no n). A control name that is
    ALSO a genuine input column is NOT dropped (want2 keeps p; n still goes).
    POINT= + BY is illegal SAS: the bad step ERRORs and prints nothing (it is
-   last — an errored step poisons the rest of the run).
+   last - an errored step poisons the rest of the run).
    expect-rc: 1 */
 data have;
   input k x;

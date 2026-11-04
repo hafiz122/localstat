@@ -1,7 +1,7 @@
 /* BUG-inputlinehighwater: a BACKWARD #n line pointer revisits an earlier record
-   of the group (Language Reference: Concepts Table 21.5 p.516 — #n is random-access within the record
+   of the group (Language Reference: Concepts Table 21.5 p.516 - #n is random-access within the record
    group). The step must release the whole HIGH-WATER window, not the final
-   cursor position — else the group collapses to one record: a sliding window of
+   cursor position - else the group collapses to one record: a sliding window of
    2-3x too many observations plus a fabricated EOF row. */
 data _null_;
   input #2 y #1 x;

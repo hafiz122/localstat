@@ -1,10 +1,10 @@
-/* QA tick312 — pins the Language Reference: Concepts p.74 rule ("Example:
+/* QA tick312 - pins the Language Reference: Concepts p.74 rule ("Example:
    Drop and Rename Variables") on the interaction BUG-renamestmtmultiout
    (6481ea65) made reachable: a statement-form RENAME relabels EVERY output
    data set (Language Reference: Concepts Table 4.7 p.73), and because the
    RENAME statement is applied BEFORE the output data set options ("Order of
    Application", p.73-74), an output DROP=/KEEP=/WHERE= must name the NEW
-   variable — p.74 notes explicitly that the renamed name is the one used in
+   variable - p.74 notes explicitly that the renamed name is the one used in
    the DROP= data set option.
    Pre-fix this program was silently wrong: the second split set kept the old
    name, the remainder set kept the old name and did not drop it, plus a bogus

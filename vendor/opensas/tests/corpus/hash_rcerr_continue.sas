@@ -1,8 +1,8 @@
-/* SEV-rcbydesignerr: a duplicate:'e' condition is rc-by-design — the program
+/* SEV-rcbydesignerr: a duplicate:'e' condition is rc-by-design - the program
    checks the rc and handles it (Component Objects Ref: ADD's rc contract
    printed p.24, duplicate:'e' printed p.32). The ERROR must still be logged
    (and the exit code stays non-zero), but it must NOT errhalt-skip LATER
-   steps — the D-014 shape. This .txt pins the STDOUT side: every step after
+   steps - the D-014 shape. This .txt pins the STDOUT side: every step after
    the handled condition still runs. The ERRORs themselves go to stderr and
    are pinned by the captured-reporter test in exec.zig.
    expect-rc: 1 */

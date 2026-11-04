@@ -1,16 +1,16 @@
 <!doctype html>
-<!-- opensas web demo — a single self-contained file. `zig build wasm` drops
+<!-- opensas web demo - a single self-contained file. `zig build wasm` drops
      opensas.wasm next to this; serve the directory statically:
        python3 -m http.server -d web
      Everything runs client-side: the interpreter is the real opensas binary
      compiled to wasm32-wasi, with a ~20-line WASI shim below (fd_write → the
-     log pane; every other syscall stubbed — the demo runs interpret(io=null),
+     log pane; every other syscall stubbed - the demo runs interpret(io=null),
      the pure in-memory path, so no filesystem is ever touched). -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>opensas — SAS in your browser</title>
+<title>opensas - SAS in your browser</title>
 <style>
   :root {
     --bg: #0d1117; --panel: #161b22; --border: #30363d;
@@ -239,7 +239,7 @@ function runProgram() {
   span.className = rc ? "e" : "";
   span.textContent = (stderrBuf + diags) || "NOTE: no errors, no warnings.";
   log.appendChild(span);
-  // BUG-wasmignoresabortrc: rc 3+ is D-009a — the SAS program's own ABORT rc, not
+  // BUG-wasmignoresabortrc: rc 3+ is D-009a - the SAS program's own ABORT rc, not
   // an opensas gap. The old `rc === 1 ? … : "unsupported feature"` labelled every
   // `abort return n` as a missing feature, which is the exact mis-routing D-009a
   // warns about (and it never showed, because run() used to return 1 there).

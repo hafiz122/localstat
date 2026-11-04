@@ -1,6 +1,6 @@
 /* BUG-lengthcapnostore (ATTRIB spelling): `attrib z length=$40000;` is the
    other spelling of the same declaration and took the same silent-accept
-   hole. ATTRIB Statement, same volume, printed p.34 (pdf 45 — "34 Chapter 2"
+   hole. ATTRIB Statement, same volume, printed p.34 (pdf 45 - "34 Chapter 2"
    footer closes pdf 45): "LENGTH=<$>length ... Range For character
    variables, the range is from 1 to 32767 bytes for all operating
    environments." Rejected at the statement by the same parser.zig

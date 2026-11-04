@@ -9,7 +9,7 @@
    is the whole point of formatted input and the shape that regressed. */
 
 /* S1 blank-separated, each field exactly its declared width: the SECOND field
-   starts at column 6 (the blank), not at the token — COMMA5. strips the blank
+   starts at column 6 (the blank), not at the token - COMMA5. strips the blank
    and the comma, so 567, NOT 5678. */
 data _null_; infile datalines truncover;
   input a comma5. b comma5.;
@@ -28,7 +28,7 @@ datalines;
 ;
 run;
 
-/* S3 the COLON form still TOKENIZES — widths are max lengths, not columns */
+/* S3 the COLON form still TOKENIZES - widths are max lengths, not columns */
 data _null_; infile datalines truncover;
   input a :comma5. b :comma5.;
   put "S3 a=" a " b=" b;
@@ -101,7 +101,7 @@ datalines;
 ;
 run;
 
-/* S11 adjacent TIME8. and adjacent HEX4. — value AND cursor */
+/* S11 adjacent TIME8. and adjacent HEX4. - value AND cursor */
 data _null_; infile datalines truncover;
   input t1 time8. t2 time8.;
   put "S11 t1=" t1 " t2=" t2;
@@ -118,7 +118,7 @@ datalines;
 ;
 run;
 
-/* S13 PERCENT5. then a plain w. — the following field must get its own cols */
+/* S13 PERCENT5. then a plain w. - the following field must get its own cols */
 data _null_; infile datalines truncover;
   input p percent5. n 2.;
   put "S13 p=" p " n=" n;

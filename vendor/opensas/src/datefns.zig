@@ -113,7 +113,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     }
 
     // ── holiday occurrences of a specific named holiday within [date1, date2].
-    // (HOLIDAYCOUNT — count of ALL holidays on a date — is NOT implemented: it needs
+    // (HOLIDAYCOUNT - count of ALL holidays on a date - is NOT implemented: it needs
     // SAS's complete default holiday database, which our curated table doesn't match.)
     if (eqi(name, "holidayck")) {
         if (args.len < 3 or args.len > 4) return badArity(ev, name, "3 or 4", args.len);
@@ -160,7 +160,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         if (std.mem.startsWith(u8, base, "WEEKDAY")) base = "WEEKDAY"; // WEEKDAYnW head
         // YEAR/SEMIYEAR/QTR shift by MONTH; every other interval shifts by itself.
         const shift = if (eqi(base, "YEAR") or eqi(base, "SEMIYEAR") or eqi(base, "QTR")) "MONTH" else base;
-        // datetime intervals — input `DT…`, or the inherently-datetime time units — are DT-prefixed
+        // datetime intervals - input `DT…`, or the inherently-datetime time units - are DT-prefixed
         const dt = has_dt or eqi(base, "HOUR") or eqi(base, "MINUTE") or eqi(base, "SECOND");
         return .{ .str = if (dt) try std.fmt.allocPrint(ev.arena, "DT{s}", .{shift}) else try ev.arena.dupe(u8, shift) };
     }
@@ -217,13 +217,13 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
                 @divTrunc(c.m - 1, 3) + 1 // quarter (1-4)
             else
                 if (c.m <= 6) 1 else 2;
-            // BUG-intindexmult: fold into the multi-unit period — a multiplier n
+            // BUG-intindexmult: fold into the multi-unit period - a multiplier n
             // groups n sub-intervals, so the index cycles 1..INTSEAS (same fold as
             // INTINDEX, with which this coincides at mult 1). ceil(idx/mult).
             return numVal(@floatFromInt(@divTrunc(idx - 1, iv.mult) + 1));
         }
         if (eqi(iv.base, "DAY") or eqi(iv.base, "WEEKDAY") or eqi(iv.base, "WEEK")) {
-            // ponytail: week-cycle multiplier (WEEK2/DAY2) fold not SAS-verified —
+            // ponytail: week-cycle multiplier (WEEK2/DAY2) fold not SAS-verified -
             // honest missing, never a silently wrong number.
             if (iv.mult != 1) return Value.missing;
             // week of the year (SAS WEEK.1): weeks from the year's first week + 1.
@@ -254,13 +254,13 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         else if (eqi(iv.base, "TENDAY"))
             (c.m - 1) * 3 + (if (c.d <= 10) @as(i64, 1) else if (c.d <= 20) @as(i64, 2) else 3) // 1-36
         else if (eqi(iv.base, "DAY") or eqi(iv.base, "WEEKDAY")) blk: {
-            // ponytail: week-cycle multiplier (DAY2) fold not SAS-verified —
+            // ponytail: week-cycle multiplier (DAY2) fold not SAS-verified -
             // honest missing, never a silently wrong number.
             if (iv.mult != 1) return Value.missing;
             break :blk weekdayOf(dt); // day of week (1=Sun..7=Sat), cycle = WEEK
         } else
             return Value.missing;
-        // BUG-intindexmult: fold the plain index into the multi-unit period — a
+        // BUG-intindexmult: fold the plain index into the multi-unit period - a
         // multiplier n groups n sub-intervals, so the index cycles 1..INTSEAS
         // (SAS: INTINDEX('MONTH2',15MAR2020)=2, INTINDEX('QTR2',15AUG2020)=2).
         // ceil(idx/mult); no-op at mult 1.
@@ -382,12 +382,12 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const yr: i64 = toInt(toNum(args[3])) orelse return Value.missing;
         // NOTE-nwkdomdomain: documented domains (Functions Ref p.1269: n 1–5,
         // weekday 1–7, month 1–12). Out-of-domain silently returned a date in a
-        // DIFFERENT month — n=6 overshot into the next month (the −7 correction
+        // DIFFERENT month - n=6 overshot into the next month (the −7 correction
         // below is right only for n=5), n=0 reached back into the previous year,
         // weekday 0/8 wrapped mod 7, month 13 rolled into next January. The doc
         // pins no out-of-range value, so be loud (D-002): NOTE + _ERROR_=1 +
         // missing via the shared domErr path. (year carries no documented
-        // numeric range — same as mdy, not checked.)
+        // numeric range - same as mdy, not checked.)
         if (n < 1 or n > 5 or wd < 1 or wd > 7 or mo < 1 or mo > 12)
             return domErr(ev, name);
         const first = daysFromCivil(yr, mo, 1) + sas_epoch_days;
@@ -425,7 +425,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         return numVal(@floatFromInt(n));
     }
     if (eqi(name, "yyq")) {
-        // first day of quarter q of year y — mirrors mdy: out-of-range → missing
+        // first day of quarter q of year y - mirrors mdy: out-of-range → missing
         if (args.len != 2) return badArity(ev, name, "2", args.len);
         const yf = toNum(args[0]);
         const qf = toNum(args[1]);
@@ -468,7 +468,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         if (isMiss(d1) or isMiss(d2)) return Value.missing;
         return datdif(floorI64(d1), floorI64(d2), try toStr(ev, args[2]));
     }
-    // coalesce / coalescec — first non-missing (numeric) / non-blank (char) arg.
+    // coalesce / coalescec - first non-missing (numeric) / non-blank (char) arg.
     if (eqi(name, "coalesce")) {
         for (args) |arg| {
             const v = toNum(arg);
@@ -515,7 +515,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         // calendar month/day shift (BUG-intckcontyear: NOT INTNX SAME's day-of-year,
         // which mis-counts across leap boundaries); day/week/time fall back to SAME.
         // BUG-intckdtcontinuous F1: DT-prefixed intervals keep from/to on the
-        // SECONDS scale, but addMonthsCal shifts a DAYS-scale SAS date — shift the
+        // SECONDS scale, but addMonthsCal shifts a DAYS-scale SAS date - shift the
         // calendar day, re-attach the time-of-day, compare in seconds (mirrors
         // sameAlign's days↔seconds handling, BUG-intnxdtsameoverflow).
         var buf: [32]u8 = undefined;
@@ -556,7 +556,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
             };
         }
         // BUG-intnxfracincr: SAS truncates the increment toward zero (like INT),
-        // not floor — -0.5 must be 0, not -1. Start date stays floored.
+        // not floor - -0.5 must be 0, not -1. Start date stays floored.
         const r = intnxAlign(iv, floorI64(sf), clampI64(nf), al) orelse return unknownInterval(ev, iv);
         return numVal(@floatFromInt(r));
     }
@@ -601,7 +601,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
     // `currentSecondOfDay`), so the user zone IS UTC: the ID/name are "UTC", the
     // offset is 0, and the local⇄UTC conversions are the identity.
     // ponytail: there is no time-zone database, so a NAMED non-UTC zone argument
-    // cannot be honored — it errors loud (D-002) instead of silently answering
+    // cannot be honored - it errors loud (D-002) instead of silently answering
     // for UTC; blank/'UTC' and the zero-argument current-zone forms stay as-is.
     if (eqi(name, "tzoneid") or eqi(name, "tzonename")) { // current time-zone ID / std/DST name
         if (!try utcZoneOk(ev, name, args, 0)) return Value.missing;
@@ -618,7 +618,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         if (isMiss(dt)) return Value.missing;
         return numVal(dt);
     }
-    if (eqi(name, "sysprod")) { // 1 if a SAS product is licensed — this interpreter has them all
+    if (eqi(name, "sysprod")) { // 1 if a SAS product is licensed - this interpreter has them all
         if (args.len != 1) return badArity(ev, name, "1", args.len);
         return numVal(1);
     }
@@ -627,15 +627,15 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
 }
 
 /// The optional time-zone argument at `args[idx]`: absent, blank, or 'UTC'
-/// (case-insensitive) is honored — this interpreter's only zone (see the tzone
+/// (case-insensitive) is honored - this interpreter's only zone (see the tzone
 /// block above). A NAMED non-UTC zone cannot be resolved without a time-zone
-/// database: ERROR + false (D-002 — silently answering for UTC would hand back
+/// database: ERROR + false (D-002 - silently answering for UTC would hand back
 /// offset 0 / "UTC" / the identity conversion under the requested zone's name).
 fn utcZoneOk(ev: *eval.Evaluator, name: []const u8, args: []const Value, idx: usize) eval.Error!bool {
     if (args.len <= idx) return true;
     const z = std.mem.trim(u8, try toStr(ev, args[idx]), " ");
     if (z.len == 0 or eqi(z, "UTC")) return true;
-    ev.diags.report(.err, 0, "{s}(): time zone '{s}' is not supported — only 'UTC' (no time-zone database)", .{ name, z }) catch {};
+    ev.diags.report(.err, 0, "{s}(): time zone '{s}' is not supported - only 'UTC' (no time-zone database)", .{ name, z }) catch {};
     return false;
 }
 
@@ -656,7 +656,7 @@ test "BUG-tzonesilentignore: a NAMED non-UTC zone errors loud (D-002); blank/'UT
     }.v;
 
     // A named non-UTC zone → ERROR + missing on every TZONE* fn (was: silently
-    // answered for UTC — off=0 / id="UTC" / identity conversion).
+    // answered for UTC - off=0 / id="UTC" / identity conversion).
     try t.expect((try fns.dispatch(&e, "tzoneoff", &.{strV("America/New_York")})).isMissing());
     try t.expect((try fns.dispatch(&e, "tzoneid", &.{strV("America/New_York")})).isMissing());
     try t.expect((try fns.dispatch(&e, "tzonename", &.{strV("Europe/Paris")})).isMissing());
@@ -666,7 +666,7 @@ test "BUG-tzonesilentignore: a NAMED non-UTC zone errors loud (D-002); blank/'UT
     try t.expect(diags.hasErrors());
     try t.expect(std.mem.indexOf(u8, try diags.render(), "America/New_York") != null);
 
-    // Blank / 'UTC' (any case) / zero-arg are honored — no new diagnostics.
+    // Blank / 'UTC' (any case) / zero-arg are honored - no new diagnostics.
     try t.expectEqualStrings("UTC", (try fns.dispatch(&e, "tzoneid", &.{strV("UTC")})).str);
     try t.expectEqualStrings("UTC", (try fns.dispatch(&e, "tzonename", &.{strV("utc")})).str);
     try t.expectEqual(@as(f64, 0), (try fns.dispatch(&e, "tzoneoff", &.{strV("")})).num);

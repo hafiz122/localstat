@@ -1,8 +1,8 @@
 /* QA tick364 cross-landing: BUG-lengthaftersetinput x MERGE x BY. The
    established-length guard used to fire only on the assignment path; it now
    fires on the SET and INPUT paths too. bug_lengthaftersetinput pins SET /
-   INPUT / assign with PUT; this pins the two shapes it does not reach — a
-   MERGE-established variable, and a SET step that also carries a BY — and it
+   INPUT / assign with PUT; this pins the two shapes it does not reach - a
+   MERGE-established variable, and a SET step that also carries a BY - and it
    pins them through CONCATENATION, which is where a wrong storage length
    actually corrupts data rather than merely warning.
 
@@ -23,7 +23,7 @@ data m1;
 run;
 proc print data=m1 noobs; run;
 
-/* 2. Same rule in a step that also carries a BY — the BY rework routed PROC
+/* 2. Same rule in a step that also carries a BY - the BY rework routed PROC
       and DATA-step BY through one scanner in this same batch, so the pair is
       worth pinning together. */
 data m2;

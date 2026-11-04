@@ -1,9 +1,9 @@
 /* BUG-fmttimewidth: TIME/TOD/DATETIME honor width w (hh vs hh:mm vs hh:mm:ss)
-   and decimals d (fractional seconds) — SAS 9.4 Formats reference. */
+   and decimals d (fractional seconds) - SAS 9.4 Formats reference. */
 data _null_;
   t  = '14:45:32't;
   dt = '17MAR2013:14:45:32'dt;
-  put t time5.;      /* hh:mm — seconds dropped */
+  put t time5.;      /* hh:mm - seconds dropped */
   put t time8.;      /* hh:mm:ss */
   put t time11.2;    /* d=2 fractional seconds */
   put t tod12.3;     /* d=3 */

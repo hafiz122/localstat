@@ -1,4 +1,4 @@
-/* %sysfunc with a zero-argument function (today()/date()/time()) — empty parens
+/* %sysfunc with a zero-argument function (today()/date()/time()) - empty parens
    must pass NO args, not one empty arg. Deterministic guard. macro-sysfunc. */
 data _null_;
   t = input("%sysfunc(today())", best12.);

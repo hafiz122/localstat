@@ -1,9 +1,9 @@
 /* BUG-tabulatemissclass: SAS 9.4 EXCLUDES an obs with a missing value on ANY
-   class variable from the whole table — every cell N/SUM and every PCTN
-   denominator — by DEFAULT; the MISSING option keeps such obs as their own
+   class variable from the whole table - every cell N/SUM and every PCTN
+   denominator - by DEFAULT; the MISSING option keeps such obs as their own
    class level (missing numeric sorts first, blank char first). opensas kept
    them in every N/SUM/PCTN and silently swallowed the MISSING option.
-   (MEANS/FREQ already exclude on the same binary — BUG-meansclassmiss.) */
+   (MEANS/FREQ already exclude on the same binary - BUG-meansclassmiss.) */
 data d; input g x; datalines;
 1 10
 1 20
@@ -11,10 +11,10 @@ data d; input g x; datalines;
 2 30
 ;
 run;
-/* default: the g=. obs is dropped — denominator is 3, so g=1 is N=2 Sum=30
+/* default: the g=. obs is dropped - denominator is 3, so g=1 is N=2 Sum=30
    PctN=66.67 and g=2 is N=1 Sum=30 PctN=33.33; no g=. row. */
 proc tabulate data=d; class g; var x; table g, x*(n sum pctn); run;
-/* MISSING: g=. is its own level, ordered first — N=1 Sum=999 PctN=25 (of 4). */
+/* MISSING: g=. is its own level, ordered first - N=1 Sum=999 PctN=25 (of 4). */
 proc tabulate data=d missing; class g; var x; table g, x*(n sum pctn); run;
 
 /* blank CHAR class level: same default exclusion, same MISSING re-include

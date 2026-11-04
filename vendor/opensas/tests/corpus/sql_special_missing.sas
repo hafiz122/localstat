@@ -1,7 +1,7 @@
-/* BUG-sqlmissdistinct: special missings are DISTINCT values in SAS — SQL
+/* BUG-sqlmissdistinct: special missings are DISTINCT values in SAS - SQL
    DISTINCT/GROUP BY/UNION merged .A into . (any-NaN-equals-any-NaN), and the
    result printer showed "." instead of the letter. DATA-side twin (hash keys,
-   MERGE BY) is exec.zig — ticketed to dev-d. */
+   MERGE BY) is exec.zig - ticketed to dev-d. */
 data a; input k v; datalines;
 .A 1
 .Z 2

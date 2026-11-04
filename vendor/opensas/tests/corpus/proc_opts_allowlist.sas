@@ -1,12 +1,12 @@
 /* GAP-procopts (tick330 EBNF audit, proc_opts): the PROC statement-option
-   surface converged on fail-loud for unknown options (D-002) — an unknown
+   surface converged on fail-loud for unknown options (D-002) - an unknown
    option was LOUD on PROC PRINT but SILENTLY SKIPPED on PROC MEANS (and RANK,
    DELETE, DATASETS, EXPORT, IMPORT had their own silent `else i += 1`s).
    This fixture is the POSITIVE CONTROL, the important half: a pile of
    honoured and legitimately-inert options across every touched PROC must
    keep parsing and rendering at exit 0. The loud arms (bogusopt=, maxddec=,
    grups=, kll, memtype=catalog, putname/getname typos) are pinned by the
-   captured-diagnostics test in src/proc.zig — never a real aborting process. */
+   captured-diagnostics test in src/proc.zig - never a real aborting process. */
 data d;
   input g $ x;
   datalines;
@@ -22,7 +22,7 @@ proc means data=d maxdec=2 alpha=0.1 order=freq vardef=n n mean std clm nway mis
   class g;
   var x;
 run;
-/* SUMMARY shares the MEANS header parser — same surface, silent by default */
+/* SUMMARY shares the MEANS header parser - same surface, silent by default */
 proc summary data=d nway print;
   class g;
   var x;
@@ -38,7 +38,7 @@ run;
 proc print data=r noobs;
 run;
 /* DATASETS: nolist / nodetails / memtype=data are the directory-listing knobs
-   — inert here, no directory listing is ever printed; the delete still runs */
+   - inert here, no directory listing is ever printed; the delete still runs */
 proc datasets lib=work nolist nodetails memtype=data;
   delete r;
 run;

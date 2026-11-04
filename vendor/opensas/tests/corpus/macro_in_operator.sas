@@ -4,7 +4,7 @@
    (SAS 9.4 default is NOMINOPERATOR); MINDELIMITER= overrides the delimiter.
    Member and non-member must take DIFFERENT branches. */
 
-/* /minoperator ON — blank-delimited list; case-sensitive */
+/* /minoperator ON - blank-delimited list; case-sensitive */
 %macro mem(x) / minoperator;
   %if &x in a b c %then %let r = member;
   %else %let r = nonmember;
@@ -16,7 +16,7 @@
 %mem(z)
 %mem(B)
 
-/* MINDELIMITER=',' — comma-delimited list */
+/* MINDELIMITER=',' - comma-delimited list */
 %macro memc(x) / minoperator mindelimiter=',';
   %if &x in a,b,c %then %let r = member;
   %else %let r = nonmember;
@@ -27,9 +27,9 @@
 %memc(c)
 %memc(z)
 
-/* MINOPERATOR OFF (default): `%if &x in a b c` is NOT a membership test — the
+/* MINOPERATOR OFF (default): `%if &x in a b c` is NOT a membership test - the
    un-gated `in` makes the condition the SAME invalid macro expression %eval
    rejects, so it is a loud ERROR (BUG-minoperatoropt: %if agrees with %eval;
    the old always-true fallthrough let every operand take %then at exit 0).
-   Loud half pinned by in-file tests in macro.zig — green fixtures only. The
+   Loud half pinned by in-file tests in macro.zig - green fixtures only. The
    OPTIONS-statement form of the gate is pinned by macro_minoperator_opt. */

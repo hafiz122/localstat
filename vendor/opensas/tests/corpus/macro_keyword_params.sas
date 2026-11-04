@@ -1,4 +1,4 @@
-/* Keyword macro parameters + defaults — the core SDTM report-macro pattern:
+/* Keyword macro parameters + defaults - the core SDTM report-macro pattern:
    %macro rpt(dom, lib=work, keep=usubjid). Synthetic. macro-params. */
 %macro rpt(dom, lib=work, keep=usubjid);
   data _null_; put "RPT dom=&dom lib=&lib keep=&keep"; run;

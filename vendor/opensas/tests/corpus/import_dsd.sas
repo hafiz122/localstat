@@ -1,4 +1,4 @@
-/* GREEN lock (doc-finder tick223): DBMS=CSV DSD parsing is correct —
+/* GREEN lock (doc-finder tick223): DBMS=CSV DSD parsing is correct -
    quoted embedded comma, "" escaped quote, empty field = missing, and a
    clean numeric column is typed numeric. The tick223 pin that a zero-padded
    code (007) stays CHARACTER is OVERTURNED by live SAS 9.4 (GH#29,

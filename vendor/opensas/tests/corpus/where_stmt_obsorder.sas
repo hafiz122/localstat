@@ -1,6 +1,6 @@
 /* BUG-wherestmtobsorder: the DATA-step WHERE STATEMENT is a read-time filter,
    applied BEFORE firstobs=/obs= count positions WITHIN the WHERE-selected
-   subset — identical to the where= OPTION twin (BUG-whereobsorder). opensas
+   subset - identical to the where= OPTION twin (BUG-whereobsorder). opensas
    used to slice the physical firstobs=/obs= range first, THEN filter, so a
    `set a(obs=5); where x>3;` kept x=4,5 instead of x=4,5,6,7,8. */
 data a; do x=1 to 10; output; end; run;

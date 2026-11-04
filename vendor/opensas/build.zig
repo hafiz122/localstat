@@ -23,12 +23,12 @@ pub fn build(b: *std.Build) void {
 
     // GH#10 ISS-versionflag: the binary must self-report (`sas --version`).
     // Two sources, CI wins: the release workflow passes the git tag straight
-    // through (`VERSION=v0.6.5 make …` → `-Dversion=v0.6.5`) — authoritative
+    // through (`VERSION=v0.6.5 make …` → `-Dversion=v0.6.5`) - authoritative
     // even from a shallow checkout, where actions/checkout's default fetch
     // carries no tag objects and `git describe` would be wrong or empty. A
     // local build falls back to `git describe --tags --always` (precise:
     // `0.6.5-3-gbe92f29`), then to "dev" outside a git tree. build.zig.zon's
-    // .version deliberately stays the 0.0.0 placeholder — never printed.
+    // .version deliberately stays the 0.0.0 placeholder - never printed.
     const version = b.option([]const u8, "version", "Release version string reported by `sas --version`") orelse describeGit(b) orelse "dev";
     const version_opts = b.addOptions();
     version_opts.addOption([]const u8, "version", version);
@@ -42,7 +42,7 @@ pub fn build(b: *std.Build) void {
     // module they want to access.
     // On macOS libSystem is always the syscall layer anyway; linking it gives
     // %SYSGET a real getenv (macro.zig envValue). Linux release binaries stay
-    // libc-free (no glibc versioning) — they read /proc/self/environ instead.
+    // libc-free (no glibc versioning) - they read /proc/self/environ instead.
     const native_libc: ?bool = if (target.result.os.tag == .macos) true else null;
     const mod = b.addModule("sas", .{
         .link_libc = native_libc,
@@ -96,7 +96,7 @@ pub fn build(b: *std.Build) void {
                 // can be extremely useful in case of collisions (which can happen
                 // importing modules from different packages).
                 .{ .name = "sas", .module = mod },
-                // GH#10: `@import("build_options").version` — the string
+                // GH#10: `@import("build_options").version` - the string
                 // `sas --version` prints. CLI module only; the interpreter
                 // (root.zig) has no use for the build's git state.
                 .{ .name = "build_options", .module = version_opts.createModule() },
@@ -220,10 +220,10 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_programs_tests.step);
 
     // Web demo: `zig build wasm` compiles the interpreter to wasm32-wasi (a
-    // reactor — no main; wasm.zig exports alloc/run/outPtr/…) and drops
+    // reactor - no main; wasm.zig exports alloc/run/outPtr/…) and drops
     // web/opensas.wasm next to web/index.html. Serve `web/` statically to demo.
     // wasi (not freestanding) so the fail-loud std.debug.print paths keep
-    // working — index.html shims fd_write in ~20 lines of JS.
+    // working - index.html shims fd_write in ~20 lines of JS.
     const wasm_target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .wasi });
     const wasm = b.addExecutable(.{
         .name = "opensas",
@@ -266,10 +266,10 @@ pub fn build(b: *std.Build) void {
     // and reading its source code will allow you to master it.
 }
 
-/// GH#10 ISS-versionflag: the LOCAL-build fallback — `git describe --tags
+/// GH#10 ISS-versionflag: the LOCAL-build fallback - `git describe --tags
 /// --always` run by the build runner at execution time (`b.graph.io`), trimmed
 /// of its trailing newline. null (→ "dev") when git is missing, the dir isn't a
-/// git tree, or the describe fails — versioning must never break a build. The
+/// git tree, or the describe fails - versioning must never break a build. The
 /// spawn+collect shape mirrors std.Build.Step.Run's `evalGeneric` (Zig 0.16
 /// has no `Child.run` convenience).
 fn describeGit(b: *std.Build) ?[]const u8 {
@@ -278,7 +278,7 @@ fn describeGit(b: *std.Build) ?[]const u8 {
     var child = std.process.spawn(io, .{
         .argv = &.{ "git", "describe", "--tags", "--always" },
         .stdout = .pipe,
-        .stderr = .ignore, // git's own "not a git repository" — the fallback IS the answer
+        .stderr = .ignore, // git's own "not a git repository" - the fallback IS the answer
     }) catch return null;
     var read_buffer: [4096]u8 = undefined;
     var stdout_reader = child.stdout.?.readerStreaming(io, &read_buffer);

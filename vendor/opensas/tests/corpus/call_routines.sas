@@ -1,4 +1,4 @@
-/* QA regression: feasible CALL routines (dev2 8683a5f) — SORTN/SORTC/SCAN/
+/* QA regression: feasible CALL routines (dev2 8683a5f) - SORTN/SORTC/SCAN/
    CATS/CATT/CATX, value-verified vs SAS incl edge cases (missing sorts first,
    numeric auto-convert, negative scan index). CALL LABEL excluded (unstored labels). */
 data _null_;

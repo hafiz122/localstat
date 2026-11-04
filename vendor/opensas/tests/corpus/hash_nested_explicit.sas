@@ -1,9 +1,9 @@
-/* BUG-hashofhashexplicit — NOTE-hashofhash's guard was IMPLICIT-form-only.
+/* BUG-hashofhashexplicit - NOTE-hashofhash's guard was IMPLICIT-form-only.
 
    A defineData'd name that is itself a declared hash object cannot be stored
    (Value is num|str; true hash-of-hash needs an object value type). The guard
-   for that lived inside collectArgs' `out.items.len == 0` arm — the IMPLICIT
-   `h.add()` spelling — so the EXPLICIT tag form `h.add(key: 1, data: inner)`
+   for that lived inside collectArgs' `out.items.len == 0` arm - the IMPLICIT
+   `h.add()` spelling - so the EXPLICIT tag form `h.add(key: 1, data: inner)`
    walked past it, stored a SILENT numeric missing and exited 0. A later find()
    then reported a HIT (rc 0) and handed back `inner=.`: a fabricated value at
    exit 0, the worst failure class here. The `dataset:` bulk load never calls

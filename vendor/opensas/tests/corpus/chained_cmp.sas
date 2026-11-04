@@ -1,4 +1,4 @@
-/* SAS chained comparisons: `a op b op c` means (a op b) AND (b op c) — not the
+/* SAS chained comparisons: `a op b op c` means (a op b) AND (b op c) - not the
    C-style ((a op b)) op c, whose 0/1 result made every low<=x<=high window
    check near-always-true (QA-chaincmp; inflated AE via an EPOCH macro's
    SESTDTM<=dtm<=SEENDTM). */

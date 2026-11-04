@@ -1,5 +1,5 @@
 /* NOTE-chunkrelativelineno (QA tick312 F3): a diagnostic after the first
-   top-level run; reports the ABSOLUTE source line — zzzq below is line 11
+   top-level run; reports the ABSOLUTE source line - zzzq below is line 11
    (was chunk-relative L3). main.zig's unit test pins the number; this
    fixture pins that the steps before the error still print.
    expect-rc: 1 */

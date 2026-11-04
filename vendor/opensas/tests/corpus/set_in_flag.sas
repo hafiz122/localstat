@@ -1,4 +1,4 @@
-/* BUG-setinflag: SET honors the IN= dataset option — the flag is 1 while its
+/* BUG-setinflag: SET honors the IN= dataset option - the flag is 1 while its
    dataset contributes the current obs, 0 for the others (was: always missing).
    Also: `if from_a;` subsetting keeps only a's rows. */
 data a;

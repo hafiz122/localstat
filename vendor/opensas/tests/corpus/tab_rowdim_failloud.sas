@@ -1,5 +1,5 @@
 /* BUG-tabulaterowdim: a crossed/stacked ROW dimension used to silently keep
-   only the FIRST row var (undetectable — output looked like a valid single-var
+   only the FIRST row var (undetectable - output looked like a valid single-var
    table). It must FAIL LOUD instead (mirrors PROC REPORT ACROSS). The valid
    single-row TABULATE below still renders; the 2nd proc (`table reg*sex,`)
    prints nothing to stdout and reports UNSUPPORTED to stderr (exit 2). If the

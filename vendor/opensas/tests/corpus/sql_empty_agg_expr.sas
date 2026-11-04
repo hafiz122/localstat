@@ -1,5 +1,5 @@
 /* BUG-sqlemptyaggexpr: no GROUP BY, aggregate wrapped in an expression or CASE,
-   over a physically zero-row table — SAS returns ONE row (aggregates missing,
+   over a physically zero-row table - SAS returns ONE row (aggregates missing,
    count(*) = 0); opensas indexed a bogus rep row and crashed (OOB/SIGSEGV). */
 data w; x=1; if 0 then output; run;
 proc sql; select mean(x)+1 from w; quit;

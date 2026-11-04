@@ -1,4 +1,4 @@
-/* BUG-picturepos1opts — a name the doc does NOT put in the PICTURE
+/* BUG-picturepos1opts - a name the doc does NOT put in the PICTURE
    position-1 format-options (printed p. 1098 closes that set at
    DEFAULT/FUZZ/MAX/MIN/MULTILABEL/NOTSORTED/ROUND) is the USER's error,
    exit 1, NAMED (was the degenerate empty-entry message). Gap twin:

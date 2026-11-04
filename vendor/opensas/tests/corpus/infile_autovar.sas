@@ -1,5 +1,5 @@
 /* BUG-infilebufvar: `_INFILE_` is a character automatic holding the raw current
-   input record (the buffer just read by INFILE/INPUT). Was: zero refs in src —
+   input record (the buffer just read by INFILE/INPUT). Was: zero refs in src -
    a reference created a fresh uninitialized NUMERIC var yielding `.` plus a
    misleading "uninitialized" NOTE. It must yield the raw record text, and must
    NOT become an output column (automatic). */

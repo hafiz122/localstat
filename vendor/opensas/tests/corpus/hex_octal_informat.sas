@@ -3,7 +3,7 @@
    OCTALw. reads octal digits as the integer value ("017" -> 15, "377" -> 255).
    Verified via the INPUT() function AND the INPUT statement. $HEXw. (char hex
    -> bytes) stays the char path. OCTALw. had a wrong-value decimal fallback
-   after its error — gone (377 no longer prints as 377). */
+   after its error - gone (377 no longer prints as 377). */
 data _null_;
   a = input("000F", hex4.);
   b = input("C4A2", hex8.);

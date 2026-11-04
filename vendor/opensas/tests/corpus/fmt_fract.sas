@@ -1,4 +1,4 @@
-/* GAP-fmtwrite-unimpl: FRACTw. (SAS 9.4 Formats Reference p.224 — default w 10,
+/* GAP-fmtwrite-unimpl: FRACTw. (SAS 9.4 Formats Reference p.224 - default w 10,
    range 4–32, reduced fractions, right-justified). The two documented rows are
    0.6666666667 fract8. -> `     2/3` and 0.2784 fract8. -> ` 174/625`. */
 data _null_;

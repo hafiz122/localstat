@@ -1,8 +1,8 @@
-/* EPIC-charfixedwidth-slice1 (GH#27, MED silent-wrong — validator-probed on
+/* EPIC-charfixedwidth-slice1 (GH#27, MED silent-wrong - validator-probed on
    live SAS 9.4): SAS fixes a char variable's storage width at COMPILE time;
    opensas re-derived it from EVERY stored value (growing 3->6 and shrinking
-   6->3 — the silent-wrong this slice kills). Language Reference: Concepts
-   p.49: the first reference that gives a variable a length fixes it — for an
+   6->3 - the silent-wrong this slice kills). Language Reference: Concepts
+   p.49: the first reference that gives a variable a length fixes it - for an
    undeclared var first seen in `v = "<literal>"`, that width is the
    literal's. This slice stamps exactly that (assignment arm + retain-init
    path); every later store then truncates at the width via setAt, the SAME
@@ -17,13 +17,13 @@
    CASE6  per-row re-execution stamps ONCE: row 2 keeps the row-1 width
 
    CONTROLS (the slice's hard boundary, pinned so a regression is loud): a
-   NON-literal first RHS keeps today's floating width — upcase/cats results
+   NON-literal first RHS keeps today's floating width - upcase/cats results
    stay FULL-LENGTH. That computed class is exactly what the REVERTED broad
    width-on-first-assign attempt truncated ('small'->'sma',
    'CARDIAC DISORDERS'->'DISOR'); SQL computed widths are pinned separately
    in charwidth_sql_nonregress.sas. (no PHI) */
 
-/* CASE1 — the GH#27 repro */
+/* CASE1 - the GH#27 repro */
 data t1;
   y = "n/a";
   x = "abcdef";
@@ -36,7 +36,7 @@ data _null_;
   put 'CASE1 ' y= 'len=' len 'vlen=' vlen;
 run;
 
-/* CASE2 — shrink: first width wins, the short literal does not re-size */
+/* CASE2 - shrink: first width wins, the short literal does not re-size */
 data t2;
   s6 = "abcdef";
   s6 = "n/a";
@@ -48,7 +48,7 @@ data _null_;
   put 'CASE2 ' s6= 'len=' len 'vlen=' vlen;
 run;
 
-/* CASE3 — a computed RHS after the literal truncates at the literal's width */
+/* CASE3 - a computed RHS after the literal truncates at the literal's width */
 data t3;
   f = "n/a";
   f = upcase("abcdef");
@@ -60,7 +60,7 @@ data _null_;
   put 'CASE3 ' f= 'len=' len 'vlen=' vlen;
 run;
 
-/* CASE4 — CONTENTS Len: the descriptor carries the fixed width.
+/* CASE4 - CONTENTS Len: the descriptor carries the fixed width.
    w1: first-assign literal (3) + a wider store (truncates) -> Char 3, abc.
    w2: the length-stmt twin stays Char 3. */
 data w1;
@@ -76,7 +76,7 @@ proc contents data=w1; run;
 proc contents data=w2; run;
 proc print data=w1 noobs; run;
 
-/* CASE5 — the retain-init store path stamps the same way */
+/* CASE5 - the retain-init store path stamps the same way */
 data t5;
   retain r6 "abcdef";
   r6 = "n/a";
@@ -88,7 +88,7 @@ data _null_;
   put 'CASE5 ' r6= 'len=' len 'vlen=' vlen;
 run;
 
-/* CASE6 — the stamp persists across iterations: row 2's literal re-store is
+/* CASE6 - the stamp persists across iterations: row 2's literal re-store is
    a no-op and the wider computed store still truncates */
 data t6;
   input id $1.;
@@ -101,7 +101,7 @@ data t6;
 ;
 run;
 
-/* CONTROLS — non-literal first RHS: width keeps floating (full-length), the
+/* CONTROLS - non-literal first RHS: width keeps floating (full-length), the
    acknowledged partial the rest of EPIC-charfixedwidth owns */
 data t7;
   g = upcase("small");

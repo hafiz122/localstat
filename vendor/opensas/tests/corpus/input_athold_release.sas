@@ -1,6 +1,6 @@
 /* BUG-atholdhang: single trailing `@` hold + conditional re-read where a
    branch reads no further INPUT. SAS releases an un-consumed `@` hold at the
-   iteration boundary and the next INPUT reads a NEW record — opensas used to
+   iteration boundary and the next INPUT reads a NEW record - opensas used to
    re-read the held line forever (hang). Must read all rows and terminate. */
 data held;
   input type $ @;

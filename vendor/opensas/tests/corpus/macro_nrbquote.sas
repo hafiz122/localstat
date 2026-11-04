@@ -1,5 +1,5 @@
 /* BUG-macronrbquoteresolve + BUG-macronrquotemissing: %NRBQUOTE/%NRQUOTE are
-   execution-time quoting fns — they RESOLVE &refs/%calls first, THEN mask the
+   execution-time quoting fns - they RESOLVE &refs/%calls first, THEN mask the
    triggers that survive. %NRSTR stays compile-time verbatim. Synthetic.
    BUG-macronrbquoteresolve. */
 %let x=9;

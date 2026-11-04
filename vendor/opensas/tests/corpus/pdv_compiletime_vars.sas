@@ -1,4 +1,4 @@
-/* BUG-pdvcompilevars: SAS builds the PDV at compile time — a variable named
+/* BUG-pdvcompilevars: SAS builds the PDV at compile time - a variable named
    only in a never-executed statement (or a bare FORMAT statement) still
    exists, as missing-of-type. an EPOCH macro's partial-date vars rely
    on this: with full dates their branches never run, but the later PROC

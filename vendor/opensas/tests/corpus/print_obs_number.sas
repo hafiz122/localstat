@@ -22,7 +22,7 @@ run;
 /* FIRSTOBS=2 OBS=4: obs is the LAST obs number → SAS Obs 2,3,4 */
 proc print data=class(firstobs=2 obs=4);
 run;
-/* WHERE + FIRSTOBS= (Language Reference: Concepts p.229): FIRSTOBS counts WITHIN the WHERE subset —
+/* WHERE + FIRSTOBS= (Language Reference: Concepts p.229): FIRSTOBS counts WITHIN the WHERE subset -
    subset is Alice,Barbara,Carol, firstobs=3 → 3rd of the subset → Obs 4 */
 proc print data=class(firstobs=3);
   where sex='F';

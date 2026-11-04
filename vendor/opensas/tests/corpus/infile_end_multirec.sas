@@ -1,4 +1,4 @@
-/* REVERT-infileendmultirec — this fixture's SUBJECT IS REVERSED, deliberately.
+/* REVERT-infileendmultirec - this fixture's SUBJECT IS REVERSED, deliberately.
 
    It was written for BUG-infileendmultirec (e7ac8ee7, off QA tick356 F1) to
    pin that INFILE END= FIRES for `/`, `#n` and two INPUTs in one iteration.
@@ -16,14 +16,14 @@
                     INPUT statement that reads multiple input data records.
        Tip          Use the option EOF= on page 130 when END= is invalid.
    That "Restriction" means a flag stuck at 0, not a diagnostic: printed p.332
-   uses the identical construction for SET and spells it out — "END= cannot be
+   uses the identical construction for SET and spells it out - "END= cannot be
    used with POINT=. When random access is used, the END= variable is never
-   set to 1" — which opensas already implemented the never-set way.
+   set to 1" - which opensas already implemented the never-set way.
 
    So `TOTAL groups=2` is GONE from the golden below. That line was QA tick356
    F1's stated expectation, and a QA expectation is not an oracle; per p.130 the
    SAS answer is that the idiom produces no output at all here. The fixture now
-   pins the RESTRICTION instead of the feature — which is the regression net
+   pins the RESTRICTION instead of the feature - which is the regression net
    this revert needs, since nothing else would notice the flag creeping back.
 
    END= FIRING is still pinned where it is LEGAL, and that case deliberately

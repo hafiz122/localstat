@@ -1,7 +1,7 @@
 /* CALL SOFTMAX (exp(xi)/Σexp(xj) in place) and CALL VNEXT (iterate PDV variable
    names/type/length). Phase-F-callbatch.
    Re-pinned for BUG-varorder: the assignments establish x1-x3 BEFORE the LENGTH
-   statement, so SAS PDV order is x1 x2 x3 nm ty and VNEXT iterates from x1 —
+   statement, so SAS PDV order is x1 x2 x3 nm ty and VNEXT iterates from x1 -
    the old nm-first expectation encoded the pre-fix always-LENGTH-first bug. */
 data _null_;
   x1=1; x2=2; x3=3;

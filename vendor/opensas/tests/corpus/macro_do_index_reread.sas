@@ -1,19 +1,19 @@
 /* GAP-macrodoindex: the iterative %DO index was a Zig-local counter the loop body
    could never influence, so the documented early-exit idiom silently ran the FULL
-   trip count — a wrong answer, not a missing feature.
+   trip count - a wrong answer, not a missing feature.
 
    Macro Language Reference, printed p.388, `macro-variable`: "You can change the
    value of the index variable during processing. For example, using conditional
    processing to set the value of the index variable beyond the stop value when a
    certain condition is met ends processing of the loop."
 
-   The same page draws the OPPOSITE conclusion for the increment — "%BY ... is
+   The same page draws the OPPOSITE conclusion for the increment - "%BY ... is
    evaluated before the first iteration of the loop. Therefore, you cannot change it
-   as the loop iterates" — so the by-step stays evaluated once and only the index is
+   as the loop iterates" - so the by-step stays evaluated once and only the index is
    re-read each pass. The `by2` row below is that half of the contract.
    The runaway shape this re-read makes possible (a body pinning the index below
    stop) hits the max_loop_iters backstop with a loud ERROR; asserted in macro.zig
-   via the captured reporter (D-003), not here — green fixtures only. */
+   via the captured reporter (D-003), not here - green fixtures only. */
 %macro early;
   %do i=1 %to 5;x&i.%if &i = 2 %then %let i = 99;%end;final=&i
 %mend;

@@ -1,6 +1,6 @@
 /* BUG-byvaltitle: #BYVAL(var)/#BYVAR(var) in a TITLE/FOOTNOTE re-resolve per
-   BY group — the current group's FORMATTED value / the variable's label (or
-   name) — stamped above each BY group, not printed literally once. */
+   BY group - the current group's FORMATTED value / the variable's label (or
+   name) - stamped above each BY group, not printed literally once. */
 options nodate nonumber;
 data d;
   input g $ x;

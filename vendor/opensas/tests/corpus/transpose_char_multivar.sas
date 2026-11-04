@@ -5,7 +5,7 @@ S01 Normal High
 S02 Low Normal
 ;
 run;
-/* Single-type (all-char) multi-VAR list must still transpose —
+/* Single-type (all-char) multi-VAR list must still transpose -
    only a MIXED char/num VAR list errors (BUG-transposemixedvar). */
 proc transpose data=long out=wide;
   by usubjid;

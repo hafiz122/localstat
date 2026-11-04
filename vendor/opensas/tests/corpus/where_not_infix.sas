@@ -14,12 +14,12 @@ go 5
 go 1
 ;
 run;
-/* the p.226 infix form — all four WHERE routes */
+/* the p.226 infix form - all four WHERE routes */
 data r1; set d; where tool not eq 'rust' or level not eq 5; put 'STMT ' tool level; run;
 data r2; set d(where=(tool not eq 'rust' or level not eq 5)); put 'OPT  ' tool level; run;
 proc print data=d noobs; where tool not eq 'rust' or level not eq 5; run;
 proc sql; select * from d where tool not eq 'rust' or level not eq 5; quit;
-/* the p.224 sounds-like form — DATA-step and PROC SQL routes */
+/* the p.224 sounds-like form - DATA-step and PROC SQL routes */
 data r3; set d; where tool not =* 'rust'; put 'SND  ' tool level; run;
 data r4; set d(where=(tool not =* 'rust')); put 'SNDO ' tool level; run;
 proc print data=d noobs; where tool not =* 'rust'; run;
@@ -33,11 +33,11 @@ data r9; set d; where level not lt 2; put 'GE   ' tool level; run;
 data rA; set d; where level not le 1; put 'GT   ' tool level; run;
 proc sql; select * from d where level not = 5; quit;
 /* prefix NOT is a DIFFERENT expression and must keep SAS precedence:
-   `not level eq 5` is (not level) eq 5 — false on every row here */
+   `not level eq 5` is (not level) eq 5 - false on every row here */
 data rB; set d; where not level eq 5; put 'PFX  ' tool; run;
 /* parenthesised prefix: not (level eq 5) = level ne 5 */
 data rC; set d; where not (level eq 5); put 'PAR  ' tool level; run;
-/* the six sibling negations that already worked — unchanged */
+/* the six sibling negations that already worked - unchanged */
 data s1; set d; where level not in (5);          put 'IN   ' tool level; run;
 data s2; set d; where tool not contains 'us';    put 'CON  ' tool level; run;
 data s3; set d; where tool not like 'r%';        put 'LIKE ' tool level; run;

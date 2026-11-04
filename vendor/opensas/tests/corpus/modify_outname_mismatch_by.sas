@@ -1,4 +1,4 @@
-/* BUG-modifyoutnamemismatch, the SIBLING the ticket did not name — MODIFY WITH
+/* BUG-modifyoutnamemismatch, the SIBLING the ticket did not name - MODIFY WITH
    BY had the identical defect and for the identical reason.
 
    The ticket described `data b; modify d;`, the single-data-set sequential
@@ -6,8 +6,8 @@
    driver (buildModify/ModifyState, BUG-modifybymasterdriven) and it was just as
    wrong: its rebuild-commit (modifyFlush) re-emits the master through the same
    `outputAll`, i.e. through the DATA statement's output data set. So the merged
-   result landed in `b` and the master `d` — the whole point of an in-place
-   update — was left byte-identical, at exit 0, with no diagnostic.
+   result landed in `b` and the master `d` - the whole point of an in-place
+   update - was left byte-identical, at exit 0, with no diagnostic.
 
    That shared root is why the guard is ONE check ahead of buildDriver rather
    than one per driver: both drivers commit through the step's output data set,
@@ -18,7 +18,7 @@
    the DATA and the MODIFY statements".
 
    Only the MASTER is restricted. `t` is a transaction data set and must NOT
-   have to appear in the DATA statement — modify_outname_mismatch.sas C5 pins
+   have to appear in the DATA statement - modify_outname_mismatch.sas C5 pins
    the positive half of that.
 
    REVERTING THE FIX GAINS A WRONG VALUE: the trailing PROC PRINTs return, `d`

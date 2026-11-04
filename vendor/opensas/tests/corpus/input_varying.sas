@@ -1,4 +1,4 @@
-/* BUG-varyinginformat: `input var $VARYINGw. length-variable;` — the token after
+/* BUG-varyinginformat: `input var $VARYINGw. length-variable;` - the token after
    the $VARYING informat is NOT a second input variable, it is the LENGTH-VARIABLE
    operand giving the field width (0..w) to read for `var` at the current column
    pointer. opensas used to parse it as a second variable, reading `var` at a fixed

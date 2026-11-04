@@ -1,9 +1,9 @@
 /* SE-shaped multi-key sort: PROC SORT BY USUBJID SESTDTC ETCD over a CHARACTER
    ISO date. SESTDTC leads the key, so an earlier date sorts first: SCRN
-   (2018-09-13) BEFORE FULT (2019-03-28) for a subject — even though ETCD "FULT"
+   (2018-09-13) BEFORE FULT (2019-03-28) for a subject - even though ETCD "FULT"
    < "SCRN" alphabetically. Verifies our sort follows the real SE program's key
    (GAP-sedm-next: the golden was built by an older SE program that ordered
-   FULT-first, a program-version skew, not an interpreter diff — ours is correct). */
+   FULT-first, a program-version skew, not an interpreter diff - ours is correct). */
 data se;
   input usubjid $ etcd $ sestdtc : $10.;
   datalines;

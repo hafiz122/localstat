@@ -1,6 +1,6 @@
 /* compute-at-break: a COMPUTED column filled ON each BREAK/RBREAK SUMMARIZE row
    by a `compute after` block, evaluated over that row's AGGREGATED (summed)
-   values — pct = revenue / units. The break subtotal (reg) and the grand total
+   values - pct = revenue / units. The break subtotal (reg) and the grand total
    (rbreak) each show pct computed from their own summed revenue/units; the GROUP
    detail rows leave pct blank (only compute-after drives it).
      E subtotal: units=5, revenue=25 -> pct=5

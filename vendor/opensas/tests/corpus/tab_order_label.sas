@@ -1,6 +1,6 @@
 /* GAP-tabulateopts: PROC TABULATE options that used to be SILENT no-ops are
    honored. ORDER=FREQ sorts the class levels by descending count (b:3, a:2,
-   c:1 — not the lexical a,b,c); ORDER=DATA keeps first-appearance order
+   c:1 - not the lexical a,b,c); ORDER=DATA keeps first-appearance order
    (c,a,b). LABEL heads the row/analysis columns, KEYLABEL renames the Sum
    heading, and the TABLE `/ box='…'` text fills the corner box (a `/` option
    used to be mis-parsed into the bogus "analysis variable not found"). */

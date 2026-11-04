@@ -1,8 +1,8 @@
 /* BUG-nesteddeclarative: RETAIN nested inside an IF-THEN/ELSE branch is a
-   compile-time declarative in SAS — it registers its retain flag regardless of
+   compile-time declarative in SAS - it registers its retain flag regardless of
    the runtime branch that (never) executes it. c is retained via a THEN-DO
    branch, w via an ELSE-DO branch; both accumulate instead of resetting to
-   missing each row. top is an ordinary top-level RETAIN — must stay unchanged. */
+   missing each row. top is an ordinary top-level RETAIN - must stay unchanged. */
 data _null_;
   input x;
   if _n_ = 1 then do; retain c 100; end;

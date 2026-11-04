@@ -1,4 +1,4 @@
-/* BUG-fmtnestlabel: a VALUE range may name ANOTHER format as its label —
+/* BUG-fmtnestlabel: a VALUE range may name ANOTHER format as its label -
    `range=[fmtname w.d]` (SAS directed formatting). The bracketed format renders
    the value at apply time. opensas's entry parser only accepted a quoted label,
    so the bracket tokens hit the silent skip and the entry rendered EMPTY. */

@@ -10,7 +10,7 @@ B Y
 run;
 
 /* BUG-freqmultitables: separate TABLES statements are separate tables.
-   Two one-way tables (g, then h) — never a merged g*h crosstab. */
+   Two one-way tables (g, then h) - never a merged g*h crosstab. */
 proc freq data=d;
   tables g;
   tables h;

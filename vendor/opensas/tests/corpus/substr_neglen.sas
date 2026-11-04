@@ -1,5 +1,5 @@
 /* BUG-substrneglen: SUBSTR (read direction) with a NONPOSITIVE length (zero or
-   negative) is invalid in SAS 9.4 — it logs a NOTE (3rd arg invalid) and returns
+   negative) is invalid in SAS 9.4 - it logs a NOTE (3rd arg invalid) and returns
    the REMAINDER from the position to the end (NOT ""). Ref: SAS 9.4 Functions
    Reference, SUBSTRN comparison table (p.1535, "length nonpositive" row).
    Also covers the pos<1 + neg-length combo: the invalid position wins and the

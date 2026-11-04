@@ -133,7 +133,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         return numVal(std.math.pow(f64, s, 1.0 / p));
     }
     if (eqi(name, "geomean") or eqi(name, "geomeanz")) { // (Πx)^(1/n), x≥0
-        // ponytail: GEOMEAN fuzzes near-zero args, GEOMEANZ doesn't — we don't
+        // ponytail: GEOMEAN fuzzes near-zero args, GEOMEANZ doesn't - we don't
         // fuzz either way, so they share one impl.
         const xs = try collectNums(ev, args);
         if (xs.len == 0) return Value.missing;
@@ -431,7 +431,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         if (eqi(name, "logcdf") or eqi(name, "logsdf")) {
             if (val > 0) return numVal(@log(val)); // mid-range: byte-identical to before
             // BUG-logxdftail: the tail probability underflowed f64 to exactly 0,
-            // so log(val) = −inf → missing — precisely the deep-tail range the
+            // so log(val) = −inf → missing - precisely the deep-tail range the
             // LOGxDF family exists for (doc LOGCDF p.1169). Recompute in log-space.
             const lv = if (d) |dd|
                 distLogCdfSdf(dd, x, args, right)
@@ -456,7 +456,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         if (eqi(name, "logpdf")) {
             if (dens > 0 and !std.math.isInf(dens)) return numVal(@log(dens)); // byte-identical
             // BUG-logxdftail: dens underflowed to 0 deep in the tail (or blew up
-            // to inf/NaN at a pole) — compute the log-density in log-space.
+            // to inf/NaN at a pole) - compute the log-density in log-space.
             // −inf/NaN out of it → missing, exactly like log(dens) before.
             const lv = if (d) |dd|
                 distLogPdf(dd, x, args)
@@ -511,7 +511,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const nu = toNum(args[0]);
         const x = toNum(args[1]);
         // NOTE-besselneg: JBESSEL's `nu` carries "Range nu ≥ 0" (Functions ref
-        // p.1115), so nu<0 is an argument OUTSIDE THE PRESCRIBED RANGE — which
+        // p.1115), so nu<0 is an argument OUTSIDE THE PRESCRIBED RANGE - which
         // p.5 defines as invalid: note + _ERROR_=1 + missing. The missing was
         // already right; the diagnostic was not there. Same domErr path the
         // sibling range checks in this file already use (hyperCdf just above).
@@ -525,7 +525,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const x = toNum(args[1]);
         const kode = toNum(args[2]);
         if (isMiss(nu) or isMiss(x) or isMiss(kode)) return Value.missing;
-        if (nu < 0) return domErr(ev, name); // "Range nu ≥ 0", p.1022 — see JBESSEL above
+        if (nu < 0) return domErr(ev, name); // "Range nu ≥ 0", p.1022 - see JBESSEL above
         return numVal(besselI(nu, x, kode != 0));
     }
     if (eqi(name, "nvalid")) { // 1 if a valid SAS variable name (V7 rules)
@@ -538,7 +538,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
         const y = toNum(args[1]);
         const mu = toNum(args[2]);
         if (isMiss(y) or isMiss(mu)) return Value.missing;
-        // BUG-devianceeps (doc pp.614–618): ε is the LAST argument — the 4th for
+        // BUG-devianceeps (doc pp.614–618): ε is the LAST argument - the 4th for
         // most distributions, the 5th for BINOMIAL whose shape params are (μ, n).
         // ponytail: a missing ε takes the doc default 1e-12 (unprobed; needs-oracle).
         const bino = distIs(std.mem.trim(u8, dname, " "), "BINOMIAL");
@@ -744,7 +744,7 @@ pub fn dispatch(ev: *eval.Evaluator, name: []const u8, args: []const Value) eval
 /// The added set: WEIBULL, GEOMETRIC, NEGBINOMIAL, HYPERGEOMETRIC (SAS 9.4
 /// functions ref, CDF pp.485–502), LAPLACE, PARETO (closed-form continuous,
 /// GAP-quantiledists). WALD/IGAUSS, NORMALMIX, TWEEDIE and RAND TABLE
-/// deliberately stay fail-loud — recognized gaps, never silent missing.
+/// deliberately stay fail-loud - recognized gaps, never silent missing.
 const ExtDist = enum { weibull, geometric, negbinomial, hypergeometric, laplace, pareto };
 
 fn parseExtDist(s_in: []const u8) ?ExtDist {
@@ -758,7 +758,7 @@ fn parseExtDist(s_in: []const u8) ?ExtDist {
     return null;
 }
 
-/// Distribution parameter `i` (0-based, after dist+quantile) or a default —
+/// Distribution parameter `i` (0-based, after dist+quantile) or a default -
 /// local twin of functions.zig's private distParam.
 fn xpar(args: []const Value, i: usize, default: f64) f64 {
     return if (args.len > 2 + i) toNum(args[2 + i]) else default;
@@ -778,14 +778,14 @@ fn domNull(ev: *eval.Evaluator, fname: []const u8) ?f64 {
 }
 
 /// Unknown distribution name → loud ERROR (D-002) + missing. Was: silent
-/// missing — the silent-wrong class this task kills.
+/// missing - the silent-wrong class this task kills.
 fn unknownDist(ev: *eval.Evaluator, fname: []const u8, dname: []const u8) Value {
     ev.diags.report(.err, 0, "{s}: distribution '{s}' is not supported", .{ fname, std.mem.trim(u8, dname, " ") }) catch {};
     return Value.missing;
 }
 
 /// distCdf + the optional noncentrality parm SAS documents for CHISQUARE/F/T
-/// (CDF('T',t,df<,nc>) …) and PROBCHI/PROBF/PROBT already accept — wired to the
+/// (CDF('T',t,df<,nc>) …) and PROBCHI/PROBF/PROBT already accept - wired to the
 /// same noncentral routines (distCdf itself is central-only).
 /// `anytype`: functions.zig's Dist enum is file-private, can't be named here;
 /// the enum literals still check against it.
@@ -920,7 +920,7 @@ fn extPdf(ev: *eval.Evaluator, fname: []const u8, ed: ExtDist, x: f64, args: []c
     }
 }
 
-/// log of the PDF/PMF of an extended dist at `x` — the @exp argument of extPdf's
+/// log of the PDF/PMF of an extended dist at `x` - the @exp argument of extPdf's
 /// formulas. −inf outside the support (→ missing, like log(0) before). Called
 /// only after extPdf returned a validated-params value that under/overflowed.
 fn extLogPdf(ed: ExtDist, x: f64, args: []const Value) f64 {
@@ -972,10 +972,10 @@ fn extLogPdf(ed: ExtDist, x: f64, args: []const Value) f64 {
 }
 
 /// log of the CDF (right=false) or SDF (right=true) of an extended dist, in
-/// log-space — called only when the direct tail underflowed to exactly 0, so
+/// log-space - called only when the direct tail underflowed to exactly 0, so
 /// the tail is always deep (see distLogCdfSdf). null = no log-space form →
 /// missing, unchanged (ponytail: negbinomial/hypergeometric tails ride betaI/
-/// hyperCdf sums — log-space versions only when a study hits them).
+/// hyperCdf sums - log-space versions only when a study hits them).
 fn extLogCdfSdf(ed: ExtDist, x: f64, args: []const Value, right: bool) ?f64 {
     const ninf = -std.math.inf(f64);
     switch (ed) {
@@ -1129,7 +1129,7 @@ test "GAP-distsilentmiss: WEIBULL/GEOMETRIC/NEGBINOMIAL/HYPERGEOMETRIC CDF+PDF+Q
     // doc example: cdf('WEIBULL',1,2) = 0.63212 (λ defaults to 1)
     try t.expectApproxEqAbs(0.6321205588285577, (try dispatch(&e, "cdf", &.{ strV("WEIBULL"), numV(1), numV(2) })).?.num, 1e-12);
 
-    // GAP-quantiledists — LAPLACE(θ=0, λ=1): F(−1)=e⁻¹/2, f(2)=e⁻²/2,
+    // GAP-quantiledists - LAPLACE(θ=0, λ=1): F(−1)=e⁻¹/2, f(2)=e⁻²/2,
     // q(0.9)=−ln(0.2); location/scale: F(8;2,3)=1−e⁻²/2, q roundtrips.
     try t.expectApproxEqAbs(0.18393972058572117, (try dispatch(&e, "cdf", &.{ strV("LAPLACE"), numV(-1) })).?.num, 1e-12);
     try t.expectApproxEqAbs(0.8160602794142788, (try dispatch(&e, "cdf", &.{ strV("LAPLACE"), numV(1) })).?.num, 1e-12);
@@ -1193,7 +1193,7 @@ test "BUG-quantilediscrete: POISSON/BINOMIAL QUANTILE/SQUANTILE return the integ
     try t.expectEqual(@as(f64, 2), (try dispatch(&e, "quantile", &.{ strV("POISSON"), numV(0.6766764161830635), numV(2) })).?.num);
 }
 
-test "BUG-invquantp1: CINV/FINV/GAMINV reject p>=1 (missing, like QUANTILE) — interior unchanged" {
+test "BUG-invquantp1: CINV/FINV/GAMINV reject p>=1 (missing, like QUANTILE) - interior unchanged" {
     var h = Harness{ .arena = std.heap.ArenaAllocator.init(t.allocator) };
     defer h.deinit();
     h.prime();
@@ -1216,13 +1216,13 @@ test "BUG-invquantp1: CINV/FINV/GAMINV reject p>=1 (missing, like QUANTILE) — 
     try t.expectApproxEqAbs(2.2281388519649385, (try dispatch(&e, "tinv", &.{ numV(0.975), numV(10) })).?.num, 1e-9);
 }
 
-test "BUG-noncentralinverse: TINV/FINV/CINV honor nc (invert the noncentral CDF) — central unchanged" {
+test "BUG-noncentralinverse: TINV/FINV/CINV honor nc (invert the noncentral CDF) - central unchanged" {
     var h = Harness{ .arena = std.heap.ArenaAllocator.init(t.allocator) };
     defer h.deinit();
     h.prime();
     var e = h.ev();
 
-    // scipy reference values: nct/ncf/ncx2 .ppf — the inverse now solves the
+    // scipy reference values: nct/ncf/ncx2 .ppf - the inverse now solves the
     // same noncentral CDF the forward PROBT/PROBF/PROBCHI evaluate.
     try t.expectApproxEqAbs(4.357475178664401, (try dispatch(&e, "tinv", &.{ numV(0.95), numV(10), numV(2) })).?.num, 1e-6);
     try t.expectApproxEqAbs(5.952705641727215, (try dispatch(&e, "finv", &.{ numV(0.95), numV(3), numV(10), numV(2) })).?.num, 1e-6);
@@ -1245,7 +1245,7 @@ test "BUG-noncentralinverse: TINV/FINV/CINV honor nc (invert the noncentral CDF)
     try t.expectApproxEqAbs(0.9, (try dispatch(&e, "probt", &.{ numV(q), numV(7), numV(1.5) })).?.num, 1e-9);
 }
 
-test "BUG-betainvendpoint: BETAINV returns exact 0/1 at the endpoints — interior unchanged" {
+test "BUG-betainvendpoint: BETAINV returns exact 0/1 at the endpoints - interior unchanged" {
     var h = Harness{ .arena = std.heap.ArenaAllocator.init(t.allocator) };
     defer h.deinit();
     h.prime();
@@ -1328,7 +1328,7 @@ test "BUG-devianceeps + BUG-logxdftail: DEVIANCE ε-clamps (doc pp.614-618) + LO
     // ── deviance ε-clamps: boundary args now FINITE (was missing via log(0)/÷0)
     // BERN p→ε: −2·ln(1e-12); also p=1e-13 < ε clamps up to the same ε
     try t.expectApproxEqAbs(55.262042231857096, (try dispatch(&e, "deviance", &.{ strV("BERN"), numV(1), numV(0) })).?.num, 1e-9);
-    // y=0, p=1 → p clamped to 1−ε: −2·ln(1−(1−ε)) — f64 rounds 1−(1−1e-12) to
+    // y=0, p=1 → p clamped to 1−ε: −2·ln(1−(1−ε)) - f64 rounds 1−(1−1e-12) to
     // 9.99978e-13, so this is NOT exactly −2·ln(ε) (IEEE-double-faithful, as SAS).
     try t.expectApproxEqAbs(55.26208647578672, (try dispatch(&e, "deviance", &.{ strV("BERN"), numV(0), numV(1) })).?.num, 1e-9);
     try t.expectApproxEqAbs(55.262042231857096, (try dispatch(&e, "deviance", &.{ strV("BERN"), numV(1), numV(1e-13) })).?.num, 1e-9);

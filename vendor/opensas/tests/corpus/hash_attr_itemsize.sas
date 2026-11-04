@@ -1,4 +1,4 @@
-/* audit-tick: hash_attr_ref — h.item_size (approximate per-item bytes,
+/* audit-tick: hash_attr_ref - h.item_size (approximate per-item bytes,
    Language Reference: Concepts p.623) alongside h.num_items, parenless attribute form. */
 data d; k = 1; v = 2; run;
 data _null_;

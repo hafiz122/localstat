@@ -36,7 +36,7 @@ data _null_;
   put "done2";
 run;
 
-/* control: everything top-level — must be byte-identical to before */
+/* control: everything top-level - must be byte-identical to before */
 data _null_;
   a = 5;
   link double;

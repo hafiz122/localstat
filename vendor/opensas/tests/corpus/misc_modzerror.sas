@@ -1,6 +1,6 @@
 /* GAP-modzerror: MODZ with a zero divisor takes the shared invalid-arg path
    (domErr): NOTE + _ERROR_=1 + missing, same as MOD (misc_sqrtmoderror.sas)
-   — was a silent missing, so the `if _error_ then …` validation idiom never
+   - was a silent missing, so the `if _error_ then …` validation idiom never
    fired (docs/findings/qa-findings-tick138.md). Valid calls leave _ERROR_
    untouched. NOTEs go to stderr (off the diff). */
 data _null_;

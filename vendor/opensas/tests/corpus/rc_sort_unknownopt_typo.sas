@@ -1,4 +1,4 @@
-/* BUG-proctypoexits2 — a TYPO'd PROC SORT option (`oout=`) is the USER's
+/* BUG-proctypoexits2 - a TYPO'd PROC SORT option (`oout=`) is the USER's
    error, exit 1 ("fix your SAS"), not an opensas gap. The valid set is
    closed (Base SAS 9.4 Procedures Guide, 7th ed., printed pp. 2406-2408),
    so the catch-all can tell a typo from an unimplemented option; the gap
