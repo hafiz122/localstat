@@ -6,6 +6,9 @@ All notable changes to LocalStat are recorded here.
 
 ### Added
 
+- Horizontally scrolling source tabs with visible close buttons, unsaved-change
+  indicators, and keyboard-accessible controls.
+- View menu commands that open the editor and output font settings directly.
 - Offline searchable Help with a user guide, language guides, procedure/function
   index, and runnable examples that open as unsaved editor tabs.
 - Native Settings with editor themes, separate source/output fonts, viewing

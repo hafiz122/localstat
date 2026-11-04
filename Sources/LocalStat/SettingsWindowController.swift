@@ -1,5 +1,13 @@
 import AppKit
 
+enum SettingsSection: String {
+    case appearance = "Appearance"
+    case editor = "Editor"
+    case outputAndTables = "Output and Tables"
+    case editing = "Editing"
+    case layout = "Layout"
+}
+
 @MainActor final class SettingsWindowController: NSWindowController {
     private weak var app: AppDelegate?
     private var controls: [String: NSControl] = [:]
@@ -23,12 +31,12 @@ import AppKit
             sections.topAnchor.constraint(equalTo: window.contentView!.topAnchor, constant: 16),
             sections.bottomAnchor.constraint(equalTo: window.contentView!.bottomAnchor, constant: -16)
         ])
-        addSection("Appearance", rows: [
+        addSection(.appearance, rows: [
             row("App appearance", popup("appearance", AppearancePreference.allCases.map(\.title))),
             row("Editor theme", popup("theme", EditorTheme.allCases.map(\.title))),
             row("Help reading size", popup("helpFontSize", (10...28).map { "\($0) pt" }))
         ], explanation: "App appearance follows your Mac with System. Editor themes set code colors independently. Native follows the app appearance.")
-        addSection("Editor", rows: [
+        addSection(.editor, rows: [
             row("Font", popup("editorFontName", ["System Monospaced"] + fontNames)),
             row("Font size", popup("editorFontSize", (8...40).map { "\($0) pt" })),
             row("Line spacing", popup("lineSpacing", ["1", "1.25", "1.5", "1.75", "2"])),
@@ -38,18 +46,18 @@ import AppKit
             row("", checkbox("invisibleCharacters", "Show whitespace characters")),
             row("", checkbox("currentLineHighlight", "Highlight current line"))
         ], explanation: "Display changes apply to every open source tab. Your source and undo history are preserved.")
-        addSection("Output and Tables", rows: [
+        addSection(.outputAndTables, rows: [
             row("Output and diagnostics font", popup("outputFontName", ["System Monospaced"] + fontNames)),
             row("Font size", popup("outputFontSize", (8...40).map { "\($0) pt" })),
             row("", checkbox("outputWrap", "Wrap text output")),
             row("Table zoom", popup("tableZoom", stride(from: 50, through: 200, by: 10).map { "\($0)%" }))
         ], explanation: "Wrapping can make plain-text table columns harder to compare. Table zoom affects the screen; printed pages and PDF reports keep their page layout.")
-        addSection("Editing", rows: [
+        addSection(.editing, rows: [
             row("Indentation", popup("indentWidth", ["2 spaces", "4 spaces", "8 spaces"])),
             row("", checkbox("automaticIndentation", "Indent automatically on Return")),
             row("", checkbox("bracketPairing", "Pair brackets, skip closers, and delete empty pairs"))
         ], explanation: "Indentation settings affect future edits. Existing source is not reformatted. Indentation assistance is a SAS-aware heuristic.")
-        addSection("Layout", rows: [
+        addSection(.layout, rows: [
             row("", checkbox("navigatorVisible", "Show project navigator")),
             row("", checkbox("resultsExpanded", "Expand results"))
         ], explanation: "Drag dividers to resize panes. Command-0 toggles the navigator. Command-2 expands results or restores the editor.")
@@ -57,6 +65,21 @@ import AppKit
         window.center()
     }
     required init?(coder: NSCoder) { nil }
+
+    func selectSection(_ section: SettingsSection) {
+        sections.selectTabViewItem(withIdentifier: section.rawValue)
+        window?.contentView?.layoutSubtreeIfNeeded()
+        let fontID: String?
+        switch section {
+        case .editor: fontID = "editorFontName"
+        case .outputAndTables: fontID = "outputFontName"
+        default: fontID = nil
+        }
+        if let fontID, let control = controls[fontID] {
+            control.scrollToVisible(control.bounds)
+            window?.makeFirstResponder(control)
+        }
+    }
 
     private func row(_ label: String, _ control: NSControl) -> [NSView] {
         let text = NSTextField(labelWithString: label)
@@ -79,7 +102,8 @@ import AppKit
         controls[id] = control
         return control
     }
-    private func addSection(_ title: String, rows: [[NSView]], explanation: String) {
+    private func addSection(_ section: SettingsSection, rows: [[NSView]], explanation: String) {
+        let title = section.rawValue
         let grid = NSGridView(views: rows)
         grid.rowSpacing = 12; grid.columnSpacing = 16
         grid.setContentHuggingPriority(.required, for: .vertical)
