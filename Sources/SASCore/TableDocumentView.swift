@@ -51,11 +51,20 @@ import AppKit
     public override func isAccessibilityElement() -> Bool { true }
     public override func accessibilityRole() -> NSAccessibility.Role? { .staticText }
     public override func accessibilityValue() -> Any? {
-        tables.map { table in
-            ([table.title, table.section] + table.headers.map { $0.cells.map(\.text).joined(separator: "\t") } +
-             table.rows.map { $0.cells.map(\.text).joined(separator: "\t") } + table.notes)
-                .filter { !$0.isEmpty }.joined(separator: "\n")
-        }.joined(separator: "\n\n")
+        let descriptions: [String] = tables.map { table in
+            let headers: [String] = table.headers.map { row in
+                row.cells.map(\.text).joined(separator: "\t")
+            }
+            let rows: [String] = table.rows.map { row in
+                row.cells.map(\.text).joined(separator: "\t")
+            }
+            var lines: [String] = [table.title, table.section]
+            lines.append(contentsOf: headers)
+            lines.append(contentsOf: rows)
+            lines.append(contentsOf: table.notes)
+            return lines.filter { !$0.isEmpty }.joined(separator: "\n")
+        }
+        return descriptions.joined(separator: "\n\n")
     }
 
     public var pageCount: Int { fragments.count }

@@ -14,6 +14,9 @@ on:
 permissions:
   contents: read
 
+env:
+  DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
+
 concurrency:
   group: alpha-candidate
   cancel-in-progress: false
@@ -29,6 +32,10 @@ jobs:
         with:
           ref: ${{ inputs.candidate_commit || github.sha }}
           persist-credentials: false
+      - name: Report Swift toolchain
+        run: |
+          xcodebuild -version
+          swift --version
       - name: Verify release identity
         env:
           CANDIDATE_COMMIT: ${{ inputs.candidate_commit }}

@@ -38,6 +38,20 @@ final class RuntimeRunnerTests: XCTestCase {
                                          rows: [ResultRow(cells: [ResultCell("a", span: 2), ResultCell("b", span: 2)])])
         XCTAssertThrowsError(try TableFile(version: 1, tables: [overflowingRow]).validated())
     }
+    @MainActor func testTableAccessibilityPreservesContentAndSeparators() {
+        _ = NSApplication.shared
+        let first = ResultTable(procedure: "PRINT", title: "First table", section: "Section A",
+                                headers: [ResultRow(cells: [ResultCell("Name"), ResultCell("Value")])],
+                                rows: [ResultRow(cells: [ResultCell("café"), ResultCell("12")])],
+                                notes: ["", "First note"])
+        let second = ResultTable(procedure: "PRINT", title: "Second table",
+                                 headers: [ResultRow(cells: [ResultCell("Total")])],
+                                 rows: [ResultRow(cells: [ResultCell("24")])])
+        let view = TableDocumentView(tables: [first, second])
+        XCTAssertEqual(view.accessibilityValue() as? String,
+                       "First table\nSection A\nName\tValue\ncafé\t12\nFirst note\n\nSecond table\nTotal\n24")
+        XCTAssertEqual(TableDocumentView(tables: []).accessibilityValue() as? String, "")
+    }
     @MainActor func testTablePageLayoutAndPDFReport() throws {
         _ = NSApplication.shared
         let headers = [ResultRow(cells: [ResultCell("Group"), ResultCell("Analysis", span: 8)]),
