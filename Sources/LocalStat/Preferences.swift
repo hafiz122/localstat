@@ -1,4 +1,5 @@
 import AppKit
+import SASCore
 
 enum AppearancePreference: String, Codable, CaseIterable {
     case system, light, dark
@@ -85,7 +86,7 @@ struct PreferenceValues: Codable, Equatable {
     var currentLineHighlight = false
     var tableZoom: Double = 1
     var helpFontSize: Double = 14
-    var indentWidth = 2
+    var indentWidth = EditorTextEditing.defaultIndentWidth
     var automaticIndentation = true
     var bracketPairing = true
     var navigatorWidth: Double = 215
@@ -103,7 +104,7 @@ struct PreferenceValues: Codable, Equatable {
         tableZoom = bounded(tableZoom, 0.5...2, 1)
         navigatorWidth = bounded(navigatorWidth, 150...2000, 215)
         resultsFraction = bounded(resultsFraction, 0...1, 0.30)
-        if ![2, 4, 8].contains(indentWidth) { indentWidth = 2 }
+        if ![2, 4, 8].contains(indentWidth) { indentWidth = EditorTextEditing.defaultIndentWidth }
     }
 
     func font(name: String, size: Double) -> NSFont {
@@ -131,6 +132,13 @@ struct PreferenceValues: Codable, Equatable {
         if defaults.object(forKey: "resultsFraction") != nil { values.resultsFraction = defaults.double(forKey: "resultsFraction") }
         if defaults.object(forKey: "navigatorVisible") != nil { values.navigatorVisible = defaults.bool(forKey: "navigatorVisible") }
         values.validate()
+        if !defaults.bool(forKey: "fourSpaceIndentationDefaultApplied") {
+            if values.indentWidth == 2 {
+                values.indentWidth = EditorTextEditing.defaultIndentWidth
+                if let data = try? JSONEncoder().encode(values) { defaults.set(data, forKey: "idePreferences") }
+            }
+            defaults.set(true, forKey: "fourSpaceIndentationDefaultApplied")
+        }
     }
     func update(persist: Bool = true, notify: Bool = true, _ change: (inout PreferenceValues) -> Void) {
         change(&values)
