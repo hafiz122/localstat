@@ -10,6 +10,7 @@ extension AppDelegate {
         let value = preferences.values
         NSApp?.appearance = value.appearance.appearance
         appearancePopup.selectItem(withTitle: value.appearance.title)
+        applyWorkspaceStyle()
         documents.forEach { $0.applyPreferences(value) }
         applyOutputPreferences()
         (tableScroll.documentView as? TableDocumentView)?.setScreenZoom(CGFloat(value.tableZoom))
@@ -21,13 +22,65 @@ extension AppDelegate {
         let value = preferences.values
         let origin = outputView.enclosingScrollView?.contentView.bounds.origin
         outputView.font = value.outputFont
-        outputView.textColor = .textColor
-        outputView.backgroundColor = .textBackgroundColor
+        outputView.textColor = value.appearance == .sasStudio ? StudioStyle.ink : .textColor
+        outputView.backgroundColor = value.appearance == .sasStudio ? .white : .textBackgroundColor
         if let scroll = outputView.enclosingScrollView {
             configureWrapping(outputView, in: scroll, enabled: value.outputWrap)
             if let origin { scroll.contentView.scroll(to: origin); scroll.reflectScrolledClipView(scroll.contentView) }
         }
         diagnosticTable.rowHeight = max(23, value.outputFontSize + 8)
+        diagnosticTable.reloadData()
+    }
+
+    func applyWorkspaceStyle() {
+        guard window != nil else { return }
+        guard appliedWorkspaceAppearance != preferences.values.appearance else { return }
+        appliedWorkspaceAppearance = preferences.values.appearance
+        let studio = preferences.values.appearance == .sasStudio
+        studioBanner.isHidden = !studio
+        StudioStyle.background(studio ? StudioStyle.blue : nil, on: studioBanner)
+        StudioStyle.background(studio ? StudioStyle.chrome : nil, on: toolbar)
+        StudioStyle.background(studio ? .white : nil, on: codeHeader)
+        StudioStyle.background(studio ? StudioStyle.chrome : nil, on: editorToolbar)
+        StudioStyle.background(studio ? .white : nil, on: navigatorPane)
+        StudioStyle.background(studio ? StudioStyle.chrome : nil, on: resultsHeader)
+        StudioStyle.background(studio ? StudioStyle.chrome : nil, on: statusBar)
+        window.backgroundColor = studio ? .white : .windowBackgroundColor
+        explorerHeader.isHidden = !studio
+        explorerHeader.textColor = studio ? StudioStyle.ink : .labelColor
+        codeLabel.textColor = studio ? StudioStyle.blue : .labelColor
+        projectLabel.textColor = studio ? StudioStyle.muted : .labelColor
+        projectHint.textColor = studio ? StudioStyle.muted : .secondaryLabelColor
+        statusLabel.textColor = studio ? StudioStyle.muted : .labelColor
+        resultsTitle.isHidden = studio
+        resultsTitle.textColor = studio ? StudioStyle.ink : .labelColor
+        fileOutline.backgroundColor = studio ? .white : .controlBackgroundColor
+        fileOutline.rowHeight = studio ? 26 : 20
+        fileScroll.backgroundColor = studio ? .white : .controlBackgroundColor
+        diagnosticTable.backgroundColor = studio ? .white : .controlBackgroundColor
+        tableScroll.backgroundColor = studio ? .white : .controlBackgroundColor
+        runButton.bezelColor = studio ? StudioStyle.blue : nil
+        runButton.contentTintColor = studio ? .white : nil
+        runButton.attributedTitle = studio
+            ? NSAttributedString(string: "Run Program", attributes: [.foregroundColor: NSColor.white, .font: NSFont.systemFont(ofSize: 13, weight: .medium)])
+            : NSAttributedString(string: "Run Program", attributes: [.foregroundColor: NSColor.labelColor, .font: NSFont.systemFont(ofSize: 13)])
+        for button in [addFolderButton, addFileButton, createFileButton, createFolderButton] {
+            button.contentTintColor = studio ? StudioStyle.blue : nil
+        }
+        programTabStrip.usesStudioStyle = studio
+        programTabStrip.synchronize(documents: documents, selectedID: current?.id)
+        let expanded = (0..<fileOutline.numberOfRows).compactMap { row -> ProjectNode? in
+            guard let node = fileOutline.item(atRow: row) as? ProjectNode,
+                  node.isDirectory, fileOutline.isItemExpanded(node) else { return nil }
+            return node
+        }
+        let selected = fileOutline.item(atRow: fileOutline.selectedRow) as? ProjectNode
+        fileOutline.reloadData()
+        expanded.forEach { fileOutline.expandItem($0) }
+        if let selected {
+            let row = fileOutline.row(forItem: selected)
+            if row >= 0 { fileOutline.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
+        }
         diagnosticTable.reloadData()
     }
 

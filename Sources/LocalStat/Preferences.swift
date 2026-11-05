@@ -2,10 +2,11 @@ import AppKit
 import SASCore
 
 enum AppearancePreference: String, Codable, CaseIterable {
-    case system, light, dark
-    var title: String { rawValue.capitalized }
+    case sasStudio, system, light, dark
+    var title: String { self == .sasStudio ? "SAS Studio" : rawValue.capitalized }
     var appearance: NSAppearance? {
         switch self {
+        case .sasStudio: NSAppearance(named: .aqua)
         case .system: nil
         case .light: NSAppearance(named: .aqua)
         case .dark: NSAppearance(named: .darkAqua)
@@ -14,10 +15,12 @@ enum AppearancePreference: String, Codable, CaseIterable {
 }
 
 enum EditorTheme: String, Codable, CaseIterable {
-    case native, paper, midnight, contrastLight, contrastDark
+    case sasStudio, native, sasClassic, paper, midnight, contrastLight, contrastDark
     var title: String {
         switch self {
+        case .sasStudio: "SAS Studio"
         case .native: "Native"
+        case .sasClassic: "SAS Classic"
         case .paper: "Paper"
         case .midnight: "Midnight"
         case .contrastLight: "High Contrast Light"
@@ -26,19 +29,28 @@ enum EditorTheme: String, Codable, CaseIterable {
     }
     var appearance: NSAppearance? {
         switch self {
-        case .native: nil
-        case .paper, .contrastLight: NSAppearance(named: .aqua)
+        case .sasStudio, .native: nil
+        case .sasClassic, .paper, .contrastLight: NSAppearance(named: .aqua)
         case .midnight, .contrastDark: NSAppearance(named: .darkAqua)
         }
     }
     var palette: EditorPalette {
         switch self {
+        case .sasStudio:
+            EditorPalette(background: .textBackgroundColor, text: .textColor,
+                          keyword: .init(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? NSColor(srgbRed: 0.67, green: 0.79, blue: 1, alpha: 1) : NSColor(srgbRed: 0, green: 0.24, blue: 0.62, alpha: 1) },
+                          string: .init(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? NSColor(srgbRed: 0.96, green: 0.72, blue: 0.90, alpha: 1) : NSColor(srgbRed: 0.48, green: 0.14, blue: 0.48, alpha: 1) },
+                          comment: .init(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? NSColor(srgbRed: 0.58, green: 0.84, blue: 0.67, alpha: 1) : NSColor(srgbRed: 0.09, green: 0.42, blue: 0.23, alpha: 1) },
+                          selection: .selectedTextBackgroundColor, selectedText: .selectedTextColor,
+                          currentLine: .controlBackgroundColor)
         case .native:
             EditorPalette(background: .textBackgroundColor, text: .textColor,
                           keyword: .init(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? EditorTheme.midnight.palette.keyword : EditorTheme.paper.palette.keyword },
                           string: .init(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? EditorTheme.midnight.palette.string : EditorTheme.paper.palette.string },
                           comment: .init(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? EditorTheme.midnight.palette.comment : EditorTheme.paper.palette.comment }, selection: .selectedTextBackgroundColor,
                           selectedText: .selectedTextColor, currentLine: .controlBackgroundColor)
+        case .sasClassic:
+            EditorPalette("FFFFFF", "202020", "003C9E", "7A247A", "176B3A", "C9DEFF", "202020", "F2F6FC")
         case .paper:
             EditorPalette("FAF7F0", "252525", "663399", "814600", "556454", "B7D6FF", "111111", "EFEADF")
         case .midnight:
@@ -71,8 +83,8 @@ struct EditorPalette {
 }
 
 struct PreferenceValues: Codable, Equatable {
-    var appearance: AppearancePreference = .system
-    var theme: EditorTheme = .native
+    var appearance: AppearancePreference = .sasStudio
+    var theme: EditorTheme = .sasStudio
     var editorFontName = ""
     var editorFontSize: Double = 13
     var outputFontName = ""

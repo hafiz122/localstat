@@ -2,13 +2,25 @@ import AppKit
 import SASCore
 import UniformTypeIdentifiers
 
+final class ProjectNode {
+    let url: URL
+    let isDirectory: Bool
+    var children: [ProjectNode] = []
+
+    init(url: URL, isDirectory: Bool) {
+        self.url = url
+        self.isDirectory = isDirectory
+    }
+}
+
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
-    NSTableViewDataSource, NSTableViewDelegate, NSTabViewDelegate, NSSplitViewDelegate, NSMenuItemValidation {
+    NSTableViewDataSource, NSTableViewDelegate, NSOutlineViewDataSource, NSOutlineViewDelegate,
+    NSTabViewDelegate, NSSplitViewDelegate, NSMenuItemValidation {
     var window: NSWindow!
     let preferences = IDEPreferences()
     var helpController: HelpWindowController?
     var settingsController: SettingsWindowController?
-    let fileTable = NSTableView()
+    let fileOutline = NSOutlineView()
     let diagnosticTable = NSTableView()
     let tabs = NSTabView()
     let programTabStrip = ProgramTabStrip()
@@ -18,12 +30,27 @@ import UniformTypeIdentifiers
     let editorResultsSplit = NSSplitView()
     let navigatorPane = NSStackView()
     let resultsContainer = NSStackView()
+    let studioBanner = NSStackView()
+    let toolbar = NSStackView()
+    let codeHeader = NSStackView()
+    let codeLabel = NSTextField(labelWithString: "CODE")
+    let editorToolbar = NSStackView()
+    let resultsHeader = NSStackView()
+    let resultsTitle = NSTextField(labelWithString: "Results")
+    let statusBar = NSStackView()
+    let folderButton = NSButton(title: "Open Project…", target: nil, action: nil)
+    let fileScroll = NSScrollView()
     let resultsSelector = NSSegmentedControl()
     let expandResultsButton = NSButton(title: "Expand Results", target: nil, action: nil)
     let outputView = NSTextView()
     let tableScroll = NSScrollView()
     let statusLabel = NSTextField(labelWithString: "Open a program or create a new one.")
+    let explorerHeader = NSTextField(labelWithString: "Explorer")
     let projectLabel = NSTextField(labelWithString: "Project")
+    let addFolderButton = NSButton()
+    let addFileButton = NSButton()
+    let createFileButton = NSButton()
+    let createFolderButton = NSButton()
     let projectHint = NSTextField(wrappingLabelWithString: "Double-click a program to open it. Paths are relative to this project folder.")
     let runButton = NSButton(title: "Run Program", target: nil, action: nil)
     let stopButton = NSButton(title: "Stop", target: nil, action: nil)
@@ -43,8 +70,11 @@ import UniformTypeIdentifiers
     private var normalResultsFraction: CGFloat = 0.30
     private var navigatorMinimumWidth: NSLayoutConstraint?
     private var applyingLayout = false
+    var appliedWorkspaceAppearance: AppearancePreference?
     var documents: [EditorDocument] = []
     var files: [URL] = []
+    var projectNodes: [ProjectNode] = []
+    private var displayedProjectURL: URL?
     var diagnostics: [Diagnostic] = []
     var lastResult: RunResult?
     var lastRunDocument: EditorDocument?
@@ -172,7 +202,7 @@ import UniformTypeIdentifiers
         for button in [runButton, stopButton] { button.bezelStyle = .rounded }
         runButton.toolTip = "Run the entire editor buffer in a fresh local runtime (Command-R)"
         stopButton.toolTip = "Stop the current runtime (Command-period)"
-        let folderButton = NSButton(title: "Open Project…", target: self, action: #selector(openProject))
+        folderButton.target = self; folderButton.action = #selector(openProject)
         folderButton.bezelStyle = .rounded
         let spacer = NSView(); spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let appearanceLabel = NSTextField(labelWithString: "Appearance")
@@ -184,9 +214,16 @@ import UniformTypeIdentifiers
         appearancePopup.target = self
         appearancePopup.action = #selector(changeAppearance)
         appearancePopup.setAccessibilityLabel("Appearance")
-        appearancePopup.toolTip = "Choose System, Light, or Dark appearance"
-        appearancePopup.widthAnchor.constraint(equalToConstant: 100).isActive = true
-        let toolbar = NSStackView(views: [folderButton, runButton, stopButton, spacer, appearanceLabel, appearancePopup])
+        appearancePopup.toolTip = "Choose SAS Studio, System, Light, or Dark appearance"
+        appearancePopup.widthAnchor.constraint(equalToConstant: 120).isActive = true
+        let bannerTitle = NSTextField(labelWithString: "LocalStat Studio")
+        bannerTitle.font = .systemFont(ofSize: 13, weight: .semibold)
+        bannerTitle.textColor = .white
+        studioBanner.addArrangedSubview(bannerTitle)
+        studioBanner.edgeInsets = NSEdgeInsets(top: 5, left: 14, bottom: 5, right: 14)
+        studioBanner.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        root.addArrangedSubview(studioBanner)
+        [folderButton, spacer, appearanceLabel, appearancePopup].forEach { toolbar.addArrangedSubview($0) }
         toolbar.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
         toolbar.heightAnchor.constraint(equalToConstant: 44).isActive = true
         root.addArrangedSubview(toolbar)
@@ -196,16 +233,31 @@ import UniformTypeIdentifiers
         let sidebar = navigatorPane
         sidebar.orientation = .vertical; sidebar.spacing = 8; sidebar.distribution = .fill
         sidebar.edgeInsets = NSEdgeInsets(top: 10, left: 8, bottom: 8, right: 8)
+        explorerHeader.stringValue = "Local Files and Folders"
+        explorerHeader.font = .systemFont(ofSize: 12, weight: .semibold)
+        sidebar.addArrangedSubview(explorerHeader)
         projectLabel.font = .systemFont(ofSize: 12, weight: .semibold)
         projectLabel.lineBreakMode = .byTruncatingMiddle
         sidebar.addArrangedSubview(projectLabel)
+        let actions = NSStackView(views: [addFolderButton, addFileButton, createFileButton, createFolderButton])
+        actions.orientation = .horizontal; actions.spacing = 4
+        actions.distribution = .fillEqually
+        configureProjectButton(addFolderButton, symbol: "folder", title: "Add Existing Folder", action: #selector(addFolderToProject))
+        configureProjectButton(addFileButton, symbol: "doc", title: "Add Existing SAS File", action: #selector(addFileToProject))
+        configureProjectButton(createFileButton, symbol: "doc.badge.plus", title: "Create SAS File", action: #selector(createProjectFile))
+        configureProjectButton(createFolderButton, symbol: "folder.badge.plus", title: "Create Folder", action: #selector(createProjectFolder))
+        sidebar.addArrangedSubview(actions)
+        actions.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -16).isActive = true
+        actions.heightAnchor.constraint(equalToConstant: 26).isActive = true
         let fileColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("file"))
-        fileColumn.title = "SAS Programs"; fileColumn.width = 180
-        fileTable.addTableColumn(fileColumn); fileTable.headerView = nil
-        fileTable.dataSource = self; fileTable.delegate = self
-        fileTable.target = self; fileTable.doubleAction = #selector(openSelectedFile)
-        fileTable.setAccessibilityLabel("Project programs")
-        let fileScroll = scroll(fileTable)
+        fileColumn.title = "Project files"; fileColumn.width = 180
+        fileOutline.addTableColumn(fileColumn); fileOutline.outlineTableColumn = fileColumn
+        fileOutline.headerView = nil
+        fileOutline.dataSource = self; fileOutline.delegate = self
+        fileOutline.target = self; fileOutline.doubleAction = #selector(openSelectedFile)
+        fileOutline.setAccessibilityLabel("Project folders and SAS programs")
+        fileScroll.hasVerticalScroller = true; fileScroll.hasHorizontalScroller = true
+        fileScroll.autohidesScrollers = true; fileScroll.documentView = fileOutline
         fileScroll.setContentHuggingPriority(.defaultLow, for: .vertical)
         sidebar.addArrangedSubview(fileScroll)
         fileScroll.widthAnchor.constraint(equalTo: sidebar.widthAnchor, constant: -16).isActive = true
@@ -226,8 +278,20 @@ import UniformTypeIdentifiers
         programTabStrip.closeDocument = { [weak self] id in self?.closeDocument(id) }
         editorContainer.orientation = .vertical; editorContainer.spacing = 0
         editorContainer.addArrangedSubview(programTabStrip)
+        codeLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        codeHeader.addArrangedSubview(codeLabel)
+        codeHeader.edgeInsets = NSEdgeInsets(top: 5, left: 14, bottom: 5, right: 14)
+        codeHeader.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        editorContainer.addArrangedSubview(codeHeader)
+        [runButton, stopButton].forEach { editorToolbar.addArrangedSubview($0) }
+        editorToolbar.spacing = 8
+        editorToolbar.edgeInsets = NSEdgeInsets(top: 5, left: 12, bottom: 5, right: 12)
+        editorToolbar.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        editorContainer.addArrangedSubview(editorToolbar)
         editorContainer.addArrangedSubview(tabs)
         programTabStrip.widthAnchor.constraint(equalTo: editorContainer.widthAnchor).isActive = true
+        codeHeader.widthAnchor.constraint(equalTo: editorContainer.widthAnchor).isActive = true
+        editorToolbar.widthAnchor.constraint(equalTo: editorContainer.widthAnchor).isActive = true
         tabs.widthAnchor.constraint(equalTo: editorContainer.widthAnchor).isActive = true
         vertical.addArrangedSubview(editorContainer)
         outputView.isEditable = false
@@ -244,12 +308,12 @@ import UniformTypeIdentifiers
         outputView.setAccessibilityLabel("Program output")
         results.tabViewType = .noTabsNoBorder
         results.delegate = self
-        let outItem = NSTabViewItem(identifier: "output"); outItem.label = "Output"; outItem.view = scroll(outputView)
+        let outItem = NSTabViewItem(identifier: "output"); outItem.label = "Results"; outItem.view = scroll(outputView)
         tableScroll.hasVerticalScroller = true
         tableScroll.hasHorizontalScroller = true
         tableScroll.autohidesScrollers = true
         setTableMessage("Run a program to see formatted tables here.")
-        let tableItem = NSTabViewItem(identifier: "tables"); tableItem.label = "Tables"; tableItem.view = tableScroll
+        let tableItem = NSTabViewItem(identifier: "tables"); tableItem.label = "Output Data"; tableItem.view = tableScroll
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("diagnostic"))
         column.title = "Runtime diagnostics · double-click an original-source line to navigate"
         column.width = 800
@@ -261,7 +325,7 @@ import UniformTypeIdentifiers
         let diagItem = NSTabViewItem(identifier: "diagnostics"); diagItem.label = "Diagnostics"; diagItem.view = scroll(diagnosticTable)
         results.addTabViewItem(outItem); results.addTabViewItem(tableItem); results.addTabViewItem(diagItem)
         resultsSelector.segmentCount = 3
-        for (index, title) in ["Output", "Tables (0)", "Diagnostics (0)"].enumerated() {
+        for (index, title) in ["Results", "Output Data (0)", "Diagnostics (0)"].enumerated() {
             resultsSelector.setLabel(title, forSegment: index)
         }
         resultsSelector.trackingMode = .selectOne
@@ -272,10 +336,9 @@ import UniformTypeIdentifiers
         expandResultsButton.target = self
         expandResultsButton.action = #selector(toggleResultsExpansion)
         expandResultsButton.bezelStyle = .rounded
-        let resultsTitle = NSTextField(labelWithString: "Results")
         resultsTitle.font = .systemFont(ofSize: 12, weight: .semibold)
         let headerSpacer = NSView(); headerSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let resultsHeader = NSStackView(views: [resultsTitle, resultsSelector, headerSpacer, expandResultsButton])
+        [resultsTitle, resultsSelector, headerSpacer, expandResultsButton].forEach { resultsHeader.addArrangedSubview($0) }
         resultsHeader.edgeInsets = NSEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)
         resultsHeader.spacing = 8
         resultsHeader.heightAnchor.constraint(equalToConstant: 38).isActive = true
@@ -293,11 +356,11 @@ import UniformTypeIdentifiers
         statusLabel.font = .systemFont(ofSize: 11)
         statusLabel.lineBreakMode = .byTruncatingMiddle
         statusLabel.setAccessibilityLabel("Run status")
-        let status = NSStackView(views: [statusLabel])
-        status.edgeInsets = NSEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
-        status.heightAnchor.constraint(equalToConstant: 29).isActive = true
-        root.addArrangedSubview(status)
-        for view in [toolbar, navigatorSplit, status] {
+        statusBar.addArrangedSubview(statusLabel)
+        statusBar.edgeInsets = NSEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
+        statusBar.heightAnchor.constraint(equalToConstant: 29).isActive = true
+        root.addArrangedSubview(statusBar)
+        for view in [studioBanner, toolbar, navigatorSplit, statusBar] {
             view.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
         }
         window.contentView?.layoutSubtreeIfNeeded()
@@ -444,18 +507,61 @@ import UniformTypeIdentifiers
     }
 
     @objc func refreshProject() {
+        let sameProject = displayedProjectURL == projectURL.standardizedFileURL
+        let selectedURL = (fileOutline.item(atRow: fileOutline.selectedRow) as? ProjectNode)?.url.standardizedFileURL
+        let expanded = Set((0..<fileOutline.numberOfRows).compactMap { row -> URL? in
+            guard let node = fileOutline.item(atRow: row) as? ProjectNode,
+                  node.isDirectory, fileOutline.isItemExpanded(node) else { return nil }
+            return node.url.standardizedFileURL
+        })
         files = []
-        if let enumerator = FileManager.default.enumerator(at: projectURL, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles, .skipsPackageDescendants]) {
-            for case let url as URL in enumerator where url.pathExtension.lowercased() == "sas" {
+        func children(of folder: URL) -> [ProjectNode] {
+            let urls = (try? FileManager.default.contentsOfDirectory(at: folder,
+                includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey, .isPackageKey],
+                options: [.skipsHiddenFiles])) ?? []
+            return urls.compactMap { url -> ProjectNode? in
+                guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey, .isPackageKey]) else { return nil }
+                if values.isDirectory == true && values.isSymbolicLink != true && values.isPackage != true {
+                    let node = ProjectNode(url: url, isDirectory: true)
+                    node.children = children(of: url)
+                    return node
+                }
+                var targetIsDirectory: ObjCBool = false
+                let linkedProgram = values.isSymbolicLink == true &&
+                    FileManager.default.fileExists(atPath: url.path, isDirectory: &targetIsDirectory) && !targetIsDirectory.boolValue
+                guard (values.isRegularFile == true || linkedProgram), url.pathExtension.lowercased() == "sas" else { return nil }
                 files.append(url)
+                return ProjectNode(url: url, isDirectory: false)
+            }.sorted {
+                if $0.isDirectory != $1.isDirectory { return $0.isDirectory }
+                return $0.url.lastPathComponent.localizedStandardCompare($1.url.lastPathComponent) == .orderedAscending
             }
         }
+        projectNodes = children(of: projectURL)
         files.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
         projectLabel.stringValue = projectURL.lastPathComponent
         projectLabel.toolTip = projectURL.path
-        projectHint.stringValue = "No SAS programs in this folder. Choose File > New Program to create one."
+        projectHint.stringValue = files.isEmpty ? "No SAS programs in this folder. Choose File > New Program to create one." : "Double-click a program to open it. Paths are relative to this project folder."
         projectHint.isHidden = !files.isEmpty
-        fileTable.reloadData()
+        fileOutline.reloadData()
+        if sameProject {
+            func restore(_ nodes: [ProjectNode]) {
+                for node in nodes where node.isDirectory && expanded.contains(node.url.standardizedFileURL) {
+                    fileOutline.expandItem(node)
+                    restore(node.children)
+                }
+            }
+            restore(projectNodes)
+        } else {
+            for node in projectNodes where node.isDirectory { fileOutline.expandItem(node) }
+        }
+        if sameProject, let selectedURL,
+           let row = (0..<fileOutline.numberOfRows).first(where: {
+               (fileOutline.item(atRow: $0) as? ProjectNode)?.url.standardizedFileURL == selectedURL
+           }) {
+            fileOutline.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        }
+        displayedProjectURL = projectURL.standardizedFileURL
         updateControls()
     }
 
@@ -467,6 +573,106 @@ import UniformTypeIdentifiers
             UserDefaults.standard.set(url.path, forKey: "projectFolder")
             refreshProject()
         }
+    }
+    func configureProjectButton(_ button: NSButton, symbol: String, title: String, action: Selector) {
+        button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: title)
+        button.title = button.image == nil ? title : ""
+        button.imagePosition = button.image == nil ? .noImage : .imageOnly
+        button.bezelStyle = .texturedRounded
+        button.toolTip = title
+        button.setAccessibilityLabel(title)
+        button.target = self
+        button.action = action
+    }
+    var selectedProjectFolder: URL {
+        guard let node = fileOutline.item(atRow: fileOutline.selectedRow) as? ProjectNode else { return projectURL }
+        return node.isDirectory ? node.url : node.url.deletingLastPathComponent()
+    }
+    func projectName(_ proposed: String, file: Bool) throws -> String {
+        let name = proposed.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name != ".", name != "..", !name.hasPrefix("."), !name.contains("/"), !name.contains(":") else {
+            throw NSError(domain: "LocalStat", code: 1, userInfo: [NSLocalizedDescriptionKey: "Choose a name without a leading dot, slash, or colon."])
+        }
+        return file && !name.lowercased().hasSuffix(".sas") ? name + ".sas" : name
+    }
+    func unusedProjectURL(_ url: URL) throws {
+        guard !FileManager.default.fileExists(atPath: url.path),
+              (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) == nil else {
+            throw NSError(domain: "LocalStat", code: 2, userInfo: [NSLocalizedDescriptionKey: "A file or folder named \(url.lastPathComponent) already exists here."])
+        }
+    }
+    func importProjectItem(_ source: URL, into folder: URL) throws -> URL {
+        let destination = folder.appendingPathComponent(source.lastPathComponent)
+        try unusedProjectURL(destination)
+        let sourcePath = source.resolvingSymlinksInPath().standardizedFileURL.path
+        let destinationPath = destination.resolvingSymlinksInPath().standardizedFileURL.path
+        guard destinationPath != sourcePath && !destinationPath.hasPrefix(sourcePath + "/") else {
+            throw NSError(domain: "LocalStat", code: 3, userInfo: [NSLocalizedDescriptionKey: "Cannot copy a folder into itself."])
+        }
+        try FileManager.default.copyItem(at: source, to: destination)
+        refreshProject()
+        return destination
+    }
+    func makeProjectFile(named proposed: String, in folder: URL) throws -> URL {
+        let url = folder.appendingPathComponent(try projectName(proposed, file: true))
+        try unusedProjectURL(url)
+        try "".write(to: url, atomically: true, encoding: .utf8)
+        refreshProject()
+        return url
+    }
+    func makeProjectFolder(named proposed: String, in folder: URL) throws -> URL {
+        let url = folder.appendingPathComponent(try projectName(proposed, file: false))
+        try unusedProjectURL(url)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+        refreshProject()
+        return url
+    }
+    func promptForProjectName(_ title: String, defaultName: String) -> String? {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.addButton(withTitle: "Create")
+        alert.addButton(withTitle: "Cancel")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        field.stringValue = defaultName
+        alert.accessoryView = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        return field.stringValue
+    }
+    @objc func addFolderToProject() {
+        let folder = selectedProjectFolder
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true; panel.canChooseFiles = false
+        panel.directoryURL = folder; panel.prompt = "Add Folder"
+        guard panel.runModal() == .OK, let source = panel.url else { return }
+        do { _ = try importProjectItem(source, into: folder) }
+        catch { showError(error) }
+    }
+    @objc func addFileToProject() {
+        let folder = selectedProjectFolder
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false; panel.canChooseFiles = true
+        panel.allowsMultipleSelection = true
+        panel.allowedContentTypes = [UTType(filenameExtension: "sas") ?? .plainText]
+        panel.directoryURL = folder; panel.prompt = "Add File"
+        guard panel.runModal() == .OK else { return }
+        for source in panel.urls {
+            do { _ = try importProjectItem(source, into: folder) }
+            catch { showError(error) }
+        }
+    }
+    @objc func createProjectFile() {
+        let folder = selectedProjectFolder
+        guard let proposed = promptForProjectName("Create SAS File", defaultName: "program.sas") else { return }
+        do {
+            open(try makeProjectFile(named: proposed, in: folder))
+        } catch { showError(error) }
+    }
+    @objc func createProjectFolder() {
+        let folder = selectedProjectFolder
+        guard let proposed = promptForProjectName("Create Folder", defaultName: "New Folder") else { return }
+        do {
+            _ = try makeProjectFolder(named: proposed, in: folder)
+        } catch { showError(error) }
     }
     @objc func openProgram() {
         let panel = NSOpenPanel(); panel.allowsMultipleSelection = true; panel.directoryURL = projectURL
@@ -482,8 +688,12 @@ import UniformTypeIdentifiers
         sender.reply(toOpenOrPrint: .success)
     }
     @objc func openSelectedFile() {
-        let row = fileTable.clickedRow
-        if files.indices.contains(row) { open(files[row]) }
+        let row = fileOutline.clickedRow
+        guard row >= 0, let node = fileOutline.item(atRow: row) as? ProjectNode else { return }
+        if node.isDirectory {
+            if fileOutline.isItemExpanded(node) { fileOutline.collapseItem(node) }
+            else { fileOutline.expandItem(node) }
+        } else { open(node.url) }
     }
     func open(_ url: URL) {
         if let doc = documents.first(where: { $0.url?.standardizedFileURL == url.standardizedFileURL }) {
@@ -605,7 +815,7 @@ import UniformTypeIdentifiers
             }
             diagnosticTable.reloadData()
             applyOutputPreferences()
-            resultsSelector.setLabel("Tables (\(result.tables.count))", forSegment: 1)
+            resultsSelector.setLabel("Output Data (\(result.tables.count))", forSegment: 1)
             resultsSelector.setLabel("Diagnostics (\(diagnostics.count))", forSegment: 2)
             if result.status != .success { selectResults(at: 2) }
             else if !result.tables.isEmpty { selectResults(at: 1) }
@@ -698,11 +908,39 @@ import UniformTypeIdentifiers
             updateControls()
         }
     }
-    func numberOfRows(in tableView: NSTableView) -> Int { tableView === fileTable ? files.count : diagnostics.count }
+    func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+        (item as? ProjectNode)?.children.count ?? projectNodes.count
+    }
+    func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+        ((item as? ProjectNode)?.children ?? projectNodes)[index]
+    }
+    func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
+        (item as? ProjectNode)?.isDirectory ?? false
+    }
+    func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
+        guard let node = item as? ProjectNode else { return nil }
+        let label = NSTextField(labelWithString: node.url.lastPathComponent)
+        label.font = .systemFont(ofSize: 12)
+        label.lineBreakMode = .byTruncatingMiddle
+        label.toolTip = node.url.path
+        label.textColor = appearancePreference == .sasStudio ? StudioStyle.ink : .labelColor
+        let symbol = node.isDirectory ? "folder.fill" : "doc.text"
+        let icon = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: node.isDirectory ? "Folder" : "SAS program") ?? NSImage())
+        icon.contentTintColor = appearancePreference == .sasStudio ? StudioStyle.blue : .secondaryLabelColor
+        icon.widthAnchor.constraint(equalToConstant: 16).isActive = true
+        let row = NSStackView(views: [icon, label])
+        row.orientation = .horizontal; row.spacing = 7
+        return row
+    }
+    func outlineView(_ outlineView: NSOutlineView, rowViewForItem item: Any) -> NSTableRowView? {
+        let row = StudioOutlineRowView()
+        row.usesStudioStyle = appearancePreference == .sasStudio
+        return row
+    }
+    func numberOfRows(in tableView: NSTableView) -> Int { diagnostics.count }
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let label = NSTextField(labelWithString: tableView === fileTable
-            ? String(files[row].path.dropFirst(projectURL.path.count + 1)) : diagnostics[row].message)
-        label.font = tableView === fileTable ? .systemFont(ofSize: 12) : preferences.values.outputFont
+        let label = NSTextField(labelWithString: diagnostics[row].message)
+        label.font = preferences.values.outputFont
         label.lineBreakMode = .byTruncatingTail; label.toolTip = label.stringValue
         if tableView === diagnosticTable, diagnostics[row].message.hasPrefix("ERROR") { label.textColor = .systemRed }
         return label

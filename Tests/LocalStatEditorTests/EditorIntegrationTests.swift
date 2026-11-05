@@ -80,6 +80,82 @@ final class EditorIntegrationTests: XCTestCase {
         XCTAssertEqual(reopenedApp.results.selectedTabViewItem?.identifier as? String, "diagnostics")
     }
 
+    @MainActor func testProjectNavigatorShowsFoldersAndPreservesExpansion() throws {
+        _ = NSApplication.shared
+        let app = AppDelegate()
+        app.buildWindow()
+        defer { app.window.delegate = nil; app.window.close() }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("LocalStatTree-\(UUID().uuidString)")
+        let nested = root.appendingPathComponent("analysis/semester")
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try "data a; run;".write(to: root.appendingPathComponent("top.sas"), atomically: true, encoding: .utf8)
+        try "data b; run;".write(to: nested.appendingPathComponent("nested.sas"), atomically: true, encoding: .utf8)
+        try "notes".write(to: root.appendingPathComponent("notes.txt"), atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("linked.sas"),
+                                                    withDestinationURL: nested.appendingPathComponent("nested.sas"))
+
+        app.projectURL = root
+        app.refreshProject()
+        XCTAssertEqual(app.files.count, 3)
+        let folder = try XCTUnwrap(app.projectNodes.first)
+        XCTAssertEqual(folder.url.lastPathComponent, "analysis")
+        XCTAssertTrue(folder.isDirectory)
+        XCTAssertEqual(folder.children.first?.children.first?.url.lastPathComponent, "nested.sas")
+        XCTAssertEqual(app.fileOutline.numberOfRows, 4)
+        let semester = try XCTUnwrap(folder.children.first)
+        app.fileOutline.expandItem(semester)
+        XCTAssertEqual(app.fileOutline.numberOfRows, 5)
+
+        app.fileOutline.collapseItem(folder)
+        app.refreshProject()
+        XCTAssertEqual(app.fileOutline.numberOfRows, 3)
+        let refreshedFolder = try XCTUnwrap(app.projectNodes.first)
+        XCTAssertFalse(app.fileOutline.isItemExpanded(refreshedFolder))
+    }
+
+    @MainActor func testProjectActionsTargetSelectedFolderAndRejectDuplicates() throws {
+        _ = NSApplication.shared
+        let app = AppDelegate()
+        app.buildWindow()
+        defer { app.window.delegate = nil; app.window.close() }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("LocalStatActions-\(UUID().uuidString)")
+        let external = FileManager.default.temporaryDirectory.appendingPathComponent("LocalStatImport-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("analysis"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: external.appendingPathComponent("samples"), withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            try? FileManager.default.removeItem(at: external)
+        }
+        let sourceFile = external.appendingPathComponent("example.sas")
+        try "data example; run;".write(to: sourceFile, atomically: true, encoding: .utf8)
+        try "data sample; run;".write(to: external.appendingPathComponent("samples/sample.sas"), atomically: true, encoding: .utf8)
+
+        app.projectURL = root
+        app.refreshProject()
+        let folder = try XCTUnwrap(app.projectNodes.first)
+        app.fileOutline.selectRowIndexes(IndexSet(integer: app.fileOutline.row(forItem: folder)), byExtendingSelection: false)
+        XCTAssertEqual(app.selectedProjectFolder, folder.url)
+
+        let newFile = try app.makeProjectFile(named: "new", in: app.selectedProjectFolder)
+        XCTAssertEqual(newFile.lastPathComponent, "new.sas")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: newFile.path))
+        XCTAssertEqual(app.selectedProjectFolder, folder.url)
+        XCTAssertThrowsError(try app.makeProjectFile(named: "new.sas", in: folder.url))
+        XCTAssertThrowsError(try app.makeProjectFile(named: "../outside", in: folder.url))
+
+        let newFolder = try app.makeProjectFolder(named: "results", in: app.selectedProjectFolder)
+        XCTAssertEqual(newFolder.deletingLastPathComponent(), folder.url)
+        XCTAssertThrowsError(try app.makeProjectFolder(named: "results", in: folder.url))
+        let importedFile = try app.importProjectItem(sourceFile, into: app.selectedProjectFolder)
+        XCTAssertEqual(importedFile.deletingLastPathComponent(), folder.url)
+        XCTAssertThrowsError(try app.importProjectItem(sourceFile, into: folder.url))
+        let importedFolder = try app.importProjectItem(external.appendingPathComponent("samples"), into: folder.url)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: importedFolder.appendingPathComponent("sample.sas").path))
+        XCTAssertThrowsError(try app.importProjectItem(root, into: folder.url))
+        XCTAssertEqual(app.files.count, 3)
+    }
+
     @MainActor func testAppearanceSelectorPersistsLightAndDark() throws {
         _ = NSApplication.shared
         let originalAppearance = NSApp.appearance
@@ -107,13 +183,19 @@ final class EditorIntegrationTests: XCTestCase {
             defaults.removePersistentDomain(forName: suiteName)
         }
 
-        XCTAssertEqual(app.appearancePreference, .system)
-        XCTAssertNil(NSApp.appearance)
-        XCTAssertEqual(app.appearancePopup.selectedItem?.title, "System")
+        XCTAssertEqual(app.appearancePreference, .sasStudio)
+        XCTAssertEqual(app.preferences.values.theme, .sasStudio)
+        XCTAssertEqual(NSApp.appearance?.name, .aqua)
+        XCTAssertEqual(app.appearancePopup.selectedItem?.title, "SAS Studio")
+        XCTAssertFalse(app.studioBanner.isHidden)
+        XCTAssertEqual(app.explorerHeader.stringValue, "Local Files and Folders")
+
+        app.preferences.update { $0.theme = .native }
 
         app.appearancePopup.selectItem(withTitle: "Dark")
         app.changeAppearance()
         XCTAssertEqual(app.appearancePreference, .dark)
+        XCTAssertTrue(app.studioBanner.isHidden)
         XCTAssertEqual(NSApp.appearance?.name, .darkAqua)
         XCTAssertEqual(defaults.string(forKey: "appearancePreference"), "dark")
         XCTAssertEqual(editor.textView.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]), .darkAqua)

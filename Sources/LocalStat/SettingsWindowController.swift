@@ -35,7 +35,7 @@ enum SettingsSection: String {
             row("App appearance", popup("appearance", AppearancePreference.allCases.map(\.title))),
             row("Editor theme", popup("theme", EditorTheme.allCases.map(\.title))),
             row("Help reading size", popup("helpFontSize", (10...28).map { "\($0) pt" }))
-        ], explanation: "App appearance follows your Mac with System. Editor themes set code colors independently. Native follows the app appearance.")
+        ], explanation: "SAS Studio is the default workspace appearance. System follows your Mac; Light and Dark use Mac controls. Editor themes can be chosen separately.")
         addSection(.editor, rows: [
             row("Font", popup("editorFontName", ["System Monospaced"] + fontNames)),
             row("Font size", popup("editorFontSize", (8...40).map { "\($0) pt" })),
