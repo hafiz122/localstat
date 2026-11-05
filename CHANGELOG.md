@@ -25,6 +25,9 @@ All notable changes to LocalStat are recorded here.
 
 ### Fixed
 
+- Default to four spaces for automatic indentation, Tab, and Shift-Tab. Migrate
+  saved two-space settings once while preserving later explicit choices and
+  existing source text.
 - Keep the Settings table-zoom selector accurate after repeated size changes.
 - Clear Help's empty-search message when navigation restores the contents list.
 - Show the complete input data and program in the reporting guide, and verify

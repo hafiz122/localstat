@@ -13,7 +13,8 @@ public struct EditorTextEdit: Equatable {
 }
 
 public enum EditorTextEditing {
-    public static let indentUnit = "  "
+    public static let defaultIndentWidth = 4
+    public static let indentUnit = String(repeating: " ", count: defaultIndentWidth)
     private static let bracketPairs = ["(": ")", "[": "]", "{": "}"]
 
     public static func openingBracket(_ bracket: String, in source: String, selection: NSRange) -> EditorTextEdit? {
@@ -53,7 +54,7 @@ public enum EditorTextEditing {
         )
     }
 
-    public static func newline(in source: String, selection: NSRange, indentWidth: Int = 2) -> EditorTextEdit? {
+    public static func newline(in source: String, selection: NSRange, indentWidth: Int = EditorTextEditing.defaultIndentWidth) -> EditorTextEdit? {
         let indentUnit = String(repeating: " ", count: min(max(indentWidth, 1), 8))
         guard isValid(selection, in: source) else { return nil }
         let text = source as NSString
@@ -91,7 +92,7 @@ public enum EditorTextEditing {
         )
     }
 
-    public static func indent(in source: String, selection: NSRange, indentWidth: Int = 2) -> EditorTextEdit? {
+    public static func indent(in source: String, selection: NSRange, indentWidth: Int = EditorTextEditing.defaultIndentWidth) -> EditorTextEdit? {
         let indentUnit = String(repeating: " ", count: min(max(indentWidth, 1), 8))
         guard isValid(selection, in: source) else { return nil }
         if selection.length == 0 {
@@ -112,7 +113,7 @@ public enum EditorTextEditing {
         )
     }
 
-    public static func outdent(in source: String, selection: NSRange, indentWidth: Int = 2) -> EditorTextEdit? {
+    public static func outdent(in source: String, selection: NSRange, indentWidth: Int = EditorTextEditing.defaultIndentWidth) -> EditorTextEdit? {
         guard isValid(selection, in: source) else { return nil }
         let text = source as NSString
         let lines = text.lineRange(for: selection)

@@ -49,7 +49,7 @@ final class CodeTextView: NSTextView {
     var appearanceChanged: (() -> Void)?
     var automaticIndentation = true
     var bracketPairing = true
-    var indentWidth = 2
+    var indentWidth = EditorTextEditing.defaultIndentWidth
     var currentLineColor: NSColor?
 
     override func insertText(_ insertString: Any, replacementRange: NSRange) {

@@ -70,8 +70,8 @@ final class EditorTextEditingTests: XCTestCase {
         let source = "  do;"
         let edit = try XCTUnwrap(EditorTextEditing.newline(in: source, selection: NSRange(location: 5, length: 0)))
 
-        XCTAssertEqual(applying(edit, to: source), "  do;\n    ")
-        XCTAssertEqual(edit.selectedRange, NSRange(location: 10, length: 0))
+        XCTAssertEqual(applying(edit, to: source), "  do;\n      ")
+        XCTAssertEqual(edit.selectedRange, NSRange(location: 12, length: 0))
     }
 
     func testReturnIndentsAfterIndexedSASDo() throws {
@@ -81,7 +81,7 @@ final class EditorTextEditingTests: XCTestCase {
             selection: NSRange(location: (source as NSString).length, length: 0)
         ))
 
-        XCTAssertEqual(applying(edit, to: source), source + "\n    ")
+        XCTAssertEqual(applying(edit, to: source), source + "\n      ")
     }
 
     func testReturnIndentsAfterSASSelectExpression() throws {
@@ -91,7 +91,7 @@ final class EditorTextEditingTests: XCTestCase {
             selection: NSRange(location: (source as NSString).length, length: 0)
         ))
 
-        XCTAssertEqual(applying(edit, to: source), source + "\n  ")
+        XCTAssertEqual(applying(edit, to: source), source + "\n    ")
     }
 
     func testReturnIndentsAfterDataAndProcHeaders() throws {
@@ -100,7 +100,7 @@ final class EditorTextEditingTests: XCTestCase {
                 in: source,
                 selection: NSRange(location: (source as NSString).length, length: 0)
             ))
-            XCTAssertEqual(applying(edit, to: source), source + "\n  ")
+            XCTAssertEqual(applying(edit, to: source), source + "\n    ")
         }
     }
 
@@ -115,8 +115,8 @@ final class EditorTextEditingTests: XCTestCase {
         let source = "  ()"
         let edit = try XCTUnwrap(EditorTextEditing.newline(in: source, selection: NSRange(location: 3, length: 0)))
 
-        XCTAssertEqual(applying(edit, to: source), "  (\n    \n  )")
-        XCTAssertEqual(edit.selectedRange, NSRange(location: 8, length: 0))
+        XCTAssertEqual(applying(edit, to: source), "  (\n      \n  )")
+        XCTAssertEqual(edit.selectedRange, NSRange(location: 10, length: 0))
     }
 
     func testTabIndentsAndBacktabOutdentsSelectedLines() throws {
@@ -125,8 +125,19 @@ final class EditorTextEditingTests: XCTestCase {
         let indented = try XCTUnwrap(EditorTextEditing.indent(in: source, selection: selection))
         let indentedSource = applying(indented, to: source)
 
-        XCTAssertEqual(indentedSource, "  data demo;\n    x = 1;\n  run;")
+        XCTAssertEqual(indentedSource, "    data demo;\n      x = 1;\n    run;")
         let outdented = try XCTUnwrap(EditorTextEditing.outdent(in: indentedSource, selection: indented.selectedRange))
         XCTAssertEqual(applying(outdented, to: indentedSource), source)
+    }
+
+    func testExplicitTwoSpaceIndentationRemainsAvailable() throws {
+        let source = "data demo;"
+        let edit = try XCTUnwrap(EditorTextEditing.newline(in: source,
+            selection: NSRange(location: (source as NSString).length, length: 0), indentWidth: 2))
+        XCTAssertEqual(applying(edit, to: source), source + "\n  ")
+        let indented = try XCTUnwrap(EditorTextEditing.indent(in: "x=1;", selection: NSRange(location: 0, length: 0), indentWidth: 2))
+        XCTAssertEqual(applying(indented, to: "x=1;"), "  x=1;")
+        let outdented = try XCTUnwrap(EditorTextEditing.outdent(in: "  x=1;", selection: NSRange(location: 2, length: 0), indentWidth: 2))
+        XCTAssertEqual(applying(outdented, to: "  x=1;"), "x=1;")
     }
 }
