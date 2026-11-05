@@ -3,7 +3,7 @@ import SASCore
 
 enum AppearancePreference: String, Codable, CaseIterable {
     case sasStudio, system, light, dark
-    var title: String { self == .sasStudio ? "SAS Studio" : rawValue.capitalized }
+    var title: String { self == .sasStudio ? "SAS Native" : rawValue.capitalized }
     var appearance: NSAppearance? {
         switch self {
         case .sasStudio: NSAppearance(named: .aqua)
@@ -18,7 +18,7 @@ enum EditorTheme: String, Codable, CaseIterable {
     case sasStudio, native, sasClassic, paper, midnight, contrastLight, contrastDark
     var title: String {
         switch self {
-        case .sasStudio: "SAS Studio"
+        case .sasStudio: "SAS Native"
         case .native: "Native"
         case .sasClassic: "SAS Classic"
         case .paper: "Paper"
@@ -101,8 +101,8 @@ struct PreferenceValues: Codable, Equatable {
     var indentWidth = EditorTextEditing.defaultIndentWidth
     var automaticIndentation = true
     var bracketPairing = true
-    var navigatorWidth: Double = 215
-    var resultsFraction: Double = 0.30
+    var navigatorWidth: Double = 235
+    var resultsFraction: Double = 0.38
     var navigatorVisible = true
 
     mutating func validate() {
@@ -114,8 +114,8 @@ struct PreferenceValues: Codable, Equatable {
         helpFontSize = bounded(helpFontSize, 10...28, 14)
         lineSpacing = bounded(lineSpacing, 1...2, 1)
         tableZoom = bounded(tableZoom, 0.5...2, 1)
-        navigatorWidth = bounded(navigatorWidth, 150...2000, 215)
-        resultsFraction = bounded(resultsFraction, 0...1, 0.30)
+        navigatorWidth = bounded(navigatorWidth, 150...2000, 235)
+        resultsFraction = bounded(resultsFraction, 0...1, 0.38)
         if ![2, 4, 8].contains(indentWidth) { indentWidth = EditorTextEditing.defaultIndentWidth }
     }
 

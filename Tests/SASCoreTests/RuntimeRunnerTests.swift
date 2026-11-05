@@ -84,6 +84,43 @@ final class RuntimeRunnerTests: XCTestCase {
                            "Blank PDF page \(index + 1)")
         }
     }
+    @MainActor func testPrintedTableKeepsNumericValuesAlignedAndTitleCentered() throws {
+        _ = NSApplication.shared
+        let table = ResultTable(procedure: "PRINT", title: "Printed observations",
+                                headers: [ResultRow(cells: [ResultCell("Name"), ResultCell("Value")])],
+                                rows: [ResultRow(cells: [ResultCell("Short"), ResultCell("2.00")]),
+                                       ResultRow(cells: [ResultCell("Long"), ResultCell("1000.00")])])
+        let destination = try workspace().appendingPathComponent("sas-style-table.pdf")
+        XCTAssertTrue(TablePrintRenderer.operation(for: [table], destination: destination).run())
+        let page = try XCTUnwrap(PDFDocument(url: destination)?.page(at: 0))
+        let content = try XCTUnwrap(page.string) as NSString
+        func bounds(_ value: String) throws -> NSRect {
+            let range = content.range(of: value)
+            XCTAssertNotEqual(range.location, NSNotFound)
+            return try XCTUnwrap(page.selection(for: range)).bounds(for: page)
+        }
+        XCTAssertEqual(try bounds("2.00").maxX, try bounds("1000.00").maxX, accuracy: 1)
+        XCTAssertEqual(try bounds("Printed observations").midX, page.bounds(for: .mediaBox).midX, accuracy: 20)
+    }
+    @MainActor func testPrintedTableKeepsCharacterValuesLeftAligned() throws {
+        _ = NSApplication.shared
+        let table = ResultTable(procedure: "PRINT", title: "Mixed values",
+                                headers: [ResultRow(cells: [ResultCell("Value")])],
+                                rows: [ResultRow(cells: [ResultCell("23.00")]),
+                                       ResultRow(cells: [ResultCell("1%2")]),
+                                       ResultRow(cells: [ResultCell("1,2,3")])])
+        let destination = try workspace().appendingPathComponent("mixed-value-table.pdf")
+        XCTAssertTrue(TablePrintRenderer.operation(for: [table], destination: destination).run())
+        let page = try XCTUnwrap(PDFDocument(url: destination)?.page(at: 0))
+        let content = try XCTUnwrap(page.string) as NSString
+        func left(_ value: String) throws -> CGFloat {
+            let range = content.range(of: value)
+            XCTAssertNotEqual(range.location, NSNotFound)
+            return try XCTUnwrap(page.selection(for: range)).bounds(for: page).minX
+        }
+        XCTAssertLessThan(try left("1%2"), try left("23.00"))
+        XCTAssertLessThan(try left("1,2,3"), try left("23.00"))
+    }
     @MainActor func testRepeatedTableTextIsMeasuredOncePerWidthAndFont() {
         _ = NSApplication.shared
         let table = ResultTable(procedure: "PRINT", title: "Repeated cells",

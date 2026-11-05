@@ -32,8 +32,7 @@ final class ProjectNode {
     let resultsContainer = NSStackView()
     let studioBanner = NSStackView()
     let toolbar = NSStackView()
-    let codeHeader = NSStackView()
-    let codeLabel = NSTextField(labelWithString: "CODE")
+    let codeLabel = NSTextField(labelWithString: "Program")
     let editorToolbar = NSStackView()
     let resultsHeader = NSStackView()
     let resultsTitle = NSTextField(labelWithString: "Results")
@@ -66,8 +65,8 @@ final class ProjectNode {
     var appearancePreference: AppearancePreference { preferences.values.appearance }
     private(set) var navigatorVisible = true
     private(set) var resultsExpanded = false
-    private var navigatorWidth: CGFloat = 215
-    private var normalResultsFraction: CGFloat = 0.30
+    private var navigatorWidth: CGFloat = 235
+    private var normalResultsFraction: CGFloat = 0.38
     private var navigatorMinimumWidth: NSLayoutConstraint?
     private var applyingLayout = false
     var appliedWorkspaceAppearance: AppearancePreference?
@@ -214,7 +213,7 @@ final class ProjectNode {
         appearancePopup.target = self
         appearancePopup.action = #selector(changeAppearance)
         appearancePopup.setAccessibilityLabel("Appearance")
-        appearancePopup.toolTip = "Choose SAS Studio, System, Light, or Dark appearance"
+        appearancePopup.toolTip = "Choose SAS Native, System, Light, or Dark appearance"
         appearancePopup.widthAnchor.constraint(equalToConstant: 120).isActive = true
         let bannerTitle = NSTextField(labelWithString: "LocalStat Studio")
         bannerTitle.font = .systemFont(ofSize: 13, weight: .semibold)
@@ -233,7 +232,7 @@ final class ProjectNode {
         let sidebar = navigatorPane
         sidebar.orientation = .vertical; sidebar.spacing = 8; sidebar.distribution = .fill
         sidebar.edgeInsets = NSEdgeInsets(top: 10, left: 8, bottom: 8, right: 8)
-        explorerHeader.stringValue = "Local Files and Folders"
+        explorerHeader.stringValue = "Project Explorer"
         explorerHeader.font = .systemFont(ofSize: 12, weight: .semibold)
         sidebar.addArrangedSubview(explorerHeader)
         projectLabel.font = .systemFont(ofSize: 12, weight: .semibold)
@@ -278,19 +277,16 @@ final class ProjectNode {
         programTabStrip.closeDocument = { [weak self] id in self?.closeDocument(id) }
         editorContainer.orientation = .vertical; editorContainer.spacing = 0
         editorContainer.addArrangedSubview(programTabStrip)
-        codeLabel.font = .systemFont(ofSize: 12, weight: .medium)
-        codeHeader.addArrangedSubview(codeLabel)
-        codeHeader.edgeInsets = NSEdgeInsets(top: 5, left: 14, bottom: 5, right: 14)
-        codeHeader.heightAnchor.constraint(equalToConstant: 28).isActive = true
-        editorContainer.addArrangedSubview(codeHeader)
-        [runButton, stopButton].forEach { editorToolbar.addArrangedSubview($0) }
+        codeLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+        let commandSpacer = NSView()
+        commandSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        [codeLabel, commandSpacer, runButton, stopButton].forEach { editorToolbar.addArrangedSubview($0) }
         editorToolbar.spacing = 8
         editorToolbar.edgeInsets = NSEdgeInsets(top: 5, left: 12, bottom: 5, right: 12)
         editorToolbar.heightAnchor.constraint(equalToConstant: 38).isActive = true
         editorContainer.addArrangedSubview(editorToolbar)
         editorContainer.addArrangedSubview(tabs)
         programTabStrip.widthAnchor.constraint(equalTo: editorContainer.widthAnchor).isActive = true
-        codeHeader.widthAnchor.constraint(equalTo: editorContainer.widthAnchor).isActive = true
         editorToolbar.widthAnchor.constraint(equalTo: editorContainer.widthAnchor).isActive = true
         tabs.widthAnchor.constraint(equalTo: editorContainer.widthAnchor).isActive = true
         vertical.addArrangedSubview(editorContainer)
@@ -831,7 +827,7 @@ final class ProjectNode {
         label.isSelectable = true
         label.drawsBackground = false
         label.font = .systemFont(ofSize: 12)
-        label.textColor = .secondaryLabelColor
+        label.textColor = appearancePreference == .sasStudio ? StudioStyle.muted : .secondaryLabelColor
         label.textContainerInset = NSSize(width: 16, height: 16)
         label.string = message
         label.setAccessibilityLabel("Formatted tables status")

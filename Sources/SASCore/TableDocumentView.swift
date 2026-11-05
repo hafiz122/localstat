@@ -1,6 +1,8 @@
 import AppKit
 
 @MainActor public final class TableDocumentView: NSView {
+    private static let numericPattern = try! NSRegularExpression(
+        pattern: #"^(?:[+-]?\$?(?:(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?%?|\.)$"#)
     private struct Fragment {
         let table: ResultTable
         let columns: [Int]
@@ -30,6 +32,7 @@ import AppKit
     private let gap: CGFloat
     private let bodyFont = NSFont.systemFont(ofSize: 9.5)
     private let headerFont = NSFont.systemFont(ofSize: 9.5, weight: .semibold)
+    private let noteFont = NSFont.systemFont(ofSize: 9, weight: .regular)
     private let titleFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
     private var fragments: [Fragment] = []
     public let tables: [ResultTable]
@@ -195,10 +198,12 @@ import AppKit
     private func rowHeight(_ row: ResultRow, columns: [Int], widths: [CGFloat], header: Bool) -> CGFloat {
         let cells = projected(row, columns: columns)
         var offset = 0
-        var height: CGFloat = 25
+        var height: CGFloat = forPrinting ? 22 : 25
         for cell in cells {
-            let width = widths[offset..<min(offset + cell.span, widths.count)].reduce(0, +) - 12
-            height = max(height, textHeight(cell.text, width: width, font: header ? headerFont : bodyFont) + 12)
+            let padding: CGFloat = forPrinting ? 10 : 12
+            let width = widths[offset..<min(offset + cell.span, widths.count)].reduce(0, +) - padding
+            let font = row.kind == "note" ? noteFont : (header || row.kind != "data" ? headerFont : bodyFont)
+            height = max(height, textHeight(cell.text, width: width, font: font) + padding)
             offset += cell.span
         }
         return min(height, 300)
@@ -244,13 +249,17 @@ import AppKit
         let title = fragment.table.title + (fragment.continuation > 0 ? " · columns continued" : "")
         let available = paper.width - 2 * margin
         let titleHeight = fragment.titleHeight
+        let titleParagraph = NSMutableParagraphStyle()
+        titleParagraph.alignment = .center
         (title as NSString).draw(in: NSRect(x: margin, y: y, width: available, height: titleHeight - 8),
-                                 withAttributes: [.font: titleFont, .foregroundColor: ink])
+                                 withAttributes: [.font: titleFont, .foregroundColor: ink, .paragraphStyle: titleParagraph])
         y += titleHeight
         if !fragment.table.section.isEmpty {
             let sectionHeight = fragment.sectionHeight
+            let sectionParagraph = NSMutableParagraphStyle()
+            sectionParagraph.alignment = .center
             (fragment.table.section as NSString).draw(in: NSRect(x: margin, y: y, width: available, height: sectionHeight - 6),
-                                                      withAttributes: [.font: bodyFont, .foregroundColor: muted])
+                                                      withAttributes: [.font: bodyFont, .foregroundColor: muted, .paragraphStyle: sectionParagraph])
             y += sectionHeight
         }
         for (row, height) in zip(fragment.table.headers, fragment.headerHeights) {
@@ -267,26 +276,62 @@ import AppKit
 
     private func drawRow(_ row: ResultRow, columns: [Int], widths: [CGFloat], y: CGFloat, height: CGFloat, header: Bool, screen: Bool) {
         let cells = projected(row, columns: columns)
-        let background: NSColor = header || row.kind == "total" || row.kind == "section"
-            ? (screen ? .controlBackgroundColor : NSColor(calibratedWhite: 0.92, alpha: 1))
-            : (screen ? .textBackgroundColor : .white)
         let ink: NSColor = screen ? .labelColor : .black
-        var x = margin
+        let isDark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let horizontalRule: NSColor = screen
+            ? (isDark ? NSColor(calibratedRed: 0.37, green: 0.44, blue: 0.51, alpha: 1)
+                      : NSColor(calibratedRed: 0.78, green: 0.84, blue: 0.89, alpha: 1))
+            : NSColor(calibratedWhite: 0.64, alpha: 1)
+        let headerFill: NSColor = screen
+            ? (isDark ? NSColor(calibratedRed: 0.17, green: 0.23, blue: 0.30, alpha: 1)
+                      : NSColor(calibratedRed: 0.88, green: 0.93, blue: 0.97, alpha: 1))
+            : .white
+        let summaryFill: NSColor = screen
+            ? (isDark ? NSColor(calibratedRed: 0.16, green: 0.20, blue: 0.25, alpha: 1)
+                      : NSColor(calibratedRed: 0.95, green: 0.97, blue: 0.98, alpha: 1))
+            : .white
+        let background: NSColor = header ? headerFill : (row.kind == "total" || row.kind == "section" ? summaryFill : (screen ? .textBackgroundColor : .white))
+        let tableWidth = widths.reduce(0, +)
+        let tableX = max(margin, (paper.width - tableWidth) / 2)
+        background.setFill()
+        NSRect(x: tableX, y: y, width: tableWidth, height: height).fill()
+        if header || row.kind == "section" {
+            horizontalRule.setStroke()
+            let top = NSBezierPath()
+            top.lineWidth = header && !screen ? 0.9 : 0.5
+            top.move(to: NSPoint(x: tableX, y: y + 0.5))
+            top.line(to: NSPoint(x: tableX + tableWidth, y: y + 0.5))
+            top.stroke()
+        }
+        var x = tableX
         var offset = 0
         for cell in cells {
             let width = widths[offset..<min(offset + cell.span, widths.count)].reduce(0, +)
             let rect = NSRect(x: x, y: y, width: width, height: height)
-            background.setFill()
-            rect.fill()
-            (screen ? NSColor.separatorColor : NSColor.gray).setStroke()
-            NSBezierPath(rect: rect).stroke()
             let paragraph = NSMutableParagraphStyle()
             paragraph.lineBreakMode = .byCharWrapping
-            let font = header || row.kind != "data" ? headerFont : bodyFont
-            (cell.text as NSString).draw(in: rect.insetBy(dx: 6, dy: 5), withAttributes: [.font: font, .foregroundColor: ink, .paragraphStyle: paragraph])
+            paragraph.alignment = header ? .center : (isNumeric(cell.text) ? .right : .left)
+            let font = row.kind == "note" ? noteFont : (header || row.kind != "data" ? headerFont : bodyFont)
+            let inset = forPrinting ? rect.insetBy(dx: 5, dy: 4) : rect.insetBy(dx: 6, dy: 5)
+            (cell.text as NSString).draw(in: inset, withAttributes: [.font: font, .foregroundColor: ink, .paragraphStyle: paragraph])
             x += width
             offset += cell.span
         }
+        if row.kind != "note" {
+            horizontalRule.setStroke()
+            let bottom = NSBezierPath()
+            bottom.lineWidth = header || row.kind == "total" || row.kind == "section" ? 0.8 : 0.35
+            bottom.move(to: NSPoint(x: tableX, y: y + height - 0.5))
+            bottom.line(to: NSPoint(x: tableX + tableWidth, y: y + height - 0.5))
+            bottom.stroke()
+        }
+    }
+
+    private func isNumeric(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("\n") else { return false }
+        let range = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
+        return Self.numericPattern.firstMatch(in: trimmed, range: range) != nil
     }
 }
 

@@ -80,7 +80,15 @@ import AppKit
     private let titleButton = NSButton()
     private let closeButton = NSButton(title: "×", target: nil, action: nil)
     private var selected = false
-    var usesStudioStyle = false { didSet { needsDisplay = true } }
+    private var filename = "Untitled.sas"
+    private var isDirty = false
+    private var filePath: String?
+    var usesStudioStyle = false {
+        didSet {
+            updateTitle()
+            needsDisplay = true
+        }
+    }
     var preferredWidth: CGFloat {
         min(240, max(130, titleButton.intrinsicContentSize.width + 42))
     }
@@ -93,10 +101,12 @@ import AppKit
         titleButton.isBordered = false
         titleButton.cell?.lineBreakMode = .byTruncatingMiddle
         titleButton.cell?.usesSingleLineMode = true
+        titleButton.focusRingType = .exterior
         titleButton.target = self; titleButton.action = #selector(selectTab)
         closeButton.bezelStyle = .recessed
         closeButton.showsBorderOnlyWhileMouseInside = true
         closeButton.font = .systemFont(ofSize: 16)
+        closeButton.focusRingType = .exterior
         closeButton.target = self; closeButton.action = #selector(closeTab)
         addSubview(titleButton); addSubview(closeButton)
     }
@@ -104,26 +114,33 @@ import AppKit
 
     func update(document: EditorDocument, selected: Bool) {
         self.selected = selected
-        let filename = document.url?.lastPathComponent ?? "Untitled.sas"
+        filename = document.url?.lastPathComponent ?? "Untitled.sas"
+        isDirty = document.isDirty
+        filePath = document.url?.path
         titleButton.state = selected ? .on : .off
-        let title = NSAttributedString(string: document.title, attributes: [
-            .font: NSFont.systemFont(ofSize: 12, weight: selected ? .semibold : .regular),
-            .foregroundColor: usesStudioStyle ? StudioStyle.ink : NSColor.labelColor
-        ])
-        titleButton.attributedTitle = title
-        titleButton.attributedAlternateTitle = title
-        titleButton.setAccessibilityLabel(document.title)
-        titleButton.toolTip = document.url?.path ?? filename
+        updateTitle()
         closeButton.setAccessibilityLabel("Close \(filename)")
         closeButton.toolTip = "Close \(filename)"
         needsLayout = true
         needsDisplay = true
     }
 
+    private func updateTitle() {
+        let titleText = filename + (isDirty ? " *" : "")
+        let title = NSAttributedString(string: titleText, attributes: [
+            .font: NSFont.systemFont(ofSize: 12, weight: selected ? .semibold : .regular),
+            .foregroundColor: usesStudioStyle ? (selected ? StudioStyle.ink : StudioStyle.muted) : NSColor.labelColor
+        ])
+        titleButton.attributedTitle = title
+        titleButton.attributedAlternateTitle = title
+        titleButton.setAccessibilityLabel("\(filename)\(isDirty ? ", unsaved changes" : ""), \(selected ? "selected" : "not selected")")
+        titleButton.toolTip = filePath ?? filename
+    }
+
     override func layout() {
         super.layout()
-        titleButton.frame = NSRect(x: 6, y: 5, width: max(0, bounds.width - 38), height: 24)
-        closeButton.frame = NSRect(x: bounds.width - 30, y: 5, width: 24, height: 24)
+        titleButton.frame = NSRect(x: 8, y: 5, width: max(0, bounds.width - 40), height: 24)
+        closeButton.frame = NSRect(x: bounds.width - 28, y: 5, width: 24, height: 24)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -132,9 +149,12 @@ import AppKit
         bounds.fill()
         (usesStudioStyle ? StudioStyle.line : NSColor.separatorColor).setFill()
         NSRect(x: bounds.maxX - 1, y: 0, width: 1, height: bounds.height).fill()
+        if !selected {
+            NSRect(x: 0, y: 0, width: bounds.width, height: 1).fill()
+        }
         if selected {
             (usesStudioStyle ? StudioStyle.blue : NSColor.controlAccentColor).setFill()
-            NSRect(x: 0, y: 0, width: bounds.width, height: 2).fill()
+            NSRect(x: 0, y: bounds.maxY - 3, width: bounds.width, height: 3).fill()
         }
     }
 
