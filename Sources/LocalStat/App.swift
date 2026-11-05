@@ -30,7 +30,6 @@ final class ProjectNode {
     let editorResultsSplit = NSSplitView()
     let navigatorPane = NSStackView()
     let resultsContainer = NSStackView()
-    let studioBanner = NSStackView()
     let toolbar = NSStackView()
     let codeLabel = NSTextField(labelWithString: "Program")
     let editorToolbar = NSStackView()
@@ -80,6 +79,7 @@ final class ProjectNode {
     var lastRunDocument: EditorDocument?
     private var pendingOpenURLs: [URL] = []
     var projectURL = FileManager.default.homeDirectoryForCurrentUser
+    var applicationSupportDirectoryOverride: URL?
     lazy var runner = LocalRuntimeRunner(executable: Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/opensas"))
     var current: EditorDocument? {
         guard let id = tabs.selectedTabViewItem?.identifier as? UUID else { return nil }
@@ -216,13 +216,6 @@ final class ProjectNode {
         appearancePopup.setAccessibilityLabel("Appearance")
         appearancePopup.toolTip = "Choose SAS Native, System, Light, or Dark appearance"
         appearancePopup.widthAnchor.constraint(equalToConstant: 120).isActive = true
-        let bannerTitle = NSTextField(labelWithString: "LocalStat Studio")
-        bannerTitle.font = .systemFont(ofSize: 13, weight: .semibold)
-        bannerTitle.textColor = .white
-        studioBanner.addArrangedSubview(bannerTitle)
-        studioBanner.edgeInsets = NSEdgeInsets(top: 5, left: 14, bottom: 5, right: 14)
-        studioBanner.heightAnchor.constraint(equalToConstant: 28).isActive = true
-        root.addArrangedSubview(studioBanner)
         [folderButton, spacer, appearanceLabel, appearancePopup].forEach { toolbar.addArrangedSubview($0) }
         toolbar.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
         toolbar.heightAnchor.constraint(equalToConstant: 44).isActive = true
@@ -372,7 +365,7 @@ final class ProjectNode {
         statusBar.edgeInsets = NSEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
         statusBar.heightAnchor.constraint(equalToConstant: 29).isActive = true
         root.addArrangedSubview(statusBar)
-        for view in [studioBanner, toolbar, navigatorSplit, statusBar] {
+        for view in [toolbar, navigatorSplit, statusBar] {
             view.widthAnchor.constraint(equalTo: root.widthAnchor).isActive = true
         }
         window.contentView?.layoutSubtreeIfNeeded()
@@ -523,21 +516,36 @@ final class ProjectNode {
     }
 
     func loadProject() {
-        if let path = UserDefaults.standard.string(forKey: "projectFolder"), FileManager.default.fileExists(atPath: path) {
+        var selectedProjectIsSaved = false
+        var selectedIsDirectory: ObjCBool = false
+        if let path = preferences.defaults.string(forKey: "projectFolder"),
+           FileManager.default.fileExists(atPath: path, isDirectory: &selectedIsDirectory),
+           selectedIsDirectory.boolValue {
             projectURL = URL(fileURLWithPath: path)
+            selectedProjectIsSaved = true
         } else {
             do {
-                let support = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+                let support = try applicationSupportDirectoryOverride ?? FileManager.default.url(
+                    for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
                 let examples = support.appendingPathComponent("LocalStat/Examples")
-                if !FileManager.default.fileExists(atPath: examples.path), let bundled = Bundle.main.resourceURL?.appendingPathComponent("Examples") {
+                let workspace = support.appendingPathComponent("LocalStat/Workspace")
+                projectURL = workspace
+                try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+                if !FileManager.default.fileExists(atPath: examples.path),
+                   let bundled = Bundle.main.resourceURL?.appendingPathComponent("Examples"),
+                   FileManager.default.fileExists(atPath: bundled.path) {
                     try FileManager.default.createDirectory(at: examples.deletingLastPathComponent(), withIntermediateDirectories: true)
                     try FileManager.default.copyItem(at: bundled, to: examples)
                 }
-                projectURL = examples
-            } catch { showError(error) }
+            } catch {
+                projectURL = (applicationSupportDirectoryOverride ?? FileManager.default.homeDirectoryForCurrentUser
+                    .appendingPathComponent("Library/Application Support"))
+                    .appendingPathComponent("LocalStat/Workspace")
+                showError(error)
+            }
         }
         refreshProject()
-        if let first = files.first { open(first) }
+        if selectedProjectIsSaved, let first = files.first { open(first) }
     }
 
     @objc func refreshProject() {
@@ -575,7 +583,7 @@ final class ProjectNode {
         files.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
         projectLabel.stringValue = projectURL.lastPathComponent
         projectLabel.toolTip = projectURL.path
-        projectHint.stringValue = files.isEmpty ? "No SAS programs in this folder. Choose File > New Program to create one." : "Double-click a program to open it. Paths are relative to this project folder."
+        projectHint.stringValue = files.isEmpty ? "No SAS programs here. Use Create SAS File in this pane or open a project folder." : "Double-click a program to open it. Paths are relative to this project folder."
         projectHint.isHidden = !files.isEmpty
         fileOutline.reloadData()
         if sameProject {
@@ -604,7 +612,7 @@ final class ProjectNode {
         panel.prompt = "Open Project"
         if panel.runModal() == .OK, let url = panel.url {
             projectURL = url
-            UserDefaults.standard.set(url.path, forKey: "projectFolder")
+            preferences.defaults.set(url.path, forKey: "projectFolder")
             refreshProject()
         }
     }

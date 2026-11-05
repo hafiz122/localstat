@@ -37,8 +37,6 @@ extension AppDelegate {
         guard appliedWorkspaceAppearance != preferences.values.appearance else { return }
         appliedWorkspaceAppearance = preferences.values.appearance
         let studio = preferences.values.appearance == .sasStudio
-        studioBanner.isHidden = !studio
-        StudioStyle.background(studio ? StudioStyle.blue : nil, on: studioBanner)
         StudioStyle.background(studio ? StudioStyle.chrome : nil, on: toolbar)
         StudioStyle.background(studio ? StudioStyle.chrome : nil, on: editorToolbar)
         StudioStyle.background(studio ? .white : nil, on: navigatorPane)

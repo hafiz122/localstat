@@ -1,14 +1,14 @@
-# Install LocalStat 0.1.3-alpha
+# Install LocalStat 0.1.4-alpha
 
 Requires an Apple Silicon Mac and macOS 14 or later. The alpha app contains its
 runtime; Zig, Xcode, Python, and SAS are not needed to run the downloaded app.
 
-Download `LocalStat-0.1.3-alpha-arm64.zip` and its `.zip.sha256` file from the
-same [public GitHub release](https://github.com/hafiz122/localstat/releases/tag/v0.1.3-alpha).
+Download `LocalStat-0.1.4-alpha-arm64.zip` and its `.zip.sha256` file from the
+same [public GitHub release](https://github.com/hafiz122/localstat/releases/tag/v0.1.4-alpha).
 From the directory containing both files, verify:
 
 ```sh
-shasum -a 256 -c LocalStat-0.1.3-alpha-arm64.zip.sha256
+shasum -a 256 -c LocalStat-0.1.4-alpha-arm64.zip.sha256
 ```
 
 Expect `OK`. If verification fails, discard the download and download both files
@@ -23,9 +23,12 @@ Building from source is also supported through `scripts/build.sh`.
 
 ## First run
 
-LocalStat copies bundled examples into Application Support/LocalStat/Examples.
-Open an example and press Command-R. Open Project Folder changes the working
-directory for relative file paths and `%INCLUDE`. Save works with Command-S;
+LocalStat opens an empty Application Support/LocalStat/Workspace folder in the
+Project Explorer and copies bundled examples into a separate Examples folder.
+The examples do not appear in the Explorer unless you open that folder as a
+project. You can also choose Open Example in Help to create an unsaved program
+tab, then press Command-R. Open Project Folder changes the working directory
+for relative file paths and `%INCLUDE`. Save works with Command-S;
 Command-period stops a run. File > Export Report as PDF exports the last run.
 
 Every run starts fresh WORK and macro state. Explicitly written files persist.

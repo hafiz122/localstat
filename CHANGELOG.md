@@ -4,6 +4,21 @@ All notable changes to LocalStat are recorded here.
 
 ## Unreleased
 
+## [0.1.4-alpha] - 2026-11-05
+
+### Changed
+
+- Start a fresh workspace with an empty Project Explorer and an untitled
+  program, instead of showing and opening bundled examples by default.
+- Keep editable example copies in Application Support and make them available
+  through Help or by explicitly opening the Examples folder as a project.
+- Remove the extra "LocalStat Studio" bar above the workbench.
+
+### Fixed
+
+- Restore only valid saved project folders and keep failed fallback setup from
+  displaying the home directory in the Project Explorer.
+
 ## [0.1.3-alpha] - 2026-11-05
 
 ### Changed
