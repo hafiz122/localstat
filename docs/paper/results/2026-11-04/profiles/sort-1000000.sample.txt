@@ -1,0 +1,529 @@
+Analysis of sampling opensas (pid 60677) every 1 millisecond
+Process:         opensas [60677]
+Path:            /Users/USER/Documents/*/opensas
+Load Address:    0x104654000
+Identifier:      opensas
+Version:         0
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  Python [60555]
+Target Type:     live task
+
+Date/Time:       2026-11-04 18:52:53.852 +0800
+Launch Time:     2026-11-04 18:52:53.828 +0800
+OS Version:      macOS 26.4.1 (25E253)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+----
+
+Call graph:
+    779 Thread_607228   DispatchQueue_1: com.apple.main-thread  (serial)
+      779 start  (in dyld) + 6992  [0x18cd07da4]
+        770 main  (in opensas) + 4496  [0x10465bf0c]  start.zig:663
+        + 770 main.interpretWithTables  (in opensas) + 11872  [0x1046595c8]  main.zig:292
+        +   770 macro.process  (in opensas) + 9188  [0x1046c31d8]  macro.zig:1140
+        +     770 main.interleaveStep  (in opensas) + 212  [0x104908080]  main.zig:528
+        +       389 main.runExpanded  (in opensas) + 12280  [0x1046bd2f8]  main.zig:487
+        +       ! 389 main.runData  (in opensas) + 11520  [0x10488b23c]  main.zig:2187
+        +       !   129 exec.Executor.run  (in opensas) + 19148  [0x10489048c]  exec.zig:1271
+        +       !   : 75 exec.Executor.runProgramRange  (in opensas) + 368  [0x104897a64]  exec.zig:4712
+        +       !   : | 48 exec.Executor.runStmt  (in opensas) + 3380  [0x10489948c]  exec.zig:4857
+        +       !   : | + 47 eval.Evaluator.eval  (in opensas) + 1260  [0x1046de6f8]  eval.zig:100
+        +       !   : | + ! 21 eval.Evaluator.evalBinary  (in opensas) + 84  [0x1046e2fa4]  eval.zig:191
+        +       !   : | + ! : 12 eval.Evaluator.eval  (in opensas) + 860  [0x1046de568]  eval.zig:96
+        +       !   : | + ! : | 5 pdv.Pdv.indexOf  (in opensas) + 136  [0x1046e5504]  pdv.zig:157
+        +       !   : | + ! : | + 2 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 60  [0x1046b6c00]  hash_map.zig:975
+        +       !   : | + ! : | + ! 1 hash.wyhash.Wyhash.hash  (in opensas) + 24  [0x10466be08]  wyhash.zig:181
+        +       !   : | + ! : | + ! 1 hash.wyhash.Wyhash.hash  (in opensas) + 40  [0x10466be18]  wyhash.zig:182
+        +       !   : | + ! : | + 2 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 192  [0x1046b6c84]  hash_map.zig:988
+        +       !   : | + ! : | + ! 1 mem.eqlBytes  (in opensas) + 244  [0x10491804c]  mem.zig:0
+        +       !   : | + ! : | + ! 1 mem.eqlBytes  (in opensas) + 24  [0x104917f70]  mem.zig:772
+        +       !   : | + ! : | + 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 8  [0x1046b6bcc]  hash_map.zig:965
+        +       !   : | + ! : | 4 pdv.Pdv.indexOf  (in opensas) + 56,88  [0x1046e54b4,0x1046e54d4]  pdv.zig:157
+        +       !   : | + ! : | 3 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 220,224,...  [0x1046b6ca0,0x1046b6ca4,...]  hash_map.zig:0
+        +       !   : | + ! : 3 eval.Evaluator.eval  (in opensas) + 828  [0x1046de548]  eval.zig:96
+        +       !   : | + ! : | 2 eval.Evaluator.rejectObjectName  (in opensas) + 596  [0x1046e50a8]  diag.zig:0
+        +       !   : | + ! : | 1 eval.Evaluator.rejectObjectName  (in opensas) + 36  [0x1046e4e78]  eval.zig:137
+        +       !   : | + ! : 3 eval.Evaluator.eval  (in opensas) + 872,1444,...  [0x1046de574,0x1046de7b0,...]  eval.zig:96
+        +       !   : | + ! : 2 eval.Evaluator.rejectObjectName  (in opensas) + 612,616  [0x1046e50b8,0x1046e50bc]  diag.zig:0
+        +       !   : | + ! : 1 eval.Evaluator.eval  (in opensas) + 56  [0x1046de244]  eval.zig:91
+        +       !   : | + ! 11 eval.Evaluator.evalBinary  (in opensas) + 116  [0x1046e2fc4]  eval.zig:192
+        +       !   : | + ! : 5 eval.Evaluator.eval  (in opensas) + 860  [0x1046de568]  eval.zig:96
+        +       !   : | + ! : | 3 pdv.Pdv.indexOf  (in opensas) + 56,88  [0x1046e54b4,0x1046e54d4]  pdv.zig:157
+        +       !   : | + ! : | 1 pdv.Pdv.indexOf  (in opensas) + 396  [0x1046e5608]  pdv.zig:0
+        +       !   : | + ! : | 1 pdv.Pdv.indexOf  (in opensas) + 136  [0x1046e5504]  pdv.zig:157
+        +       !   : | + ! : |   1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 192  [0x1046b6c84]  hash_map.zig:988
+        +       !   : | + ! : |     1 mem.eqlBytes  (in opensas) + 16  [0x104917f68]  mem.zig:0
+        +       !   : | + ! : 3 eval.Evaluator.eval  (in opensas) + 68,60  [0x1046de250,0x1046de248]  eval.zig:92
+        +       !   : | + ! : 2 eval.Evaluator.eval  (in opensas) + 872,1524  [0x1046de574,0x1046de800]  eval.zig:96
+        +       !   : | + ! : 1 eval.Evaluator.eval  (in opensas) + 828  [0x1046de548]  eval.zig:96
+        +       !   : | + ! :   1 eval.Evaluator.rejectObjectName  (in opensas) + 584  [0x1046e509c]  diag.zig:0
+        +       !   : | + ! 5 eval.Evaluator.evalBinary  (in opensas) + 212  [0x1046e3024]  eval.zig:194
+        +       !   : | + ! : 2 eval.Evaluator.toNum  (in opensas) + 320  [0x1046e0e1c]  eval.zig:0
+        +       !   : | + ! : 2 eval.Evaluator.toNum  (in opensas) + 44  [0x1046e0d08]  eval.zig:539
+        +       !   : | + ! : 1 eval.Evaluator.toNum  (in opensas) + 36  [0x1046e0d00]  eval.zig:538
+        +       !   : | + ! 3 eval.Evaluator.evalBinary  (in opensas) + 184  [0x1046e3008]  eval.zig:194
+        +       !   : | + ! : 3 eval.Evaluator.toNum  (in opensas) + 320  [0x1046e0e1c]  eval.zig:0
+        +       !   : | + ! 3 eval.Evaluator.evalBinary  (in opensas) + 220,2020,...  [0x1046e302c,0x1046e3734,...]  eval.zig:194
+        +       !   : | + ! 2 eval.Evaluator.toNum  (in opensas) + 344  [0x1046e0e34]  eval.zig:0
+        +       !   : | + ! 1 eval.Evaluator.evalBinary  (in opensas) + 84  [0x1046e2fa4]  eval.zig:191
+        +       !   : | + ! 1 eval.Evaluator.evalBinary  (in opensas) + 152  [0x1046e2fe8]  eval.zig:193
+        +       !   : | + 1 eval.Evaluator.eval  (in opensas) + 136  [0x1046de294]  eval.zig:0
+        +       !   : | 16 exec.Executor.runStmt  (in opensas) + 3408  [0x1048994a8]  exec.zig:4857
+        +       !   : | + 13 pdv.Pdv.set  (in opensas) + 64  [0x1046da6b8]  pdv.zig:216
+        +       !   : | + ! 11 pdv.Pdv.define  (in opensas) + 80  [0x1046da208]  pdv.zig:175
+        +       !   : | + ! : 7 pdv.Pdv.indexOf  (in opensas) + 136  [0x1046e5504]  pdv.zig:157
+        +       !   : | + ! : | 3 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 60  [0x1046b6c00]  hash_map.zig:975
+        +       !   : | + ! : | + 2 hash.wyhash.Wyhash.hash  (in opensas) + 564,592  [0x10466c024,0x10466c040]  wyhash.zig:195
+        +       !   : | + ! : | + 1 hash.wyhash.Wyhash.hash  (in opensas) + 16  [0x10466be00]  wyhash.zig:178
+        +       !   : | + ! : | 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 148  [0x1046b6c58]  hash_map.zig:0
+        +       !   : | + ! : | 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 64  [0x1046b6c04]  hash_map.zig:977
+        +       !   : | + ! : | 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 88  [0x1046b6c1c]  hash_map.zig:984
+        +       !   : | + ! : | 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 192  [0x1046b6c84]  hash_map.zig:988
+        +       !   : | + ! : |   1 mem.eqlBytes  (in opensas) + 292  [0x10491807c]  mem.zig:781
+        +       !   : | + ! : 4 pdv.Pdv.indexOf  (in opensas) + 56,100,...  [0x1046e54b4,0x1046e54e0,...]  pdv.zig:157
+        +       !   : | + ! 1 pdv.Pdv.define  (in opensas) + 732  [0x1046da494]  math.zig:0
+        +       !   : | + ! 1 pdv.Pdv.define  (in opensas) + 88  [0x1046da210]  pdv.zig:175
+        +       !   : | + 1 pdv.Pdv.set  (in opensas) + 48  [0x1046da6a8]  pdv.zig:216
+        +       !   : | + 1 pdv.Pdv.setAt  (in opensas) + 252  [0x1046e05a8]  pdv.zig:250
+        +       !   : | + 1 pdv.Pdv.setAt  (in opensas) + 372  [0x1046e0620]  pdv.zig:288
+        +       !   : | 3 exec.Executor.runStmt  (in opensas) + 140  [0x1048987e4]  exec.zig:4851
+        +       !   : | 3 exec.Executor.runStmt  (in opensas) + 3380,3388  [0x10489948c,0x104899494]  exec.zig:4857
+        +       !   : | 2 ascii.eqlIgnoreCase  (in opensas) + 104  [0x1046b8b48]  ascii.zig:0
+        +       !   : | 2 exec.Executor.runStmt  (in opensas) + 20,28  [0x10489876c,0x104898774]  exec.zig:4850
+        +       !   : | 1 exec.Executor.runStmt  (in opensas) + 92  [0x1048987b4]  exec.zig:0
+        +       !   : 38 exec.Executor.runProgramRange  (in opensas) + 820  [0x104897c28]  exec.zig:4727
+        +       !   : | 21 eval.Evaluator.eval  (in opensas) + 1260  [0x1046de6f8]  eval.zig:100
+        +       !   : | + 14 eval.Evaluator.evalBinary  (in opensas) + 84  [0x1046e2fa4]  eval.zig:191
+        +       !   : | + ! 6 eval.Evaluator.eval  (in opensas) + 860  [0x1046de568]  eval.zig:96
+        +       !   : | + ! : 4 pdv.Pdv.indexOf  (in opensas) + 136  [0x1046e5504]  pdv.zig:157
+        +       !   : | + ! : | 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 216  [0x1046b6c9c]  hash_map.zig:0
+        +       !   : | + ! : | 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 60  [0x1046b6c00]  hash_map.zig:975
+        +       !   : | + ! : | + 1 hash.wyhash.Wyhash.hash  (in opensas) + 592  [0x10466c040]  wyhash.zig:195
+        +       !   : | + ! : | 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 144  [0x1046b6c54]  hash_map.zig:985
+        +       !   : | + ! : | 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 192  [0x1046b6c84]  hash_map.zig:988
+        +       !   : | + ! : |   1 mem.eqlBytes  (in opensas) + 68  [0x104917f9c]  mem.zig:776
+        +       !   : | + ! : 1 pdv.Pdv.indexOf  (in opensas) + 36  [0x1046e54a0]  pdv.zig:156
+        +       !   : | + ! : 1 pdv.Pdv.indexOf  (in opensas) + 136  [0x1046e5504]  pdv.zig:157
+        +       !   : | + ! 3 eval.Evaluator.eval  (in opensas) + 1524,1452  [0x1046de800,0x1046de7b8]  eval.zig:96
+        +       !   : | + ! 2 eval.Evaluator.eval  (in opensas) + 24  [0x1046de224]  eval.zig:91
+        +       !   : | + ! 2 eval.Evaluator.eval  (in opensas) + 60,68  [0x1046de248,0x1046de250]  eval.zig:92
+        +       !   : | + ! 1 pdv.Pdv.indexOf  (in opensas) + 412  [0x1046e5618]  pdv.zig:0
+        +       !   : | + 5 eval.Evaluator.evalBinary  (in opensas) + 116  [0x1046e2fc4]  eval.zig:192
+        +       !   : | + ! 4 eval.Evaluator.eval  (in opensas) + 860  [0x1046de568]  eval.zig:96
+        +       !   : | + ! : 3 pdv.Pdv.indexOf  (in opensas) + 136  [0x1046e5504]  pdv.zig:157
+        +       !   : | + ! : | 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 4  [0x1046b6bc8]  hash_map.zig:965
+        +       !   : | + ! : | 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 60  [0x1046b6c00]  hash_map.zig:975
+        +       !   : | + ! : | + 1 hash.wyhash.Wyhash.hash  (in opensas) + 592  [0x10466c040]  wyhash.zig:195
+        +       !   : | + ! : | 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 192  [0x1046b6c84]  hash_map.zig:988
+        +       !   : | + ! : |   1 mem.eqlBytes  (in opensas) + 40  [0x104917f80]  mem.zig:775
+        +       !   : | + ! : 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 232  [0x1046b6cac]  hash_map.zig:0
+        +       !   : | + ! 1 eval.Evaluator.eval  (in opensas) + 828  [0x1046de548]  eval.zig:96
+        +       !   : | + !   1 eval.Evaluator.rejectObjectName  (in opensas) + 28  [0x1046e4e70]  eval.zig:137
+        +       !   : | + 1 eval.Evaluator.evalBinary  (in opensas) + 16  [0x1046e2f60]  eval.zig:189
+        +       !   : | + 1 eval.Evaluator.evalBinary  (in opensas) + 1624  [0x1046e35a8]  eval.zig:200
+        +       !   : | +   1 eval.Evaluator.toNum  (in opensas) + 344  [0x1046e0e34]  eval.zig:0
+        +       !   : | 13 eval.Evaluator.eval  (in opensas) + 860  [0x1046de568]  eval.zig:96
+        +       !   : | + 10 pdv.Pdv.indexOf  (in opensas) + 136  [0x1046e5504]  pdv.zig:157
+        +       !   : | + ! 6 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 60  [0x1046b6c00]  hash_map.zig:975
+        +       !   : | + ! : 3 hash.wyhash.Wyhash.hash  (in opensas) + 24  [0x10466be08]  wyhash.zig:181
+        +       !   : | + ! : 2 hash.wyhash.Wyhash.hash  (in opensas) + 588,592  [0x10466c03c,0x10466c040]  wyhash.zig:195
+        +       !   : | + ! : 1 hash.wyhash.Wyhash.hash  (in opensas) + 84  [0x10466be44]  wyhash.zig:182
+        +       !   : | + ! 3 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 192  [0x1046b6c84]  hash_map.zig:988
+        +       !   : | + ! : 1 mem.eqlBytes  (in opensas) + 40  [0x104917f80]  mem.zig:775
+        +       !   : | + ! : 1 mem.eqlBytes  (in opensas) + 272  [0x104918068]  mem.zig:780
+        +       !   : | + ! : 1 mem.eqlBytes  (in opensas) + 292  [0x10491807c]  mem.zig:781
+        +       !   : | + ! 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 148  [0x1046b6c58]  hash_map.zig:0
+        +       !   : | + 2 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 232  [0x1046b6cac]  hash_map.zig:0
+        +       !   : | + 1 pdv.Pdv.indexOf  (in opensas) + 40  [0x1046e54a4]  pdv.zig:156
+        +       !   : | 1 eval.Evaluator.eval  (in opensas) + 4796  [0x1046df4c8]  eval.zig:100
+        +       !   : | 1 eval.Evaluator.eval  (in opensas) + 828  [0x1046de548]  eval.zig:96
+        +       !   : | + 1 eval.Evaluator.rejectObjectName  (in opensas) + 48  [0x1046e4e84]  eval.zig:138
+        +       !   : | 1 eval.Evaluator.eval  (in opensas) + 1476  [0x1046de7d0]  eval.zig:96
+        +       !   : | 1 pdv.Pdv.indexOf  (in opensas) + 412  [0x1046e5618]  pdv.zig:0
+        +       !   : 4 exec.Executor.runProgramRange  (in opensas) + 292,252  [0x104897a18,0x1048979f0]  exec.zig:4708
+        +       !   : 3 exec.Executor.runProgramRange  (in opensas) + 124  [0x104897970]  exec.zig:4699
+        +       !   : 3 exec.Executor.runProgramRange  (in opensas) + 804,820,...  [0x104897c18,0x104897c28,...]  exec.zig:4727
+        +       !   : 2 exec.Executor.runProgramRange  (in opensas) + 112,1392  [0x104897964,0x104897e64]  exec.zig:0
+        +       !   : 1 exec.Executor.runProgramRange  (in opensas) + 1872  [0x104898044]  exec.zig:4679
+        +       !   : | 1 _platform_memset  (in libsystem_platform.dylib) + 12  [0x18d0cd0fc]
+        +       !   : 1 exec.Executor.runProgramRange  (in opensas) + 1852  [0x104898030]  exec.zig:4679
+        +       !   : 1 exec.Executor.runProgramRange  (in opensas) + 224  [0x1048979d4]  exec.zig:4703
+        +       !   : 1 exec.Executor.runStmt  (in opensas) + 224  [0x104898838]  exec.zig:0
+        +       !   123 exec.Executor.run  (in opensas) + 21300  [0x104890cf4]  exec.zig:1307
+        +       !   : 56 exec.Executor.output  (in opensas) + 392  [0x104894f00]  exec.zig:7661
+        +       !   : | 41 pdv.Pdv.indexOf  (in opensas) + 136  [0x1046e5504]  pdv.zig:157
+        +       !   : | + 14 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 192  [0x1046b6c84]  hash_map.zig:988
+        +       !   : | + ! 5 mem.eqlBytes  (in opensas) + 16,244,...  [0x104917f68,0x10491804c,...]  mem.zig:0
+        +       !   : | + ! 5 mem.eqlBytes  (in opensas) + 0  [0x104917f58]  mem.zig:768
+        +       !   : | + ! 2 mem.eqlBytes  (in opensas) + 56,68  [0x104917f90,0x104917f9c]  mem.zig:776
+        +       !   : | + ! 1 mem.eqlBytes  (in opensas) + 40  [0x104917f80]  mem.zig:775
+        +       !   : | + ! 1 mem.eqlBytes  (in opensas) + 324  [0x10491809c]  mem.zig:781
+        +       !   : | + 10 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 60  [0x1046b6c00]  hash_map.zig:975
+        +       !   : | + ! 5 hash.wyhash.Wyhash.hash  (in opensas) + 584,592  [0x10466c038,0x10466c040]  wyhash.zig:195
+        +       !   : | + ! 3 hash.wyhash.Wyhash.hash  (in opensas) + 24  [0x10466be08]  wyhash.zig:181
+        +       !   : | + ! 2 hash.wyhash.Wyhash.hash  (in opensas) + 4  [0x10466bdf4]  wyhash.zig:178
+        +       !   : | + 5 hash.wyhash.Wyhash.hash  (in opensas) + 596  [0x10466c044]  wyhash.zig:195
+        +       !   : | + 5 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 28,0,...  [0x1046b6be0,0x1046b6bc4,...]  hash_map.zig:965
+        +       !   : | + 3 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 144  [0x1046b6c54]  hash_map.zig:985
+        +       !   : | + 2 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 88  [0x1046b6c1c]  hash_map.zig:984
+        +       !   : | + 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 96  [0x1046b6c24]  hash_map.zig:0
+        +       !   : | + 1 mem.eqlBytes  (in opensas) + 252  [0x104918054]  mem.zig:0
+        +       !   : | 9 pdv.Pdv.indexOf  (in opensas) + 56,88,...  [0x1046e54b4,0x1046e54d4,...]  pdv.zig:157
+        +       !   : | 3 pdv.Pdv.indexOf  (in opensas) + 32  [0x1046e549c]  pdv.zig:154
+        +       !   : | 2 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 232  [0x1046b6cac]  hash_map.zig:0
+        +       !   : | 1 pdv.Pdv.indexOf  (in opensas) + 40  [0x1046e54a4]  pdv.zig:156
+        +       !   : 44 exec.Executor.output  (in opensas) + 496  [0x104894f68]  exec.zig:7661
+        +       !   : | 14 dataset.Dataset.appendRow  (in opensas) + 244,252  [0x1046d5184,0x1046d518c]  dataset.zig:92
+        +       !   : | 9 dataset.Dataset.appendRow  (in opensas) + 172  [0x1046d513c]  dataset.zig:90
+        +       !   : | + 9 _platform_memset  (in libsystem_platform.dylib) + 108,140,...  [0x18d0cd15c,0x18d0cd17c,...]
+        +       !   : | 9 dataset.Dataset.appendRow  (in opensas) + 476  [0x1046d526c]  dataset.zig:97
+        +       !   : | + 4 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 420  [0x10475311c]  array_list.zig:1211
+        +       !   : | + ! 4 _platform_memmove  (in libsystem_platform.dylib) + 96,88  [0x18d0cd420,0x18d0cd418]
+        +       !   : | + 3 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 316  [0x1047530b4]  array_list.zig:1211
+        +       !   : | + ! 3 _platform_memset  (in libsystem_platform.dylib) + 72  [0x18d0cd138]
+        +       !   : | + 1 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 0  [0x104752f78]  array_list.zig:1209
+        +       !   : | + 1 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 32  [0x104752f98]  array_list.zig:1210
+        +       !   : | 7 dataset.Dataset.appendRow  (in opensas) + 296,292  [0x1046d51b8,0x1046d51b4]  dataset.zig:91
+        +       !   : | 4 dataset.Dataset.appendRow  (in opensas) + 152  [0x1046d5128]  dataset.zig:90
+        +       !   : | + 2 heap.ArenaAllocator.alloc  (in opensas) + 128,240  [0x104918d7c,0x104918dec]  ArenaAllocator.zig:0
+        +       !   : | + 1 heap.ArenaAllocator.alloc  (in opensas) + 24  [0x104918d14]  ArenaAllocator.zig:332
+        +       !   : | + 1 heap.ArenaAllocator.alloc  (in opensas) + 164  [0x104918da0]  ArenaAllocator.zig:359
+        +       !   : | 1 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 116  [0x104752fec]  array_list.zig:0
+        +       !   : 13 exec.Executor.output  (in opensas) + 244  [0x104894e6c]  exec.zig:7661
+        +       !   : | 13 _platform_memset  (in libsystem_platform.dylib) + 168,140,...  [0x18d0cd198,0x18d0cd17c,...]
+        +       !   : 7 exec.Executor.output  (in opensas) + 336,392,...  [0x104894ec8,0x104894f00,...]  exec.zig:7661
+        +       !   : 3 exec.Executor.output  (in opensas) + 224  [0x104894e58]  exec.zig:7661
+        +       !   :   2 heap.ArenaAllocator.alloc  (in opensas) + 100,240  [0x104918d60,0x104918dec]  ArenaAllocator.zig:0
+        +       !   :   1 heap.ArenaAllocator.alloc  (in opensas) + 108  [0x104918d68]  ArenaAllocator.zig:348
+        +       !   39 exec.Executor.run  (in opensas) + 13424  [0x10488ee30]  exec.zig:1225
+        +       !   : 13 exec.Executor.setsConsume  (in opensas) + 1592  [0x104897504]  exec.zig:3731
+        +       !   : | 3 pdv.Pdv.setAt  (in opensas) + 48  [0x1046e04dc]  pdv.zig:226
+        +       !   : | 3 pdv.Pdv.setAt  (in opensas) + 84  [0x1046e0500]  pdv.zig:237
+        +       !   : | 2 pdv.Pdv.setAt  (in opensas) + 60,1020  [0x1046e04e8,0x1046e08a8]  pdv.zig:0
+        +       !   : | 2 pdv.Pdv.setAt  (in opensas) + 372,380  [0x1046e0620,0x1046e0628]  pdv.zig:288
+        +       !   : | 1 pdv.Pdv.setAt  (in opensas) + 40  [0x1046e04d4]  pdv.zig:225
+        +       !   : | 1 pdv.Pdv.setAt  (in opensas) + 252  [0x1046e05a8]  pdv.zig:250
+        +       !   : | 1 pdv.Pdv.setAt  (in opensas) + 500  [0x1046e06a0]  pdv.zig:312
+        +       !   : 9 exec.Executor.setsConsume  (in opensas) + 2116  [0x104897710]  exec.zig:0
+        +       !   : | 8 pdv.Pdv.define  (in opensas) + 80  [0x1046da208]  pdv.zig:175
+        +       !   : | + 4 pdv.Pdv.indexOf  (in opensas) + 136  [0x1046e5504]  pdv.zig:157
+        +       !   : | + ! 2 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 28  [0x1046b6be0]  hash_map.zig:965
+        +       !   : | + ! 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 60  [0x1046b6c00]  hash_map.zig:975
+        +       !   : | + ! : 1 hash.wyhash.Wyhash.hash  (in opensas) + 592  [0x10466c040]  wyhash.zig:195
+        +       !   : | + ! 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 192  [0x1046b6c84]  hash_map.zig:988
+        +       !   : | + 3 pdv.Pdv.indexOf  (in opensas) + 136,88  [0x1046e5504,0x1046e54d4]  pdv.zig:157
+        +       !   : | + 1 pdv.Pdv.indexOf  (in opensas) + 404  [0x1046e5610]  pdv.zig:0
+        +       !   : | 1 pdv.Pdv.define  (in opensas) + 16  [0x1046da1c8]  pdv.zig:174
+        +       !   : 7 pdv.Pdv.setAt  (in opensas) + 1040,1024,...  [0x1046e08bc,0x1046e08ac,...]  pdv.zig:0
+        +       !   : 4 exec.Executor.setsConsume  (in opensas) + 1564,1600  [0x1048974e8,0x10489750c]  exec.zig:3731
+        +       !   : 3 exec.Executor.setsConsume  (in opensas) + 2140  [0x104897728]  exec.zig:0
+        +       !   : | 1 pdv.Pdv.setAt  (in opensas) + 24  [0x1046e04c4]  pdv.zig:225
+        +       !   : | 1 pdv.Pdv.setAt  (in opensas) + 48  [0x1046e04dc]  pdv.zig:226
+        +       !   : | 1 pdv.Pdv.setAt  (in opensas) + 372  [0x1046e0620]  pdv.zig:288
+        +       !   : 1 exec.Executor.setsConsume  (in opensas) + 12  [0x104896ed8]  exec.zig:3687
+        +       !   : 1 exec.Executor.setsConsume  (in opensas) + 1628  [0x104897528]  exec.zig:3732
+        +       !   : | 1 exec.Executor.stampObs  (in opensas) + 284  [0x10489628c]  pdv.zig:0
+        +       !   : 1 exec.Executor.setsConsume  (in opensas) + 2000  [0x10489769c]  exec.zig:3745
+        +       !   34 exec.Executor.run  (in opensas) + 11064  [0x10488e4f8]  exec.zig:1207
+        +       !   : 10 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 60  [0x1046b6c00]  hash_map.zig:975
+        +       !   : | 6 hash.wyhash.Wyhash.hash  (in opensas) + 592  [0x10466c040]  wyhash.zig:195
+        +       !   : | 2 hash.wyhash.Wyhash.hash  (in opensas) + 32,356  [0x10466be10,0x10466bf54]  wyhash.zig:182
+        +       !   : | 1 hash.wyhash.Wyhash.hash  (in opensas) + 16  [0x10466be00]  wyhash.zig:178
+        +       !   : | 1 hash.wyhash.Wyhash.hash  (in opensas) + 24  [0x10466be08]  wyhash.zig:181
+        +       !   : 7 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 192  [0x1046b6c84]  hash_map.zig:988
+        +       !   : | 4 mem.eqlBytes  (in opensas) + 52,48,...  [0x104917f8c,0x104917f88,...]  mem.zig:776
+        +       !   : | 1 mem.eqlBytes  (in opensas) + 16  [0x104917f68]  mem.zig:0
+        +       !   : | 1 mem.eqlBytes  (in opensas) + 24  [0x104917f70]  mem.zig:772
+        +       !   : | 1 mem.eqlBytes  (in opensas) + 284  [0x104918074]  mem.zig:781
+        +       !   : 5 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 4,16,...  [0x1046b6bc8,0x1046b6bd4,...]  hash_map.zig:965
+        +       !   : 3 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 88,124  [0x1046b6c1c,0x1046b6c40]  hash_map.zig:984
+        +       !   : 2 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 36,148  [0x1046b6be8,0x1046b6c58]  hash_map.zig:0
+        +       !   : 2 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 60,64  [0x1046b6c00,0x1046b6c04]  hash_map.zig:977
+        +       !   : 2 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 144  [0x1046b6c54]  hash_map.zig:985
+        +       !   : 1 hash.wyhash.Wyhash.hash  (in opensas) + 596  [0x10466c044]  wyhash.zig:195
+        +       !   : 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 192  [0x1046b6c84]  hash_map.zig:988
+        +       !   : 1 mem.eqlBytes  (in opensas) + 252  [0x104918054]  mem.zig:0
+        +       !   9 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 232  [0x1046b6cac]  hash_map.zig:0
+        +       !   8 exec.Executor.run  (in opensas) + 11464  [0x10488e688]  exec.zig:1220
+        +       !   : 5 pdv.Pdv.define  (in opensas) + 80  [0x1046da208]  pdv.zig:175
+        +       !   : | 3 pdv.Pdv.indexOf  (in opensas) + 136  [0x1046e5504]  pdv.zig:157
+        +       !   : | + 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 148  [0x1046b6c58]  hash_map.zig:0
+        +       !   : | + 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 60  [0x1046b6c00]  hash_map.zig:975
+        +       !   : | + ! 1 hash.wyhash.Wyhash.hash  (in opensas) + 592  [0x10466c040]  wyhash.zig:195
+        +       !   : | + 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 60  [0x1046b6c00]  hash_map.zig:977
+        +       !   : | 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 228  [0x1046b6ca8]  hash_map.zig:0
+        +       !   : | 1 pdv.Pdv.indexOf  (in opensas) + 372  [0x1046e55f0]  pdv.zig:157
+        +       !   : 1 pdv.Pdv.define  (in opensas) + 68  [0x1046da1fc]  pdv.zig:174
+        +       !   : 1 pdv.Pdv.define  (in opensas) + 116  [0x1046da22c]  pdv.zig:177
+        +       !   : 1 pdv.Pdv.indexOf  (in opensas) + 412  [0x1046e5618]  pdv.zig:0
+        +       !   7 exec.Executor.run  (in opensas) + 10988,10960,...  [0x10488e4ac,0x10488e490,...]  exec.zig:1207
+        +       !   7 exec.Executor.run  (in opensas) + 11396  [0x10488e644]  exec.zig:1219
+        +       !   : 3 pdv.Pdv.define  (in opensas) + 80  [0x1046da208]  pdv.zig:175
+        +       !   : | 2 pdv.Pdv.indexOf  (in opensas) + 136  [0x1046e5504]  pdv.zig:157
+        +       !   : | + 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 72  [0x1046b6c0c]  hash_map.zig:977
+        +       !   : | + 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 144  [0x1046b6c54]  hash_map.zig:985
+        +       !   : | 1 pdv.Pdv.indexOf  (in opensas) + 100  [0x1046e54e0]  pdv.zig:157
+        +       !   : 1 pdv.Pdv.define  (in opensas) + 32  [0x1046da1d8]  pdv.zig:174
+        +       !   : 1 pdv.Pdv.define  (in opensas) + 100  [0x1046da21c]  pdv.zig:176
+        +       !   : 1 pdv.Pdv.define  (in opensas) + 116  [0x1046da22c]  pdv.zig:177
+        +       !   : 1 pdv.Pdv.indexOf  (in opensas) + 412  [0x1046e5618]  pdv.zig:0
+        +       !   5 exec.Executor.run  (in opensas) + 21448  [0x104890d88]  exec.zig:1319
+        +       !   : 2 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 44,148  [0x1046b6bf0,0x1046b6c58]  hash_map.zig:0
+        +       !   : 1 hash.wyhash.Wyhash.hash  (in opensas) + 596  [0x10466c044]  wyhash.zig:195
+        +       !   : 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 60  [0x1046b6c00]  hash_map.zig:975
+        +       !   : | 1 hash.wyhash.Wyhash.hash  (in opensas) + 592  [0x10466c040]  wyhash.zig:195
+        +       !   : 1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 192  [0x1046b6c84]  hash_map.zig:988
+        +       !   :   1 mem.eqlBytes  (in opensas) + 16  [0x104917f68]  mem.zig:0
+        +       !   5 exec.Executor.run  (in opensas) + 21948  [0x104890f7c]  exec.zig:1326
+        +       !   4 exec.Executor.run  (in opensas) + 10932  [0x10488e474]  exec.zig:1208
+        +       !   4 exec.Executor.run  (in opensas) + 11524  [0x10488e6c4]  exec.zig:1222
+        +       !   : 2 exec.Executor.runProgramRange  (in opensas) + 368  [0x104897a64]  exec.zig:4712
+        +       !   : | 2 exec.Executor.runStmt  (in opensas) + 88,176  [0x1048987b0,0x104898808]  exec.zig:0
+        +       !   : 1 exec.Executor.runProgramRange  (in opensas) + 1872  [0x104898044]  exec.zig:4679
+        +       !   : | 1 _platform_memset  (in libsystem_platform.dylib) + 0  [0x18d0cd0f0]
+        +       !   : 1 exec.Executor.runProgramRange  (in opensas) + 124  [0x104897970]  exec.zig:4699
+        +       !   2 exec.Executor.run  (in opensas) + 11420  [0x10488e65c]  exec.zig:1219
+        +       !   : 1 pdv.Pdv.setAt  (in opensas) + 24  [0x1046e04c4]  pdv.zig:225
+        +       !   : 1 pdv.Pdv.setAt  (in opensas) + 84  [0x1046e0500]  pdv.zig:237
+        +       !   2 exec.Executor.run  (in opensas) + 11492  [0x10488e6a4]  exec.zig:1220
+        +       !   : 1 pdv.Pdv.setAt  (in opensas) + 36  [0x1046e04d0]  pdv.zig:225
+        +       !   : 1 pdv.Pdv.setAt  (in opensas) + 84  [0x1046e0500]  pdv.zig:237
+        +       !   2 exec.Executor.run  (in opensas) + 11532,11540  [0x10488e6cc,0x10488e6d4]  exec.zig:1222
+        +       !   2 exec.Executor.run  (in opensas) + 19148,19156  [0x10489048c,0x104890494]  exec.zig:1271
+        +       !   2 exec.Executor.run  (in opensas) + 21380,21508  [0x104890d44,0x104890dc4]  exec.zig:1319
+        +       !   1 exec.Executor.run  (in opensas) + 10936  [0x10488e478]  exec.zig:1206
+        +       !   1 exec.Executor.run  (in opensas) + 11364  [0x10488e624]  exec.zig:1219
+        +       !   1 exec.Executor.run  (in opensas) + 11596  [0x10488e70c]  exec.zig:1225
+        +       !   1 exec.Executor.run  (in opensas) + 21180  [0x104890c7c]  exec.zig:1307
+        +       !   1 exec.Executor.run  (in opensas) + 10844  [0x10488e41c]  exec.zig:1330
+        +       !     1 heap.ArenaAllocator.reset  (in opensas) + 136  [0x104668bb0]  ArenaAllocator.zig:0
+        +       380 main.runExpanded  (in opensas) + 9844  [0x1046bc974]  main.zig:487
+        +       ! 342 main.runProc  (in opensas) + 10908  [0x1046d1034]  main.zig:2669
+        +       ! : 342 proc.runImport  (in opensas) + 4316  [0x1046d7e70]  proc.zig:10393
+        +       ! :   89 io.readDelimited  (in opensas) + 2496  [0x104751a7c]  io.zig:1722
+        +       ! :   | 39 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 188,444,...  [0x1046b6f18,0x1046b7018,...]  parse_float.zig:37
+        +       ! :   | 37 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 420  [0x1046b7000]  parse_float.zig:37
+        +       ! :   | + 23 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 244,256,...  [0x1046b8e04,0x1046b8e10,...]  parse.zig:43
+        +       ! :   | + 8 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 336  [0x1046b8e60]  parse.zig:45
+        +       ! :   | + 3 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 8,16,...  [0x1046b8d18,0x1046b8d20,...]  parse.zig:32
+        +       ! :   | + 2 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 352  [0x1046b8e70]  parse.zig:46
+        +       ! :   | + 1 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 20  [0x1046b8d24]  FloatStream.zig:0
+        +       ! :   | 5 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 3268,172  [0x1046b7b20,0x1046b6f08]  parse_float.zig:0
+        +       ! :   | 3 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 2220,2236  [0x1046b7708,0x1046b7718]  parse_float.zig:45
+        +       ! :   | 2 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 20,24  [0x1046b6e70,0x1046b6e74]  parse_float.zig:335
+        +       ! :   | 1 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 356  [0x1046b8e74]  parse.zig:46
+        +       ! :   | 1 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 56  [0x1046b6e94]  parse_float.zig:29
+        +       ! :   | 1 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 1868  [0x1046b75a8]  parse_float.zig:41
+        +       ! :   42 io.readDelimited  (in opensas) + 2364  [0x1047519f8]  io.zig:1720
+        +       ! :   | 38 mem.eqlBytes  (in opensas) + 248,240,...  [0x104918050,0x104918048,...]  mem.zig:0
+        +       ! :   | 2 mem.eqlBytes  (in opensas) + 0  [0x104917f58]  mem.zig:768
+        +       ! :   | 2 mem.eqlBytes  (in opensas) + 24  [0x104917f70]  mem.zig:772
+        +       ! :   41 io.readDelimited  (in opensas) + 4528  [0x10475226c]  io.zig:1782
+        +       ! :   | 16 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 420  [0x1046b7000]  parse_float.zig:37
+        +       ! :   | + 7 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 232,244  [0x1046b8df8,0x1046b8e04]  parse.zig:43
+        +       ! :   | + 3 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 336  [0x1046b8e60]  parse.zig:45
+        +       ! :   | + 3 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 352  [0x1046b8e70]  parse.zig:46
+        +       ! :   | + 2 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 8  [0x1046b8d18]  parse.zig:32
+        +       ! :   | + 1 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 320  [0x1046b8e50]  parse.zig:44
+        +       ! :   | 16 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 792,1860,...  [0x1046b7174,0x1046b75a0,...]  parse_float.zig:37
+        +       ! :   | 4 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 3268  [0x1046b7b20]  parse_float.zig:0
+        +       ! :   | 3 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 2208,2232,...  [0x1046b76fc,0x1046b7714,...]  parse_float.zig:45
+        +       ! :   | 1 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 48  [0x1046b6e8c]  parse_float.zig:335
+        +       ! :   | 1 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 1868  [0x1046b75a8]  parse_float.zig:41
+        +       ! :   29 io.readDelimited  (in opensas) + 2228  [0x104751970]  io.zig:1719
+        +       ! :   27 io.readDelimited  (in opensas) + 2344,2284,...  [0x1047519e4,0x1047519a8,...]  io.zig:1720
+        +       ! :   22 io.readDelimited  (in opensas) + 2408,2372,...  [0x104751a24,0x104751a00,...]  io.zig:1722
+        +       ! :   18 io.readDelimited  (in opensas) + 4468  [0x104752230]  io.zig:1782
+        +       ! :   | 11 mem.eqlBytes  (in opensas) + 240,16,...  [0x104918048,0x104917f68,...]  mem.zig:0
+        +       ! :   | 6 mem.eqlBytes  (in opensas) + 0  [0x104917f58]  mem.zig:768
+        +       ! :   | 1 mem.eqlBytes  (in opensas) + 80  [0x104917fa8]  mem.zig:776
+        +       ! :   13 io.readDelimited  (in opensas) + 4504  [0x104752254]  io.zig:1782
+        +       ! :   | 6 mem.trim__anon_22840  (in opensas) + 96  [0x1046b96bc]  mem.zig:1205
+        +       ! :   | + 3 mem.findScalarPos__anon_9702  (in opensas) + 4  [0x10466e220]  mem.zig:1241
+        +       ! :   | + 2 mem.findScalarPos__anon_9702  (in opensas) + 340  [0x10466e370]  mem.zig:1284
+        +       ! :   | + 1 mem.findScalarPos__anon_9702  (in opensas) + 468  [0x10466e3f0]  mem.zig:1297
+        +       ! :   | 6 mem.trim__anon_22840  (in opensas) + 176  [0x1046b970c]  mem.zig:1206
+        +       ! :   | + 2 mem.findScalarPos__anon_9702  (in opensas) + 468  [0x10466e3f0]  mem.zig:1297
+        +       ! :   | + 1 mem.findScalarPos__anon_9702  (in opensas) + 496  [0x10466e40c]  mem.zig:0
+        +       ! :   | + 1 mem.findScalarPos__anon_9702  (in opensas) + 4  [0x10466e220]  mem.zig:1241
+        +       ! :   | + 1 mem.findScalarPos__anon_9702  (in opensas) + 20  [0x10466e230]  mem.zig:1263
+        +       ! :   | + 1 mem.findScalarPos__anon_9702  (in opensas) + 340  [0x10466e370]  mem.zig:1284
+        +       ! :   | 1 mem.trim__anon_22840  (in opensas) + 140  [0x1046b96e8]  mem.zig:1206
+        +       ! :   13 io.readDelimited  (in opensas) + 4472,4248,...  [0x104752234,0x104752154,...]  io.zig:1782
+        +       ! :   9 mem.eqlBytes  (in opensas) + 252  [0x104918054]  mem.zig:0
+        +       ! :   7 io.readDelimited  (in opensas) + 3948  [0x104752028]  io.zig:1776
+        +       ! :   | 6 heap.ArenaAllocator.alloc  (in opensas) + 200,240,...  [0x104918dc4,0x104918dec,...]  ArenaAllocator.zig:0
+        +       ! :   | 1 heap.ArenaAllocator.alloc  (in opensas) + 32  [0x104918d1c]  ArenaAllocator.zig:332
+        +       ! :   7 io.readDelimited  (in opensas) + 3968  [0x10475203c]  io.zig:1776
+        +       ! :   | 7 _platform_memset  (in libsystem_platform.dylib) + 168,108  [0x18d0cd198,0x18d0cd15c]
+        +       ! :   6 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 3300,3296  [0x1046b7b40,0x1046b7b3c]  parse_float.zig:0
+        +       ! :   4 io.readDelimited  (in opensas) + 4588  [0x1047522a8]  io.zig:1785
+        +       ! :   | 3 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 316  [0x1047530b4]  array_list.zig:1211
+        +       ! :   | + 3 _platform_memset  (in libsystem_platform.dylib) + 72  [0x18d0cd138]
+        +       ! :   | 1 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 444  [0x104753134]  array_list.zig:1211
+        +       ! :   |   1 _platform_memset  (in libsystem_platform.dylib) + 72  [0x18d0cd138]
+        +       ! :   3 io.readDelimited  (in opensas) + 2208,2200  [0x10475195c,0x104751954]  io.zig:1718
+        +       ! :   3 mem.trim__anon_22840  (in opensas) + 232,244  [0x1046b9744,0x1046b9750]  mem.zig:1207
+        +       ! :   2 io.readDelimited  (in opensas) + 2368,4548  [0x1047519fc,0x104752280]  io.zig:0
+        +       ! :   2 io.readDelimited  (in opensas) + 2192  [0x10475194c]  io.zig:1726
+        +       ! :   2 io.readDelimited  (in opensas) + 4112,4136  [0x1047520cc,0x1047520e4]  io.zig:1781
+        +       ! :   2 io.readDelimited  (in opensas) + 4024  [0x104752074]  io.zig:1784
+        +       ! :   1 io.readDelimited  (in opensas) + 4556  [0x104752288]  io.zig:1780
+        +       ! 36 main.runProc  (in opensas) + 14528  [0x1046d1e58]  main.zig:2633
+        +       ! : 4 sort.block.block__anon_83095  (in opensas) + 928  [0x1047c1db4]  block.zig:146
+        +       ! : | 2 sort.block.swap__anon_83106  (in opensas) + 128,148  [0x1047c6ee8,0x1047c6efc]  block.zig:1071
+        +       ! : | 1 proc.cmpColl  (in opensas) + 628  [0x10475b13c]  proc.zig:0
+        +       ! : | 1 sort.block.swap__anon_83106  (in opensas) + 208  [0x1047c6f38]  block.zig:1071
+        +       ! : |   1 proc.cmpColl  (in opensas) + 464  [0x10475b098]  proc.zig:606
+        +       ! : 3 sort.block.block__anon_83095  (in opensas) + 9424  [0x1047c3ee4]  block.zig:579
+        +       ! : | 3 mem.reverse__anon_13976  (in opensas) + 32,36,...  [0x10467c6b4,0x10467c6b8,...]  mem.zig:3916
+        +       ! : 2 sort.block.block__anon_83095  (in opensas) + 844  [0x1047c1d60]  block.zig:143
+        +       ! : | 1 sort.block.swap__anon_83106  (in opensas) + 208  [0x1047c6f38]  block.zig:1071
+        +       ! : | + 1 proc.cmpColl  (in opensas) + 620  [0x10475b134]  proc.zig:0
+        +       ! : | 1 sort.block.swap__anon_83106  (in opensas) + 468  [0x1047c703c]  block.zig:1072
+        +       ! : 2 sort.block.block__anon_83095  (in opensas) + 900  [0x1047c1d98]  block.zig:145
+        +       ! : | 1 sort.block.swap__anon_83106  (in opensas) + 148  [0x1047c6efc]  block.zig:1071
+        +       ! : | 1 sort.block.swap__anon_83106  (in opensas) + 468  [0x1047c703c]  block.zig:1072
+        +       ! : 2 sort.block.block__anon_83095  (in opensas) + 1068  [0x1047c1e40]  block.zig:151
+        +       ! : | 1 sort.block.swap__anon_83106  (in opensas) + 48  [0x1047c6e98]  block.zig:1070
+        +       ! : | 1 sort.block.swap__anon_83106  (in opensas) + 128  [0x1047c6ee8]  block.zig:1071
+        +       ! : 2 sort.block.block__anon_83095  (in opensas) + 4652  [0x1047c2c40]  block.zig:281
+        +       ! : 2 sort.block.block__anon_83095  (in opensas) + 9436  [0x1047c3ef0]  block.zig:579
+        +       ! : | 2 mem.reverse__anon_13976  (in opensas) + 24,36  [0x10467c6ac,0x10467c6b8]  mem.zig:3916
+        +       ! : 2 sort.block.block__anon_83095  (in opensas) + 13616  [0x1047c4f44]  block.zig:733
+        +       ! : 2 sort.block.swap__anon_83106  (in opensas) + 532  [0x1047c707c]  block.zig:1073
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 692  [0x1047c1cc8]  block.zig:0
+        +       ! : | 1 sort.block.swap__anon_83106  (in opensas) + 48  [0x1047c6e98]  block.zig:1070
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 4500  [0x1047c2ba8]  block.zig:0
+        +       ! : | 1 _platform_memmove  (in libsystem_platform.dylib) + 180  [0x18d0cd474]
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 984  [0x1047c1dec]  block.zig:148
+        +       ! : | 1 sort.block.swap__anon_83106  (in opensas) + 128  [0x1047c6ee8]  block.zig:1071
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 1292  [0x1047c1f20]  block.zig:159
+        +       ! : | 1 sort.block.swap__anon_83106  (in opensas) + 208  [0x1047c6f38]  block.zig:1071
+        +       ! : |   1 proc.cmpColl  (in opensas) + 44  [0x10475aef4]  proc.zig:602
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 1612  [0x1047c2060]  block.zig:166
+        +       ! : | 1 sort.block.swap__anon_83106  (in opensas) + 148  [0x1047c6efc]  block.zig:1071
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 1640  [0x1047c207c]  block.zig:167
+        +       ! : | 1 sort.block.swap__anon_83106  (in opensas) + 24  [0x1047c6e80]  block.zig:1070
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 1724  [0x1047c20d0]  block.zig:170
+        +       ! : | 1 sort.block.swap__anon_83106  (in opensas) + 24  [0x1047c6e80]  block.zig:1070
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 3356  [0x1047c2730]  block.zig:240
+        +       ! : | 1 _platform_memmove  (in libsystem_platform.dylib) + 212  [0x18d0cd494]
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 4428  [0x1047c2b60]  block.zig:262
+        +       ! : | 1 _platform_memmove  (in libsystem_platform.dylib) + 204  [0x18d0cd48c]
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 4972  [0x1047c2d80]  block.zig:286
+        +       ! : | 1 _platform_memmove  (in libsystem_platform.dylib) + 180  [0x18d0cd474]
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 4948  [0x1047c2d68]  block.zig:286
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 7028  [0x1047c3588]  block.zig:310
+        +       ! : | 1 mem.reverse__anon_13976  (in opensas) + 0  [0x10467c694]  mem.zig:3890
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 7624  [0x1047c37dc]  block.zig:520
+        +       ! : | 1 sort.block.findFirstBackward__anon_83114  (in opensas) + 680  [0x1047c6554]  block.zig:0
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 7800  [0x1047c388c]  block.zig:522
+        +       ! : 1 sort.block.block__anon_83095  (in opensas) + 9412  [0x1047c3ed8]  block.zig:579
+        +       ! :   1 mem.reverse__anon_13976  (in opensas) + 68  [0x10467c6d8]  mem.zig:3916
+        +       ! 1 main.runProc  (in opensas) + 9088  [0x1046d0918]  main.zig:2633
+        +       ! : 1 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 316  [0x1047530b4]  array_list.zig:1211
+        +       ! :   1 _platform_memset  (in libsystem_platform.dylib) + 72  [0x18d0cd138]
+        +       ! 1 main.runProc  (in opensas) + 9176  [0x1046d0970]  main.zig:2633
+        +       !   1 _platform_memmove  (in libsystem_platform.dylib) + 88  [0x18d0cd418]
+        +       1 main.runExpanded  (in opensas) + 23712  [0x1046bffa0]  main.zig:517
+        +         1 functions.setLetVar  (in opensas) + 340  [0x104862dec]  functions.zig:434
+        +           1 hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 192  [0x1046b6c84]  hash_map.zig:988
+        +             1 mem.eqlBytes  (in opensas) + 340  [0x1049180ac]  mem.zig:781
+        9 main  (in opensas) + 9564  [0x10465d2d8]  start.zig:663
+          9 posix.munmap  (in opensas) + 12  [0x104676c88]  posix.zig:685
+            9 __munmap  (in libsystem_kernel.dylib) + 8  [0x18d083728]
+
+Total number in stack (recursive counted multiple, when >=5):
+        13       hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 0  [0x1046b6bc4]  hash_map.zig:0
+        12       hash.wyhash.Wyhash.hash  (in opensas) + 0  [0x10466bdf0]  wyhash.zig:195
+        10       hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 192  [0x1046b6c84]  hash_map.zig:988
+        10       hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 60  [0x1046b6c00]  hash_map.zig:975
+        10       mem.eqlBytes  (in opensas) + 0  [0x104917f58]  mem.zig:0
+        10       pdv.Pdv.indexOf  (in opensas) + 136  [0x1046e5504]  pdv.zig:157
+        9       _platform_memset  (in libsystem_platform.dylib) + 0  [0x18d0cd0f0]
+        8       pdv.Pdv.indexOf  (in opensas) + 0  [0x1046e547c]  pdv.zig:157
+        6       _platform_memmove  (in libsystem_platform.dylib) + 0  [0x18d0cd3c0]
+        6       pdv.Pdv.indexOf  (in opensas) + 0  [0x1046e547c]  pdv.zig:0
+        5       eval.Evaluator.eval  (in opensas) + 860  [0x1046de568]  eval.zig:96
+        5       hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas) + 0  [0x1046b6bc4]  hash_map.zig:965
+        5       mem.eqlBytes  (in opensas) + 0  [0x104917f58]  mem.zig:781
+        5       sort.block.swap__anon_83106  (in opensas) + 0  [0x1047c6e68]  block.zig:1071
+
+Sort by top of stack, same collapsed (when >= 5):
+        io.readDelimited  (in opensas)        103
+        mem.eqlBytes  (in opensas)        103
+        fmt.parse_float.parseFloat__anon_30309  (in opensas)        82
+        hash_map.HashMapUnmanaged([]const u8,*const format.UserFmtEntry,hash_map.StringContext,80).getIndex__anon_30179  (in opensas)        61
+        fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas)        54
+        hash.wyhash.Wyhash.hash  (in opensas)        43
+        _platform_memset  (in libsystem_platform.dylib)        39
+        pdv.Pdv.indexOf  (in opensas)        38
+        pdv.Pdv.setAt  (in opensas)        29
+        exec.Executor.run  (in opensas)        26
+        dataset.Dataset.appendRow  (in opensas)        21
+        eval.Evaluator.eval  (in opensas)        19
+        exec.Executor.runProgramRange  (in opensas)        15
+        heap.ArenaAllocator.alloc  (in opensas)        14
+        sort.block.swap__anon_83106  (in opensas)        14
+        exec.Executor.runStmt  (in opensas)        12
+        mem.findScalarPos__anon_9702  (in opensas)        12
+        eval.Evaluator.toNum  (in opensas)        11
+        __munmap  (in libsystem_kernel.dylib)        9
+        _platform_memmove  (in libsystem_platform.dylib)        9
+        eval.Evaluator.rejectObjectName  (in opensas)        8
+        pdv.Pdv.define  (in opensas)        8
+        exec.Executor.output  (in opensas)        7
+        mem.reverse__anon_13976  (in opensas)        7
+        eval.Evaluator.evalBinary  (in opensas)        6
+        exec.Executor.setsConsume  (in opensas)        6
+        sort.block.block__anon_83095  (in opensas)        6
+
+Binary Images:
+       0x104654000 -        0x10496c5ef +opensas (0) <6C3B2D5D-80A1-3E86-B1EF-D98F60B04BA6> /Users/*/Documents/*/opensas
+       0x18cc60000 -        0x18ccb2b4b  libobjc.A.dylib (951.7) <2E858E25-1FF6-3DA6-84F6-911630620512> /usr/lib/libobjc.A.dylib
+       0x18ccb3000 -        0x18cce7b34  libdyld.dylib (1376.6) <2C3C5F75-3686-39A1-9202-BD4D2133379D> /usr/lib/system/libdyld.dylib
+       0x18cce8000 -        0x18cd8dec7  dyld (1.0.0 - 1376.6) <9F682DCF-340C-3BFA-BCDD-DD702F30313E> /usr/lib/dyld
+       0x18cd8e000 -        0x18cd91228  libsystem_blocks.dylib (96) <2EA73169-CF76-3DD1-9869-F23C8B338022> /usr/lib/system/libsystem_blocks.dylib
+       0x18cd92000 -        0x18cde651f  libxpc.dylib (3102.100.102) <618039C8-9965-3782-A7D2-90FD4C3DD66F> /usr/lib/system/libxpc.dylib
+       0x18cde7000 -        0x18ce079bf  libsystem_trace.dylib (1861.100.19) <08629650-54FC-3AA6-910E-EACA563804D0> /usr/lib/system/libsystem_trace.dylib
+       0x18ce08000 -        0x18ceb5daf  libcorecrypto.dylib (1922.101.2) <D1EC203E-9B2E-391B-8DE3-7C58F0589437> /usr/lib/system/libcorecrypto.dylib
+       0x18ceb6000 -        0x18cf061d7  libsystem_malloc.dylib (812.100.31) <2AD21BE3-FFDB-31D5-A3D7-2F7F672D6E92> /usr/lib/system/libsystem_malloc.dylib
+       0x18cf07000 -        0x18cf4e23f  libdispatch.dylib (1542.100.32) <E17AA23F-DB2A-3302-B14C-F6B08C540FCF> /usr/lib/system/libdispatch.dylib
+       0x18cf4f000 -        0x18cf51ffb  libsystem_featureflags.dylib (103) <0DE01F76-4B36-35A2-98F9-43DD147EDD95> /usr/lib/system/libsystem_featureflags.dylib
+       0x18cf52000 -        0x18cfd2ef7  libsystem_c.dylib (1752.100.10) <66EBD321-6899-3863-BA24-5CFC3076A0CB> /usr/lib/system/libsystem_c.dylib
+       0x18cfd3000 -        0x18d063ae7  libc++.1.dylib (2100.43) <1E9541EC-C564-38CB-BED6-46F708E8D863> /usr/lib/libc++.1.dylib
+       0x18d064000 -        0x18d07e75f  libc++abi.dylib (2100.43) <E8D325ED-3B97-325E-B494-B1B0FF93D133> /usr/lib/libc++abi.dylib
+       0x18d07f000 -        0x18d0bc28f  libsystem_kernel.dylib (12377.101.15) <51565B39-F595-3E96-A217-FEF29815057A> /usr/lib/system/libsystem_kernel.dylib
+       0x18d0bd000 -        0x18d0c9b3b  libsystem_pthread.dylib (539.100.4) <E7A73008-0C09-31E3-9DD9-0C61652F0E85> /usr/lib/system/libsystem_pthread.dylib
+       0x18d0ca000 -        0x18d0d28f3  libsystem_platform.dylib (375.100.10) <D93EC420-F465-3A3A-916D-A04AF9B023EB> /usr/lib/system/libsystem_platform.dylib
+       0x18d0d3000 -        0x18d1026eb  libsystem_info.dylib (600) <201FD67C-3DF6-3788-B132-A69CAA2AA3D7> /usr/lib/system/libsystem_info.dylib
+       0x191098000 -        0x1910a1e5f  libsystem_darwin.dylib (1752.100.10) <D5BA0CAB-F283-3620-AAA9-1EEB718E1BA8> /usr/lib/system/libsystem_darwin.dylib
+       0x191503000 -        0x191514f5b  libsystem_notify.dylib (348.100.7) <9F46F30B-B7C0-3DD7-AC38-57B78C7971FF> /usr/lib/system/libsystem_notify.dylib
+       0x1937cd000 -        0x1937e7f5b  libsystem_networkextension.dylib (2226.101.1) <85169C7B-48DD-3542-AD38-F1B88EA2A95A> /usr/lib/system/libsystem_networkextension.dylib
+       0x19386a000 -        0x193881fdf  libsystem_asl.dylib (406) <6427D987-7938-3278-8C14-10FB9C06BBD5> /usr/lib/system/libsystem_asl.dylib
+       0x195425000 -        0x19542d387  libsystem_symptoms.dylib (2169.100.30) <28B6E34E-9C7D-3437-A3F1-A3C979DE579A> /usr/lib/system/libsystem_symptoms.dylib
+       0x1996c0000 -        0x1996f825f  libsystem_containermanager.dylib (725.100.37) <14750F95-BB3A-3654-8610-A05A454643A8> /usr/lib/system/libsystem_containermanager.dylib
+       0x19aad0000 -        0x19aad45d7  libsystem_configuration.dylib (1405.100.8) <634F597D-F8BD-3C00-B967-86047FC15D14> /usr/lib/system/libsystem_configuration.dylib
+       0x19aad5000 -        0x19aadb8cf  libsystem_sandbox.dylib (2680.100.174) <AF76231D-EADC-3399-9414-6AD90FB4EA89> /usr/lib/system/libsystem_sandbox.dylib
+       0x19c11b000 -        0x19c11e1fb  libquarantine.dylib (196.100.8) <268FEB6E-A237-3050-BFFF-AE3A66B7EAD4> /usr/lib/system/libquarantine.dylib
+       0x19c8ba000 -        0x19c8c0d03  libsystem_coreservices.dylib (191.4.5) <7129349D-04F9-3C3C-BF37-3082C1468654> /usr/lib/system/libsystem_coreservices.dylib
+       0x19ce3f000 -        0x19ce7ca77  libsystem_m.dylib (3312.100.1) <83B173CD-7F32-3901-8E67-C0B2676BE015> /usr/lib/system/libsystem_m.dylib
+       0x19ce7e000 -        0x19ce81527  libmacho.dylib (1376.6) <9729ECEA-0A08-32E3-8BDB-B42FC15FF258> /usr/lib/system/libmacho.dylib
+       0x19ce9b000 -        0x19cea83a7  libcommonCrypto.dylib (600035) <710EC5FA-F77C-3646-A9E3-C037C42E1539> /usr/lib/system/libcommonCrypto.dylib
+       0x19cea9000 -        0x19ceb2ca3  libunwind.dylib (2100.2) <FB0518B9-DF0F-3A03-A74B-AF1B21C26F8B> /usr/lib/system/libunwind.dylib
+       0x19cebb000 -        0x19cec57ff  libcopyfile.dylib (240) <0B7FF027-5579-3CBF-A12B-68A4FD36641C> /usr/lib/system/libcopyfile.dylib
+       0x19cec6000 -        0x19cec9987  libcompiler_rt.dylib (103.3) <65E29E6E-7042-3F73-A1D2-F2C4EBCD7524> /usr/lib/system/libcompiler_rt.dylib
+       0x19ceca000 -        0x19cece78b  libsystem_collections.dylib (1752.100.10) <B81193DE-3BEC-3340-86D0-DB7F3683D135> /usr/lib/system/libsystem_collections.dylib
+       0x19cecf000 -        0x19ced24cf  libsystem_secinit.dylib (168.100.7) <A6B77B36-195D-33F8-8058-FE0B5BFA9D37> /usr/lib/system/libsystem_secinit.dylib
+       0x19ced3000 -        0x19ced5bf7  libremovefile.dylib (85.100.6) <BD89B1A3-0D06-3881-B5E1-EFC6CFBDFCC1> /usr/lib/system/libremovefile.dylib
+       0x19ced6000 -        0x19ced6f27  libkeymgr.dylib (31) <DE8F8219-0072-35C2-8932-C065491ED15D> /usr/lib/system/libkeymgr.dylib
+       0x19ced7000 -        0x19cedfe3f  libsystem_dnssd.dylib (2881.100.56.0.1) <DEC8BDD2-366C-3BF9-A123-35744DB06354> /usr/lib/system/libsystem_dnssd.dylib
+       0x19cee0000 -        0x19cee509b  libcache.dylib (95) <4D6833A3-C910-3A76-AA8A-303F698B36BF> /usr/lib/system/libcache.dylib
+       0x19cee6000 -        0x19cee7ce3  libSystem.B.dylib (1356) <E05F5341-06B7-365E-8014-E9CD64C352FE> /usr/lib/libSystem.B.dylib
+       0x28f7c9000 -        0x28f7d0349  libRosetta.dylib (367.5) <2FC1EF06-04C4-35FC-8DC3-BEA1E9FBD63F> /usr/lib/libRosetta.dylib
+       0x2914a6000 -        0x2914a9a4b  libsystem_darwindirectory.dylib (122) <CCAA2170-32DD-34BD-A927-32DF30893969> /usr/lib/system/libsystem_darwindirectory.dylib
+       0x2914aa000 -        0x2914b35a7  libsystem_eligibility.dylib (319.101.1) <2D19994A-87BB-34B8-A343-CB8DD47FF110> /usr/lib/system/libsystem_eligibility.dylib
+       0x2914b4000 -        0x2914bb8db  libsystem_sanitizers.dylib (26) <FCB93D2F-4437-3089-A43F-A19BC23DD65B> /usr/lib/system/libsystem_sanitizers.dylib
+       0x2914bc000 -        0x2914bcbb7  libsystem_trial.dylib (474.2.18) <5BB81430-4E33-3160-94D2-1FFB2B614DB2> /usr/lib/system/libsystem_trial.dylib

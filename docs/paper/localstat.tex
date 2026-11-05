@@ -1,0 +1,732 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=25mm]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{flafter}
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily\footnotesize,breaklines=true,
+    columns=fullflexible,keepspaces=true,showstringspaces=false,
+    frame=single,numbers=left,numberstyle=\tiny,tabsize=4}
+\usepackage[hidelinks]{hyperref}
+\usepackage{microtype}
+
+\newcommand{\localstatrevision}{7f6dec6537cc9e9ca9f9c37961b8b6811c5b7aff}
+\hypersetup{
+    pdftitle={LocalStat: A Native macOS Environment for Local Execution of a SAS-Language Subset},
+    pdfauthor={Muhammad Hafiz bin Ismail},
+    pdfsubject={System paper with code and controlled before/after memory and PRINT optimizations}
+}
+
+\title{LocalStat: A Native macOS Environment for Local
+Execution of a SAS-Language Subset}
+\author{Muhammad Hafiz bin Ismail}
+\date{4 November 2026\\Draft manuscript with controlled optimization results}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+LocalStat combines a native macOS editing environment with a
+local interpreter for a supported subset of the SAS language.
+The application uses Swift and AppKit for document editing,
+execution control, diagnostics, and result presentation. Its
+runtime is a pinned and locally extended version of OpenSAS,
+implemented in Zig. Local extensions include a bounded ordinary
+least-squares implementation of PROC REG and structured table
+output for selected procedures. This paper describes the system
+architecture, execution model, numerical implementation, and
+compatibility boundaries. An initial 855-sample study is followed
+by a controlled 1,912-sample before/after study on an Apple M5
+Mac with 16 GB of memory. The implementation changes reclaim
+CSV parsing intermediates, eliminate duplicate snapshot row
+allocations, and reuse PRINT layout measurements. Across seven
+one-million-row workload families, median peak interpreter RSS
+falls by 54.0 to 75.6\%, with runtime speedups of
+1.12 to 1.26 times. For 10,000 PRINT rows, median table construction
+falls from 210.5 to 51.8 ms, and full application latency falls
+from 343.5 to 172.9 ms. Outputs and pagination remain unchanged
+under the stated checks. The paper includes evaluated code
+excerpts and reproducible artifacts. These results apply to the
+tested workloads and do not establish general SAS equivalence
+or an advantage over another implementation language.
+\end{abstract}
+
+\section{Introduction}
+
+LocalStat provides a macOS environment for editing and executing
+supported SAS programs locally. The application combines source
+editing, project navigation, execution controls, diagnostics,
+text output, formatted tables, and report export. Once built,
+the application runs without a developer toolchain or a hosted
+execution service.
+
+The system uses OpenSAS as its interpreter foundation~\cite{opensas}.
+LocalStat adds a native application layer and
+selected runtime extensions. The implementation is independent
+of SAS Institute's runtime and supports a bounded language
+subset. Compatibility must therefore be described through
+specific supported behavior rather than inferred from the
+ability to execute a program successfully.
+
+This paper documents three implementation areas: the integration
+of a native editor with a local interpreter, a bounded regression
+procedure, and a structured interface for presenting selected
+procedure results. It reports a reproducible baseline followed
+by targeted memory and PRINT optimizations with a controlled
+before/after evaluation.
+
+\section{System Architecture}
+
+\subsection{Native application}
+
+The application is implemented in Swift using AppKit. Its
+interface includes document tabs, a project sidebar, an editor,
+and results views. Users can run an entire editor buffer,
+including unsaved changes, with the selected project directory
+serving as the runtime working directory.
+
+The application retains the executed source snapshot with the
+run result. Diagnostic navigation is enabled only when an
+original-source position refers to an unchanged editor buffer.
+Positions belonging to macro-expanded text are not treated as
+direct coordinates in the original source.
+
+Offline Help documents supported behavior and provides executable
+examples. Text export preserves runtime output and diagnostics.
+PDF report export combines the executed source, run metadata,
+results, and diagnostics. This report facility belongs to the
+application and is distinct from a SAS ODS destination.
+
+\subsection{Interpreter process}
+
+Each submission starts a fresh interpreter process. The
+application writes the source snapshot to a temporary file,
+launches the bundled executable, and drains standard output and
+standard error concurrently. Concurrent draining prevents a full
+output pipe from blocking completion.
+
+Fresh processes reset WORK datasets and macro definitions between
+submissions. Files explicitly written by a program can persist.
+The process boundary separates run state; it does not provide a
+filesystem sandbox.
+
+The application supports cancellation through a termination
+signal, followed by forced termination after two seconds if the
+process remains active. Runtime output is buffered until
+execution finishes, so cancellation can discard output that has
+not yet been emitted.
+
+\subsection{Runtime provenance and build}
+
+The interpreter is based on OpenSAS commit
+\texttt{927a2fa9f1401e365d975536bd704819ada1f1f4}.
+The repository retains the upstream source snapshot and records
+local modifications separately~\cite{runtimechanges}.
+
+The current build targets Apple Silicon and macOS 14 or newer.
+The runtime is built with Zig 0.16.0 using
+\texttt{ReleaseSafe}; the Swift application uses a release build.
+Python supports repository tests and Help generation. It is not
+part of the application execution path.
+
+\section{Selected Implementation Details}
+
+\subsection{Bounded ordinary least squares}
+
+LocalStat extends the runtime with a numeric subset of
+\texttt{PROC REG}. A supported model has one response, explicit
+numeric predictors, and an intercept:
+\[
+    y = X\beta + \varepsilon.
+\]
+Rows missing any model variable are excluded. The remaining
+design must have positive residual degrees of freedom and
+sufficient numerical rank.
+
+The solver uses column scaling and Householder QR factorization
+with column pivoting. It produces coefficient estimates,
+standard errors, analysis-of-variance quantities, and associated
+test statistics.
+
+The implementation rejects numerically rank-deficient designs.
+It does not reproduce generalized-inverse handling of aliased
+coefficients. Unsupported model options produce explicit
+diagnostics. This procedure is a documented subset rather than
+a complete implementation of SAS PROC REG~\cite{compatibility}.
+
+\subsection{Structured table results}
+
+The runtime can write an optional, versioned JSON sidecar for
+selected results from \texttt{PROC PRINT},
+\texttt{PROC FREQ}, and \texttt{PROC TABULATE}. The sidecar
+contains table titles, headers, rows, notes, and cell spans.
+
+The application validates the version and table shape before
+displaying the results. Raw output and diagnostics remain
+available alongside formatted tables. The interface supports
+native table presentation without interpreting aligned text as
+a table schema.
+
+\section{Evaluation Questions}
+
+The evaluation addresses four questions:
+\begin{enumerate}
+    \item How do interpreter runtime and peak memory change as
+    input size increases?
+    \item Which runtime functions and execution stages account
+    for the largest costs?
+    \item How much additional latency comes from table generation,
+    result decoding, and application presentation?
+    \item Do targeted optimizations improve performance while
+    preserving validated behavior?
+\end{enumerate}
+
+The study does not attempt to establish that one implementation
+language is universally faster than another. Such a comparison
+would require equivalent implementations and controlled
+workloads. The first three questions are addressed through
+baseline measurements and profiles. Section~\ref{sec:optimization}
+addresses the fourth with a controlled implementation comparison.
+
+\section{Experimental Method}
+
+\subsection{Workloads}
+
+A six-observation multiple-regression example from the repository,
+with an appended checksum, provides a small-program baseline.
+Synthetic workloads use 1,000, 10,000, 100,000, and 1,000,000 rows.
+Every generated CSV has five numeric columns: a descending row
+identifier, a group identifier, two predictors, and a response.
+The group identifier cycles through 100 levels. Predictors and
+noise cycle through a balanced factorial design with values
+$-1$ and $1$, and the response is
+$y=2+3x-4z+\varepsilon$.
+
+The seven scaling families perform a DATA-step transformation
+($v=3\,\mathrm{id}+2$), ascending sort, SQL grouping, SQL join,
+two-predictor regression, CSV round trip, or frequency tabulation.
+The grouping workload produces 100 groups. The join uses a
+100-row dimension with unique group keys and produces exactly
+as many rows as its input. The CSV round trip imports, exports,
+and reimports all five columns. PRINT adds output-heavy cases
+at 1,000 and 10,000 rows. Both FREQ and PRINT run with and
+without the structured table sidecar.
+
+Input generation occurs outside the timed interval. Each scaling
+program includes CSV loading and a compact validation scan;
+these measurements are whole-program costs, not isolated
+operator timings. Checks verify row counts and exact checksums,
+sort order, group aggregates, and joined key associations.
+Regression checks require coefficients $(2,3,-4)$ within absolute
+and relative tolerances of $10^{-8}$, and residual sum of squares
+equal to the row count within relative tolerance $10^{-8}$.
+Every exported CSV field and numeric listing row is checked
+after timing. Sidecar checks validate shape, PRINT cells, and
+FREQ group counts. Output and diagnostic hashes must remain identical
+across repetitions and sidecar variants.
+
+\subsection{Measurement boundaries}
+
+Command-line measurements run the executable directly. A
+high-resolution monotonic clock surrounds process launch and
+\texttt{wait4}; elapsed time includes launch and observation
+overhead, source loading, interpretation, and output completion.
+Per-child \texttt{wait4} resource counters provide CPU time and
+peak resident memory. This replaces the draft protocol's
+\texttt{/usr/bin/time -l} invocation to retain sub-centisecond
+precision and avoid a separate timing process. Compilation,
+input generation, output parsing, and validation are excluded.
+
+The native experiment compares the existing
+\texttt{LocalRuntimeRunner} directly against the actual
+\texttt{AppDelegate.runProgram} workflow in a release-mode XCTest
+host. Both execute the same frozen interpreter. The direct
+runner includes source snapshot creation, process handling,
+output capture, and table decoding. Application timing starts
+before dispatch and ends after result application, layout, and
+a synchronous window display pass. Completion observation polls
+at one-millisecond intervals. Window creation and document setup
+are excluded. The four cases are DATA at 10,000 rows, FREQ at
+100,000 rows, and PRINT at 1,000 and 10,000 rows.
+
+These are paired executions, not separately instrumented stages
+of one execution. Their difference includes scheduling and
+observation effects and cannot isolate decoding or rendering
+time. The display boundary does not measure physical screen
+presentation or the latency of a human keyboard action.
+
+Separate one-second stack profiles were collected at nominal
+one-millisecond sampling intervals for each million-row family.
+Profiled runs are excluded from timing summaries. Their short,
+partially observed execution windows support hotspot
+identification rather than precise stage-time attribution.
+
+\subsection{Repetition and environment}
+
+Each configuration has one separately recorded first execution,
+three warmups, and fifteen measured repetitions in fresh
+interpreter processes. The primary summaries are medians and
+interquartile ranges (IQRs), using linearly interpolated inclusive
+quartiles. The first runs and warmups are retained in the raw
+artifact but excluded from summary tables. No cache flush was
+performed, and first execution is not claimed to be a cold-cache
+measurement. Paired variant order alternates by iteration.
+
+The host was a ten-core Apple M5 MacBook Pro (Mac17,2) with 16 GB
+of memory, running macOS 26.4.1 (25E253), Swift 6.3.3, and Zig
+0.16.0. The Mac was connected to AC power with low-power mode
+disabled. The runtime used the normal ARM64 ReleaseSafe build;
+the native test host used Swift release compilation. App windows
+used the light appearance, a $1100\times780$ frame, default fonts,
+and unit table zoom. Timing studies and profiling ran
+sequentially.
+
+The artifact records executable hashes, source hashes, working-tree
+state, compiler versions, power settings, and load averages.
+Native app sources were frozen before compilation to prevent
+concurrent workspace edits from changing that experiment. The
+machine was not otherwise isolated from operating-system or user
+activity. Command-line runs used the automation filesystem
+sandbox; native app runs required normal AppKit access. The
+native runner and application comparison used the same host
+process and access conditions.
+
+\subsection{Correctness and comparisons}
+
+A sample is accepted only when execution succeeds and all
+applicable checks pass. A sixty-second command-line watchdog
+kills the process group on timeout; failed and timed-out runs
+are recorded rather than included as successful observations.
+Native output hashes are checked against validated command-line
+output. The reporting tool recomputes summaries from raw records
+and rejects incomplete, duplicated, or invalid repetitions.
+
+For paired sidecar and native comparisons, the reported
+difference is the median of iteration-matched differences,
+not the difference of marginal medians. No significance test
+or confidence interval is asserted. An IQR crossing zero is
+treated as insufficient evidence of a consistent directional
+effect in that comparison. The initial baseline did not compare
+optimized builds; the follow-up comparison is described separately.
+
+\section{Initial Baseline Results}
+
+\subsection{Interpreter latency and memory}
+
+All 703 command-line samples passed validation, with no timeouts.
+There are 37 configurations and 555 measured samples; the other
+148 are first executions or warmups. Table~\ref{tab:cli} reports
+the three larger sizes. The six-row example has a median latency
+of 2.7 ms (IQR 0.7 ms), including launch and observation costs.
+
+\begin{table}[tbp]
+\centering
+\small
+\input{docs/paper/results/2026-11-04/cli-timings.tex}
+\caption{Command-line median latency in milliseconds, with IQR
+width in parentheses; fifteen measured repetitions per cell.
+The last column is median peak resident memory in MiB at one
+million rows. Sidecar output is disabled.}
+\label{tab:cli}
+\end{table}
+
+At one million rows, median latency ranges from 877.2 ms for SORT
+to 1677.8 ms for the CSV round trip. Increasing input from
+100,000 to one million rows increases median latency by factors
+of approximately 9.5 to 11.8 across these families. These
+observations describe this input range; they do not establish
+asymptotic complexity.
+
+Median peak resident memory at one million rows ranges from
+1464.5 MiB for FREQ to 2005.5 MiB for the SQL join. The shared
+CSV load, dataset representation, and validation scans are part
+of each workload. The table therefore cannot attribute either
+time or memory solely to a named procedure. The CSV round trip
+has a 273.0 ms latency IQR at one million rows, illustrating
+variation that a single execution would conceal.
+
+\subsection{Structured table output}
+
+Table~\ref{tab:sidecar} compares the sidecar variants. The paired
+median increase for PRINT is 0.6 ms at 1,000 rows and 4.3 ms at
+10,000 rows. FREQ produces only 100 category rows regardless of
+input size. For FREQ at 10,000 through one million input rows,
+the paired-difference IQR crosses zero, so these observations
+do not establish a consistent directional sidecar cost.
+
+\begin{table}[tbp]
+\centering
+\small
+\input{docs/paper/results/2026-11-04/table-costs.tex}
+\caption{CLI table-output comparison in milliseconds. Values
+are medians (IQR widths). The paired difference is sidecar minus
+plain execution, matched by iteration. It can differ in sign
+from the difference of marginal medians.}
+\label{tab:sidecar}
+\end{table}
+
+\subsection{Native application latency}
+
+All 152 native samples passed checks, including 120 measured
+samples across eight configurations. Table~\ref{tab:ui} compares
+the direct native runner and complete app workflow. Native runner
+costs include Foundation process management and table decoding
+and are distinct from the command-line launch path.
+
+\begin{table}[tbp]
+\centering
+\small
+\input{docs/paper/results/2026-11-04/ui-timings.tex}
+\caption{Native runner and application latency in milliseconds:
+medians (IQR widths), fifteen measured repetitions per cell.
+The paired difference is application minus runner. App timing
+ends after the first synchronous display pass, not physical
+screen presentation.}
+\label{tab:ui}
+\end{table}
+
+For the DATA and FREQ cases, paired median application-minus-runner
+differences are 7.7 and 8.0 ms. For PRINT, the difference grows
+from 32.9 ms at 1,000 rows to 276.4 ms at 10,000 rows. The latter
+case has a median application latency of 385.1 ms and an IQR of
+75.7 ms. This identifies result-heavy application behavior as a
+separate optimization target, but does not isolate the cost of
+formatting, pagination, layout, drawing, or scheduling.
+
+\subsection{Profiles and optimization priorities}
+
+All seven profiled million-row runs completed successfully.
+The samples repeatedly show \texttt{io.readDelimited}, numeric
+conversion, PDV field lookup, hash lookup, and memory allocation
+or initialization. The DATA profile also shows row consumption,
+expression evaluation, and dataset output. These observations
+support investigating CSV conversion, field access, and data
+representation before considering a language migration. They
+do not quantify an achievable speedup or establish a precise
+breakdown of total execution time.
+
+\section{Targeted Optimizations and Controlled Comparison}
+\label{sec:optimization}
+
+\subsection{Allocation lifetime and row ownership}
+
+The CSV reader previously decoded all records into temporary
+string fields allocated in the run arena, then constructed
+typed rows while retaining those temporary fields. Numeric
+columns therefore kept both their textual intermediates and
+their final values until the process exited. DATA-step snapshots
+also allocated a temporary value row and passed it to
+\texttt{Dataset.appendRow}, which allocated and copied another row.
+
+The revised importer makes two passes over its in-memory record
+index. The first preserves whole-column numeric and date
+inference while resetting a record-local arena after each row.
+The second constructs owned values, again reusing record-local
+scratch space. Temporary record-index storage is released when
+import returns. Character cells are explicitly copied into the
+destination allocator before scratch space is reset. This does
+not make file loading fully streaming: source text, the record
+index, and final datasets still require memory proportional to
+input size.
+
+The snapshot path now allocates final cells once, copies character
+bytes into dataset-owned storage, and appends that already-owned
+row directly. Listing~\ref{lst:snapshot} shows the complete helper.
+The remaining listings are excerpts from the exact evaluated
+source, preserved with file and line provenance in the artifact.
+
+\noindent\begin{minipage}{\linewidth}
+\lstinputlisting[caption={Single-allocation PDV snapshot with owned character bytes.},label={lst:snapshot}]{docs/paper/results/2026-11-04-optimization/code/snapshot.zig}
+\end{minipage}
+
+\noindent\begin{minipage}{\linewidth}
+\lstinputlisting[gobble=4,caption={CSV inference pass using reusable per-record scratch storage.},label={lst:inference}]{docs/paper/results/2026-11-04-optimization/code/csv-inference.zig}
+\end{minipage}
+
+\noindent\begin{minipage}{\linewidth}
+\lstinputlisting[gobble=4,caption={Typed row construction copies character data before reusing scratch storage.},label={lst:materialization}]{docs/paper/results/2026-11-04-optimization/code/csv-materialization.zig}
+\end{minipage}
+
+Each allocation-budget test constructs 4,096 five-column numeric
+rows within a one-MiB destination allocator. Both import and
+snapshot tests fail before and pass after the changes. They bound
+destination allocation, not process RSS. Mutation tests separately
+verify character ownership after input buffers change.
+
+\subsection{PRINT layout reuse}
+
+The original table view repeatedly measured cell text during
+pagination and drawing and rebuilt column projections even
+when all columns were displayed. The revised view caches text
+heights by text, available width, font name, and font size during
+construction. It records header and row heights once per column
+panel and reuses those arrays for pagination and drawing. Full
+column projections reuse the existing row cells. The temporary
+text cache is discarded after construction; shared height arrays
+remain with the page fragments.
+
+\noindent\begin{minipage}{\linewidth}
+\lstinputlisting[gobble=4,caption={Text-height cache keyed by the complete measurement context.},label={lst:heightcache}]{docs/paper/results/2026-11-04-optimization/code/text-height.swift}
+\end{minipage}
+
+\noindent\begin{minipage}{\linewidth}
+\lstinputlisting[gobble=16,caption={Header and row metrics are computed once per column panel.},label={lst:rowheights}]{docs/paper/results/2026-11-04-optimization/code/row-heights.swift}
+\end{minipage}
+
+A deterministic test lays out 2,000 repeated two-cell rows with
+at most four distinct text measurements and requires drawing
+to perform no additional measurements. Another test distinguishes
+font and width contexts. Existing tests cover zoom geometry,
+accessibility text, Unicode output, spanning headers, multiple
+column panels, and searchable PDF pagination.
+
+\subsection{Follow-up protocol}
+
+The follow-up preserves the initial evidence and uses new frozen
+before/after artifacts. Only the table view differs between
+the native packages; their measurement driver and remaining
+application sources are identical. The baseline uses the source
+snapshot taken before these changes. Historical results remain
+a separate study. Interpreter changes are confined to \texttt{io.zig}.
+
+For every CLI workload, sidecar variant, and iteration, baseline
+and optimized executions are adjacent; their order alternates
+between iterations. All four row counts and the six-observation
+example are repeated, with one first execution, three warmups,
+and fifteen measured repetitions per build and configuration.
+Both builds use the same inputs, compiler versions, optimization
+settings, and execution access conditions.
+The follow-up uses normal local process access for both CLI and
+native paths; the initial CLI study used the automation filesystem sandbox.
+
+Native measurements use counterbalanced blocks in the order
+before, after, after, before. Each build contributes eight measured
+repetitions in its first block and seven in its second. Every
+block records a separate first execution and three warmups per
+configuration. In addition to the native runner and full app,
+FREQ and PRINT measure table-view construction from a preloaded
+validated result. This construction measurement excludes runtime
+execution, JSON decoding, and drawing. Its page count must be
+identical across builds. App timing retains the original
+synchronous-display boundary.
+
+The follow-up tables report median latency with IQR width,
+median peak child RSS, and ratios of before/after medians.
+Speedup is $t_{\mathrm{before}}/t_{\mathrm{after}}$; memory
+reduction is $100(1-m_{\mathrm{after}}/m_{\mathrm{before}})$.
+No confidence interval or universal complexity claim is inferred.
+
+\subsection{Before/after results}
+
+All 1,406 interleaved CLI observations passed validation, including
+1,110 measured observations across 37 configurations per build.
+All 506 native observations also passed, including 330 measured
+observations across 11 configurations per build. The remaining
+observations are first executions and warmups. Output and
+diagnostic hashes match across builds and repetitions; the
+canonical sidecar JSON hashes also match. Native table page
+counts are unchanged: 39 and 385 for the two PRINT sizes, and
+four for FREQ.
+
+\begin{table}[tbp]
+\centering\small
+\input{docs/paper/results/2026-11-04-optimization/memory-comparison.tex}
+\caption{Million-row median peak child RSS before and after the
+allocation changes; fifteen measured repetitions per build and
+workload. Percentage reduction compares medians.}
+\label{tab:memorycomparison}
+\end{table}
+
+Table~\ref{tab:memorycomparison} shows median peak RSS reductions
+of 54.0\% for the SQL join through 75.6\% for FREQ. Optimized
+medians range from 357.8 to 921.7 MiB, compared with 1464.5 to
+2324.0 MiB for the fresh baseline. The CSV round trip falls from
+2324.0 to 579.7 MiB. Final datasets and source text still occupy
+memory, and SQL and regression retain their own working data.
+The changes reduce redundant allocation rather than imposing
+a fixed memory cap.
+
+\begin{table}[tbp]
+\centering\small
+\input{docs/paper/results/2026-11-04-optimization/latency-comparison.tex}
+\caption{Million-row CLI latency in milliseconds: median (IQR
+width). Speedup is the ratio of before/after medians, with
+adjacent build order alternating each iteration.}
+\label{tab:latencycomparison}
+\end{table}
+
+All seven million-row families improve in this controlled run
+(Table~\ref{tab:latencycomparison}), with median speedups from
+1.12 for the SQL join to 1.26 for the CSV round trip. The
+optimized medians range from 598.2 to 1160.8 ms. The importer
+parses each record twice, but avoids retaining its intermediate
+field buffers; the observed result is lower memory use with
+lower elapsed time for these workloads. These measurements do
+not isolate allocation, parsing, or memory-page costs individually.
+
+\begin{table}[tbp]
+\centering\footnotesize
+\input{docs/paper/results/2026-11-04-optimization/native-comparison.tex}
+\caption{Counterbalanced native comparison in milliseconds:
+median (IQR width), fifteen measured observations per build and
+path. The layout path constructs a table view from preloaded
+results and excludes execution, decoding, and drawing.}
+\label{tab:nativecomparison}
+\end{table}
+
+For PRINT at 10,000 rows, isolated table construction improves
+from 210.5 to 51.8 ms, a 4.07-fold speedup
+(Table~\ref{tab:nativecomparison}). Full application latency
+improves from 343.5 to 172.9 ms, a 1.99-fold speedup. At 1,000
+PRINT rows, construction improves from 22.3 to 6.1 ms and the
+application improves from 106.0 to 88.1 ms. These comparisons
+retain every table row and the original page geometry.
+
+Not every native path shows a meaningful improvement. DATA app
+latency changes from 74.2 to 74.9 ms, within the observed IQRs,
+and FREQ app latency changes only from 142.2 to 139.9 ms. The
+optimized FREQ runner has an IQR of 33.4 ms, so its marginal
+median is especially sensitive to scheduling and host behavior.
+Runner and app measurements are separate executions; differences
+between them must not be interpreted as exact stage costs.
+
+The four source changes discussed here were evaluated together
+as one candidate: reusable CSV record storage, single-allocation
+snapshots, cached text heights, and stored row/panel metrics.
+The study does not provide an ablation assigning separate speedups
+to each change. Exact before/after sources, the patch, raw
+measurements, and code-excerpt provenance are preserved in the
+optimization artifact~\cite{optimization}.
+
+\section{Verification and Reproducibility}
+
+Repository documentation remains pinned to base source revision
+\texttt{7f6dec6} (full identifier:
+\texttt{\localstatrevision}). The evaluated working tree also
+contained uncommitted app changes. The artifact preserves exact
+native sources, per-file hashes, runtime executable hashes,
+workload source, input hashes, individual samples, and profiles
+rather than claiming a clean evaluated release commit.
+
+For the initial study, the project verification log records 969 runtime unit
+tests, 1,924 corpus programs, and 11 end-to-end fixtures passing.
+The Swift suite reports 48 tests with one opt-in benchmark test
+skipped and no failures; the benchmark test was subsequently
+enabled for the native study. The packaged-runtime checks,
+harness checks, Help checks, and repository text check also
+passed. Separate evidence-auditor tests check incomplete records,
+output mismatches, and iteration pairing. Earlier verification
+records remain historical evidence~\cite{verification}.
+
+For the optimization follow-up, the full project suite passes
+973 runtime unit tests, all 1,924 corpus programs, and all 11
+end-to-end fixtures. The Swift suite reports 57 tests with the
+one opt-in measurement test skipped and no failures. Both
+frozen native packages then pass the enabled measurement test.
+The packaged-runtime checks and the Python harness/report tests
+also pass. The source archive and patch identify the evaluated
+working-tree changes without inventing a release commit.
+
+The measurement artifact is stored under
+\path{docs/paper/results/2026-11-04}. The harness generates inputs
+and runs the CLI study, an opt-in native test measures the app,
+and a reporting script audits raw evidence and generates the
+three tables in this paper. Instructions describe rebuilding and
+repeating the experiments. These checks establish reproducibility
+of the stated workflow, not correctness for every SAS program.
+
+\clearpage
+\section{Limitations}
+
+LocalStat supports a subset of the SAS language and procedure
+options. Passing repository tests does not establish general
+SAS compatibility. Existing numerical checks include analytical
+and published-example comparisons; this manuscript reports no
+new comparison against an installed SAS engine.
+
+Fresh processes provide no persistent interactive session.
+Buffered output and in-memory results affect cancellation and
+large-output workloads.
+
+The alpha is not sandboxed: programs can access permitted files
+and inherited environment values. Local execution alone does not
+establish security or suitability for regulated work.
+
+One host, numeric inputs, 100 groups, a bounded join, and two
+predictors do not represent all programs. Character-heavy files
+and tables with mostly distinct text may behave differently.
+The transient text cache can grow during construction; native
+process peak memory was not measured.
+
+Warm caches, workload order, OS activity, and execution access
+conditions affect results. Native timings use a release XCTest
+host and a synchronous display boundary, not independently
+launched app or physical-screen latency. Short profiles miss
+parts of execution. There is no persistent-session, alternative-
+language, installed-SAS, or per-change ablation comparison.
+Fresh controls account for differences from historical host and
+allocator conditions without assuming old and new baselines match.
+
+\section{Conclusion}
+
+LocalStat integrates a native macOS editing environment with
+a locally extended OpenSAS interpreter. Its current design
+provides fresh-process execution, source-aware diagnostics,
+bounded ordinary least squares, and structured presentation
+for selected tables.
+
+The initial baseline identified interpreter memory and large
+PRINT presentation costs. The controlled follow-up reduces
+million-row median peak interpreter RSS by 54.0 to 75.6\% and
+improves median runtime by factors of 1.12 to 1.26 in the tested
+families. Cached PRINT layout provides a 4.07-fold construction
+speedup at 10,000 rows and a 1.99-fold improvement in full app
+latency, with matching output and page counts. The implementation,
+regression tests, and preserved artifacts make these specific
+results inspectable. They establish a targeted improvement on
+this host, not general SAS equivalence or a language advantage.
+
+\begin{thebibliography}{9}
+\raggedright
+
+\bibitem{opensas}
+OpenSAS contributors.
+\emph{OpenSAS source code}.
+Pinned commit:
+\texttt{927a2fa9f1401e365d975536bd704819ada1f1f4}.
+\href{https://github.com/kirha-ai/opensas/tree/927a2fa9f1401e365d975536bd704819ada1f1f4}{OpenSAS source snapshot}.
+
+\bibitem{runtimechanges}
+LocalStat project.
+\emph{Runtime provenance and local changes}.
+\href{https://github.com/hafiz122/localstat/blob/\localstatrevision/docs/RUNTIME_CHANGES.md}{\texttt{docs/RUNTIME\_CHANGES.md}}.
+Source revision \texttt{7f6dec6}.
+
+\bibitem{compatibility}
+LocalStat project.
+\emph{LocalStat source-build compatibility}.
+\href{https://github.com/hafiz122/localstat/blob/\localstatrevision/docs/COMPATIBILITY.md}{\texttt{docs/COMPATIBILITY.md}}.
+Source revision \texttt{7f6dec6}.
+
+\bibitem{verification}
+LocalStat project.
+\emph{Verification record}.
+\href{https://github.com/hafiz122/localstat/blob/\localstatrevision/docs/VERIFICATION.md}{\texttt{docs/VERIFICATION.md}}.
+Source revision \texttt{7f6dec6}; historical records dated
+29 October and 1 November 2026.
+
+\bibitem{optimization}
+Muhammad Hafiz bin Ismail.
+\emph{LocalStat controlled optimization artifact}.
+4 November 2026.
+\path{docs/paper/results/2026-11-04-optimization}.
+Frozen sources, implementation patch, code provenance, individual
+observations, generated comparisons, and verification records.
+
+\end{thebibliography}
+\end{document}

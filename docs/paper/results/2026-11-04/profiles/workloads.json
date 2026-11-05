@@ -1,0 +1,134 @@
+[
+  {
+    "name": "data",
+    "rows": 1000000,
+    "directory": "1000000",
+    "source": "data.sas",
+    "source_sha256": "3aa835cc94bad4d1e5de55cfa5a5c9a39f4d3956f3b3e04c7e2971a5283752c9",
+    "inputs": {
+      "input.csv": "0cda45b62332dcc5854878c9004291b2ae626e400fb0fc3294b183fbafe76f8e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000000,
+      1500003500000
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "sort",
+    "rows": 1000000,
+    "directory": "1000000",
+    "source": "sort.sas",
+    "source_sha256": "55174016452e52cfa4de799dc1fd51a7e018f385cca549408fa9cbe2e52caf35",
+    "inputs": {
+      "input.csv": "0cda45b62332dcc5854878c9004291b2ae626e400fb0fc3294b183fbafe76f8e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000000,
+      500000500000,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "group",
+    "rows": 1000000,
+    "directory": "1000000",
+    "source": "group.sas",
+    "source_sha256": "075b6312a92f8e71b4ac648ae161d9c03b3f1981c96861362ffae45ab7e92f0e",
+    "inputs": {
+      "input.csv": "0cda45b62332dcc5854878c9004291b2ae626e400fb0fc3294b183fbafe76f8e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      100,
+      1000000,
+      500000500000,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "join",
+    "rows": 1000000,
+    "directory": "1000000",
+    "source": "join.sas",
+    "source_sha256": "eb0a7d8c3e7a9bda2d7a8823d11b4b0bef27502f7466c89b5833d5ed1978f1b6",
+    "inputs": {
+      "input.csv": "0cda45b62332dcc5854878c9004291b2ae626e400fb0fc3294b183fbafe76f8e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000000,
+      500000500000,
+      50500000,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "reg",
+    "rows": 1000000,
+    "directory": "1000000",
+    "source": "reg.sas",
+    "source_sha256": "88648f81d96be5a73925c0e303fbf8ea1bbbc52e7e6960c5c20a61ee20cb66d3",
+    "inputs": {
+      "input.csv": "0cda45b62332dcc5854878c9004291b2ae626e400fb0fc3294b183fbafe76f8e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000000,
+      500000500000
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "csv",
+    "rows": 1000000,
+    "directory": "1000000",
+    "source": "csv.sas",
+    "source_sha256": "09bc49a79d513e3378e5854c3e5090812edc2c750fc61ab5741dc378186e1130",
+    "inputs": {
+      "input.csv": "0cda45b62332dcc5854878c9004291b2ae626e400fb0fc3294b183fbafe76f8e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000000,
+      500000500000
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "freq",
+    "rows": 1000000,
+    "directory": "1000000",
+    "source": "freq.sas",
+    "source_sha256": "5f7782bd414c8b7cf18c2709b9c4fa8b383bfe0403870abe829c33c705fa9b4e",
+    "inputs": {
+      "input.csv": "0cda45b62332dcc5854878c9004291b2ae626e400fb0fc3294b183fbafe76f8e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000000,
+      500000500000
+    ],
+    "variants": [
+      "plain",
+      "tables"
+    ]
+  }
+]

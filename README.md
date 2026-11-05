@@ -30,7 +30,7 @@ Current source builds include a **Tables** results tab for `PROC PRINT`, `PROC F
 | Native IDE | Horizontally scrolling, closable source tabs, project sidebar, saved viewing and editing settings, five editor themes, separate source/output fonts, offline searchable Help, file operations, Run/Stop, diagnostics, text output, formatted Tables, printing, raw-text export and paginated PDF report export. |
 | Local runtime | The app bundles an ARM64 build of OpenSAS pinned to `927a2fa9f1401e365d975536bd704819ada1f1f4`. Each run starts a fresh local process. |
 | Statistical modeling | A bounded numeric ordinary-least-squares subset of `PROC REG` is implemented. |
-| Verification | Source suite: 969 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 67 Swift tests (one opt-in measurement skipped by default), 16 packaged-runtime checks, 37 benchmark checks, 3 offline Help checks and 1 repository text check. Separate local performance results are described below. |
+| Verification | Source suite: 973 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 69 Swift tests (one opt-in measurement skipped by default), 16 packaged-runtime checks, 37 benchmark checks, 3 offline Help checks and 1 repository text check. Recorded performance results are described below. |
 | Distribution | Alpha automation tests and packages each candidate. New versions produce draft prereleases; repeat runs preserve existing release assets. The app remains ad-hoc signed and unnotarized. |
 | Compatibility | Coverage is documented and intentionally limited. No feature is labeled SAS-verified without output from an installed SAS engine. |
 
@@ -120,7 +120,7 @@ This builds the app and runs OpenSAS unit/conformance/end-to-end suites, Swift e
 
 The 5 November 2026 [main CI run](https://github.com/hafiz122/localstat/actions/runs/41945456267) and [alpha validation run](https://github.com/hafiz122/localstat/actions/runs/41945456385) passed for commit `42495ca`, including four-space indentation defaults and migration, packaging, signatures, ARM64 architecture, and checksums. The alpha validation preserved the existing published assets.
 
-The local, unmerged 4 November performance follow-up records 973 runtime tests, 20 benchmark harness/report checks, and opt-in native measurements. These results include optimization changes beyond the verified `main` commit and are separate from its CI totals. Native measurements run only when `LOCALSTAT_BENCHMARK_CONFIG` is set.
+The source includes the CSV allocation, snapshot ownership, and table-layout optimizations evaluated in the [4 November performance study](docs/paper/README.md). Its frozen evidence records 1,406 CLI and 506 native observations from controlled before/after builds on one Apple M5 Mac. The historical verification logs retain their original test totals; the source-suite totals above include later regression tests. Native measurements run only when `LOCALSTAT_BENCHMARK_CONFIG` is set. See [the reproduction instructions](docs/paper/BENCHMARKS.md) and [the write-along demo](docs/video/localstat-demo.md).
 
 ## Source layout
 

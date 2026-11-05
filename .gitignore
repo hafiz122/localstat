@@ -10,3 +10,5 @@ test-results/
 __pycache__/
 *.zip
 *.sha256
+/output/pdf/
+/tmp/pdfs/

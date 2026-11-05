@@ -1,0 +1,29 @@
+test_anova_error_row_is_not_a_runtime_diagnostic (__main__.BenchmarkTests.test_anova_error_row_is_not_a_runtime_diagnostic) ... ok
+test_existing_experiment_is_never_overwritten (__main__.BenchmarkTests.test_existing_experiment_is_never_overwritten) ... ok
+test_plain_frequency_listing_must_match_all_expected_groups (__main__.BenchmarkTests.test_plain_frequency_listing_must_match_all_expected_groups) ... ok
+test_prepared_inputs_are_deterministic_and_join_is_bounded (__main__.BenchmarkTests.test_prepared_inputs_are_deterministic_and_join_is_bounded) ... ok
+test_runner_collects_per_child_usage_and_captures_output (__main__.BenchmarkTests.test_runner_collects_per_child_usage_and_captures_output) ... ok
+test_runner_enforces_timeout (__main__.BenchmarkTests.test_runner_enforces_timeout) ... ok
+test_summary_excludes_first_warmup_failure_and_timeout (__main__.BenchmarkTests.test_summary_excludes_first_warmup_failure_and_timeout) ... ok
+test_table_validator_rejects_shape_and_frequency_corruption (__main__.BenchmarkTests.test_table_validator_rejects_shape_and_frequency_corruption) ... ok
+test_validator_rejects_plausible_but_wrong_results_and_diagnostics (__main__.BenchmarkTests.test_validator_rejects_plausible_but_wrong_results_and_diagnostics) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.194s
+
+OK
+test_paired_differences_match_iterations_rather_than_file_order (__main__.ReportTests.test_paired_differences_match_iterations_rather_than_file_order) ... ok
+test_rejects_incomplete_repetitions_and_duplicate_iterations (__main__.ReportTests.test_rejects_incomplete_repetitions_and_duplicate_iterations) ... ok
+test_rejects_invalid_results_and_mismatched_app_output (__main__.ReportTests.test_rejects_invalid_results_and_mismatched_app_output) ... ok
+test_rounding_does_not_display_negative_zero_latency (__main__.ReportTests.test_rounding_does_not_display_negative_zero_latency) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.012s
+
+OK
+test_tracked_text_contains_no_em_dashes (__main__.TextTests.test_tracked_text_contains_no_em_dashes) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.303s
+
+OK

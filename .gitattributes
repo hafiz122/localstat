@@ -1,0 +1,2 @@
+# Preserve dated benchmark evidence byte-for-byte across checkouts.
+docs/paper/results/** -text -whitespace

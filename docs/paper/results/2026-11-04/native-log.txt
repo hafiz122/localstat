@@ -1,0 +1,47 @@
+Building for production...
+[0/12] Write sources
+[3/12] /Users/d3x/Documents/ChatGPT/sas-mac/dist/benchmarks/native-source/.build/arm64-apple-macosx/release/LocalStatPackageTests.derived/runner.swift
+[3/12] Write sources
+[6/12] Copying Help
+[7/12] Write swift-version--58304C5D6DBC2206.txt
+[9/13] Compiling SASCore EditorTextEditing.swift
+[10/15] Compiling LocalStat App.swift
+[10/15] Write Objects.LinkFileList
+[11/15] Linking LocalStat
+[13/16] Compiling SASCoreTests EditorTextEditingTests.swift
+[14/16] Compiling LocalStatEditorTests BenchmarkIntegrationTests.swift
+/Users/d3x/Documents/ChatGPT/sas-mac/dist/benchmarks/native-source/Tests/LocalStatEditorTests/TabNavigationTests.swift:40:35: warning: capture of 'self' with non-Sendable type 'TabNavigationTests' in a '@Sendable' closure [#SendableClosureCaptures]
+  4 | import SASCore
+  5 | 
+  6 | final class TabNavigationTests: XCTestCase {
+    |             `- note: class 'TabNavigationTests' does not conform to the 'Sendable' protocol
+  7 |     @MainActor private func makeApp() throws -> AppDelegate {
+  8 |         _ = NSApplication.shared
+    :
+ 38 |             MainActor.assumeIsolated {
+ 39 |                 if let title = remaining.first, let content = NSApp.modalWindow?.contentView,
+ 40 |                    let response = self.button(title, in: content) {
+    |                                   `- warning: capture of 'self' with non-Sendable type 'TabNavigationTests' in a '@Sendable' closure [#SendableClosureCaptures]
+ 41 |                     remaining.removeFirst()
+ 42 |                     response.performClick(nil)
+
+[#SendableClosureCaptures]: <https://docs.swift.org/compiler/documentation/diagnostics/sendable-closure-captures>
+[15/17] Compiling LocalStatPackageTests runner.swift
+[15/17] Write Objects.LinkFileList
+[16/17] Linking LocalStatPackageTests
+Build complete! (12.09s)
+Test Suite 'Selected tests' started at 2026-11-04 18:51:55.213.
+Test Suite 'LocalStatPackageTests.xctest' started at 2026-11-04 18:51:55.218.
+Test Suite 'BenchmarkIntegrationTests' started at 2026-11-04 18:51:55.218.
+Test Case '-[LocalStatEditorTests.BenchmarkIntegrationTests testMeasuredRuns]' started.
+Test Case '-[LocalStatEditorTests.BenchmarkIntegrationTests testMeasuredRuns]' passed (22.528 seconds).
+Test Suite 'BenchmarkIntegrationTests' passed at 2026-11-04 18:52:17.746.
+	 Executed 1 test, with 0 failures (0 unexpected) in 22.528 (22.528) seconds
+Test Suite 'LocalStatPackageTests.xctest' passed at 2026-11-04 18:52:17.746.
+	 Executed 1 test, with 0 failures (0 unexpected) in 22.528 (22.528) seconds
+Test Suite 'Selected tests' passed at 2026-11-04 18:52:17.746.
+	 Executed 1 test, with 0 failures (0 unexpected) in 22.528 (22.533) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

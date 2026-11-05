@@ -1,0 +1,3 @@
+PASS: rebuilt before/after example (6 rows); validated outputs match.
+PASS: rebuilt before/after data (1000 rows); validated outputs match.
+PASS: rebuilt before/after csv (1000 rows); validated outputs match.

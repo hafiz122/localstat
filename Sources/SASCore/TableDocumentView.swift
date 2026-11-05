@@ -8,7 +8,22 @@ import AppKit
         let rows: Range<Int>
         let contentRows: [ResultRow]
         let continuation: Int
+        let rowHeights: [CGFloat]
+        let headerHeights: [CGFloat]
+        let titleHeight: CGFloat
+        let sectionHeight: CGFloat
     }
+
+    private struct TextKey: Hashable {
+        let text: String
+        let width: CGFloat
+        let fontName: String
+        let fontSize: CGFloat
+    }
+
+    typealias TextMeasurer = @MainActor (String, CGFloat, NSFont) -> CGFloat
+    private let measureText: TextMeasurer
+    private var textHeights: [TextKey: CGFloat] = [:]
 
     private let paper = NSSize(width: 612, height: 792)
     private let margin: CGFloat = 40
@@ -22,12 +37,19 @@ import AppKit
     private var pageSize = NSSize.zero
     public private(set) var screenZoom: CGFloat = 1
 
-    public init(tables: [ResultTable], forPrinting: Bool = false) {
+    public convenience init(tables: [ResultTable], forPrinting: Bool = false) {
+        self.init(tables: tables, forPrinting: forPrinting, measureText: Self.systemTextHeight)
+    }
+
+    init(tables: [ResultTable], forPrinting: Bool, measureText: @escaping TextMeasurer) {
         self.tables = tables
         self.forPrinting = forPrinting
+        self.measureText = measureText
         gap = forPrinting ? 0 : 16
         super.init(frame: .zero)
         buildPages()
+        // Fragments retain the layout; distinct cell strings need not stay in a cache.
+        textHeights.removeAll(keepingCapacity: false)
         frame = NSRect(origin: .zero, size: NSSize(width: paper.width, height: CGFloat(max(1, fragments.count)) * paper.height + CGFloat(max(0, fragments.count - 1)) * gap - (forPrinting ? 1 : 0)))
         pageSize = frame.size
         setAccessibilityLabel("Formatted tables")
@@ -121,22 +143,26 @@ import AppKit
                     let factor = available / total
                     widths = widths.map { max(24, floor($0 * factor)) }
                 }
+                let title = table.title + (chunkIndex > 0 ? " · columns continued" : "")
+                let titleHeight = textHeight(title, width: available, font: titleFont) + 8
+                let sectionHeight = table.section.isEmpty ? 0 : textHeight(table.section, width: available, font: bodyFont) + 6
+                let top = margin + titleHeight + sectionHeight
+                let headerHeights = table.headers.map { rowHeight($0, columns: columns, widths: widths, header: true) }
+                let headerHeight = headerHeights.reduce(CGFloat(0), +)
+                let rowHeights = contentRows.map { rowHeight($0, columns: columns, widths: widths, header: false) }
                 var start = 0
                 repeat {
-                    let title = table.title + (chunkIndex > 0 ? " · columns continued" : "")
-                    let titleHeight = textHeight(title, width: available, font: titleFont) + 8
-                    let sectionHeight = table.section.isEmpty ? 0 : textHeight(table.section, width: available, font: bodyFont) + 6
-                    let top = margin + titleHeight + sectionHeight
-                    let headerHeight = table.headers.reduce(CGFloat(0)) { $0 + rowHeight($1, columns: columns, widths: widths, header: true) }
                     var used = top + headerHeight + 8
                     var end = start
                     while end < contentRows.count {
-                        let height = rowHeight(contentRows[end], columns: columns, widths: widths, header: false)
+                        let height = rowHeights[end]
                         if end > start && used + height > paper.height - margin { break }
                         used += min(height, paper.height - margin - top - headerHeight)
                         end += 1
                     }
-                    fragments.append(Fragment(table: table, columns: columns, widths: widths, rows: start..<end, contentRows: contentRows, continuation: chunkIndex))
+                    fragments.append(Fragment(table: table, columns: columns, widths: widths, rows: start..<end,
+                                              contentRows: contentRows, continuation: chunkIndex, rowHeights: rowHeights,
+                                              headerHeights: headerHeights, titleHeight: titleHeight, sectionHeight: sectionHeight))
                     start = end
                 } while start < contentRows.count
             }
@@ -144,6 +170,10 @@ import AppKit
     }
 
     private func projected(_ row: ResultRow, columns: [Int]) -> [ResultCell] {
+        if columns.enumerated().allSatisfy({ $0.offset == $0.element }),
+           row.cells.reduce(0, { $0 + $1.span }) == columns.count {
+            return row.cells
+        }
         var expanded: [(Range<Int>, ResultCell)] = []
         var start = 0
         for cell in row.cells {
@@ -175,6 +205,14 @@ import AppKit
     }
 
     private func textHeight(_ text: String, width: CGFloat, font: NSFont) -> CGFloat {
+        let key = TextKey(text: text, width: width, fontName: font.fontName, fontSize: font.pointSize)
+        if let height = textHeights[key] { return height }
+        let height = measureText(text, width, font)
+        textHeights[key] = height
+        return height
+    }
+
+    private static func systemTextHeight(_ text: String, width: CGFloat, font: NSFont) -> CGFloat {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byCharWrapping
         let rect = (text as NSString).boundingRect(with: NSSize(width: max(12, width), height: 10_000),
@@ -205,24 +243,23 @@ import AppKit
         var y = originY + margin
         let title = fragment.table.title + (fragment.continuation > 0 ? " · columns continued" : "")
         let available = paper.width - 2 * margin
-        let titleHeight = textHeight(title, width: available, font: titleFont) + 8
+        let titleHeight = fragment.titleHeight
         (title as NSString).draw(in: NSRect(x: margin, y: y, width: available, height: titleHeight - 8),
                                  withAttributes: [.font: titleFont, .foregroundColor: ink])
         y += titleHeight
         if !fragment.table.section.isEmpty {
-            let sectionHeight = textHeight(fragment.table.section, width: available, font: bodyFont) + 6
+            let sectionHeight = fragment.sectionHeight
             (fragment.table.section as NSString).draw(in: NSRect(x: margin, y: y, width: available, height: sectionHeight - 6),
                                                       withAttributes: [.font: bodyFont, .foregroundColor: muted])
             y += sectionHeight
         }
-        for row in fragment.table.headers {
-            let height = rowHeight(row, columns: fragment.columns, widths: fragment.widths, header: true)
+        for (row, height) in zip(fragment.table.headers, fragment.headerHeights) {
             drawRow(row, columns: fragment.columns, widths: fragment.widths, y: y, height: height, header: true, screen: screen)
             y += height
         }
         for index in fragment.rows {
             let row = fragment.contentRows[index]
-            let height = min(rowHeight(row, columns: fragment.columns, widths: fragment.widths, header: false), originY + paper.height - margin - y)
+            let height = min(fragment.rowHeights[index], originY + paper.height - margin - y)
             drawRow(row, columns: fragment.columns, widths: fragment.widths, y: y, height: height, header: false, screen: screen)
             y += height
         }

@@ -1,0 +1,37 @@
+{
+  "snapshot.zig": {
+    "source": "vendor/opensas/src/io.zig",
+    "source_sha256": "15b07ae831d865fab6a95f8195cdfcfcf66aeb46f6868eaa645798b97d3b5b7e",
+    "first_line": 1173,
+    "last_line": 1184,
+    "sha256": "01c205163a9c7cf8a1e01b960b1635520f7e4568b3bbee7ff6398e4c25fbc9c0"
+  },
+  "csv-inference.zig": {
+    "source": "vendor/opensas/src/io.zig",
+    "source_sha256": "15b07ae831d865fab6a95f8195cdfcfcf66aeb46f6868eaa645798b97d3b5b7e",
+    "first_line": 1720,
+    "last_line": 1740,
+    "sha256": "cce2f26e2f367421c2ee6ae68b39c73b9715a5c76ddde728efd2f24454cb9526"
+  },
+  "csv-materialization.zig": {
+    "source": "vendor/opensas/src/io.zig",
+    "source_sha256": "15b07ae831d865fab6a95f8195cdfcfcf66aeb46f6868eaa645798b97d3b5b7e",
+    "first_line": 1757,
+    "last_line": 1772,
+    "sha256": "dca7fa24d97c21af60664a815fddfce661b847b2255c462546465d4b0eb920b2"
+  },
+  "text-height.swift": {
+    "source": "Sources/SASCore/TableDocumentView.swift",
+    "source_sha256": "1980dfe7d67b91642772946782f48b624de7750195d556ec06648f5370aff887",
+    "first_line": 207,
+    "last_line": 214,
+    "sha256": "786bb50ef1cd03404e73b14f26245074da275b7dd451f4862398eaa38a80a12f"
+  },
+  "row-heights.swift": {
+    "source": "Sources/SASCore/TableDocumentView.swift",
+    "source_sha256": "1980dfe7d67b91642772946782f48b624de7750195d556ec06648f5370aff887",
+    "first_line": 150,
+    "last_line": 152,
+    "sha256": "270db7cac0f765423814a4d03d98a158a0f73431526343d214d1bff581cef366"
+  }
+}

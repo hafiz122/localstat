@@ -84,6 +84,40 @@ final class RuntimeRunnerTests: XCTestCase {
                            "Blank PDF page \(index + 1)")
         }
     }
+    @MainActor func testRepeatedTableTextIsMeasuredOncePerWidthAndFont() {
+        _ = NSApplication.shared
+        let table = ResultTable(procedure: "PRINT", title: "Repeated cells",
+                                headers: [ResultRow(cells: [ResultCell("Value"), ResultCell("Value")])],
+                                rows: (0..<2000).map { _ in ResultRow(cells: [ResultCell("123"), ResultCell("123")]) })
+        var measurements = 0
+        let view = TableDocumentView(tables: [table], forPrinting: false, measureText: { _, _, _ in
+            measurements += 1
+            return 12
+        })
+        XCTAssertGreaterThan(view.pageCount, 10)
+        XCTAssertLessThanOrEqual(measurements, 4)
+        let before = measurements
+        _ = view.dataWithPDF(inside: NSRect(x: 0, y: 0, width: 612, height: 792))
+        XCTAssertEqual(measurements, before, "Drawing must reuse computed layout")
+    }
+
+    @MainActor func testTableMeasurementCacheDistinguishesWidthAndFont() {
+        _ = NSApplication.shared
+        let table = ResultTable(procedure: "PRINT", title: "same",
+                                headers: [ResultRow(cells: [ResultCell("same"), ResultCell("a long second header")])],
+                                rows: [ResultRow(cells: [ResultCell("same"), ResultCell("same")])])
+        var measuredWidths = Set<CGFloat>()
+        var measuredFonts = Set<String>()
+        _ = TableDocumentView(tables: [table], forPrinting: true, measureText: { text, width, font in
+            if text == "same" {
+                measuredWidths.insert(width)
+                measuredFonts.insert(font.fontName)
+            }
+            return 12
+        })
+        XCTAssertGreaterThan(measuredWidths.count, 1)
+        XCTAssertGreaterThan(measuredFonts.count, 1)
+    }
     @MainActor func testMalformedTableFileDoesNotChangeRunStatus() async throws {
         let folder = try workspace()
         let script = try executable("printf '{invalid' > \"$3\"\nprintf 'ordinary output\\n'\n", in: folder)
