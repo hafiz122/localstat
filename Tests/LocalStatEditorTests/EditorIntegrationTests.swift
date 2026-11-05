@@ -90,6 +90,97 @@ final class EditorIntegrationTests: XCTestCase {
         XCTAssertEqual(reopenedApp.diagnosticsEmptyLabel.stringValue, "Run a program to see diagnostics here.")
     }
 
+    @MainActor func testFreshStartupKeepsExamplesOutOfProjectExplorer() throws {
+        _ = NSApplication.shared
+        let suite = "LocalStatFreshProject.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let support = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
+        let examples = support.appendingPathComponent("LocalStat/Examples")
+        try FileManager.default.createDirectory(at: examples, withIntermediateDirectories: true)
+        try "data example; run;".write(to: examples.appendingPathComponent("example.sas"), atomically: true, encoding: .utf8)
+        let app = AppDelegate()
+        app.appearanceDefaults = defaults
+        app.applicationSupportDirectoryOverride = support
+        app.buildWindow()
+        defer {
+            app.window.delegate = nil
+            app.window.close()
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: support)
+        }
+
+        app.loadProject()
+        XCTAssertEqual(app.projectURL.resolvingSymlinksInPath().path,
+                       support.appendingPathComponent("LocalStat/Workspace").resolvingSymlinksInPath().path)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: app.projectURL.path))
+        XCTAssertEqual(app.projectLabel.stringValue, "Workspace")
+        XCTAssertTrue(app.projectNodes.isEmpty)
+        XCTAssertTrue(app.files.isEmpty)
+        XCTAssertEqual(app.fileOutline.numberOfRows, 0)
+        XCTAssertTrue(app.documents.isEmpty)
+        XCTAssertTrue(app.projectHint.stringValue.contains("Create SAS File"))
+        app.newDocument(nil)
+        XCTAssertEqual(app.documents.count, 1)
+        XCTAssertNil(app.current?.url)
+    }
+
+    @MainActor func testStartupRestoresExplicitProjectAndOpensItsProgram() throws {
+        _ = NSApplication.shared
+        let suite = "LocalStatSavedProject.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let support = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
+        let project = support.appendingPathComponent("Chosen Project")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let program = project.appendingPathComponent("analysis.sas")
+        try "data chosen; run;".write(to: program, atomically: true, encoding: .utf8)
+        defaults.set(project.path, forKey: "projectFolder")
+        let app = AppDelegate()
+        app.appearanceDefaults = defaults
+        app.applicationSupportDirectoryOverride = support
+        app.buildWindow()
+        defer {
+            app.window.delegate = nil
+            app.window.close()
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: support)
+        }
+
+        app.loadProject()
+        XCTAssertEqual(app.projectURL.resolvingSymlinksInPath().path, project.resolvingSymlinksInPath().path)
+        XCTAssertEqual(app.projectLabel.stringValue, "Chosen Project")
+        XCTAssertEqual(app.files.map { $0.resolvingSymlinksInPath().path }, [program.resolvingSymlinksInPath().path])
+        XCTAssertEqual(app.current?.url?.resolvingSymlinksInPath().path, program.resolvingSymlinksInPath().path)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: support.appendingPathComponent("LocalStat/Workspace").path))
+    }
+
+    @MainActor func testStartupFallsBackFromInvalidSavedProjectToEmptyWorkspace() throws {
+        _ = NSApplication.shared
+        let suite = "LocalStatInvalidProject.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let support = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
+        try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+        let notAFolder = support.appendingPathComponent("not-a-folder")
+        try "file".write(to: notAFolder, atomically: true, encoding: .utf8)
+        defaults.set(notAFolder.path, forKey: "projectFolder")
+        let app = AppDelegate()
+        app.appearanceDefaults = defaults
+        app.applicationSupportDirectoryOverride = support
+        app.buildWindow()
+        defer {
+            app.window.delegate = nil
+            app.window.close()
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: support)
+        }
+
+        app.loadProject()
+        XCTAssertEqual(app.projectURL.resolvingSymlinksInPath().path,
+                       support.appendingPathComponent("LocalStat/Workspace").resolvingSymlinksInPath().path)
+        XCTAssertEqual(app.fileOutline.numberOfRows, 0)
+        XCTAssertTrue(app.files.isEmpty)
+        XCTAssertTrue(app.documents.isEmpty)
+    }
+
     @MainActor func testProjectNavigatorShowsFoldersAndPreservesExpansion() throws {
         _ = NSApplication.shared
         let app = AppDelegate()
@@ -197,7 +288,6 @@ final class EditorIntegrationTests: XCTestCase {
         XCTAssertEqual(app.preferences.values.theme, .sasStudio)
         XCTAssertEqual(NSApp.appearance?.name, .aqua)
         XCTAssertEqual(app.appearancePopup.selectedItem?.title, "SAS Native")
-        XCTAssertFalse(app.studioBanner.isHidden)
         XCTAssertEqual(app.explorerHeader.stringValue, "Project Explorer")
 
         app.preferences.update { $0.theme = .native }
@@ -205,7 +295,6 @@ final class EditorIntegrationTests: XCTestCase {
         app.appearancePopup.selectItem(withTitle: "Dark")
         app.changeAppearance()
         XCTAssertEqual(app.appearancePreference, .dark)
-        XCTAssertTrue(app.studioBanner.isHidden)
         XCTAssertEqual(NSApp.appearance?.name, .darkAqua)
         XCTAssertEqual(defaults.string(forKey: "appearancePreference"), "dark")
         XCTAssertEqual(editor.textView.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]), .darkAqua)

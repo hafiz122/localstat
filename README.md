@@ -21,16 +21,16 @@ Earlier source-rendered preview with synthetic regression data. It predates the 
 
 ## Project status
 
-LocalStat `0.1.3-alpha` is a public developer preview for Apple Silicon Macs. It is not a full SAS implementation. The app is ad-hoc signed and not notarized. [Download v0.1.3-alpha](https://github.com/hafiz122/localstat/releases/tag/v0.1.3-alpha) and see [installation and known issues](docs/INSTALL.md).
+LocalStat `0.1.4-alpha` is a public developer preview for Apple Silicon Macs. It is not a full SAS implementation. The app is ad-hoc signed and not notarized. [Download v0.1.4-alpha](https://github.com/hafiz122/localstat/releases/tag/v0.1.4-alpha) and see [installation and known issues](docs/INSTALL.md).
 
-This release makes SAS Native the fresh-start appearance and refines the Project Explorer, tabs, editor, settings, and results layout. Supported `PROC PRINT`, `PROC FREQ`, and `PROC TABULATE` tables now use a complete cell grid on screen and in print. Saved Settings, offline Help, and PDF reports remain available.
+This release opens a fresh SAS Native workbench with an empty Project Explorer and an untitled program. Bundled examples remain available through Help and in a separate folder. The extra top bar is removed. Supported `PROC PRINT`, `PROC FREQ`, and `PROC TABULATE` tables retain complete cell borders on screen and in print.
 
 | Area | Current status |
 | --- | --- |
 | Native IDE | SAS Native workspace by default, with a Project Explorer, compact source tabs, a contextual Run toolbar, and a lower results area. Settings, seven editor themes, separate source/output fonts, offline searchable Help, file operations, diagnostics, text output, formatted tables, printing, raw-text export and paginated PDF report export are available. |
 | Local runtime | The app bundles an ARM64 build of OpenSAS pinned to `927a2fa9f1401e365d975536bd704819ada1f1f4`. Each run starts a fresh local process. |
 | Statistical modeling | A bounded numeric ordinary-least-squares subset of `PROC REG` is implemented. |
-| Verification | Source suite: 973 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 75 Swift tests (one opt-in measurement skipped by default), 16 packaged-runtime checks, 37 benchmark checks, 3 offline Help checks and 1 repository text check. Recorded performance results are described below. |
+| Verification | Source suite: 973 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 78 Swift tests (one opt-in measurement skipped by default), 16 packaged-runtime checks, 37 benchmark checks, 3 offline Help checks and 1 repository text check. Recorded performance results are described below. |
 | Distribution | Alpha automation tests and packages each candidate. New versions produce draft prereleases; repeat runs preserve existing release assets. The app remains ad-hoc signed and unnotarized. |
 | Compatibility | Coverage is documented and intentionally limited. No feature is labeled SAS-verified without output from an installed SAS engine. |
 
@@ -76,7 +76,9 @@ The alpha workflow accepts a full 40-character candidate commit SHA through manu
 
 ## Use
 
-On first launch, example programs are copied to `~/Library/Application Support/LocalStat/Examples`. Open a project folder to choose the working directory used for relative file paths and `%INCLUDE`. The sidebar shows an expandable folder tree with `.sas` programs; double-click a program to open it, or use File > Open Program. Four small buttons in the sidebar import an existing folder or SAS file, or create a new SAS file or folder inside the selected folder. Imported items are copied into the project. File > New Program creates another editor tab.
+On first launch, the Project Explorer opens an empty `~/Library/Application Support/LocalStat/Workspace` folder. Bundled examples are copied separately to `~/Library/Application Support/LocalStat/Examples`; they do not fill the Explorer by default. Choose **Open Example** in Help to open one in an unsaved tab, or open the Examples folder explicitly as a project to browse its editable copies.
+
+Opening a project folder sets the working directory used for relative file paths and `%INCLUDE`. The sidebar shows an expandable folder tree with `.sas` programs; double-click a program to open it, or use File > Open Program. Four small buttons in the sidebar import an existing folder or SAS file, or create a new SAS file or folder inside the selected folder. Imported items are copied into the project. File > New Program creates another editor tab.
 
 - Source tabs scroll horizontally when needed. The active tab has a blue top rule; an asterisk marks unsaved edits. Click a tab's close button to close that program; Command-W closes the active program. Unsaved changes prompt for Save, Discard Changes, or Cancel; closing another tab preserves the active editor's selection.
 - Command-S saves; Shift-Command-S saves as another file.
@@ -85,7 +87,7 @@ On first launch, example programs are copied to `~/Library/Application Support/L
 - Typing `(`, `[`, or `{` inserts its closing bracket. Selections are wrapped, existing closing brackets are skipped, and Backspace removes an empty pair together.
 - Command-R runs the **entire current editor buffer**, including unsaved changes.
 - Command-period stops the current run, escalating to SIGKILL after two seconds if required.
-- The workspace opens in SAS Native, with a blue application header, light Project Explorer, white editor and results surfaces, and a compact program toolbar. Use the toolbar's Appearance menu to choose SAS Native, System, Light, or Dark. LocalStat remembers the choice between launches.
+- The workspace opens in SAS Native, with a light Project Explorer, white editor and results surfaces, and a compact program toolbar. Blue marks the active tab and Run action. Use the toolbar's Appearance menu to choose SAS Native, System, Light, or Dark. LocalStat remembers the choice between launches.
 - LocalStat > Settings (Command-comma) controls editor themes, separate source/output fonts, sizes, wrapping, line spacing, line numbers, whitespace, current-line highlighting, table zoom, and editing assistance. View > Editor Font and View > Output Font open the corresponding font controls directly. View > Increase/Decrease/Reset Size follows the focused content.
 - Help > LocalStat Help opens an offline searchable manual and language index. Examples can be copied or opened in a new unsaved editor tab. Command-F finds text in the current article; Command-W closes Help or Settings without closing source.
 - Drag the project and results dividers to set pane sizes. View > Hide Project Navigator (Command-0) and View > Expand Results (Command-2) provide keyboard alternatives. Pane sizes and navigator visibility are remembered.

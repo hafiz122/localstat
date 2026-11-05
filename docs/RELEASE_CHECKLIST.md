@@ -1,7 +1,7 @@
-# 0.1.3-alpha release checklist
+# 0.1.4-alpha release checklist
 
-The `v0.1.2-alpha` candidate remained a draft after table and layout feedback.
-This checklist tracks the corrected developer preview. Private
+The `v0.1.3-alpha` prerelease was published on 5 November 2026. This
+checklist tracks the next developer preview. Private
 vulnerability reporting and required CI branch protection are enabled.
 Artwork grant details and a second physical Mac test remain outstanding;
 retain these limits in the new release notes.
@@ -9,7 +9,7 @@ retain these limits in the new release notes.
 ## Candidate source
 
 - [ ] Working tree is clean and the release commit is reviewed.
-- [ ] `VERSION` is `0.1.3-alpha` and `CHANGELOG.md` has no missing alpha notes.
+- [ ] `VERSION` is `0.1.4-alpha` and `CHANGELOG.md` has no missing alpha notes.
 - [ ] `./scripts/release-alpha.sh` passes on Apple Silicon.
 - [ ] The `macos-14` CI job passes from a fresh checkout.
 - [ ] The generated ZIP checksum verifies after downloading to another path.
@@ -30,7 +30,7 @@ retain these limits in the new release notes.
 
 ## Prerelease
 
-- [ ] Push annotated `v0.1.3-alpha` on the reviewed main commit. The tag
+- [ ] Push annotated `v0.1.4-alpha` on the reviewed main commit. The tag
   triggers `release-alpha.yml`, which tests and packages the candidate and
   creates a draft prerelease with one ZIP and matching `.sha256` file.
 - [ ] Review the verification record included in the draft release body.
