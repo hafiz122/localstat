@@ -41,13 +41,11 @@ def audit(samples, cases, warmups, repetitions):
             raise ValueError('Unexpected, failed, or timed-out comparison observation')
         expected[key].append(row)
         hashes[key[:3]].add((row['stdout_sha256'], row['stderr_sha256'], row['sidecar_sha256']))
+    phases = ['first'] + ['warmup']*warmups + ['measured']*repetitions
+    expected_pairs = collections.Counter((phase, iteration) for iteration, phase in enumerate(phases))
     for rows in expected.values():
-        counts = collections.Counter(row['phase'] for row in rows)
-        if counts != dict(first=1, warmup=warmups, measured=repetitions) and not (
-                warmups == 0 and counts == dict(first=1, measured=repetitions)):
-            raise ValueError('Incomplete comparison configuration')
-        if len({r['iteration'] for r in rows}) != 1+warmups+repetitions:
-            raise ValueError('Duplicated comparison iteration')
+        if collections.Counter((row['phase'], row['iteration']) for row in rows) != expected_pairs:
+            raise ValueError('Incomplete, duplicated, or unexpected comparison phase/iteration pairs')
     if any(len(values) != 1 for values in hashes.values()):
         raise ValueError('Output or sidecar changed between builds or iterations')
 
@@ -157,7 +155,8 @@ def run(args):
                     raise ValueError(f'Exit {result["returncode"]}')
                 else:
                     sidecar = json.loads(sidefile.read_text()) if variant == 'tables' else None
-                    validate(case, result['stdout'], result['stderr'], sidecar)
+                    validate(case, result['stdout'], result['stderr'], sidecar,
+                             require_tables=variant == 'tables')
                     if sidecar is not None:
                         sidehash = hashlib.sha256(json.dumps(sidecar, sort_keys=True).encode()).hexdigest()
                     if case['name'] == 'csv':

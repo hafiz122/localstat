@@ -124,7 +124,7 @@ def prepare(root, sizes):
     return cases
 
 
-def validate(case, output, errors, sidecar):
+def validate(case, output, errors, sidecar, *, require_tables=False):
     if re.search(r'(?im)^\s*(ERROR|UNSUPPORTED)(?:\([^\n]*\))?\s*:', errors + '\n' + output):
         raise ValueError('Runtime error or unsupported behavior')
     checks = re.findall(r'^CHECK\s+(.+)$', output, re.MULTILINE)
@@ -159,24 +159,49 @@ def validate(case, output, errors, sidecar):
         if not error or not math.isclose(float(error[1]), expected_sse, rel_tol=1e-8):
             raise ValueError('Incorrect regression residual sum of squares')
     if sidecar is None:
+        if require_tables:
+            raise ValueError('Expected a table sidecar object')
         return
-    if sidecar.get('version') != 1 or len(sidecar.get('tables', [])) != 1:
+    if not isinstance(sidecar, dict):
+        raise ValueError('Expected a table sidecar object')
+    tables = sidecar.get('tables')
+    if sidecar.get('version') != 1 or not isinstance(tables, list) or len(tables) != 1:
         raise ValueError('Incorrect sidecar version or table count')
-    table = sidecar['tables'][0]
-    if table['procedure'] != case['name'].upper():
+    table = tables[0]
+    if not isinstance(table, dict) or table.get('procedure') != case['name'].upper():
         raise ValueError('Incorrect table procedure')
-    width = sum(cell['span'] for cell in table['headers'][-1]['cells'])
-    for row in table['headers'] + table['rows']:
-        if width <= 0 or any(cell['span'] <= 0 for cell in row['cells']) or sum(cell['span'] for cell in row['cells']) != width:
+    headers, body = table.get('headers'), table.get('rows')
+    if not isinstance(headers, list) or not headers or not isinstance(body, list):
+        raise ValueError('Incorrect table rows or headers')
+    for row in headers + body:
+        if not isinstance(row, dict) or not isinstance(row.get('kind', 'data'), str):
+            raise ValueError('Incorrect table row')
+        cells = row.get('cells')
+        if not isinstance(cells, list):
+            raise ValueError('Incorrect table cells')
+        for cell in cells:
+            if (not isinstance(cell, dict) or not isinstance(cell.get('text'), str) or
+                    type(cell.get('span')) is not int or cell['span'] <= 0):
+                raise ValueError('Incorrect table cell')
+    width = sum(cell['span'] for cell in headers[-1]['cells'])
+    for row in headers + body:
+        if width <= 0 or sum(cell['span'] for cell in row['cells']) != width:
             raise ValueError('Incorrect table shape')
-    rows = [row for row in table['rows'] if row.get('kind', 'data') == 'data']
+    rows = [row for row in body if row.get('kind', 'data') == 'data']
     if case['name'] == 'freq':
+        if len(rows) != 100:
+            raise ValueError('Incorrect frequency row count')
+        if any(len(row['cells']) != 5 or any(cell['span'] != 1 for cell in row['cells'])
+               for row in headers + body):
+            raise ValueError('Incorrect frequency columns')
         actual = {}
         for row in rows:
             cells = row['cells']
-            actual[int(cells[0]['text'])] = int(cells[1]['text'].replace(',', ''))
-        if actual != {i: case['rows']//100 for i in range(100)}:
-            raise ValueError('Incorrect frequency counts')
+            actual[int(cells[0]['text'])] = [float(cell['text'].replace(',', '')) for cell in cells]
+        expected = {i: [i, case['rows']//100, 1, (i+1)*(case['rows']//100), i+1]
+                    for i in range(100)}
+        if actual != expected:
+            raise ValueError('Incorrect frequency values')
     if case['name'] == 'print':
         if len(rows) != case['rows']:
             raise ValueError('Incorrect printed row count')
@@ -190,7 +215,7 @@ def validate(case, output, errors, sidecar):
 def validate_csv(path, n):
     with path.open() as stream:
         reader = csv.reader(stream)
-        if [name.lower() for name in next(reader)] != ['id', 'grp', 'x', 'z', 'y']:
+        if [name.lower() for name in next(reader, [])] != ['id', 'grp', 'x', 'z', 'y']:
             raise ValueError('Incorrect CSV header')
         count = 0
         for i, row in enumerate(reader):
@@ -329,7 +354,8 @@ def run(args):
                             raise ValueError(f'Exit {result["returncode"]}')
                         else:
                             sidecar = json.loads(sidefile.read_text()) if variant == 'tables' else None
-                            validate(case, result['stdout'], result['stderr'], sidecar)
+                            validate(case, result['stdout'], result['stderr'], sidecar,
+                                     require_tables=variant == 'tables')
                             if case['name'] == 'csv':
                                 validate_csv(folder / 'roundtrip.csv', case['rows'])
                             pair = (result['stdout'], result['stderr'])
