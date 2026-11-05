@@ -21,16 +21,16 @@ Earlier source-rendered preview with synthetic regression data. It predates the 
 
 ## Project status
 
-LocalStat `0.1.2-alpha` is a public developer preview for Apple Silicon Macs. It is not a full SAS implementation. The app is ad-hoc signed and not notarized. [Download v0.1.2-alpha](https://github.com/hafiz122/localstat/releases/tag/v0.1.2-alpha) and see [installation and known issues](docs/INSTALL.md).
+LocalStat `0.1.3-alpha` is a public developer preview for Apple Silicon Macs. It is not a full SAS implementation. The app is ad-hoc signed and not notarized. [Download v0.1.3-alpha](https://github.com/hafiz122/localstat/releases/tag/v0.1.3-alpha) and see [installation and known issues](docs/INSTALL.md).
 
-This release makes SAS Native the fresh-start appearance and refines the Project Explorer, tabs, editor, settings, and results layout. Supported `PROC PRINT`, `PROC FREQ`, and `PROC TABULATE` tables now use SAS-inspired screen and print styling. Saved Settings, offline Help, and PDF reports remain available.
+This release makes SAS Native the fresh-start appearance and refines the Project Explorer, tabs, editor, settings, and results layout. Supported `PROC PRINT`, `PROC FREQ`, and `PROC TABULATE` tables now use a complete cell grid on screen and in print. Saved Settings, offline Help, and PDF reports remain available.
 
 | Area | Current status |
 | --- | --- |
 | Native IDE | SAS Native workspace by default, with a Project Explorer, compact source tabs, a contextual Run toolbar, and a lower results area. Settings, seven editor themes, separate source/output fonts, offline searchable Help, file operations, diagnostics, text output, formatted tables, printing, raw-text export and paginated PDF report export are available. |
 | Local runtime | The app bundles an ARM64 build of OpenSAS pinned to `927a2fa9f1401e365d975536bd704819ada1f1f4`. Each run starts a fresh local process. |
 | Statistical modeling | A bounded numeric ordinary-least-squares subset of `PROC REG` is implemented. |
-| Verification | Source suite: 973 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 74 Swift tests (one opt-in measurement skipped by default), 16 packaged-runtime checks, 37 benchmark checks, 3 offline Help checks and 1 repository text check. Recorded performance results are described below. |
+| Verification | Source suite: 973 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 75 Swift tests (one opt-in measurement skipped by default), 16 packaged-runtime checks, 37 benchmark checks, 3 offline Help checks and 1 repository text check. Recorded performance results are described below. |
 | Distribution | Alpha automation tests and packages each candidate. New versions produce draft prereleases; repeat runs preserve existing release assets. The app remains ad-hoc signed and unnotarized. |
 | Compatibility | Coverage is documented and intentionally limited. No feature is labeled SAS-verified without output from an installed SAS engine. |
 
@@ -92,7 +92,7 @@ On first launch, example programs are copied to `~/Library/Application Support/L
 - Double-click an original-source diagnostic to navigate. Navigation is disabled if its editor buffer has changed, or if the position belongs to macro-expanded text.
 - File > Export Last Run as Text saves complete raw output and diagnostics.
 - File > Export Report as PDF creates a searchable, paginated report containing the executed source snapshot, run metadata, output, and diagnostics. Tabular text, including REG ANOVA and parameter estimates, has aligned columns and fits within the page width. Source text, diagnostics, and raw-text exports retain their original contents.
-- Output Data shows formatted results for supported PRINT, FREQ, and TABULATE output. On screen, table headings use a restrained blue treatment. File > Print Tables prints the latest tables on white pages with centered titles, horizontal rules, and right-aligned numeric cells; PDF reports include those tables and a raw-output appendix. This follows SAS output conventions for the supported subset, without claiming exact SAS ODS parity.
+- Output Data shows formatted results for supported PRINT, FREQ, and TABULATE output. On screen, table headings use a restrained blue treatment and every cell has a border. File > Print Tables prints the latest tables on white pages with centered titles, complete cell borders, and right-aligned numeric cells; PDF reports include those tables and a raw-output appendix. This follows the requested table presentation for the supported subset, without claiming exact SAS ODS parity.
 - Help > Compatibility and Limitations opens the supported-subset document in a native read-only window.
 
 Every run starts a fresh process: WORK datasets and macro definitions do not persist between submissions. Files explicitly written by your program persist. Output is buffered by OpenSAS until the run finishes, so cancellation may lose that buffered output. Output and diagnostics are kept in memory; very large results require corresponding memory.

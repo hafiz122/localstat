@@ -92,7 +92,8 @@ final class RuntimeRunnerTests: XCTestCase {
                                        ResultRow(cells: [ResultCell("Long"), ResultCell("1000.00")])])
         let destination = try workspace().appendingPathComponent("sas-style-table.pdf")
         XCTAssertTrue(TablePrintRenderer.operation(for: [table], destination: destination).run())
-        let page = try XCTUnwrap(PDFDocument(url: destination)?.page(at: 0))
+        let document = try XCTUnwrap(PDFDocument(url: destination))
+        let page = try XCTUnwrap(document.page(at: 0))
         let content = try XCTUnwrap(page.string) as NSString
         func bounds(_ value: String) throws -> NSRect {
             let range = content.range(of: value)
@@ -101,6 +102,35 @@ final class RuntimeRunnerTests: XCTestCase {
         }
         XCTAssertEqual(try bounds("2.00").maxX, try bounds("1000.00").maxX, accuracy: 1)
         XCTAssertEqual(try bounds("Printed observations").midX, page.bounds(for: .mediaBox).midX, accuracy: 20)
+        let firstHeader = try bounds("Name")
+        let secondHeader = try bounds("Value")
+        let columnWidth = secondHeader.midX - firstHeader.midX
+        let tableCenter = (firstHeader.midX + secondHeader.midX) / 2
+        XCTAssertEqual(tableCenter, page.bounds(for: .mediaBox).midX, accuracy: 20)
+
+        let thumbnail = page.thumbnail(of: page.bounds(for: .mediaBox).size, for: .mediaBox)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: try XCTUnwrap(thumbnail.tiffRepresentation)))
+        let scale = CGFloat(bitmap.pixelsWide) / page.bounds(for: .mediaBox).width
+        let rowY = try bounds("Short").midY
+        func hasGridLine(at pageX: CGFloat) -> Bool {
+            let x = Int((pageX * scale).rounded())
+            let y = Int(((page.bounds(for: .mediaBox).height - rowY) * scale).rounded())
+            for offset in -3...3 {
+                guard let color = bitmap.colorAt(x: x + offset, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+                if max(color.redComponent, color.greenComponent, color.blueComponent) < 0.9 { return true }
+            }
+            return false
+        }
+        XCTAssertTrue(hasGridLine(at: tableCenter - columnWidth), "The outer left cell border should print")
+        XCTAssertTrue(hasGridLine(at: tableCenter), "The inner column border should print")
+        XCTAssertTrue(hasGridLine(at: tableCenter + columnWidth), "The outer right cell border should print")
+        let headerBoundary = (firstHeader.midY + rowY) / 2
+        let boundaryY = Int(((page.bounds(for: .mediaBox).height - headerBoundary) * scale).rounded())
+        let columnX = Int((firstHeader.midX * scale).rounded())
+        XCTAssertTrue((-3...3).contains { offset in
+            guard let color = bitmap.colorAt(x: columnX, y: boundaryY + offset)?.usingColorSpace(.deviceRGB) else { return false }
+            return max(color.redComponent, color.greenComponent, color.blueComponent) < 0.9
+        }, "The border between header and data rows should print")
     }
     @MainActor func testPrintedTableKeepsCharacterValuesLeftAligned() throws {
         _ = NSApplication.shared

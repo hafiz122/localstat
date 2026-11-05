@@ -278,10 +278,10 @@ import AppKit
         let cells = projected(row, columns: columns)
         let ink: NSColor = screen ? .labelColor : .black
         let isDark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        let horizontalRule: NSColor = screen
+        let gridColor: NSColor = screen
             ? (isDark ? NSColor(calibratedRed: 0.37, green: 0.44, blue: 0.51, alpha: 1)
-                      : NSColor(calibratedRed: 0.78, green: 0.84, blue: 0.89, alpha: 1))
-            : NSColor(calibratedWhite: 0.64, alpha: 1)
+                      : NSColor(calibratedRed: 0.65, green: 0.72, blue: 0.79, alpha: 1))
+            : NSColor(calibratedWhite: 0.45, alpha: 1)
         let headerFill: NSColor = screen
             ? (isDark ? NSColor(calibratedRed: 0.17, green: 0.23, blue: 0.30, alpha: 1)
                       : NSColor(calibratedRed: 0.88, green: 0.93, blue: 0.97, alpha: 1))
@@ -295,19 +295,15 @@ import AppKit
         let tableX = max(margin, (paper.width - tableWidth) / 2)
         background.setFill()
         NSRect(x: tableX, y: y, width: tableWidth, height: height).fill()
-        if header || row.kind == "section" {
-            horizontalRule.setStroke()
-            let top = NSBezierPath()
-            top.lineWidth = header && !screen ? 0.9 : 0.5
-            top.move(to: NSPoint(x: tableX, y: y + 0.5))
-            top.line(to: NSPoint(x: tableX + tableWidth, y: y + 0.5))
-            top.stroke()
-        }
         var x = tableX
         var offset = 0
         for cell in cells {
             let width = widths[offset..<min(offset + cell.span, widths.count)].reduce(0, +)
             let rect = NSRect(x: x, y: y, width: width, height: height)
+            gridColor.setStroke()
+            let border = NSBezierPath(rect: rect)
+            border.lineWidth = 0.7
+            border.stroke()
             let paragraph = NSMutableParagraphStyle()
             paragraph.lineBreakMode = .byCharWrapping
             paragraph.alignment = header ? .center : (isNumeric(cell.text) ? .right : .left)
@@ -316,14 +312,6 @@ import AppKit
             (cell.text as NSString).draw(in: inset, withAttributes: [.font: font, .foregroundColor: ink, .paragraphStyle: paragraph])
             x += width
             offset += cell.span
-        }
-        if row.kind != "note" {
-            horizontalRule.setStroke()
-            let bottom = NSBezierPath()
-            bottom.lineWidth = header || row.kind == "total" || row.kind == "section" ? 0.8 : 0.35
-            bottom.move(to: NSPoint(x: tableX, y: y + height - 0.5))
-            bottom.line(to: NSPoint(x: tableX + tableWidth, y: y + height - 0.5))
-            bottom.stroke()
         }
     }
 

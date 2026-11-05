@@ -4,6 +4,19 @@ All notable changes to LocalStat are recorded here.
 
 ## Unreleased
 
+## [0.1.3-alpha] - 2026-11-05
+
+### Changed
+
+- Draw a complete border around every formatted table cell on screen, in
+  printed pages, and in PDF reports.
+- Keep the results controls visible when the Project Explorer divider moves
+  or the app window reaches its minimum size.
+- Keep the editor toolbar and source area visible when results expand.
+- Match the line-number gutter to System and Dark appearances and remove the
+  duplicate Results heading outside SAS Native.
+- Explain the empty Diagnostics pane before and after a run.
+
 ## [0.1.2-alpha] - 2026-11-05
 
 ### Changed

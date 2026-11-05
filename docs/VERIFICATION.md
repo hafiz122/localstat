@@ -5,7 +5,7 @@
 The maintained suite includes the memory and PRINT optimizations below, plus
 later editor, PDF, and benchmark-auditor regressions. Run `./scripts/test.sh`
 for the current source: 973 runtime unit tests, 1,924 corpus programs, 11
-end-to-end programs, 74 Swift tests (one opt-in measurement skipped by default),
+end-to-end programs, 75 Swift tests (one opt-in measurement skipped by default),
 16 packaged-runtime checks, 37 benchmark checks, 3 Help checks, and the
 repository text check. The dated records below retain the counts and source
 identity of their original runs.

@@ -64,7 +64,7 @@ Muhammad Hafiz bin Ismail\par
 \vfill
 {\small\color{Muted}Native AppKit editor with an extended OpenSAS interpreter\par}
 \source{Project: \href{https://github.com/hafiz122/localstat}{github.com/hafiz122/localstat}. Current source features and dated study results.}
-\note{Introduce LocalStat as an independent implementation of a supported SAS-language subset. The presentation screenshots come from the source commit noted on their slides; the 0.1.2-alpha build includes the demonstrated features. The project credits Muhammad Hafiz bin Ismail as the system-paper author. Suggested duration: 20 seconds.}
+\note{Introduce LocalStat as an independent implementation of a supported SAS-language subset. The presentation screenshots come from the source commit noted on their slides; the 0.1.3-alpha build includes the demonstrated features. The project credits Muhammad Hafiz bin Ismail as the system-paper author. Suggested duration: 20 seconds.}
 \end{frame}
 
 % 2
@@ -175,7 +175,7 @@ quit;
 \end{column}
 \end{columns}
 \source{Source-rendered AppKit preview from commit 83b46a8; eight synthetic sales rows. Repository asset: localstat-tables.png.}
-\note{The source program creates four stores with two weeks per store. PRINT creates the displayed table and FREQ creates another result, reflected in two formatted output tables. This illustrates the structured-table path rather than parsing aligned text into a guessed schema. The 0.1.2-alpha build includes this view. Suggested duration: 40 seconds.}
+\note{The source program creates four stores with two weeks per store. PRINT creates the displayed table and FREQ creates another result, reflected in two formatted output tables. This illustrates the structured-table path rather than parsing aligned text into a guessed schema. The 0.1.3-alpha build includes this view. Suggested duration: 40 seconds.}
 \end{frame}
 
 % 7
@@ -202,7 +202,7 @@ quit;
 973 runtime unit tests & Interpreter behavior and regressions \\
 1,924 corpus programs & Language and procedure fixtures \\
 11 end-to-end programs & Complete program execution \\
-74 Swift tests & App, editor and reports; one opt-in skip \\
+75 Swift tests & App, editor and reports; one opt-in skip \\
 \bottomrule
 \end{tabular}\par
 \vspace{4mm}
@@ -266,8 +266,8 @@ DATA 10,000: whole app & 74.2 & 74.9 & $0.99\times$ \\
 \item Programs use the app's filesystem permissions. The alpha is unsandboxed, ad-hoc signed and unnotarized.
 \item Evaluation uses one Mac and synthetic workloads. Direct SAS-engine comparison remains incomplete.
 \end{itemize}
-\source{Sources: docs/COMPATIBILITY.md; docs/VERIFICATION.md; optimization experiment README. Screenshots predate the 0.1.2-alpha interface style.}
-\note{Keep the boundaries explicit. The current regression subset rejects singular designs rather than reproducing SAS generalized-inverse handling. There is no persistent interactive session or SAS graphics. Screenshots show an earlier interface style, while the 0.1.2-alpha build includes the demonstrated functions. The local process boundary resets state but does not sandbox untrusted code. Suggested duration: 60 seconds.}
+\source{Sources: docs/COMPATIBILITY.md; docs/VERIFICATION.md; optimization experiment README. Screenshots predate the 0.1.3-alpha interface style.}
+\note{Keep the boundaries explicit. The current regression subset rejects singular designs rather than reproducing SAS generalized-inverse handling. There is no persistent interactive session or SAS graphics. Screenshots show an earlier interface style, while the 0.1.3-alpha build includes the demonstrated functions. The local process boundary resets state but does not sandbox untrusted code. Suggested duration: 60 seconds.}
 \end{frame}
 
 % 12
@@ -296,7 +296,7 @@ DATA 10,000: whole app & 74.2 & 74.9 & $0.99\times$ \\
 \end{enumerate}
 \vspace{4mm}
 {\small Included demo programs reproduce the synthetic examples shown in the screenshots.}
-\source{Use 0.1.2-alpha or a current source build for formatted output data.}
+\source{Use 0.1.3-alpha or a current source build for formatted output data.}
 \note{Allow about two minutes if the professor wants a demonstration. Use the demo directory included with the Beamer source package as the project folder. Set editor and output font sizes before screen sharing. Keep the slides available as a fallback. The expected FREQ table has four stores, each with frequency 2 and percent 25. The PRINT table contains eight rows.}
 \end{frame}
 

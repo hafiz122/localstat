@@ -51,8 +51,7 @@ extension AppDelegate {
         projectLabel.textColor = studio ? StudioStyle.muted : .labelColor
         projectHint.textColor = studio ? StudioStyle.muted : .secondaryLabelColor
         statusLabel.textColor = studio ? StudioStyle.muted : .labelColor
-        resultsTitle.isHidden = studio
-        resultsTitle.textColor = studio ? StudioStyle.ink : .labelColor
+        diagnosticsEmptyLabel.textColor = studio ? StudioStyle.muted : .secondaryLabelColor
         fileOutline.backgroundColor = studio ? .white : .controlBackgroundColor
         fileOutline.rowHeight = studio ? 26 : 20
         fileScroll.backgroundColor = studio ? .white : .controlBackgroundColor
