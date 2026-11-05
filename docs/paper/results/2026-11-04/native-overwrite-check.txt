@@ -1,0 +1,2 @@
+PASS: maintained native benchmark rejects an existing output file before measurement.
+The expected failing XCTest preserved the sentinel bytes; real experiment files were not used.

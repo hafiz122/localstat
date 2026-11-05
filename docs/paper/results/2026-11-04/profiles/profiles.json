@@ -1,0 +1,58 @@
+[
+  {
+    "workload": "data",
+    "rows": 1000000,
+    "sample_exit": 0,
+    "validation_error": "",
+    "sampler_message": "Sampling process 60583 for 1 second with 1 millisecond of run time between samples\nSampling completed, processing symbols...\nSample analysis of process 60583 written to file <workspace>/docs/paper/results/2026-11-04/profiles/data-1000000.sample.txt\n",
+    "profile_exists": true
+  },
+  {
+    "workload": "sort",
+    "rows": 1000000,
+    "sample_exit": 0,
+    "validation_error": "",
+    "sampler_message": "Sampling process 60677 for 1 second with 1 millisecond of run time between samples\nSampling completed, processing symbols...\nSample analysis of process 60677 written to file <workspace>/docs/paper/results/2026-11-04/profiles/sort-1000000.sample.txt\n",
+    "profile_exists": true
+  },
+  {
+    "workload": "group",
+    "rows": 1000000,
+    "sample_exit": 0,
+    "validation_error": "",
+    "sampler_message": "Sampling process 60684 for 1 second with 1 millisecond of run time between samples\nSampling completed, processing symbols...\nSample analysis of process 60684 written to file <workspace>/docs/paper/results/2026-11-04/profiles/group-1000000.sample.txt\n",
+    "profile_exists": true
+  },
+  {
+    "workload": "join",
+    "rows": 1000000,
+    "sample_exit": 0,
+    "validation_error": "",
+    "sampler_message": "Sampling process 60720 for 1 second with 1 millisecond of run time between samples\nSampling completed, processing symbols...\nSample analysis of process 60720 written to file <workspace>/docs/paper/results/2026-11-04/profiles/join-1000000.sample.txt\n",
+    "profile_exists": true
+  },
+  {
+    "workload": "reg",
+    "rows": 1000000,
+    "sample_exit": 0,
+    "validation_error": "",
+    "sampler_message": "Sampling process 60751 for 1 second with 1 millisecond of run time between samples\nSampling completed, processing symbols...\nSample analysis of process 60751 written to file <workspace>/docs/paper/results/2026-11-04/profiles/reg-1000000.sample.txt\n",
+    "profile_exists": true
+  },
+  {
+    "workload": "csv",
+    "rows": 1000000,
+    "sample_exit": 0,
+    "validation_error": "",
+    "sampler_message": "Sampling process 60822 for 1 second with 1 millisecond of run time between samples\nSampling completed, processing symbols...\nSample analysis of process 60822 written to file <workspace>/docs/paper/results/2026-11-04/profiles/csv-1000000.sample.txt\n",
+    "profile_exists": true
+  },
+  {
+    "workload": "freq",
+    "rows": 1000000,
+    "sample_exit": 0,
+    "validation_error": "",
+    "sampler_message": "Sampling process 60845 for 1 second with 1 millisecond of run time between samples\nSampling completed, processing symbols...\nSample analysis of process 60845 written to file <workspace>/docs/paper/results/2026-11-04/profiles/freq-1000000.sample.txt\n",
+    "profile_exists": true
+  }
+]

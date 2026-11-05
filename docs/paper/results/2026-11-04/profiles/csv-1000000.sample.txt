@@ -1,0 +1,339 @@
+Analysis of sampling opensas (pid 60822) every 1 millisecond
+Process:         opensas [60822]
+Path:            /Users/USER/Documents/*/opensas
+Load Address:    0x100a20000
+Identifier:      opensas
+Version:         0
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  Python [60555]
+Target Type:     live task
+
+Date/Time:       2026-11-04 18:52:59.536 +0800
+Launch Time:     2026-11-04 18:52:59.514 +0800
+OS Version:      macOS 26.4.1 (25E253)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+
+Physical footprint:         2.0G
+Physical footprint (peak):  2.0G
+Idle exit:                  untracked
+----
+
+Call graph:
+    823 Thread_607801   DispatchQueue_1: com.apple.main-thread  (serial)
+      823 start  (in dyld) + 6992  [0x18cd07da4]
+        823 main  (in opensas) + 4496  [0x100a27f0c]  start.zig:663
+          823 main.interpretWithTables  (in opensas) + 11872  [0x100a255c8]  main.zig:292
+            823 macro.process  (in opensas) + 9188  [0x100a8f1d8]  macro.zig:1140
+              823 main.interleaveStep  (in opensas) + 212  [0x100cd4080]  main.zig:528
+                823 main.runExpanded  (in opensas) + 9844  [0x100a88974]  main.zig:487
+                  567 main.runProc  (in opensas) + 10908  [0x100a9d034]  main.zig:2669
+                  + 566 proc.runImport  (in opensas) + 4316  [0x100aa3e70]  proc.zig:10393
+                  + ! 175 io.readDelimited  (in opensas) + 1912  [0x100b1d834]  io.zig:1702
+                  + ! : 109 io.parseCsvLine  (in opensas) + 244  [0x100b1cee0]  io.zig:1920
+                  + ! : | 71 array_list.Aligned(u8,null).ensureTotalCapacity  (in opensas) + 256  [0x100a66ce4]  array_list.zig:1211
+                  + ! : | + 71 _platform_memset  (in libsystem_platform.dylib) + 168,164,...  [0x18d0cd198,0x18d0cd194,...]
+                  + ! : | 18 array_list.Aligned(u8,null).ensureTotalCapacity  (in opensas) + 236  [0x100a66cd0]  array_list.zig:1211
+                  + ! : | + 5 heap.ArenaAllocator.alloc  (in opensas) + 24,36  [0x100ce4d14,0x100ce4d20]  ArenaAllocator.zig:332
+                  + ! : | + 3 heap.ArenaAllocator.alloc  (in opensas) + 200  [0x100ce4dc4]  ArenaAllocator.zig:0
+                  + ! : | + 3 heap.ArenaAllocator.alloc  (in opensas) + 164,160  [0x100ce4da0,0x100ce4d9c]  ArenaAllocator.zig:359
+                  + ! : | + 3 heap.ArenaAllocator.alloc  (in opensas) + 1448  [0x100ce52a4]  ArenaAllocator.zig:373
+                  + ! : | + 1 heap.ArenaAllocator.alloc  (in opensas) + 40  [0x100ce4d24]  ArenaAllocator.zig:333
+                  + ! : | + 1 heap.ArenaAllocator.alloc  (in opensas) + 112  [0x100ce4d6c]  ArenaAllocator.zig:349
+                  + ! : | + 1 heap.ArenaAllocator.alloc  (in opensas) + 144  [0x100ce4d8c]  ArenaAllocator.zig:357
+                  + ! : | + 1 heap.ArenaAllocator.alloc  (in opensas) + 224  [0x100ce4ddc]  ArenaAllocator.zig:361
+                  + ! : | 10 array_list.Aligned(u8,null).ensureTotalCapacity  (in opensas) + 196,300,...  [0x100a66ca8,0x100a66d10,...]  array_list.zig:1211
+                  + ! : | 5 array_list.Aligned(u8,null).ensureTotalCapacity  (in opensas) + 300  [0x100a66d10]  array_list.zig:1211
+                  + ! : | + 5 _platform_memmove  (in libsystem_platform.dylib) + 436,460  [0x18d0cd574,0x18d0cd58c]
+                  + ! : | 5 heap.ArenaAllocator.alloc  (in opensas) + 1568  [0x100ce531c]  ArenaAllocator.zig:0
+                  + ! : 25 io.parseCsvLine  (in opensas) + 344  [0x100b1cf44]  io.zig:1922
+                  + ! : | 14 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 316  [0x100b1f0b4]  array_list.zig:1211
+                  + ! : | + 14 _platform_memset  (in libsystem_platform.dylib) + 108,164,...  [0x18d0cd15c,0x18d0cd194,...]
+                  + ! : | 3 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 296  [0x100b1f0a0]  array_list.zig:1211
+                  + ! : | + 1 heap.ArenaAllocator.alloc  (in opensas) + 100  [0x100ce4d60]  ArenaAllocator.zig:0
+                  + ! : | + 1 heap.ArenaAllocator.alloc  (in opensas) + 36  [0x100ce4d20]  ArenaAllocator.zig:332
+                  + ! : | + 1 heap.ArenaAllocator.alloc  (in opensas) + 164  [0x100ce4da0]  ArenaAllocator.zig:359
+                  + ! : | 3 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 420  [0x100b1f11c]  array_list.zig:1211
+                  + ! : | + 3 _platform_memmove  (in libsystem_platform.dylib) + 460,0  [0x18d0cd58c,0x18d0cd3c0]
+                  + ! : | 3 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 64,264,...  [0x100b1efb8,0x100b1f080,...]  array_list.zig:1211
+                  + ! : | 2 heap.ArenaAllocator.alloc  (in opensas) + 1568  [0x100ce531c]  ArenaAllocator.zig:0
+                  + ! : 11 io.parseCsvLine  (in opensas) + 324  [0x100b1cf30]  io.zig:1920
+                  + ! : | 7 DYLD-STUB$$memcpy  (in opensas) + 4  [0x100cec1c8]
+                  + ! : | 4 _platform_memmove  (in libsystem_platform.dylib) + 12,436,...  [0x18d0cd3cc,0x18d0cd574,...]
+                  + ! : 8 io.parseCsvLine  (in opensas) + 188,176  [0x100b1cea8,0x100b1ce9c]  io.zig:1919
+                  + ! : 8 io.parseCsvLine  (in opensas) + 204,256,...  [0x100b1ceb8,0x100b1ceec,...]  io.zig:1920
+                  + ! : 4 array_list.Aligned(u8,null).ensureTotalCapacity  (in opensas) + 116  [0x100a66c58]  array_list.zig:0
+                  + ! : 3 io.parseCsvLine  (in opensas) + 100,200,...  [0x100b1ce50,0x100b1ceb4,...]  io.zig:0
+                  + ! : 2 io.parseCsvLine  (in opensas) + 392  [0x100b1cf74]  io.zig:1923
+                  + ! : 1 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 132  [0x100b1effc]  array_list.zig:0
+                  + ! : 1 io.parseCsvLine  (in opensas) + 20  [0x100b1ce00]  io.zig:1899
+                  + ! : 1 io.parseCsvLine  (in opensas) + 120  [0x100b1ce64]  io.zig:1903
+                  + ! : 1 io.parseCsvLine  (in opensas) + 136  [0x100b1ce74]  io.zig:1904
+                  + ! : 1 io.parseCsvLine  (in opensas) + 596  [0x100b1d040]  io.zig:1926
+                  + ! 85 io.readDelimited  (in opensas) + 2496  [0x100b1da7c]  io.zig:1722
+                  + ! : 36 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 188,444,...  [0x100a82f18,0x100a83018,...]  parse_float.zig:37
+                  + ! : 34 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 420  [0x100a83000]  parse_float.zig:37
+                  + ! : | 20 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 232,256,...  [0x100a84df8,0x100a84e10,...]  parse.zig:43
+                  + ! : | 8 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 336,332  [0x100a84e60,0x100a84e5c]  parse.zig:45
+                  + ! : | 4 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 8,72  [0x100a84d18,0x100a84d58]  parse.zig:32
+                  + ! : | 1 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 320  [0x100a84e50]  parse.zig:44
+                  + ! : | 1 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 352  [0x100a84e70]  parse.zig:46
+                  + ! : 4 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 2244,2232,...  [0x100a83720,0x100a83714,...]  parse_float.zig:45
+                  + ! : 3 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 3268  [0x100a83b20]  parse_float.zig:0
+                  + ! : 3 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 1868  [0x100a835a8]  parse_float.zig:41
+                  + ! : 2 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 20,48  [0x100a82e70,0x100a82e8c]  parse_float.zig:335
+                  + ! : 1 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 356  [0x100a84e74]  parse.zig:46
+                  + ! : 1 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 56  [0x100a82e94]  parse_float.zig:29
+                  + ! : 1 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 80  [0x100a82eac]  parse_float.zig:33
+                  + ! 50 io.readDelimited  (in opensas) + 2364  [0x100b1d9f8]  io.zig:1720
+                  + ! : 38 mem.eqlBytes  (in opensas) + 248,240,...  [0x100ce4050,0x100ce4048,...]  mem.zig:0
+                  + ! : 5 mem.eqlBytes  (in opensas) + 0  [0x100ce3f58]  mem.zig:768
+                  + ! : 3 mem.eqlBytes  (in opensas) + 32  [0x100ce3f78]  mem.zig:774
+                  + ! : 3 mem.eqlBytes  (in opensas) + 60,48  [0x100ce3f94,0x100ce3f88]  mem.zig:776
+                  + ! : 1 mem.eqlBytes  (in opensas) + 40  [0x100ce3f80]  mem.zig:775
+                  + ! 37 io.readDelimited  (in opensas) + 4528  [0x100b1e26c]  io.zig:1782
+                  + ! : 14 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 420  [0x100a83000]  parse_float.zig:37
+                  + ! : | 5 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 232,340  [0x100a84df8,0x100a84e64]  parse.zig:43
+                  + ! : | 4 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 8,72  [0x100a84d18,0x100a84d58]  parse.zig:32
+                  + ! : | 4 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 352  [0x100a84e70]  parse.zig:46
+                  + ! : | 1 fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas) + 0  [0x100a84d10]  parse.zig:28
+                  + ! : 14 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 568,1856,...  [0x100a83094,0x100a8359c,...]  parse_float.zig:37
+                  + ! : 4 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 2244,2208,...  [0x100a83720,0x100a836fc,...]  parse_float.zig:45
+                  + ! : 3 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 32,48  [0x100a82e7c,0x100a82e8c]  parse_float.zig:335
+                  + ! : 1 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 3268  [0x100a83b20]  parse_float.zig:0
+                  + ! : 1 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 56  [0x100a82e94]  parse_float.zig:29
+                  + ! 32 io.readDelimited  (in opensas) + 2364,2344,...  [0x100b1d9f8,0x100b1d9e4,...]  io.zig:1720
+                  + ! 25 io.readDelimited  (in opensas) + 2228  [0x100b1d970]  io.zig:1719
+                  + ! 24 io.readDelimited  (in opensas) + 2408,2372,...  [0x100b1da24,0x100b1da00,...]  io.zig:1722
+                  + ! 19 io.readDelimited  (in opensas) + 2108  [0x100b1d8f8]  io.zig:1705
+                  + ! : 9 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 316  [0x100b1f0b4]  array_list.zig:1211
+                  + ! : | 9 _platform_memset  (in libsystem_platform.dylib) + 72  [0x18d0cd138]
+                  + ! : 8 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 420  [0x100b1f11c]  array_list.zig:1211
+                  + ! : | 8 _platform_memmove  (in libsystem_platform.dylib) + 88,96  [0x18d0cd418,0x18d0cd420]
+                  + ! : 1 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 12  [0x100b1ef84]  array_list.zig:1209
+                  + ! : 1 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 444  [0x100b1f134]  array_list.zig:1211
+                  + ! :   1 _platform_memset  (in libsystem_platform.dylib) + 72  [0x18d0cd138]
+                  + ! 19 io.readDelimited  (in opensas) + 4504  [0x100b1e254]  io.zig:1782
+                  + ! : 7 mem.trim__anon_22840  (in opensas) + 176  [0x100a8570c]  mem.zig:1206
+                  + ! : | 3 mem.findScalarPos__anon_9702  (in opensas) + 4  [0x100a3a220]  mem.zig:1241
+                  + ! : | 2 mem.findScalarPos__anon_9702  (in opensas) + 20  [0x100a3a230]  mem.zig:1263
+                  + ! : | 1 mem.findScalarPos__anon_9702  (in opensas) + 496  [0x100a3a40c]  mem.zig:0
+                  + ! : | 1 mem.findScalarPos__anon_9702  (in opensas) + 468  [0x100a3a3f0]  mem.zig:1297
+                  + ! : 6 mem.trim__anon_22840  (in opensas) + 96  [0x100a856bc]  mem.zig:1205
+                  + ! : | 3 mem.findScalarPos__anon_9702  (in opensas) + 340  [0x100a3a370]  mem.zig:1284
+                  + ! : | 1 mem.findScalarPos__anon_9702  (in opensas) + 16  [0x100a3a22c]  mem.zig:1242
+                  + ! : | 1 mem.findScalarPos__anon_9702  (in opensas) + 468  [0x100a3a3f0]  mem.zig:1297
+                  + ! : | 1 mem.findScalarPos__anon_9702  (in opensas) + 480  [0x100a3a3fc]  mem.zig:1299
+                  + ! : 4 mem.trim__anon_22840  (in opensas) + 16,60  [0x100a8566c,0x100a85698]  mem.zig:8580
+                  + ! : 2 mem.trim__anon_22840  (in opensas) + 176  [0x100a8570c]  mem.zig:1206
+                  + ! 15 io.readDelimited  (in opensas) + 3968  [0x100b1e03c]  io.zig:1776
+                  + ! : 13 _platform_memset  (in libsystem_platform.dylib) + 168,108,...  [0x18d0cd198,0x18d0cd15c,...]
+                  + ! : 2 DYLD-STUB$$memset  (in opensas) + 4  [0x100cec1e0]
+                  + ! 15 io.readDelimited  (in opensas) + 4468  [0x100b1e230]  io.zig:1782
+                  + ! : 12 mem.eqlBytes  (in opensas) + 240,16,...  [0x100ce4048,0x100ce3f68,...]  mem.zig:0
+                  + ! : 2 mem.eqlBytes  (in opensas) + 52,68  [0x100ce3f8c,0x100ce3f9c]  mem.zig:776
+                  + ! : 1 mem.eqlBytes  (in opensas) + 0  [0x100ce3f58]  mem.zig:768
+                  + ! 10 io.readDelimited  (in opensas) + 1984  [0x100b1d87c]  io.zig:1703
+                  + ! : 10 _platform_memset  (in libsystem_platform.dylib) + 108,112,...  [0x18d0cd15c,0x18d0cd160,...]
+                  + ! 9 io.readDelimited  (in opensas) + 4540,4384,...  [0x100b1e278,0x100b1e1dc,...]  io.zig:1782
+                  + ! 8 io.readDelimited  (in opensas) + 3948  [0x100b1e028]  io.zig:1776
+                  + ! : 6 heap.ArenaAllocator.alloc  (in opensas) + 200,240  [0x100ce4dc4,0x100ce4dec]  ArenaAllocator.zig:0
+                  + ! : 2 heap.ArenaAllocator.alloc  (in opensas) + 112  [0x100ce4d6c]  ArenaAllocator.zig:349
+                  + ! 6 io.readDelimited  (in opensas) + 4588  [0x100b1e2a8]  io.zig:1785
+                  + ! : 4 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 420  [0x100b1f11c]  array_list.zig:1211
+                  + ! : | 4 _platform_memmove  (in libsystem_platform.dylib) + 88,96  [0x18d0cd418,0x18d0cd420]
+                  + ! : 1 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 316  [0x100b1f0b4]  array_list.zig:1211
+                  + ! : | 1 _platform_memset  (in libsystem_platform.dylib) + 72  [0x18d0cd138]
+                  + ! : 1 array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas) + 444  [0x100b1f134]  array_list.zig:1211
+                  + ! :   1 _platform_memset  (in libsystem_platform.dylib) + 72  [0x18d0cd138]
+                  + ! 5 io.readDelimited  (in opensas) + 356  [0x100b1d220]  io.zig:1645
+                  + ! 4 io.readDelimited  (in opensas) + 288  [0x100b1d1dc]  io.zig:1637
+                  + ! 4 io.readDelimited  (in opensas) + 2028,2052  [0x100b1d8a8,0x100b1d8c0]  io.zig:1704
+                  + ! 3 fmt.parse_float.parseFloat__anon_30309  (in opensas) + 3300  [0x100a83b40]  parse_float.zig:0
+                  + ! 3 io.readDelimited  (in opensas) + 4556  [0x100b1e288]  io.zig:1780
+                  + ! 3 mem.eqlBytes  (in opensas) + 252  [0x100ce4054]  mem.zig:0
+                  + ! 2 io.readDelimited  (in opensas) + 340,4548  [0x100b1d210,0x100b1e280]  io.zig:0
+                  + ! 2 io.readDelimited  (in opensas) + 364,496  [0x100b1d228,0x100b1d2ac]  io.zig:1646
+                  + ! 2 io.readDelimited  (in opensas) + 1884  [0x100b1d818]  io.zig:1700
+                  + ! 2 io.readDelimited  (in opensas) + 4024  [0x100b1e074]  io.zig:1784
+                  + ! 2 io.readDelimited  (in opensas) + 4588,4624  [0x100b1e2a8,0x100b1e2cc]  io.zig:1785
+                  + ! 1 io.readDelimited  (in opensas) + 1964  [0x100b1d868]  io.zig:1703
+                  + ! : 1 heap.ArenaAllocator.alloc  (in opensas) + 48  [0x100ce4d2c]  ArenaAllocator.zig:0
+                  + ! 1 io.readDelimited  (in opensas) + 2208  [0x100b1d95c]  io.zig:1718
+                  + ! 1 io.readDelimited  (in opensas) + 2192  [0x100b1d94c]  io.zig:1726
+                  + ! 1 io.readDelimited  (in opensas) + 4112  [0x100b1e0cc]  io.zig:1781
+                  + ! 1 mem.trim__anon_22840  (in opensas) + 244  [0x100a85750]  mem.zig:1207
+                  + 1 proc.runImport  (in opensas) + 4184  [0x100aa3dec]  proc.zig:10363
+                  +   1 Io.Dir.readFileAlloc  (in opensas) + 288  [0x100ce3950]  Dir.zig:1338
+                  +     1 Io.Reader.stream  (in opensas) + 284  [0x100a332b4]  Reader.zig:176
+                  +       1 Io.File.Reader.stream  (in opensas) + 92  [0x100a34720]  Reader.zig:202
+                  +         1 Io.Writer.Allocating.sendFile  (in opensas) + 524  [0x100ceb17c]  Writer.zig:2734
+                  +           1 Io.Reader.readSliceShort  (in opensas) + 244  [0x100a424b8]  Reader.zig:688
+                  +             1 Io.Reader.readVec  (in opensas) + 208  [0x100a42610]  Reader.zig:429
+                  +               1 Io.File.Reader.readVec  (in opensas) + 152  [0x100a33ab4]  Reader.zig:235
+                  +                 1 Io.File.Reader.readVecPositional  (in opensas) + 184  [0x100a34574]  Reader.zig:247
+                  +                   1 Io.Threaded.fileReadPositional  (in opensas) + 216  [0x100a5b120]  Threaded.zig:9885
+                  +                     1 preadv  (in libsystem_kernel.dylib) + 8  [0x18d08eb78]
+                  256 main.runProc  (in opensas) + 10800  [0x100a9cfc8]  main.zig:2667
+                    254 proc.runExport  (in opensas) + 1532  [0x100b20ba0]  proc.zig:10198
+                    ! 218 io.writeCsvImpl  (in opensas) + 1004  [0x100a6b458]  io.zig:1406
+                    ! : 188 format.bestNumW  (in opensas) + 284  [0x100a6ba68]  format.zig:3559
+                    ! : | 147 fmt.allocPrint__anon_22925  (in opensas) + 160  [0x100a853f4]  fmt.zig:633
+                    ! : | + 115 Io.Writer.printValue__anon_23589  (in opensas) + 1380,1444,...  [0x100a70f58,0x100a70f98,...]  Writer.zig:1079
+                    ! : | + 19 Io.Writer.printValue__anon_23589  (in opensas) + 3748  [0x100a71898]  Writer.zig:1079
+                    ! : | + ! 7 Io.Writer.writeAll  (in opensas) + 224  [0x100a66e54]  Writer.zig:551
+                    ! : | + ! : 4 Io.Writer.Allocating.drain  (in opensas) + 180  [0x100cead48]  Writer.zig:2705
+                    ! : | + ! : | 2 Io.Writer.Allocating.ensureTotalCapacityPrecise  (in opensas) + 24  [0x100a5763c]  Writer.zig:2628
+                    ! : | + ! : | 1 Io.Writer.Allocating.ensureTotalCapacityPrecise  (in opensas) + 96  [0x100a57684]  Writer.zig:2633
+                    ! : | + ! : | + 1 heap.ArenaAllocator.remap  (in opensas) + 20  [0x100ce4be0]  ArenaAllocator.zig:605
+                    ! : | + ! : | +   1 heap.ArenaAllocator.resize  (in opensas) + 12  [0x100ce4c00]  ArenaAllocator.zig:552
+                    ! : | + ! : | 1 Io.Writer.Allocating.ensureTotalCapacityPrecise  (in opensas) + 68  [0x100a57668]  Writer.zig:2633
+                    ! : | + ! : 1 Io.Writer.Allocating.drain  (in opensas) + 144  [0x100cead24]  Writer.zig:2705
+                    ! : | + ! : 1 Io.Writer.Allocating.drain  (in opensas) + 248  [0x100cead8c]  Writer.zig:2706
+                    ! : | + ! : | 1 _platform_memmove  (in libsystem_platform.dylib) + 448  [0x18d0cd580]
+                    ! : | + ! : 1 Io.Writer.Allocating.drain  (in opensas) + 436  [0x100ceae48]  Writer.zig:2717
+                    ! : | + ! 4 Io.Writer.writeAll  (in opensas) + 16,36  [0x100a66d84,0x100a66d98]  Writer.zig:549
+                    ! : | + ! 2 Io.Writer.alignBuffer  (in opensas) + 0,12  [0x100a32a84,0x100a32a90]  Writer.zig:1014
+                    ! : | + ! 2 Io.Writer.alignBuffer  (in opensas) + 24  [0x100a32a9c]  Writer.zig:1015
+                    ! : | + ! 2 Io.Writer.writeAll  (in opensas) + 144  [0x100a66e04]  Writer.zig:551
+                    ! : | + ! : 2 _platform_memmove  (in libsystem_platform.dylib) + 444,460  [0x18d0cd57c,0x18d0cd58c]
+                    ! : | + ! 2 Io.Writer.writeAll  (in opensas) + 112,228  [0x100a66de4,0x100a66e58]  Writer.zig:551
+                    ! : | + 7 Io.Writer.printValue__anon_23589  (in opensas) + 3472  [0x100a71784]  Writer.zig:1079
+                    ! : | + ! 6 _platform_memset  (in libsystem_platform.dylib) + 188,196,...  [0x18d0cd1ac,0x18d0cd1b4,...]
+                    ! : | + ! 1 DYLD-STUB$$memset  (in opensas) + 4  [0x100cec1e0]
+                    ! : | + 4 Io.Writer.printValue__anon_23589  (in opensas) + 3424  [0x100a71754]  Writer.zig:1079
+                    ! : | + ! 2 fmt.float.writeDecimal__anon_23761  (in opensas) + 24,32  [0x100a71e38,0x100a71e40]  float.zig:104
+                    ! : | + ! 1 fmt.float.writeDecimal__anon_23761  (in opensas) + 132  [0x100a71ea4]  float.zig:112
+                    ! : | + ! 1 fmt.float.writeDecimal__anon_23761  (in opensas) + 204  [0x100a71eec]  float.zig:118
+                    ! : | + 1 Io.Writer.printValue__anon_23589  (in opensas) + 40  [0x100a70a1c]  Writer.zig:1071
+                    ! : | + 1 Io.Writer.writeAll  (in opensas) + 272  [0x100a66e84]  Writer.zig:551
+                    ! : | 14 fmt.allocPrint__anon_22925  (in opensas) + 180  [0x100a85408]  fmt.zig:636
+                    ! : | + 10 Io.Writer.Allocating.toOwnedSlice  (in opensas) + 104  [0x100a57514]  Writer.zig:2657
+                    ! : | + ! 10 heap.ArenaAllocator.remap  (in opensas) + 20  [0x100ce4be0]  ArenaAllocator.zig:605
+                    ! : | + !   3 heap.ArenaAllocator.resize  (in opensas) + 4  [0x100ce4bf8]  ArenaAllocator.zig:551
+                    ! : | + !   2 heap.ArenaAllocator.resize  (in opensas) + 136  [0x100ce4c7c]  ArenaAllocator.zig:572
+                    ! : | + !   1 heap.ArenaAllocator.resize  (in opensas) + 224  [0x100ce4cd4]  ArenaAllocator.zig:0
+                    ! : | + !   1 heap.ArenaAllocator.resize  (in opensas) + 12  [0x100ce4c00]  ArenaAllocator.zig:552
+                    ! : | + !   1 heap.ArenaAllocator.resize  (in opensas) + 24  [0x100ce4c0c]  ArenaAllocator.zig:557
+                    ! : | + !   1 heap.ArenaAllocator.resize  (in opensas) + 32  [0x100ce4c14]  ArenaAllocator.zig:559
+                    ! : | + !   1 heap.ArenaAllocator.resize  (in opensas) + 124  [0x100ce4c70]  ArenaAllocator.zig:571
+                    ! : | + 2 Io.Writer.Allocating.toOwnedSlice  (in opensas) + 76  [0x100a574f8]  Writer.zig:2657
+                    ! : | + 1 Io.Writer.Allocating.toOwnedSlice  (in opensas) + 56  [0x100a574e4]  Writer.zig:2649
+                    ! : | + 1 heap.ArenaAllocator.remap  (in opensas) + 32  [0x100ce4bec]  ArenaAllocator.zig:605
+                    ! : | 12 Io.Writer.Allocating.toOwnedSlice  (in opensas) + 324,316,...  [0x100a575f0,0x100a575e8,...]  Writer.zig:0
+                    ! : | 8 fmt.allocPrint__anon_22925  (in opensas) + 84  [0x100a853a8]  fmt.zig:631
+                    ! : | + 5 heap.ArenaAllocator.alloc  (in opensas) + 200,128,...  [0x100ce4dc4,0x100ce4d7c,...]  ArenaAllocator.zig:0
+                    ! : | + 2 heap.ArenaAllocator.alloc  (in opensas) + 164  [0x100ce4da0]  ArenaAllocator.zig:359
+                    ! : | + 1 heap.ArenaAllocator.alloc  (in opensas) + 224  [0x100ce4ddc]  ArenaAllocator.zig:361
+                    ! : | 3 fmt.allocPrint__anon_22925  (in opensas) + 240  [0x100a85444]  fmt.zig:0
+                    ! : | 2 Io.Writer.printValue__anon_23589  (in opensas) + 3796  [0x100a718c8]  Writer.zig:1079
+                    ! : | 2 fmt.allocPrint__anon_22925  (in opensas) + 64,132  [0x100a85394,0x100a853d8]  fmt.zig:631
+                    ! : 26 format.bestNumW  (in opensas) + 256  [0x100a6ba4c]  format.zig:3558
+                    ! : | 16 format.pow10f  (in opensas) + 60,48  [0x100a85508,0x100a854fc]  format.zig:3641
+                    ! : | 7 format.pow10f  (in opensas) + 76,88  [0x100a85518,0x100a85524]  format.zig:0
+                    ! : | 3 format.pow10f  (in opensas) + 32  [0x100a854ec]  format.zig:3630
+                    ! : 2 format.bestNumW  (in opensas) + 104  [0x100a6b9b4]  format.zig:3551
+                    ! : 1 format.bestNumW  (in opensas) + 24  [0x100a6b964]  format.zig:3544
+                    ! : 1 format.bestNumW  (in opensas) + 228  [0x100a6ba30]  format.zig:3558
+                    ! 9 io.writeCsvImpl  (in opensas) + 1052  [0x100a6b488]  io.zig:1406
+                    ! : 6 array_list.Aligned(u8,null).ensureTotalCapacity  (in opensas) + 256  [0x100a66ce4]  array_list.zig:1211
+                    ! : | 6 _platform_memset  (in libsystem_platform.dylib) + 72  [0x18d0cd138]
+                    ! : 2 array_list.Aligned(u8,null).ensureTotalCapacity  (in opensas) + 320  [0x100a66d24]  array_list.zig:1211
+                    ! : | 2 _platform_memset  (in libsystem_platform.dylib) + 72  [0x18d0cd138]
+                    ! : 1 array_list.Aligned(u8,null).ensureTotalCapacity  (in opensas) + 300  [0x100a66d10]  array_list.zig:1211
+                    ! :   1 _platform_memmove  (in libsystem_platform.dylib) + 88  [0x18d0cd418]
+                    ! 8 io.writeCsvImpl  (in opensas) + 448  [0x100a6b22c]  io.zig:1374
+                    ! 5 io.writeCsvImpl  (in opensas) + 1132  [0x100a6b4d8]  io.zig:1406
+                    ! : 4 _platform_memmove  (in libsystem_platform.dylib) + 12,428,...  [0x18d0cd3cc,0x18d0cd56c,...]
+                    ! : 1 DYLD-STUB$$memcpy  (in opensas) + 4  [0x100cec1c8]
+                    ! 4 io.writeCsvImpl  (in opensas) + 1032,1060,...  [0x100a6b474,0x100a6b490,...]  io.zig:1406
+                    ! 3 io.writeCsvImpl  (in opensas) + 468,480,...  [0x100a6b240,0x100a6b24c,...]  io.zig:1375
+                    ! 2 array_list.Aligned(u8,null).ensureTotalCapacity  (in opensas) + 116  [0x100a66c58]  array_list.zig:0
+                    ! 2 format.bestNumW  (in opensas) + 1524,1544  [0x100a6bf40,0x100a6bf54]  Allocator.zig:0
+                    ! 2 io.writeCsvImpl  (in opensas) + 1568  [0x100a6b68c]  io.zig:1423
+                    ! : 1 array_list.Aligned(u8,null).ensureTotalCapacity  (in opensas) + 28  [0x100a66c00]  array_list.zig:1210
+                    ! : 1 array_list.Aligned(u8,null).ensureTotalCapacity  (in opensas) + 256  [0x100a66ce4]  array_list.zig:1211
+                    ! :   1 _platform_memset  (in libsystem_platform.dylib) + 72  [0x18d0cd138]
+                    ! 1 io.writeCsvImpl  (in opensas) + 1544  [0x100a6b674]  io.zig:1423
+                    2 proc.runExport  (in opensas) + 1668  [0x100b20c28]  proc.zig:10204
+                      2 Io.Dir.writeFile  (in opensas) + 180  [0x100a66f60]  Dir.zig:661
+                        2 Io.Threaded.operate  (in opensas) + 364  [0x100a61b10]  Threaded.zig:2553
+                          2 Io.Threaded.fileWriteStreaming  (in opensas) + 560  [0x100a5c0c8]  Threaded.zig:10732
+                            2 writev  (in libsystem_kernel.dylib) + 8  [0x18d083b8c]
+
+Total number in stack (recursive counted multiple, when >=5):
+        12       _platform_memset  (in libsystem_platform.dylib) + 0  [0x18d0cd0f0]
+        9       _platform_memmove  (in libsystem_platform.dylib) + 0  [0x18d0cd3c0]
+        7       heap.ArenaAllocator.alloc  (in opensas) + 0  [0x100ce4cfc]  ArenaAllocator.zig:0
+
+Sort by top of stack, same collapsed (when >= 5):
+        _platform_memset  (in libsystem_platform.dylib)        135
+        io.readDelimited  (in opensas)        119
+        Io.Writer.printValue__anon_23589  (in opensas)        118
+        fmt.parse_float.parseFloat__anon_30309  (in opensas)        76
+        mem.eqlBytes  (in opensas)        68
+        fmt.parse_float.parse.tryParseDigits__anon_37380  (in opensas)        49
+        heap.ArenaAllocator.alloc  (in opensas)        45
+        _platform_memmove  (in libsystem_platform.dylib)        32
+        format.pow10f  (in opensas)        26
+        io.parseCsvLine  (in opensas)        25
+        array_list.Aligned(u8,null).ensureTotalCapacity  (in opensas)        17
+        io.writeCsvImpl  (in opensas)        16
+        Io.Writer.Allocating.toOwnedSlice  (in opensas)        15
+        mem.findScalarPos__anon_9702  (in opensas)        13
+        heap.ArenaAllocator.resize  (in opensas)        11
+        DYLD-STUB$$memcpy  (in opensas)        8
+        Io.Writer.writeAll  (in opensas)        7
+        mem.trim__anon_22840  (in opensas)        7
+        format.bestNumW  (in opensas)        6
+        array_list.Aligned([]const []const u8,null).ensureTotalCapacity  (in opensas)        5
+        fmt.allocPrint__anon_22925  (in opensas)        5
+
+Binary Images:
+       0x100a20000 -        0x100d385ef +opensas (0) <6C3B2D5D-80A1-3E86-B1EF-D98F60B04BA6> /Users/*/Documents/*/opensas
+       0x18cc60000 -        0x18ccb2b4b  libobjc.A.dylib (951.7) <2E858E25-1FF6-3DA6-84F6-911630620512> /usr/lib/libobjc.A.dylib
+       0x18ccb3000 -        0x18cce7b34  libdyld.dylib (1376.6) <2C3C5F75-3686-39A1-9202-BD4D2133379D> /usr/lib/system/libdyld.dylib
+       0x18cce8000 -        0x18cd8dec7  dyld (1.0.0 - 1376.6) <9F682DCF-340C-3BFA-BCDD-DD702F30313E> /usr/lib/dyld
+       0x18cd8e000 -        0x18cd91228  libsystem_blocks.dylib (96) <2EA73169-CF76-3DD1-9869-F23C8B338022> /usr/lib/system/libsystem_blocks.dylib
+       0x18cd92000 -        0x18cde651f  libxpc.dylib (3102.100.102) <618039C8-9965-3782-A7D2-90FD4C3DD66F> /usr/lib/system/libxpc.dylib
+       0x18cde7000 -        0x18ce079bf  libsystem_trace.dylib (1861.100.19) <08629650-54FC-3AA6-910E-EACA563804D0> /usr/lib/system/libsystem_trace.dylib
+       0x18ce08000 -        0x18ceb5daf  libcorecrypto.dylib (1922.101.2) <D1EC203E-9B2E-391B-8DE3-7C58F0589437> /usr/lib/system/libcorecrypto.dylib
+       0x18ceb6000 -        0x18cf061d7  libsystem_malloc.dylib (812.100.31) <2AD21BE3-FFDB-31D5-A3D7-2F7F672D6E92> /usr/lib/system/libsystem_malloc.dylib
+       0x18cf07000 -        0x18cf4e23f  libdispatch.dylib (1542.100.32) <E17AA23F-DB2A-3302-B14C-F6B08C540FCF> /usr/lib/system/libdispatch.dylib
+       0x18cf4f000 -        0x18cf51ffb  libsystem_featureflags.dylib (103) <0DE01F76-4B36-35A2-98F9-43DD147EDD95> /usr/lib/system/libsystem_featureflags.dylib
+       0x18cf52000 -        0x18cfd2ef7  libsystem_c.dylib (1752.100.10) <66EBD321-6899-3863-BA24-5CFC3076A0CB> /usr/lib/system/libsystem_c.dylib
+       0x18cfd3000 -        0x18d063ae7  libc++.1.dylib (2100.43) <1E9541EC-C564-38CB-BED6-46F708E8D863> /usr/lib/libc++.1.dylib
+       0x18d064000 -        0x18d07e75f  libc++abi.dylib (2100.43) <E8D325ED-3B97-325E-B494-B1B0FF93D133> /usr/lib/libc++abi.dylib
+       0x18d07f000 -        0x18d0bc28f  libsystem_kernel.dylib (12377.101.15) <51565B39-F595-3E96-A217-FEF29815057A> /usr/lib/system/libsystem_kernel.dylib
+       0x18d0bd000 -        0x18d0c9b3b  libsystem_pthread.dylib (539.100.4) <E7A73008-0C09-31E3-9DD9-0C61652F0E85> /usr/lib/system/libsystem_pthread.dylib
+       0x18d0ca000 -        0x18d0d28f3  libsystem_platform.dylib (375.100.10) <D93EC420-F465-3A3A-916D-A04AF9B023EB> /usr/lib/system/libsystem_platform.dylib
+       0x18d0d3000 -        0x18d1026eb  libsystem_info.dylib (600) <201FD67C-3DF6-3788-B132-A69CAA2AA3D7> /usr/lib/system/libsystem_info.dylib
+       0x191098000 -        0x1910a1e5f  libsystem_darwin.dylib (1752.100.10) <D5BA0CAB-F283-3620-AAA9-1EEB718E1BA8> /usr/lib/system/libsystem_darwin.dylib
+       0x191503000 -        0x191514f5b  libsystem_notify.dylib (348.100.7) <9F46F30B-B7C0-3DD7-AC38-57B78C7971FF> /usr/lib/system/libsystem_notify.dylib
+       0x1937cd000 -        0x1937e7f5b  libsystem_networkextension.dylib (2226.101.1) <85169C7B-48DD-3542-AD38-F1B88EA2A95A> /usr/lib/system/libsystem_networkextension.dylib
+       0x19386a000 -        0x193881fdf  libsystem_asl.dylib (406) <6427D987-7938-3278-8C14-10FB9C06BBD5> /usr/lib/system/libsystem_asl.dylib
+       0x195425000 -        0x19542d387  libsystem_symptoms.dylib (2169.100.30) <28B6E34E-9C7D-3437-A3F1-A3C979DE579A> /usr/lib/system/libsystem_symptoms.dylib
+       0x1996c0000 -        0x1996f825f  libsystem_containermanager.dylib (725.100.37) <14750F95-BB3A-3654-8610-A05A454643A8> /usr/lib/system/libsystem_containermanager.dylib
+       0x19aad0000 -        0x19aad45d7  libsystem_configuration.dylib (1405.100.8) <634F597D-F8BD-3C00-B967-86047FC15D14> /usr/lib/system/libsystem_configuration.dylib
+       0x19aad5000 -        0x19aadb8cf  libsystem_sandbox.dylib (2680.100.174) <AF76231D-EADC-3399-9414-6AD90FB4EA89> /usr/lib/system/libsystem_sandbox.dylib
+       0x19c11b000 -        0x19c11e1fb  libquarantine.dylib (196.100.8) <268FEB6E-A237-3050-BFFF-AE3A66B7EAD4> /usr/lib/system/libquarantine.dylib
+       0x19c8ba000 -        0x19c8c0d03  libsystem_coreservices.dylib (191.4.5) <7129349D-04F9-3C3C-BF37-3082C1468654> /usr/lib/system/libsystem_coreservices.dylib
+       0x19ce3f000 -        0x19ce7ca77  libsystem_m.dylib (3312.100.1) <83B173CD-7F32-3901-8E67-C0B2676BE015> /usr/lib/system/libsystem_m.dylib
+       0x19ce7e000 -        0x19ce81527  libmacho.dylib (1376.6) <9729ECEA-0A08-32E3-8BDB-B42FC15FF258> /usr/lib/system/libmacho.dylib
+       0x19ce9b000 -        0x19cea83a7  libcommonCrypto.dylib (600035) <710EC5FA-F77C-3646-A9E3-C037C42E1539> /usr/lib/system/libcommonCrypto.dylib
+       0x19cea9000 -        0x19ceb2ca3  libunwind.dylib (2100.2) <FB0518B9-DF0F-3A03-A74B-AF1B21C26F8B> /usr/lib/system/libunwind.dylib
+       0x19cebb000 -        0x19cec57ff  libcopyfile.dylib (240) <0B7FF027-5579-3CBF-A12B-68A4FD36641C> /usr/lib/system/libcopyfile.dylib
+       0x19cec6000 -        0x19cec9987  libcompiler_rt.dylib (103.3) <65E29E6E-7042-3F73-A1D2-F2C4EBCD7524> /usr/lib/system/libcompiler_rt.dylib
+       0x19ceca000 -        0x19cece78b  libsystem_collections.dylib (1752.100.10) <B81193DE-3BEC-3340-86D0-DB7F3683D135> /usr/lib/system/libsystem_collections.dylib
+       0x19cecf000 -        0x19ced24cf  libsystem_secinit.dylib (168.100.7) <A6B77B36-195D-33F8-8058-FE0B5BFA9D37> /usr/lib/system/libsystem_secinit.dylib
+       0x19ced3000 -        0x19ced5bf7  libremovefile.dylib (85.100.6) <BD89B1A3-0D06-3881-B5E1-EFC6CFBDFCC1> /usr/lib/system/libremovefile.dylib
+       0x19ced6000 -        0x19ced6f27  libkeymgr.dylib (31) <DE8F8219-0072-35C2-8932-C065491ED15D> /usr/lib/system/libkeymgr.dylib
+       0x19ced7000 -        0x19cedfe3f  libsystem_dnssd.dylib (2881.100.56.0.1) <DEC8BDD2-366C-3BF9-A123-35744DB06354> /usr/lib/system/libsystem_dnssd.dylib
+       0x19cee0000 -        0x19cee509b  libcache.dylib (95) <4D6833A3-C910-3A76-AA8A-303F698B36BF> /usr/lib/system/libcache.dylib
+       0x19cee6000 -        0x19cee7ce3  libSystem.B.dylib (1356) <E05F5341-06B7-365E-8014-E9CD64C352FE> /usr/lib/libSystem.B.dylib
+       0x28f7c9000 -        0x28f7d0349  libRosetta.dylib (367.5) <2FC1EF06-04C4-35FC-8DC3-BEA1E9FBD63F> /usr/lib/libRosetta.dylib
+       0x2914a6000 -        0x2914a9a4b  libsystem_darwindirectory.dylib (122) <CCAA2170-32DD-34BD-A927-32DF30893969> /usr/lib/system/libsystem_darwindirectory.dylib
+       0x2914aa000 -        0x2914b35a7  libsystem_eligibility.dylib (319.101.1) <2D19994A-87BB-34B8-A343-CB8DD47FF110> /usr/lib/system/libsystem_eligibility.dylib
+       0x2914b4000 -        0x2914bb8db  libsystem_sanitizers.dylib (26) <FCB93D2F-4437-3089-A43F-A19BC23DD65B> /usr/lib/system/libsystem_sanitizers.dylib
+       0x2914bc000 -        0x2914bcbb7  libsystem_trial.dylib (474.2.18) <5BB81430-4E33-3160-94D2-1FFB2B614DB2> /usr/lib/system/libsystem_trial.dylib

@@ -1,0 +1,23 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write sources
+[2/6] Write swift-version--58304C5D6DBC2206.txt
+[4/8] Emitting module SASCoreTests
+[5/8] Compiling SASCoreTests RuntimeRunnerTests.swift
+/Users/d3x/Documents/ChatGPT/sas-mac/Tests/SASCoreTests/RuntimeRunnerTests.swift:93:88: error: extra argument 'measureText' in call
+ 91 |                                 rows: (0..<2000).map { _ in ResultRow(cells: [ResultCell("123"), ResultCell("123")]) })
+ 92 |         var measurements = 0
+ 93 |         let view = TableDocumentView(tables: [table], forPrinting: false, measureText: { _, _, _ in
+    |                                                                                        `- error: extra argument 'measureText' in call
+ 94 |             measurements += 1
+ 95 |             return 12
+
+/Users/d3x/Documents/ChatGPT/sas-mac/Tests/SASCoreTests/RuntimeRunnerTests.swift:111:80: error: extra argument 'measureText' in call
+109 |         var measuredWidths = Set<CGFloat>()
+110 |         var measuredFonts = Set<String>()
+111 |         _ = TableDocumentView(tables: [table], forPrinting: true, measureText: { text, width, font in
+    |                                                                                `- error: extra argument 'measureText' in call
+112 |             if text == "same" {
+113 |                 measuredWidths.insert(width)
+[6/8] Emitting module LocalStatEditorTests
+error: fatalError

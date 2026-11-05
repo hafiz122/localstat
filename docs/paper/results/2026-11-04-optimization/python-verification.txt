@@ -1,0 +1,40 @@
+test_anova_error_row_is_not_a_runtime_diagnostic (__main__.BenchmarkTests.test_anova_error_row_is_not_a_runtime_diagnostic) ... ok
+test_existing_experiment_is_never_overwritten (__main__.BenchmarkTests.test_existing_experiment_is_never_overwritten) ... ok
+test_plain_frequency_listing_must_match_all_expected_groups (__main__.BenchmarkTests.test_plain_frequency_listing_must_match_all_expected_groups) ... ok
+test_prepared_inputs_are_deterministic_and_join_is_bounded (__main__.BenchmarkTests.test_prepared_inputs_are_deterministic_and_join_is_bounded) ... ok
+test_runner_collects_per_child_usage_and_captures_output (__main__.BenchmarkTests.test_runner_collects_per_child_usage_and_captures_output) ... ok
+test_runner_enforces_timeout (__main__.BenchmarkTests.test_runner_enforces_timeout) ... ok
+test_summary_excludes_first_warmup_failure_and_timeout (__main__.BenchmarkTests.test_summary_excludes_first_warmup_failure_and_timeout) ... ok
+test_table_validator_rejects_shape_and_frequency_corruption (__main__.BenchmarkTests.test_table_validator_rejects_shape_and_frequency_corruption) ... ok
+test_validator_rejects_plausible_but_wrong_results_and_diagnostics (__main__.BenchmarkTests.test_validator_rejects_plausible_but_wrong_results_and_diagnostics) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.185s
+
+OK
+test_paired_differences_match_iterations_rather_than_file_order (__main__.ReportTests.test_paired_differences_match_iterations_rather_than_file_order) ... ok
+test_rejects_incomplete_repetitions_and_duplicate_iterations (__main__.ReportTests.test_rejects_incomplete_repetitions_and_duplicate_iterations) ... ok
+test_rejects_invalid_results_and_mismatched_app_output (__main__.ReportTests.test_rejects_invalid_results_and_mismatched_app_output) ... ok
+test_rounding_does_not_display_negative_zero_latency (__main__.ReportTests.test_rounding_does_not_display_negative_zero_latency) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.010s
+
+OK
+test_auditor_rejects_missing_build_or_output_change (__main__.ComparisonTests.test_auditor_rejects_missing_build_or_output_change) ... ok
+test_before_after_metrics_use_the_same_units (__main__.ComparisonTests.test_before_after_metrics_use_the_same_units) ... ok
+test_builds_are_adjacent_and_alternate_order (__main__.ComparisonTests.test_builds_are_adjacent_and_alternate_order) ... ok
+test_native_blocks_counterbalance_order_and_keep_fifteen_repetitions (__main__.ComparisonTests.test_native_blocks_counterbalance_order_and_keep_fifteen_repetitions) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.009s
+
+OK
+test_rejects_before_after_output_mismatch (__main__.ComparisonReportTests.test_rejects_before_after_output_mismatch) ... ok
+test_rejects_changed_pagination_or_missing_repetitions (__main__.ComparisonReportTests.test_rejects_changed_pagination_or_missing_repetitions) ... ok
+test_speedup_uses_median_latency_not_first_run (__main__.ComparisonReportTests.test_speedup_uses_median_latency_not_first_run) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.009s
+
+OK

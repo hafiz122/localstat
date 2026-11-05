@@ -1173,9 +1173,14 @@ pub fn seedColumns(ds: *Dataset, pdv: *const Pdv) std.mem.Allocator.Error!void {
 pub fn snapshot(ds: *Dataset, pdv: *const Pdv) std.mem.Allocator.Error!void {
     const cells = try ds.arena.alloc(Value, ds.columns.items.len);
     for (ds.columns.items, 0..) |col, i| {
-        cells[i] = pdv.get(col.name) orelse missingOf(col.type);
+        const value = pdv.get(col.name) orelse missingOf(col.type);
+        cells[i] = switch (value) {
+            .num => value,
+            .str => |s| .{ .str = try ds.arena.dupe(u8, s) },
+        };
     }
-    try ds.appendRow(cells);
+    // The cells already belong to the dataset; appendRow would copy them again.
+    try ds.rows.append(ds.arena, cells);
 }
 
 /// Resolve each column of `ds` to its PDV slot, ONCE per source
@@ -1620,6 +1625,11 @@ fn upperDup(a: std.mem.Allocator, s: []const u8) std.mem.Allocator.Error![]const
 pub fn readDelimited(a: std.mem.Allocator, text: []const u8, name: []const u8, delim: u8, getnames: bool, datarow: usize, detect_dates: bool) diag.Error!*Dataset {
     const ds = try a.create(Dataset);
     ds.* = Dataset.init(a, name);
+    var scratch_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer scratch_state.deinit();
+    const scratch = scratch_state.allocator();
+    var row_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer row_state.deinit();
 
     // Collect records (CR-trimmed) so DATAROW can index them. The split is
     // QUOTE-AWARE (BUG-importdelimread): under DSD a '\n' (or '\r\n') inside an
@@ -1643,14 +1653,14 @@ pub fn readDelimited(a: std.mem.Allocator, text: []const u8, name: []const u8, d
             in_q = true;
             field_start = false;
         } else if (c == '\n') {
-            try all.append(a, std.mem.trimEnd(u8, text[rec_start..p], "\r"));
+            try all.append(scratch, std.mem.trimEnd(u8, text[rec_start..p], "\r"));
             rec_start = p + 1;
             field_start = true;
         } else {
             field_start = c == delim;
         }
     }
-    if (rec_start < text.len) try all.append(a, std.mem.trimEnd(u8, text[rec_start..], "\r"));
+    if (rec_start < text.len) try all.append(scratch, std.mem.trimEnd(u8, text[rec_start..], "\r"));
     if (all.items.len == 0) return ds;
 
     // Column names: from row 1 when GETNAMES=YES, else VAR1.. sized to the first
@@ -1674,7 +1684,7 @@ pub fn readDelimited(a: std.mem.Allocator, text: []const u8, name: []const u8, d
             loudUnsup("CSV: {s} - the header row declares NO columns (empty first record); a 0-variable data set has no CSV encoding, so nothing is loaded", .{name});
             return ds;
         }
-        const hfields = try parseCsvLine(a, all.items[0], delim);
+        const hfields = try parseCsvLine(scratch, all.items[0], delim);
         // Header text → valid V7 names, deduped - the same mangling the XLSX
         // path uses (GH#62), so `First Name`/`Age (yrs)`/`2nd` →
         // `First_Name`/`Age__yrs_`/`_2nd` and duplicate `age,age` →
@@ -1688,101 +1698,77 @@ pub fn readDelimited(a: std.mem.Allocator, text: []const u8, name: []const u8, d
         var k = start;
         while (k < all.items.len and all.items[k].len == 0) k += 1;
         if (k < all.items.len) {
-            const ff = try parseCsvLine(a, all.items[k], delim);
+            const ff = try parseCsvLine(scratch, all.items[k], delim);
             ncol = ff.items.len;
             for (0..ncol) |c| _ = try ds.addColumn(try std.fmt.allocPrint(a, "VAR{d}", .{c + 1}), .char);
         }
     }
 
-    // Read all rows as raw string fields first, so a column's type can be
-    // inferred from the whole column before the cells are built.
-    var srows: std.ArrayList([]const []const u8) = .empty;
-    for (all.items[@min(start, all.items.len)..]) |line| {
+    const Inference = struct {
+        any: bool = false,
+        numeric: bool = true,
+        uniform_date: bool = true,
+        date_kind: ?format.ImportDateKind = null,
+        date_width: usize = 0,
+    };
+    const inferred = try scratch.alloc(Inference, ncol);
+    for (inferred) |*info| info.* = .{};
+    const records = all.items[@min(start, all.items.len)..];
+    var row_count: usize = 0;
+    // Inspect the whole column as before, but discard decoded fields after
+    // each record instead of retaining every temporary field in the run arena.
+    for (records) |line| {
         if (line.len == 0) continue;
-        const fields = try parseCsvLine(a, line, delim);
-        const rowf = try a.alloc([]const u8, ncol);
-        for (0..ncol) |i| rowf[i] = if (i < fields.items.len) fields.items[i] else "";
-        try srows.append(a, rowf);
-    }
-
-    // Infer type: a column becomes numeric when it has at least one non-missing
-    // value and every non-missing value parses as a number - so a numeric column
-    // sorts/compares numerically, not lexically (BUG-csvnumtype). A significant
-    // leading zero does NOT keep the column character: live SAS 9.4 EFI types an
-    // all-digit zero-padded column (`0001`) NUMERIC (informat BEST32.) and reads
-    // `1` (GH#29, BUG-importleadingzero - the old keep-char choice was an
-    // unrecorded deviation, overturned and recorded as D-026).
-    for (0..ncol) |ci| {
-        var any = false;
-        var all_num = true;
-        for (srows.items) |rowf| {
-            const f = rowf[ci];
+        _ = row_state.reset(.retain_capacity);
+        const fields = try parseCsvLine(row_state.allocator(), line, delim);
+        row_count += 1;
+        for (inferred, 0..) |*info, ci| {
+            const f = if (ci < fields.items.len) fields.items[ci] else "";
             if (isCsvMissing(f)) continue;
-            any = true;
-            if (parseF64(f) == null) {
-                all_num = false;
-                break;
+            info.any = true;
+            if (info.numeric and parseF64(f) == null) info.numeric = false;
+            if (detect_dates and info.uniform_date) {
+                const trimmed = std.mem.trim(u8, f, " ");
+                info.date_width = @max(info.date_width, trimmed.len);
+                if (format.importDateGuess(trimmed)) |guess| {
+                    if (info.date_kind) |kind| {
+                        if (kind != guess.kind) info.uniform_date = false;
+                    } else info.date_kind = guess.kind;
+                } else info.uniform_date = false;
             }
         }
-        if (any and all_num) ds.columns.items[ci].type = .num;
     }
-
-    // EFI date/time guessing (GAP-importtypes), PROC IMPORT only: a
-    // still-character column whose EVERY non-missing value fits the SAME
-    // recognised date/time pattern becomes NUMERIC with that format attached -
-    // Procedures Guide p. 1330 (see format.importDateGuess for the recognised
-    // set + citations). A MIXED column stays character: one informat must fit
-    // every value, else "the type remains character". ponytail: field quoting
-    // is lost by parseCsvLine, so a QUOTED date is detected too - SAS's EFI
-    // default keeps quoted values character (p. 1325 EFI_QUOTED_NUMERICS);
-    // the numeric inference above has always had that ceiling. Upgrade path:
-    // thread per-field quoted flags through parseCsvLine.
-    const col_date = try a.alloc(?format.ImportDateKind, ncol);
-    for (col_date) |*cd| cd.* = null;
-    if (detect_dates) {
-        for (0..ncol) |ci| {
-            if (ds.columns.items[ci].type == .num) continue; // numeric already won
-            var kind: ?format.ImportDateKind = null;
-            var any = false;
-            var maxw: usize = 0;
-            var uniform = true;
-            for (srows.items) |rowf| {
-                const f = std.mem.trim(u8, rowf[ci], " ");
-                if (isCsvMissing(f)) continue;
-                any = true;
-                maxw = @max(maxw, f.len);
-                const g = format.importDateGuess(f) orelse {
-                    uniform = false;
-                    break;
-                };
-                if (kind == null) {
-                    kind = g.kind;
-                } else if (kind.? != g.kind) {
-                    uniform = false;
-                    break;
-                }
-            }
-            if (any and uniform) if (kind) |k| {
-                const spec = try std.fmt.allocPrint(a, "{s}{d}.", .{ format.importDateFormatName(k), maxw });
+    const col_date = try scratch.alloc(?format.ImportDateKind, ncol);
+    @memset(col_date, null);
+    for (inferred, 0..) |info, ci| {
+        // Numeric inference still wins, including all-digit leading zeros (D-026).
+        if (info.any and info.numeric) {
+            ds.columns.items[ci].type = .num;
+        } else if (detect_dates and info.any and info.uniform_date) {
+            if (info.date_kind) |kind| {
+                const spec = try std.fmt.allocPrint(a, "{s}{d}.", .{ format.importDateFormatName(kind), info.date_width });
                 ds.columns.items[ci].type = .num;
                 ds.columns.items[ci].format = spec;
                 ds.columns.items[ci].informat = spec;
-                col_date[ci] = k;
-            };
+                col_date[ci] = kind;
+            }
         }
     }
-
-    for (srows.items) |rowf| {
+    try ds.rows.ensureTotalCapacityPrecise(a, row_count);
+    for (records) |line| {
+        if (line.len == 0) continue;
+        _ = row_state.reset(.retain_capacity);
+        const fields = try parseCsvLine(row_state.allocator(), line, delim);
         const cells = try a.alloc(Value, ncol);
         for (0..ncol) |ci| {
+            const f = if (ci < fields.items.len) fields.items[ci] else "";
             if (col_date[ci] != null) {
-                // detection passed every value → the re-guess cannot fail
-                cells[ci] = if (isCsvMissing(rowf[ci])) Value.missing else .{ .num = format.importDateGuess(rowf[ci]).?.value };
+                cells[ci] = if (isCsvMissing(f)) Value.missing else .{ .num = format.importDateGuess(f).?.value };
             } else if (ds.columns.items[ci].type == .num) {
-                cells[ci] = if (isCsvMissing(rowf[ci])) Value.missing else .{ .num = parseF64(rowf[ci]).? };
-            } else cells[ci] = .{ .str = rowf[ci] };
+                cells[ci] = if (isCsvMissing(f)) Value.missing else .{ .num = parseF64(f).? };
+            } else cells[ci] = .{ .str = try a.dupe(u8, f) };
         }
-        try ds.rows.append(a, cells);
+        ds.rows.appendAssumeCapacity(cells);
     }
     return ds;
 }
@@ -1924,6 +1910,62 @@ fn parseCsvLine(a: std.mem.Allocator, line: []const u8, delim: u8) !std.ArrayLis
         i += 1; // past the delimiter
     }
     return fields;
+}
+
+test "numeric CSV import retains typed rows within a one MiB output budget" {
+    const backing = try std.testing.allocator.alloc(u8, 1024 * 1024);
+    defer std.testing.allocator.free(backing);
+    var fixed = std.heap.FixedBufferAllocator.init(backing);
+    var source: std.ArrayList(u8) = .empty;
+    defer source.deinit(std.testing.allocator);
+    try source.appendSlice(std.testing.allocator, "id,a,b,c,d\n");
+    for (0..4096) |_| try source.appendSlice(std.testing.allocator, "1234,1,2,3,4\n");
+    const ds = try readDelimited(fixed.allocator(), source.items, "budget", ',', true, 2, true);
+    try std.testing.expectEqual(@as(usize, 4096), ds.rowCount());
+    try std.testing.expectEqual(@as(f64, 1234), ds.row(4095)[0].num);
+    try std.testing.expectEqual(@as(f64, 4), ds.row(4095)[4].num);
+}
+
+test "CSV character data and names survive overwriting input bytes" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const source = try a.dupe(u8, "name,id\n\"quoted \"\"text\"\"\",1\nplain,2\n");
+    const ds = try readDelimited(a, source, "owned", ',', true, 2, true);
+    @memset(source, '?');
+    try std.testing.expectEqualStrings("name", ds.columns.items[0].name);
+    try std.testing.expectEqualStrings("quoted \"text\"", ds.row(0)[0].str);
+    try std.testing.expectEqualStrings("plain", ds.row(1)[0].str);
+    try std.testing.expectEqual(@as(f64, 2), ds.row(1)[1].num);
+}
+
+test "PDV snapshots retain only one numeric row allocation" {
+    const backing = try std.testing.allocator.alloc(u8, 1024 * 1024);
+    defer std.testing.allocator.free(backing);
+    var fixed = std.heap.FixedBufferAllocator.init(backing);
+    const a = fixed.allocator();
+    var pdv = Pdv.init(a);
+    for ([_][]const u8{ "a", "b", "c", "d", "e" }) |name|
+        try pdv.set(name, .{ .num = 7 });
+    var ds = Dataset.init(a, "snapshots");
+    try seedColumns(&ds, &pdv);
+    for (0..4096) |_| try snapshot(&ds, &pdv);
+    try std.testing.expectEqual(@as(usize, 4096), ds.rowCount());
+    try std.testing.expectEqual(@as(f64, 7), ds.row(4095)[4].num);
+}
+
+test "PDV snapshot owns character bytes after source mutation" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var pdv = Pdv.init(a);
+    var text = [_]u8{ 'o', 'l', 'd' };
+    try pdv.set("label", .{ .str = &text });
+    var ds = Dataset.init(a, "snapshot");
+    try seedColumns(&ds, &pdv);
+    try snapshot(&ds, &pdv);
+    @memset(&text, 'x');
+    try std.testing.expectEqualStrings("old", ds.row(0)[0].str);
 }
 
 fn fmtCsvNum(a: std.mem.Allocator, x: f64) ![]const u8 {

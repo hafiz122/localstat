@@ -1,0 +1,87 @@
+test
++- run test 899 pass, 2 fail (901 total)
+error: 'io.test.numeric CSV import retains typed rows within a one MiB output budget' failed:
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/mem/Allocator.zig:300:82: 0x1027796d3 in allocBytesWithAlignment__anon_8281 (test)
+           const byte_ptr = self.rawAlloc(byte_count, alignment, return_address) orelse return error.OutOfMemory;
+                                                                                        ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/mem/Allocator.zig:286:5: 0x10277956f in allocWithSizeAndAlignment__anon_8260 (test)
+           return self.allocBytesWithAlignment(alignment, byte_count, return_address);
+           ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/mem/Allocator.zig:274:55: 0x102875b87 in allocAdvancedWithRetAddr (test)
+           const ptr: [*]align(a.toByteUnits()) T = @ptrCast(try self.allocWithSizeAndAlignment(@sizeOf(T), a, n, return_address));
+                                                             ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/mem/Allocator.zig:262:5: 0x102875bfb in alignedAlloc__anon_32367 (test)
+           return self.allocAdvancedWithRetAddr(T, alignment, n, @returnAddress());
+           ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/array_list.zig:1235:36: 0x10287581b in ensureTotalCapacityPrecise (test)
+                       const new_memory = try gpa.alignedAlloc(T, alignment, new_capacity);
+                                          ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/array_list.zig:1211:13: 0x1028755bb in ensureTotalCapacity (test)
+                   return self.ensureTotalCapacityPrecise(gpa, growCapacity(new_capacity));
+                   ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/array_list.zig:1250:13: 0x1028753d3 in ensureUnusedCapacity (test)
+                   return self.ensureTotalCapacity(gpa, try addOrOom(self.items.len, additional_count));
+                   ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/array_list.zig:984:13: 0x102885153 in appendSlice (test)
+                   try self.ensureUnusedCapacity(gpa, items.len);
+                   ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/vendor/opensas/src/io.zig:1920:13: 0x1029d1b5b in parseCsvLine (test)
+                   try cell.appendSlice(a, line[start..i]);
+                   ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/vendor/opensas/src/io.zig:1702:24: 0x1029ddd1b in readDelimited (test)
+               const fields = try parseCsvLine(a, line, delim);
+                              ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/vendor/opensas/src/io.zig:1937:16: 0x10319e1e7 in test.numeric CSV import retains typed rows within a one MiB output budget (test)
+           const ds = try readDelimited(fixed.allocator(), source.items, "budget", ',', true, 2, true);
+                      ^
+error: 'io.test.PDV snapshots retain only one numeric row allocation' failed:
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/mem/Allocator.zig:300:82: 0x1027863b7 in allocBytesWithAlignment__anon_9208 (test)
+           const byte_ptr = self.rawAlloc(byte_count, alignment, return_address) orelse return error.OutOfMemory;
+                                                                                        ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/mem/Allocator.zig:286:5: 0x1027ce0cf in allocWithSizeAndAlignment__anon_13670 (test)
+           return self.allocBytesWithAlignment(alignment, byte_count, return_address);
+           ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/mem/Allocator.zig:274:55: 0x10297d17b in allocAdvancedWithRetAddr (test)
+           const ptr: [*]align(a.toByteUnits()) T = @ptrCast(try self.allocWithSizeAndAlignment(@sizeOf(T), a, n, return_address));
+                                                             ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/mem/Allocator.zig:262:5: 0x10297d1ef in alignedAlloc__anon_59927 (test)
+           return self.allocAdvancedWithRetAddr(T, alignment, n, @returnAddress());
+           ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/array_list.zig:1235:36: 0x10297ce0f in ensureTotalCapacityPrecise (test)
+                       const new_memory = try gpa.alignedAlloc(T, alignment, new_capacity);
+                                          ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/array_list.zig:1211:13: 0x10297cb1f in ensureTotalCapacity (test)
+                   return self.ensureTotalCapacityPrecise(gpa, growCapacity(new_capacity));
+                   ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/array_list.zig:1265:13: 0x102b0b66b in addOne (test)
+                   try self.ensureTotalCapacity(gpa, newlen);
+                   ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib/std/array_list.zig:904:34: 0x102b0b493 in append (test)
+                   const new_item_ptr = try self.addOne(gpa);
+                                        ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/vendor/opensas/src/dataset.zig:97:9: 0x1028cc82b in appendRow (test)
+               try self.rows.append(self.arena, cells);
+               ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/vendor/opensas/src/io.zig:1178:5: 0x102f1a537 in snapshot (test)
+           try ds.appendRow(cells);
+           ^
+       /Users/d3x/Documents/ChatGPT/sas-mac/vendor/opensas/src/io.zig:1966:23: 0x10319d4ab in test.PDV snapshots retain only one numeric row allocation (test)
+           for (0..4096) |_| try snapshot(&ds, &pdv);
+                             ^
+failed command: ./.zig-cache/o/a8f897a563b80cf4ac4c3208033c28b0/test --cache-dir=./.zig-cache --seed=0xfef0babd --listen=-
+
+Build Summary: 9/11 steps succeeded (1 failed); 971/973 tests passed (2 failed)
+test transitive failure
++- run test 899 pass, 2 fail (901 total)
+|  +- compile test Debug native success 8s MaxRSS:1G
++- run test 61 pass (61 total) 638ms MaxRSS:11M
+|  +- compile test Debug native success 6s MaxRSS:847M
+|     +- options success
++- run test 8 pass (8 total) 7ms MaxRSS:2M
+|  +- compile test Debug native cached 76ms MaxRSS:31M
++- run test 3 pass (3 total) 5ms MaxRSS:2M
+|  +- compile test Debug native cached 75ms MaxRSS:31M
++- compile exe opensas ReleaseSmall wasm32-wasi success 12s MaxRSS:631M
+
+error: the following build command failed with exit code 1:
+.zig-cache/o/60d4406235f9a84e002c52f0578a9ddb/build /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/zig /Users/d3x/Documents/ChatGPT/sas-mac/.toolchain/zig-aarch64-macos-0.16.0/lib /Users/d3x/Documents/ChatGPT/sas-mac/vendor/opensas .zig-cache /Users/d3x/.cache/zig --seed 0xfef0babd -Zcfd5e357359878b2 test --summary all

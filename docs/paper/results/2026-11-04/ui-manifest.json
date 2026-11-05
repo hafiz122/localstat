@@ -1,0 +1,95 @@
+{
+  "base_revision": "7f6dec6537cc9e9ca9f9c37961b8b6811c5b7aff",
+  "cases": [
+    {
+      "name": "print",
+      "rows": 1000,
+      "directory": "1000",
+      "source": "print.sas",
+      "source_sha256": "1893190abbceaca55caf5b1d1cf1f9f51056fa9264d84b584767c9091e4843f3",
+      "inputs": {
+        "input.csv": "adb76d99877b0f4ce0564ea0d48c4495e19ac5b33dc7850642363fa3a63a031e",
+        "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+      },
+      "expected": [
+        1000,
+        500500
+      ],
+      "variants": [
+        "plain",
+        "tables"
+      ]
+    },
+    {
+      "name": "data",
+      "rows": 10000,
+      "directory": "10000",
+      "source": "data.sas",
+      "source_sha256": "3aa835cc94bad4d1e5de55cfa5a5c9a39f4d3956f3b3e04c7e2971a5283752c9",
+      "inputs": {
+        "input.csv": "1eed2af7cff20784646d5083c4a8d703af4241deecee01bdd615e14a4827b659",
+        "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+      },
+      "expected": [
+        10000,
+        150035000
+      ],
+      "variants": [
+        "plain"
+      ]
+    },
+    {
+      "name": "print",
+      "rows": 10000,
+      "directory": "10000",
+      "source": "print.sas",
+      "source_sha256": "1893190abbceaca55caf5b1d1cf1f9f51056fa9264d84b584767c9091e4843f3",
+      "inputs": {
+        "input.csv": "1eed2af7cff20784646d5083c4a8d703af4241deecee01bdd615e14a4827b659",
+        "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+      },
+      "expected": [
+        10000,
+        50005000
+      ],
+      "variants": [
+        "plain",
+        "tables"
+      ]
+    },
+    {
+      "name": "freq",
+      "rows": 100000,
+      "directory": "100000",
+      "source": "freq.sas",
+      "source_sha256": "5f7782bd414c8b7cf18c2709b9c4fa8b383bfe0403870abe829c33c705fa9b4e",
+      "inputs": {
+        "input.csv": "3af9b3f6ab5dd19ba2df6e6a2f8c43f14b4e6ae309476ebf579fea993586fddf",
+        "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+      },
+      "expected": [
+        100000,
+        5000050000
+      ],
+      "variants": [
+        "plain",
+        "tables"
+      ]
+    }
+  ],
+  "warmups": 3,
+  "repetitions": 15,
+  "native_source_archive_sha256": "e7c3bb896d7c4e56d5a544ad6ae4c1f17351e7c365301fae8f8154d0fa468880",
+  "runtime_executable_sha256": "5eba6715b7bbe80de7be29b69a4a99163c54c93dd144783e2fa0e0fdf6e914f1",
+  "native_test_executable_sha256": "f37655af9236fc0ecf34440354e65589e78a08dddfcf751ff47639c0fb1722e6",
+  "native_app_executable_sha256": "cf51afeb0886f1ec43cdd9cbfc69e3e9839d2ee9bee8c09d68a7d1f998034a6c",
+  "context": "Swift release XCTest host; actual LocalRuntimeRunner and AppDelegate.runProgram",
+  "window": {
+    "width": 1100,
+    "height": 780,
+    "appearance": "aqua",
+    "preferences": "isolated defaults",
+    "table_zoom": 1
+  },
+  "endpoint": "result application, layout, and synchronous window.displayIfNeeded; 1 ms completion polling; not physical display latency"
+}

@@ -1,0 +1,583 @@
+[
+  {
+    "name": "example",
+    "rows": 6,
+    "directory": "example",
+    "source": "example.sas",
+    "source_sha256": "fee55d571d0a3600d82cf3486ea2b3872f6539aa5dc4ab2efd7ae154e717708f",
+    "inputs": {},
+    "expected": [
+      6,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "data",
+    "rows": 1000,
+    "directory": "1000",
+    "source": "data.sas",
+    "source_sha256": "3aa835cc94bad4d1e5de55cfa5a5c9a39f4d3956f3b3e04c7e2971a5283752c9",
+    "inputs": {
+      "input.csv": "adb76d99877b0f4ce0564ea0d48c4495e19ac5b33dc7850642363fa3a63a031e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000,
+      1503500
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "sort",
+    "rows": 1000,
+    "directory": "1000",
+    "source": "sort.sas",
+    "source_sha256": "55174016452e52cfa4de799dc1fd51a7e018f385cca549408fa9cbe2e52caf35",
+    "inputs": {
+      "input.csv": "adb76d99877b0f4ce0564ea0d48c4495e19ac5b33dc7850642363fa3a63a031e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000,
+      500500,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "group",
+    "rows": 1000,
+    "directory": "1000",
+    "source": "group.sas",
+    "source_sha256": "7409409772d1fefaa2083eaf759ab59c47a48bafffa9503932713c5e1d44dfcb",
+    "inputs": {
+      "input.csv": "adb76d99877b0f4ce0564ea0d48c4495e19ac5b33dc7850642363fa3a63a031e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      100,
+      1000,
+      500500,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "join",
+    "rows": 1000,
+    "directory": "1000",
+    "source": "join.sas",
+    "source_sha256": "8f0a73ae0c5fcf2c846e18b0890b78dffd6096ac15026682a441ca8b7c3e9df2",
+    "inputs": {
+      "input.csv": "adb76d99877b0f4ce0564ea0d48c4495e19ac5b33dc7850642363fa3a63a031e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000,
+      500500,
+      50500,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "reg",
+    "rows": 1000,
+    "directory": "1000",
+    "source": "reg.sas",
+    "source_sha256": "88648f81d96be5a73925c0e303fbf8ea1bbbc52e7e6960c5c20a61ee20cb66d3",
+    "inputs": {
+      "input.csv": "adb76d99877b0f4ce0564ea0d48c4495e19ac5b33dc7850642363fa3a63a031e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000,
+      500500
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "csv",
+    "rows": 1000,
+    "directory": "1000",
+    "source": "csv.sas",
+    "source_sha256": "09bc49a79d513e3378e5854c3e5090812edc2c750fc61ab5741dc378186e1130",
+    "inputs": {
+      "input.csv": "adb76d99877b0f4ce0564ea0d48c4495e19ac5b33dc7850642363fa3a63a031e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000,
+      500500
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "freq",
+    "rows": 1000,
+    "directory": "1000",
+    "source": "freq.sas",
+    "source_sha256": "5f7782bd414c8b7cf18c2709b9c4fa8b383bfe0403870abe829c33c705fa9b4e",
+    "inputs": {
+      "input.csv": "adb76d99877b0f4ce0564ea0d48c4495e19ac5b33dc7850642363fa3a63a031e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000,
+      500500
+    ],
+    "variants": [
+      "plain",
+      "tables"
+    ]
+  },
+  {
+    "name": "print",
+    "rows": 1000,
+    "directory": "1000",
+    "source": "print.sas",
+    "source_sha256": "1893190abbceaca55caf5b1d1cf1f9f51056fa9264d84b584767c9091e4843f3",
+    "inputs": {
+      "input.csv": "adb76d99877b0f4ce0564ea0d48c4495e19ac5b33dc7850642363fa3a63a031e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000,
+      500500
+    ],
+    "variants": [
+      "plain",
+      "tables"
+    ]
+  },
+  {
+    "name": "data",
+    "rows": 10000,
+    "directory": "10000",
+    "source": "data.sas",
+    "source_sha256": "3aa835cc94bad4d1e5de55cfa5a5c9a39f4d3956f3b3e04c7e2971a5283752c9",
+    "inputs": {
+      "input.csv": "1eed2af7cff20784646d5083c4a8d703af4241deecee01bdd615e14a4827b659",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      10000,
+      150035000
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "sort",
+    "rows": 10000,
+    "directory": "10000",
+    "source": "sort.sas",
+    "source_sha256": "55174016452e52cfa4de799dc1fd51a7e018f385cca549408fa9cbe2e52caf35",
+    "inputs": {
+      "input.csv": "1eed2af7cff20784646d5083c4a8d703af4241deecee01bdd615e14a4827b659",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      10000,
+      50005000,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "group",
+    "rows": 10000,
+    "directory": "10000",
+    "source": "group.sas",
+    "source_sha256": "233471a8ca4aa08dfda6dce5630aafc7751fd348269feff6b34de967a07817fd",
+    "inputs": {
+      "input.csv": "1eed2af7cff20784646d5083c4a8d703af4241deecee01bdd615e14a4827b659",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      100,
+      10000,
+      50005000,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "join",
+    "rows": 10000,
+    "directory": "10000",
+    "source": "join.sas",
+    "source_sha256": "598321bb6d76f73ed705c6280f5654d4775ab702ad15d41234b077d82fb03158",
+    "inputs": {
+      "input.csv": "1eed2af7cff20784646d5083c4a8d703af4241deecee01bdd615e14a4827b659",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      10000,
+      50005000,
+      505000,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "reg",
+    "rows": 10000,
+    "directory": "10000",
+    "source": "reg.sas",
+    "source_sha256": "88648f81d96be5a73925c0e303fbf8ea1bbbc52e7e6960c5c20a61ee20cb66d3",
+    "inputs": {
+      "input.csv": "1eed2af7cff20784646d5083c4a8d703af4241deecee01bdd615e14a4827b659",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      10000,
+      50005000
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "csv",
+    "rows": 10000,
+    "directory": "10000",
+    "source": "csv.sas",
+    "source_sha256": "09bc49a79d513e3378e5854c3e5090812edc2c750fc61ab5741dc378186e1130",
+    "inputs": {
+      "input.csv": "1eed2af7cff20784646d5083c4a8d703af4241deecee01bdd615e14a4827b659",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      10000,
+      50005000
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "freq",
+    "rows": 10000,
+    "directory": "10000",
+    "source": "freq.sas",
+    "source_sha256": "5f7782bd414c8b7cf18c2709b9c4fa8b383bfe0403870abe829c33c705fa9b4e",
+    "inputs": {
+      "input.csv": "1eed2af7cff20784646d5083c4a8d703af4241deecee01bdd615e14a4827b659",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      10000,
+      50005000
+    ],
+    "variants": [
+      "plain",
+      "tables"
+    ]
+  },
+  {
+    "name": "print",
+    "rows": 10000,
+    "directory": "10000",
+    "source": "print.sas",
+    "source_sha256": "1893190abbceaca55caf5b1d1cf1f9f51056fa9264d84b584767c9091e4843f3",
+    "inputs": {
+      "input.csv": "1eed2af7cff20784646d5083c4a8d703af4241deecee01bdd615e14a4827b659",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      10000,
+      50005000
+    ],
+    "variants": [
+      "plain",
+      "tables"
+    ]
+  },
+  {
+    "name": "data",
+    "rows": 100000,
+    "directory": "100000",
+    "source": "data.sas",
+    "source_sha256": "3aa835cc94bad4d1e5de55cfa5a5c9a39f4d3956f3b3e04c7e2971a5283752c9",
+    "inputs": {
+      "input.csv": "3af9b3f6ab5dd19ba2df6e6a2f8c43f14b4e6ae309476ebf579fea993586fddf",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      100000,
+      15000350000
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "sort",
+    "rows": 100000,
+    "directory": "100000",
+    "source": "sort.sas",
+    "source_sha256": "55174016452e52cfa4de799dc1fd51a7e018f385cca549408fa9cbe2e52caf35",
+    "inputs": {
+      "input.csv": "3af9b3f6ab5dd19ba2df6e6a2f8c43f14b4e6ae309476ebf579fea993586fddf",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      100000,
+      5000050000,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "group",
+    "rows": 100000,
+    "directory": "100000",
+    "source": "group.sas",
+    "source_sha256": "af4721a3327433b68103a3c9645e6d06f2091125b30e8a5cc83b2e6139aa5285",
+    "inputs": {
+      "input.csv": "3af9b3f6ab5dd19ba2df6e6a2f8c43f14b4e6ae309476ebf579fea993586fddf",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      100,
+      100000,
+      5000050000,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "join",
+    "rows": 100000,
+    "directory": "100000",
+    "source": "join.sas",
+    "source_sha256": "e66f2da5a4579278df2d5c6679399b4683b1898a04ce0da0d5d03923d3231262",
+    "inputs": {
+      "input.csv": "3af9b3f6ab5dd19ba2df6e6a2f8c43f14b4e6ae309476ebf579fea993586fddf",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      100000,
+      5000050000,
+      5050000,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "reg",
+    "rows": 100000,
+    "directory": "100000",
+    "source": "reg.sas",
+    "source_sha256": "88648f81d96be5a73925c0e303fbf8ea1bbbc52e7e6960c5c20a61ee20cb66d3",
+    "inputs": {
+      "input.csv": "3af9b3f6ab5dd19ba2df6e6a2f8c43f14b4e6ae309476ebf579fea993586fddf",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      100000,
+      5000050000
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "csv",
+    "rows": 100000,
+    "directory": "100000",
+    "source": "csv.sas",
+    "source_sha256": "09bc49a79d513e3378e5854c3e5090812edc2c750fc61ab5741dc378186e1130",
+    "inputs": {
+      "input.csv": "3af9b3f6ab5dd19ba2df6e6a2f8c43f14b4e6ae309476ebf579fea993586fddf",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      100000,
+      5000050000
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "freq",
+    "rows": 100000,
+    "directory": "100000",
+    "source": "freq.sas",
+    "source_sha256": "5f7782bd414c8b7cf18c2709b9c4fa8b383bfe0403870abe829c33c705fa9b4e",
+    "inputs": {
+      "input.csv": "3af9b3f6ab5dd19ba2df6e6a2f8c43f14b4e6ae309476ebf579fea993586fddf",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      100000,
+      5000050000
+    ],
+    "variants": [
+      "plain",
+      "tables"
+    ]
+  },
+  {
+    "name": "data",
+    "rows": 1000000,
+    "directory": "1000000",
+    "source": "data.sas",
+    "source_sha256": "3aa835cc94bad4d1e5de55cfa5a5c9a39f4d3956f3b3e04c7e2971a5283752c9",
+    "inputs": {
+      "input.csv": "0cda45b62332dcc5854878c9004291b2ae626e400fb0fc3294b183fbafe76f8e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000000,
+      1500003500000
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "sort",
+    "rows": 1000000,
+    "directory": "1000000",
+    "source": "sort.sas",
+    "source_sha256": "55174016452e52cfa4de799dc1fd51a7e018f385cca549408fa9cbe2e52caf35",
+    "inputs": {
+      "input.csv": "0cda45b62332dcc5854878c9004291b2ae626e400fb0fc3294b183fbafe76f8e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000000,
+      500000500000,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "group",
+    "rows": 1000000,
+    "directory": "1000000",
+    "source": "group.sas",
+    "source_sha256": "075b6312a92f8e71b4ac648ae161d9c03b3f1981c96861362ffae45ab7e92f0e",
+    "inputs": {
+      "input.csv": "0cda45b62332dcc5854878c9004291b2ae626e400fb0fc3294b183fbafe76f8e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      100,
+      1000000,
+      500000500000,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "join",
+    "rows": 1000000,
+    "directory": "1000000",
+    "source": "join.sas",
+    "source_sha256": "eb0a7d8c3e7a9bda2d7a8823d11b4b0bef27502f7466c89b5833d5ed1978f1b6",
+    "inputs": {
+      "input.csv": "0cda45b62332dcc5854878c9004291b2ae626e400fb0fc3294b183fbafe76f8e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000000,
+      500000500000,
+      50500000,
+      0
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "reg",
+    "rows": 1000000,
+    "directory": "1000000",
+    "source": "reg.sas",
+    "source_sha256": "88648f81d96be5a73925c0e303fbf8ea1bbbc52e7e6960c5c20a61ee20cb66d3",
+    "inputs": {
+      "input.csv": "0cda45b62332dcc5854878c9004291b2ae626e400fb0fc3294b183fbafe76f8e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000000,
+      500000500000
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "csv",
+    "rows": 1000000,
+    "directory": "1000000",
+    "source": "csv.sas",
+    "source_sha256": "09bc49a79d513e3378e5854c3e5090812edc2c750fc61ab5741dc378186e1130",
+    "inputs": {
+      "input.csv": "0cda45b62332dcc5854878c9004291b2ae626e400fb0fc3294b183fbafe76f8e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000000,
+      500000500000
+    ],
+    "variants": [
+      "plain"
+    ]
+  },
+  {
+    "name": "freq",
+    "rows": 1000000,
+    "directory": "1000000",
+    "source": "freq.sas",
+    "source_sha256": "5f7782bd414c8b7cf18c2709b9c4fa8b383bfe0403870abe829c33c705fa9b4e",
+    "inputs": {
+      "input.csv": "0cda45b62332dcc5854878c9004291b2ae626e400fb0fc3294b183fbafe76f8e",
+      "dimension.csv": "646a216bffa8e7e2147feefdef65815029bdcb6490ec950532226baa7c8ea255"
+    },
+    "expected": [
+      1000000,
+      500000500000
+    ],
+    "variants": [
+      "plain",
+      "tables"
+    ]
+  }
+]

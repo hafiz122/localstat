@@ -8,6 +8,13 @@ The source is vendored as a snapshot, including upstream tests, documentation, a
 
 Local changes:
 
+- `src/io.zig`: CSV import infers whole-column types in a first pass and
+  builds owned values in a second pass, resetting temporary decoded fields
+  per record and releasing import scratch storage on return. Numeric, date,
+  quoting, and missing-value policies are preserved. Dataset snapshots now
+  allocate retained cells once while still copying character bytes. Regression
+  tests bound destination allocations and verify source-buffer independence.
+
 - Normalize literal em dashes to ASCII hyphens throughout the vendored snapshot,
   including comments, diagnostic messages, documentation, and fixture output.
   Matching expected messages and fixture results use the same punctuation.

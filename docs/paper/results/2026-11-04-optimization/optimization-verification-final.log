@@ -1,0 +1,247 @@
+[0/1] Planning build
+Building for production...
+[0/2] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.10s)
+/Users/d3x/Documents/ChatGPT/sas-mac/dist/LocalStat.app/Contents/Helpers/opensas: replacing existing signature
+/Users/d3x/Documents/ChatGPT/sas-mac/dist/LocalStat.app: replacing existing signature
+Built /Users/d3x/Documents/ChatGPT/sas-mac/dist/LocalStat.app
+corpus: 1924/1924 passing
+programs: 11/11 passing
+Build Summary: 18/18 steps succeeded; 973/973 tests passed
+test success
++- run test 901 pass (901 total) 2s MaxRSS:68M
+|  +- compile test Debug native cached 103ms MaxRSS:31M
++- run test 61 pass (61 total) 199ms MaxRSS:11M
+|  +- compile test Debug native cached 79ms MaxRSS:31M
+|     +- options cached
++- run test 8 pass (8 total) 17ms MaxRSS:2M
+|  +- compile test Debug native cached 104ms MaxRSS:31M
++- run test 3 pass (3 total) 5ms MaxRSS:2M
+|  +- compile test Debug native cached 87ms MaxRSS:31M
++- compile exe opensas ReleaseSmall wasm32-wasi cached 52ms MaxRSS:31M
+corpus success
++- run exe corpus_runner success 22s
+   +- compile exe corpus_runner Debug native cached 91ms MaxRSS:31M
+   +- compile exe opensas Debug native cached 103ms MaxRSS:31M
+      +- options (reused)
+programs success
++- run exe programs_runner success 119ms
+   +- compile exe programs_runner Debug native cached 98ms MaxRSS:31M
+   +- compile exe opensas Debug native (+1 more reused dependencies)
+
+[0/1] Planning build
+Building for debugging...
+[0/4] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.11s)
+Test Suite 'All tests' started at 2026-11-04 19:30:06.985.
+Test Suite 'LocalStatPackageTests.xctest' started at 2026-11-04 19:30:06.991.
+Test Suite 'BenchmarkIntegrationTests' started at 2026-11-04 19:30:06.991.
+Test Case '-[LocalStatEditorTests.BenchmarkIntegrationTests testMeasuredRuns]' started.
+/Users/d3x/Documents/ChatGPT/sas-mac/Tests/LocalStatEditorTests/BenchmarkIntegrationTests.swift:10: -[LocalStatEditorTests.BenchmarkIntegrationTests testMeasuredRuns] : Test skipped - Opt-in measurement: set LOCALSTAT_BENCHMARK_CONFIG
+Test Case '-[LocalStatEditorTests.BenchmarkIntegrationTests testMeasuredRuns]' skipped (0.001 seconds).
+Test Suite 'BenchmarkIntegrationTests' passed at 2026-11-04 19:30:06.992.
+	 Executed 1 test, with 1 test skipped and 0 failures (0 unexpected) in 0.001 (0.002) seconds
+Test Suite 'EditorIntegrationTests' started at 2026-11-04 19:30:06.992.
+Test Case '-[LocalStatEditorTests.EditorIntegrationTests testAppearanceSelectorPersistsLightAndDark]' started.
+Test Case '-[LocalStatEditorTests.EditorIntegrationTests testAppearanceSelectorPersistsLightAndDark]' passed (0.379 seconds).
+Test Case '-[LocalStatEditorTests.EditorIntegrationTests testAppOpenSaveRunAndDiagnosticsInBothAppearances]' started.
+Test Case '-[LocalStatEditorTests.EditorIntegrationTests testAppOpenSaveRunAndDiagnosticsInBothAppearances]' passed (1.398 seconds).
+Test Case '-[LocalStatEditorTests.EditorIntegrationTests testAutomaticPairAndUndoInBothAppearances]' started.
+Test Case '-[LocalStatEditorTests.EditorIntegrationTests testAutomaticPairAndUndoInBothAppearances]' passed (0.016 seconds).
+Test Case '-[LocalStatEditorTests.EditorIntegrationTests testCodeFirstLayoutRestoresSizesAndControls]' started.
+Test Case '-[LocalStatEditorTests.EditorIntegrationTests testCodeFirstLayoutRestoresSizesAndControls]' passed (0.069 seconds).
+Test Case '-[LocalStatEditorTests.EditorIntegrationTests testPastedSourceIsUnchangedInBothAppearances]' started.
+Test Case '-[LocalStatEditorTests.EditorIntegrationTests testPastedSourceIsUnchangedInBothAppearances]' passed (0.004 seconds).
+Test Suite 'EditorIntegrationTests' passed at 2026-11-04 19:30:08.857.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 1.864 (1.865) seconds
+Test Suite 'EditorTextEditingTests' started at 2026-11-04 19:30:08.857.
+Test Case '-[SASCoreTests.EditorTextEditingTests testAssistanceDoesNotChangeLiteralTextOrComments]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testAssistanceDoesNotChangeLiteralTextOrComments]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testAssistanceResumesAfterDatalinesTerminator]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testAssistanceResumesAfterDatalinesTerminator]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testBackspaceRemovesAnEmptyBracketPair]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testBackspaceRemovesAnEmptyBracketPair]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testCloserInsideStringIsInsertedNormally]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testCloserInsideStringIsInsertedNormally]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testClosingBracketSkipsExistingCloser]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testClosingBracketSkipsExistingCloser]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testOpeningBracketInsertsPairAndPlacesCaretBetweenIt]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testOpeningBracketInsertsPairAndPlacesCaretBetweenIt]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testOpeningBracketWrapsSelectedText]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testOpeningBracketWrapsSelectedText]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testReturnBetweenBracketsCreatesIndentedBlankLine]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testReturnBetweenBracketsCreatesIndentedBlankLine]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testReturnDedentsAfterSASEnd]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testReturnDedentsAfterSASEnd]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testReturnDoesNotTreatCommentContentAsSASBlock]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testReturnDoesNotTreatCommentContentAsSASBlock]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testReturnIndentsAfterDataAndProcHeaders]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testReturnIndentsAfterDataAndProcHeaders]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testReturnIndentsAfterIndexedSASDo]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testReturnIndentsAfterIndexedSASDo]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testReturnIndentsAfterSASSelectExpression]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testReturnIndentsAfterSASSelectExpression]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testReturnPreservesIndentAndIndentsAfterSASDo]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testReturnPreservesIndentAndIndentsAfterSASDo]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testTabIndentsAndBacktabOutdentsSelectedLines]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testTabIndentsAndBacktabOutdentsSelectedLines]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.EditorTextEditingTests testUnicodeSelectionWrapsUsingUTF16Coordinates]' started.
+Test Case '-[SASCoreTests.EditorTextEditingTests testUnicodeSelectionWrapsUsingUTF16Coordinates]' passed (0.000 seconds).
+Test Suite 'EditorTextEditingTests' passed at 2026-11-04 19:30:08.859.
+	 Executed 16 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'PreferencesIntegrationTests' started at 2026-11-04 19:30:08.859.
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testAppearanceChangePreservesHorizontalScroll]' started.
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testAppearanceChangePreservesHorizontalScroll]' passed (0.069 seconds).
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testEditingAssistanceUsesPreferences]' started.
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testEditingAssistanceUsesPreferences]' passed (0.006 seconds).
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testHelpClearsEmptySearchStateWhenNavigating]' started.
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testHelpClearsEmptySearchStateWhenNavigating]' passed (0.210 seconds).
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testHelpLibrarySearchAndExampleOpening]' started.
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testHelpLibrarySearchAndExampleOpening]' passed (0.441 seconds).
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testHelpNavigationKeepsTheRequestedArticleAfterFilteredSelection]' started.
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testHelpNavigationKeepsTheRequestedArticleAfterFilteredSelection]' passed (0.067 seconds).
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testIncreaseSizeKeyboardEquivalent]' started.
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testIncreaseSizeKeyboardEquivalent]' passed (0.055 seconds).
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testLiveEditorPreferencesKeepSourceSelectionUndoAndFont]' started.
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testLiveEditorPreferencesKeepSourceSelectionUndoAndFont]' passed (0.055 seconds).
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testPreferenceMigrationPersistenceAndSectionReset]' started.
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testPreferenceMigrationPersistenceAndSectionReset]' passed (0.003 seconds).
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testSettingsShowsRoundedTableZoom]' started.
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testSettingsShowsRoundedTableZoom]' passed (0.211 seconds).
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testSettingsWindowAndContextualSizeCommands]' started.
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testSettingsWindowAndContextualSizeCommands]' passed (0.232 seconds).
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testTableZoomPreservesPaginationAndPrintGeometry]' started.
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testTableZoomPreservesPaginationAndPrintGeometry]' passed (0.002 seconds).
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testThemeTextContrastInBothAppearances]' started.
+Test Case '-[LocalStatEditorTests.PreferencesIntegrationTests testThemeTextContrastInBothAppearances]' passed (0.001 seconds).
+Test Suite 'PreferencesIntegrationTests' passed at 2026-11-04 19:30:10.211.
+	 Executed 12 tests, with 0 failures (0 unexpected) in 1.351 (1.352) seconds
+Test Suite 'RuntimeRunnerTests' started at 2026-11-04 19:30:10.212.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testBundledRuntimeFreshStateAndRelativeIncludes]' started.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testBundledRuntimeFreshStateAndRelativeIncludes]' passed (0.131 seconds).
+Test Case '-[SASCoreTests.RuntimeRunnerTests testCancellationEscalationAndSingleRun]' started.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testCancellationEscalationAndSingleRun]' passed (2.228 seconds).
+Test Case '-[SASCoreTests.RuntimeRunnerTests testDiagnosticCoordinates]' started.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testDiagnosticCoordinates]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.RuntimeRunnerTests testFailureClassificationAndRecovery]' started.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testFailureClassificationAndRecovery]' passed (0.896 seconds).
+Test Case '-[SASCoreTests.RuntimeRunnerTests testMalformedTableFileDoesNotChangeRunStatus]' started.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testMalformedTableFileDoesNotChangeRunStatus]' passed (0.322 seconds).
+Test Case '-[SASCoreTests.RuntimeRunnerTests testPDFReportIsSearchableAndPaginatesLongRuns]' started.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testPDFReportIsSearchableAndPaginatesLongRuns]' passed (0.017 seconds).
+Test Case '-[SASCoreTests.RuntimeRunnerTests testReadableListingKeepsTableColumnsAligned]' started.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testReadableListingKeepsTableColumnsAligned]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.RuntimeRunnerTests testRepeatedTableTextIsMeasuredOncePerWidthAndFont]' started.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testRepeatedTableTextIsMeasuredOncePerWidthAndFont]' passed (0.008 seconds).
+Test Case '-[SASCoreTests.RuntimeRunnerTests testRunReportIncludesExecutionContextAndCompleteRunContents]' started.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testRunReportIncludesExecutionContextAndCompleteRunContents]' passed (0.001 seconds).
+Test Case '-[SASCoreTests.RuntimeRunnerTests testSnapshotsPathsAndLargeConcurrentStreams]' started.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testSnapshotsPathsAndLargeConcurrentStreams]' passed (0.201 seconds).
+Test Case '-[SASCoreTests.RuntimeRunnerTests testTableAccessibilityPreservesContentAndSeparators]' started.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testTableAccessibilityPreservesContentAndSeparators]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.RuntimeRunnerTests testTableMeasurementCacheDistinguishesWidthAndFont]' started.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testTableMeasurementCacheDistinguishesWidthAndFont]' passed (0.000 seconds).
+Test Case '-[SASCoreTests.RuntimeRunnerTests testTablePageLayoutAndPDFReport]' started.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testTablePageLayoutAndPDFReport]' passed (0.113 seconds).
+Test Case '-[SASCoreTests.RuntimeRunnerTests testTableValidationRejectsOverflowingCellSpans]' started.
+Test Case '-[SASCoreTests.RuntimeRunnerTests testTableValidationRejectsOverflowingCellSpans]' passed (0.000 seconds).
+Test Suite 'RuntimeRunnerTests' passed at 2026-11-04 19:30:14.131.
+	 Executed 14 tests, with 0 failures (0 unexpected) in 3.919 (3.920) seconds
+Test Suite 'TabNavigationTests' started at 2026-11-04 19:30:14.131.
+Test Case '-[LocalStatEditorTests.TabNavigationTests testCloseButtonsKeepInactiveDocumentSelection]' started.
+Test Case '-[LocalStatEditorTests.TabNavigationTests testCloseButtonsKeepInactiveDocumentSelection]' passed (0.046 seconds).
+Test Case '-[LocalStatEditorTests.TabNavigationTests testClosingActiveTabsSelectsRightThenLeftAndEndsEmpty]' started.
+Test Case '-[LocalStatEditorTests.TabNavigationTests testClosingActiveTabsSelectsRightThenLeftAndEndsEmpty]' passed (0.048 seconds).
+Test Case '-[LocalStatEditorTests.TabNavigationTests testClosingExecutingDocumentKeepsItsRunAndDiagnosticsSnapshot]' started.
+Test Case '-[LocalStatEditorTests.TabNavigationTests testClosingExecutingDocumentKeepsItsRunAndDiagnosticsSnapshot]' passed (0.647 seconds).
+Test Case '-[LocalStatEditorTests.TabNavigationTests testDirtyInactiveCloseCancelAndDiscardKeepSelectedEditorState]' started.
+Test Case '-[LocalStatEditorTests.TabNavigationTests testDirtyInactiveCloseCancelAndDiscardKeepSelectedEditorState]' passed (0.121 seconds).
+Test Case '-[LocalStatEditorTests.TabNavigationTests testFailedSaveKeepsTheDirtyTabAndPreviousSelection]' started.
+Test Case '-[LocalStatEditorTests.TabNavigationTests testFailedSaveKeepsTheDirtyTabAndPreviousSelection]' passed (0.114 seconds).
+Test Case '-[LocalStatEditorTests.TabNavigationTests testFontMenuCommandsSelectAndFocusExistingSettings]' started.
+Test Case '-[LocalStatEditorTests.TabNavigationTests testFontMenuCommandsSelectAndFocusExistingSettings]' passed (0.251 seconds).
+Test Case '-[LocalStatEditorTests.TabNavigationTests testSaveOnCloseWritesTheDirtyBuffer]' started.
+Test Case '-[LocalStatEditorTests.TabNavigationTests testSaveOnCloseWritesTheDirtyBuffer]' passed (0.080 seconds).
+Test Case '-[LocalStatEditorTests.TabNavigationTests testTabOverflowKeepsSelectedLongFilenameAndCloseButtonVisible]' started.
+Test Case '-[LocalStatEditorTests.TabNavigationTests testTabOverflowKeepsSelectedLongFilenameAndCloseButtonVisible]' passed (0.112 seconds).
+Test Case '-[LocalStatEditorTests.TabNavigationTests testTabTitlesHaveReadableContrastInBothAppearances]' started.
+Test Case '-[LocalStatEditorTests.TabNavigationTests testTabTitlesHaveReadableContrastInBothAppearances]' passed (0.034 seconds).
+Test Suite 'TabNavigationTests' passed at 2026-11-04 19:30:15.586.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 1.454 (1.455) seconds
+Test Suite 'LocalStatPackageTests.xctest' passed at 2026-11-04 19:30:15.586.
+	 Executed 57 tests, with 1 test skipped and 0 failures (0 unexpected) in 8.591 (8.595) seconds
+Test Suite 'All tests' passed at 2026-11-04 19:30:15.586.
+	 Executed 57 tests, with 1 test skipped and 0 failures (0 unexpected) in 8.591 (8.601) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.
+test_analytic_regression (__main__.RuntimeTests.test_analytic_regression) ... ok
+test_case_macros_and_global_statements (__main__.RuntimeTests.test_case_macros_and_global_statements) ... ok
+test_cli_missing_input (__main__.RuntimeTests.test_cli_missing_input) ... ok
+test_complete_cases (__main__.RuntimeTests.test_complete_cases) ... ok
+test_constant_and_perfect (__main__.RuntimeTests.test_constant_and_perfect) ... ok
+test_explicit_files_persist_and_work_does_not (__main__.RuntimeTests.test_explicit_files_persist_and_work_does_not) ... ok
+test_formatted_table_sidecar_preserves_stdout_and_order (__main__.RuntimeTests.test_formatted_table_sidecar_preserves_stdout_and_order) ... ok
+test_freq_nlevels_and_tabulate_by_sections (__main__.RuntimeTests.test_freq_nlevels_and_tabulate_by_sections) ... ok
+test_malformed_and_duplicate (__main__.RuntimeTests.test_malformed_and_duplicate) ... ok
+test_multiple_regression (__main__.RuntimeTests.test_multiple_regression) ... ok
+test_nonnumeric_and_unknown (__main__.RuntimeTests.test_nonnumeric_and_unknown) ... ok
+test_ods_destinations (__main__.RuntimeTests.test_ods_destinations) ... ok
+test_published_sas_population_example (__main__.RuntimeTests.test_published_sas_population_example) ... ok
+test_singular_and_insufficient (__main__.RuntimeTests.test_singular_and_insufficient) ... ok
+test_table_sidecar_suppression_empty_and_partial_error (__main__.RuntimeTests.test_table_sidecar_suppression_empty_and_partial_error) ... ok
+test_unsupported_syntax (__main__.RuntimeTests.test_unsupported_syntax) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.125s
+
+OK
+test_anova_error_row_is_not_a_runtime_diagnostic (__main__.BenchmarkTests.test_anova_error_row_is_not_a_runtime_diagnostic) ... ok
+test_existing_experiment_is_never_overwritten (__main__.BenchmarkTests.test_existing_experiment_is_never_overwritten) ... ok
+test_plain_frequency_listing_must_match_all_expected_groups (__main__.BenchmarkTests.test_plain_frequency_listing_must_match_all_expected_groups) ... ok
+test_prepared_inputs_are_deterministic_and_join_is_bounded (__main__.BenchmarkTests.test_prepared_inputs_are_deterministic_and_join_is_bounded) ... ok
+test_runner_collects_per_child_usage_and_captures_output (__main__.BenchmarkTests.test_runner_collects_per_child_usage_and_captures_output) ... ok
+test_runner_enforces_timeout (__main__.BenchmarkTests.test_runner_enforces_timeout) ... ok
+test_summary_excludes_first_warmup_failure_and_timeout (__main__.BenchmarkTests.test_summary_excludes_first_warmup_failure_and_timeout) ... ok
+test_table_validator_rejects_shape_and_frequency_corruption (__main__.BenchmarkTests.test_table_validator_rejects_shape_and_frequency_corruption) ... ok
+test_validator_rejects_plausible_but_wrong_results_and_diagnostics (__main__.BenchmarkTests.test_validator_rejects_plausible_but_wrong_results_and_diagnostics) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.190s
+
+OK
+test_paired_differences_match_iterations_rather_than_file_order (__main__.ReportTests.test_paired_differences_match_iterations_rather_than_file_order) ... ok
+test_rejects_incomplete_repetitions_and_duplicate_iterations (__main__.ReportTests.test_rejects_incomplete_repetitions_and_duplicate_iterations) ... ok
+test_rejects_invalid_results_and_mismatched_app_output (__main__.ReportTests.test_rejects_invalid_results_and_mismatched_app_output) ... ok
+test_rounding_does_not_display_negative_zero_latency (__main__.ReportTests.test_rounding_does_not_display_negative_zero_latency) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.011s
+
+OK
+test_auditor_rejects_missing_build_or_output_change (__main__.ComparisonTests.test_auditor_rejects_missing_build_or_output_change) ... ok
+test_before_after_metrics_use_the_same_units (__main__.ComparisonTests.test_before_after_metrics_use_the_same_units) ... ok
+test_builds_are_adjacent_and_alternate_order (__main__.ComparisonTests.test_builds_are_adjacent_and_alternate_order) ... ok
+test_native_blocks_counterbalance_order_and_keep_fifteen_repetitions (__main__.ComparisonTests.test_native_blocks_counterbalance_order_and_keep_fifteen_repetitions) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.011s
+
+OK
+test_examples_run_in_fresh_temporary_projects (__main__.HelpTests.test_examples_run_in_fresh_temporary_projects) ... ok
+test_manifest_links_and_offline_assets (__main__.HelpTests.test_manifest_links_and_offline_assets) ... ok
+test_reference_inventory_covers_pinned_sources (__main__.HelpTests.test_reference_inventory_covers_pinned_sources) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.053s
+
+OK
+test_tracked_text_contains_no_em_dashes (__main__.TextTests.test_tracked_text_contains_no_em_dashes) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.260s
+
+OK
+dist/LocalStat.app/Contents/MacOS/LocalStat: Mach-O 64-bit executable arm64
+dist/LocalStat.app/Contents/Helpers/opensas: Mach-O 64-bit executable arm64

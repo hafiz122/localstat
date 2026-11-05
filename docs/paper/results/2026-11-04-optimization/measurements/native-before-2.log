@@ -1,0 +1,16 @@
+Test Suite 'Selected tests' started at 2026-11-04 19:39:48.599.
+Test Suite 'LocalStatPackageTests.xctest' started at 2026-11-04 19:39:48.603.
+Test Suite 'BenchmarkIntegrationTests' started at 2026-11-04 19:39:48.603.
+Test Case '-[LocalStatEditorTests.BenchmarkIntegrationTests testMeasuredRuns]' started.
+Test Case '-[LocalStatEditorTests.BenchmarkIntegrationTests testMeasuredRuns]' passed (15.644 seconds).
+Test Suite 'BenchmarkIntegrationTests' passed at 2026-11-04 19:40:04.248.
+	 Executed 1 test, with 0 failures (0 unexpected) in 15.644 (15.645) seconds
+Test Suite 'LocalStatPackageTests.xctest' passed at 2026-11-04 19:40:04.248.
+	 Executed 1 test, with 0 failures (0 unexpected) in 15.644 (15.645) seconds
+Test Suite 'Selected tests' passed at 2026-11-04 19:40:04.248.
+	 Executed 1 test, with 0 failures (0 unexpected) in 15.644 (15.649) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.
+[0/1] Planning build
