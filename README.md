@@ -1,6 +1,11 @@
 # LocalStat
 
 [![CI](https://github.com/hafiz122/localstat/actions/workflows/ci.yml/badge.svg)](https://github.com/hafiz122/localstat/actions/workflows/ci.yml)
+[![Alpha packaging](https://github.com/hafiz122/localstat/actions/workflows/release-alpha.yml/badge.svg)](https://github.com/hafiz122/localstat/actions/workflows/release-alpha.yml)
+[![Latest prerelease](https://img.shields.io/github/v/release/hafiz122/localstat?include_prereleases&label=prerelease)](https://github.com/hafiz122/localstat/releases)
+[![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)](#build-and-run)
+[![Apple Silicon](https://img.shields.io/badge/architecture-Apple%20Silicon-blue)](docs/INSTALL.md)
+[![Source license: Apache-2.0](https://img.shields.io/badge/source%20license-Apache--2.0-blue)](LICENSE)
 
 <p align="center">
   <img src="assets/localstat-logo.png" alt="LocalStat logo" width="180">
@@ -113,7 +118,7 @@ The local extension provides a bounded ordinary-least-squares PROC REG with nume
 
 This builds the app and runs OpenSAS unit/conformance/end-to-end suites, Swift editor/runtime/PDF integration tests, packaged-runtime regression checks, and Help/text checks. PDF tests inspect exported coordinates to catch misaligned columns, wrapped p-values, and text outside page margins in ordinary reports and raw-output appendices. Python 3 is only used by tests and development tools, never by the app or runtime. Published example checks have source citations in the test. They are not a claim of new validation against an installed SAS engine.
 
-The 5 November 2026 [main CI run](https://github.com/hafiz122/localstat/actions/runs/41939610921) and [alpha validation run](https://github.com/hafiz122/localstat/actions/runs/41939612018) passed for commit `83b46a8`, including packaging, signatures, ARM64 architecture, and checksums. The alpha validation preserved the existing published assets.
+The 5 November 2026 [main CI run](https://github.com/hafiz122/localstat/actions/runs/41945456267) and [alpha validation run](https://github.com/hafiz122/localstat/actions/runs/41945456385) passed for commit `42495ca`, including four-space indentation defaults and migration, packaging, signatures, ARM64 architecture, and checksums. The alpha validation preserved the existing published assets.
 
 The local, unmerged 4 November performance follow-up records 973 runtime tests, 20 benchmark harness/report checks, and opt-in native measurements. These results include optimization changes beyond the verified `main` commit and are separate from its CI totals. Native measurements run only when `LOCALSTAT_BENCHMARK_CONFIG` is set.
 
