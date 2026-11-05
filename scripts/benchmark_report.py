@@ -9,13 +9,20 @@ import statistics
 from benchmark import summarize
 
 
-def audit(cli, ui, repetitions):
+def audit(cli, ui, repetitions, cases):
     if not cli or not ui:
         raise ValueError('Both CLI and native app evidence are required')
     hashes = collections.defaultdict(set)
     for sample in cli:
         hashes[sample['workload'], sample['rows']].add(sample['stdout_sha256'])
-    for samples in [cli, ui]:
+    if any(len(values) != 1 for values in hashes.values()):
+        raise ValueError('CLI output changed for the same workload and row count')
+    expected_cli = {(case['name'], case['rows'], variant)
+                    for case in cases for variant in case['variants']}
+    expected_ui = {(name, rows, variant)
+                   for name, rows in [('data', 10000), ('freq', 100000), ('print', 1000), ('print', 10000)]
+                   for variant in ['runner', 'app']}
+    for label, samples, expected in [('CLI', cli, expected_cli), ('native', ui, expected_ui)]:
         groups = collections.defaultdict(list)
         for sample in samples:
             if sample['status'] != 'ok':
@@ -26,9 +33,21 @@ def audit(cli, ui, repetitions):
                 groups[sample['workload'], sample['rows'], sample['variant']].append(sample)
         if not groups:
             raise ValueError('No measured samples')
+        observed = set(groups)
+        if observed != expected:
+            raise ValueError(f'Missing or unexpected {label} configurations: '
+                             f'missing={sorted(expected-observed)}, unexpected={sorted(observed-expected)}')
         for group in groups.values():
             if len(group) != repetitions or len({sample['iteration'] for sample in group}) != repetitions:
                 raise ValueError('Incomplete or duplicated measured iterations')
+        left, right = ('plain', 'tables') if label == 'CLI' else ('runner', 'app')
+        for name, rows, variant in expected:
+            if variant != right:
+                continue
+            left_iterations = {sample['iteration'] for sample in groups[name, rows, left]}
+            right_iterations = {sample['iteration'] for sample in groups[name, rows, right]}
+            if left_iterations != right_iterations:
+                raise ValueError('Unpaired variants')
 
 
 def paired(rows, left, right):
@@ -63,7 +82,8 @@ def generate(directory):
     cli = [json.loads(line) for line in (directory / 'cli/runs.jsonl').read_text().splitlines()]
     ui = json.loads((directory / 'ui-runs.json').read_text())
     meta = json.loads((directory / 'cli/metadata.json').read_text())
-    audit(cli, ui, meta['repetitions'])
+    cases = json.loads((directory / 'cli/workloads.json').read_text())
+    audit(cli, ui, meta['repetitions'], cases)
     summary = summarize(cli)
     if summary != json.loads((directory / 'cli/summary.json').read_text()):
         raise ValueError('Saved CLI summary does not match raw measurements')

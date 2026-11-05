@@ -51,6 +51,40 @@ class ComparisonTests(unittest.TestCase):
         self.assertEqual(result['speedup'], 4)
         self.assertEqual(result['memory_reduction_pct'], 75)
 
+    def test_auditor_requires_scheduled_iteration_ids_for_each_build(self):
+        bench = self.harness()
+        case = dict(name='data', rows=1000, variants=['plain'])
+        for warmups in [0, 2]:
+            rows = [dict(workload=c['name'], rows=c['rows'], phase=phase, iteration=i,
+                         variant=variant, build=build, status='ok', stdout_sha256='same',
+                         stderr_sha256='same', sidecar_sha256=None)
+                    for c, phase, i, variant, build in bench.schedule([case], warmups, 3)]
+            bench.audit(rows, [case], warmups, 3)
+            for build in ['before', 'after']:
+                with self.subTest(warmups=warmups, build=build):
+                    shifted = [dict(row, iteration=row['iteration']+1) if row['build'] == build else dict(row)
+                               for row in rows]
+                    with self.assertRaisesRegex(ValueError, 'phase/iteration'):
+                        bench.audit(shifted, [case], warmups, 3)
+
+    def test_auditor_rejects_swapped_phase_iteration_pairs(self):
+        bench = self.harness()
+        case = dict(name='freq', rows=1000, variants=['plain', 'tables'])
+        rows = [dict(workload=c['name'], rows=c['rows'], phase=phase, iteration=i,
+                     variant=variant, build=build, status='ok', stdout_sha256='same',
+                     stderr_sha256='same', sidecar_sha256=None)
+                for c, phase, i, variant, build in bench.schedule([case], 2, 3)]
+        for build in ['before', 'after']:
+            for phase in ['first', 'warmup']:
+                with self.subTest(build=build, phase=phase):
+                    swapped = [dict(row) for row in rows]
+                    selected = [row for row in swapped if row['build'] == build and row['variant'] == 'tables']
+                    left = next(row for row in selected if row['phase'] == phase)
+                    right = next(row for row in selected if row['phase'] == 'measured')
+                    left['phase'], right['phase'] = right['phase'], left['phase']
+                    with self.assertRaisesRegex(ValueError, 'phase/iteration'):
+                        bench.audit(swapped, [case], 2, 3)
+
     def test_native_blocks_counterbalance_order_and_keep_fifteen_repetitions(self):
         bench = self.harness()
         self.assertTrue(hasattr(bench, 'native_blocks'))
