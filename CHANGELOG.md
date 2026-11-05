@@ -4,6 +4,8 @@ All notable changes to LocalStat are recorded here.
 
 ## Unreleased
 
+## [0.1.1-alpha] - 2026-11-05
+
 ### Added
 
 - Horizontally scrolling source tabs with visible close buttons, unsaved-change
@@ -13,6 +15,11 @@ All notable changes to LocalStat are recorded here.
   index, and runnable examples that open as unsaved editor tabs.
 - Native Settings with editor themes, separate source/output fonts, viewing
   controls, screen-only table zoom, and configurable editing assistance.
+- SAS Studio style workspace by default, including the Explorer tree, code and
+  results chrome, syntax colors, and a matching Dark appearance.
+- Expandable project folders with import and create actions for programs and
+  folders, preserving navigation across refreshes.
+- Source package for the professor presentation and synthetic demo programs.
 - Toolbar Appearance control with System, Light, and Dark choices that persist
   between launches.
 - Code-first IDE layout with saved pane sizes, a collapsible project navigator,

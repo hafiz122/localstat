@@ -4,6 +4,7 @@ import SASCore
 final class LineRuler: NSRulerView {
     weak var editor: NSTextView?
     var palette = EditorTheme.native.palette
+    var usesStudioStyle = false
     var labelSize: CGFloat = 11
 
     init(scrollView: NSScrollView, editor: NSTextView) {
@@ -22,7 +23,7 @@ final class LineRuler: NSRulerView {
         let text = editor.string as NSString
         let attrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(ofSize: labelSize, weight: .regular),
-            .foregroundColor: palette.comment
+            .foregroundColor: usesStudioStyle ? NSColor.secondaryLabelColor : palette.comment
         ]
         var offset = 0, line = 1
         while offset < text.length {
@@ -211,6 +212,7 @@ final class EditorDocument: NSObject, NSTextViewDelegate {
         scrollView.rulersVisible = value.lineNumbers
         configureWrapping(textView, in: scrollView, enabled: value.editorWrap)
         ruler.palette = palette
+        ruler.usesStudioStyle = value.theme == .sasStudio
         ruler.labelSize = max(10, CGFloat(value.editorFontSize) - 2)
         highlight()
         textView.selectedRanges = selected

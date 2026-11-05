@@ -213,7 +213,9 @@ final class TabNavigationTests: XCTestCase {
                 let color = try XCTUnwrap(title.attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
                 appearance.performAsCurrentDrawingAppearance {
                     let foreground = luminance(color)
-                    let background = luminance(title.state == .on ? .controlBackgroundColor : .windowBackgroundColor)
+                    let background = luminance(app.programTabStrip.usesStudioStyle
+                        ? (title.state == .on ? .white : StudioStyle.chrome)
+                        : (title.state == .on ? .controlBackgroundColor : .windowBackgroundColor))
                     XCTAssertGreaterThanOrEqual((max(foreground, background) + 0.05) / (min(foreground, background) + 0.05), 4.5)
                 }
             }

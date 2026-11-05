@@ -1,9 +1,9 @@
-# Native editor direction
+# Workspace direction
 
-Direction comes from the approved implementation plan: native AppKit, standard Mac controls and system appearance. The task is editing and executing SAS programs locally.
+LocalStat opens in a SAS Studio style workspace. The reference is SAS Studio's light Explorer, document tabs, code editor, and results layout. LocalStat remains an independent AppKit application and uses its own name and supported actions.
 
-The source editor occupies the main area. The project sidebar locates programs; the lower results area keeps output and diagnostics close to the source. Resizable splits let the user prioritize reading code or output. Native tabs expose open documents and their unsaved state.
+A restrained blue application bar identifies the workspace. The folder tree, code, output, and tables use white reading surfaces. Pale gray toolbars and separators distinguish controls from content; blue marks the active tab, primary Run action, and tree icons. Source uses a light syntax palette by default and adapts to Dark appearance. System, Light, and Dark appearances and separate editor themes remain available.
 
-System UI fonts serve labels; system monospace serves source and aligned output. System semantic colors adapt to light/dark appearance. Syntax colors distinguish keywords, strings and comments. No logo, illustration or decorative motion is required.
+The source editor occupies the main area. The Explorer locates programs; the lower results area keeps output and diagnostics close to the source. Resizable splits let the user prioritize reading code or output. Native controls keep keyboard behavior and accessibility.
 
-Energy 1, rhythm 1, motion 1: a restrained document tool with hierarchy provided by source, diagnostic severity and current execution state. Native focus/selection styling provides the interaction accent. No custom visual effects.
+Energy 1, rhythm 1, motion 1: a document tool with hierarchy provided by source, diagnostic severity, and current execution state. No decorative motion or unrelated visual assets.

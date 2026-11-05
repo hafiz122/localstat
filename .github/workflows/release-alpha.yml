@@ -70,7 +70,9 @@ jobs:
           set -euo pipefail
           version=$(tr -d '[:space:]' < VERSION)
           archive="dist/release/LocalStat-$version-arm64.zip"
-          cat docs/RELEASE_NOTES_0.1.0-alpha.md dist/CANDIDATE_VERIFICATION.md > "$RUNNER_TEMP/release-notes.md"
+          notes="docs/RELEASE_NOTES_$version.md"
+          test -s "$notes"
+          cat "$notes" dist/CANDIDATE_VERIFICATION.md > "$RUNNER_TEMP/release-notes.md"
           gh release create "v$version" "$archive" "$archive.sha256" \
             --target "$(git rev-parse HEAD)" --draft --prerelease \
             --title "LocalStat v$version" --notes-file "$RUNNER_TEMP/release-notes.md"

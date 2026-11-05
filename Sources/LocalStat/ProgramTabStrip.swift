@@ -9,6 +9,14 @@ import AppKit
     private var selectedID: UUID?
     private var revealSelection = false
     private var previousSize = NSSize.zero
+    var usesStudioStyle = false {
+        didSet {
+            drawsBackground = usesStudioStyle
+            backgroundColor = usesStudioStyle ? StudioStyle.chrome : .clear
+            orderedTabs.forEach { $0.usesStudioStyle = usesStudioStyle }
+            needsDisplay = true
+        }
+    }
 
     init() {
         super.init(frame: .zero)
@@ -38,6 +46,7 @@ import AppKit
                 content.addSubview(tab)
             }
             tab.update(document: document, selected: document.id == selectedID)
+            tab.usesStudioStyle = usesStudioStyle
             return tab
         }
         self.selectedID = selectedID
@@ -71,6 +80,7 @@ import AppKit
     private let titleButton = NSButton()
     private let closeButton = NSButton(title: "×", target: nil, action: nil)
     private var selected = false
+    var usesStudioStyle = false { didSet { needsDisplay = true } }
     var preferredWidth: CGFloat {
         min(240, max(130, titleButton.intrinsicContentSize.width + 42))
     }
@@ -98,7 +108,7 @@ import AppKit
         titleButton.state = selected ? .on : .off
         let title = NSAttributedString(string: document.title, attributes: [
             .font: NSFont.systemFont(ofSize: 12, weight: selected ? .semibold : .regular),
-            .foregroundColor: NSColor.labelColor
+            .foregroundColor: usesStudioStyle ? StudioStyle.ink : NSColor.labelColor
         ])
         titleButton.attributedTitle = title
         titleButton.attributedAlternateTitle = title
@@ -117,12 +127,13 @@ import AppKit
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        (selected ? NSColor.controlBackgroundColor : NSColor.windowBackgroundColor).setFill()
+        (usesStudioStyle ? (selected ? NSColor.white : StudioStyle.chrome) :
+            (selected ? NSColor.controlBackgroundColor : NSColor.windowBackgroundColor)).setFill()
         bounds.fill()
-        NSColor.separatorColor.setFill()
+        (usesStudioStyle ? StudioStyle.line : NSColor.separatorColor).setFill()
         NSRect(x: bounds.maxX - 1, y: 0, width: 1, height: bounds.height).fill()
         if selected {
-            NSColor.controlAccentColor.setFill()
+            (usesStudioStyle ? StudioStyle.blue : NSColor.controlAccentColor).setFill()
             NSRect(x: 0, y: 0, width: bounds.width, height: 2).fill()
         }
     }
