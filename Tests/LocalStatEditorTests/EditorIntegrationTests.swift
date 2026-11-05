@@ -21,9 +21,9 @@ final class EditorIntegrationTests: XCTestCase {
             defaults.removePersistentDomain(forName: suiteName)
         }
 
-        XCTAssertEqual(app.navigatorPane.frame.width, 215, accuracy: 2)
+        XCTAssertEqual(app.navigatorPane.frame.width, 235, accuracy: 2)
         let initialFraction = app.resultsContainer.frame.height / app.editorResultsSplit.bounds.height
-        XCTAssertEqual(initialFraction, 0.30, accuracy: 0.03)
+        XCTAssertEqual(initialFraction, 0.38, accuracy: 0.03)
         XCTAssertEqual(app.results.tabViewType, .noTabsNoBorder)
         let viewMenu = try XCTUnwrap(NSApp.mainMenu?.item(withTitle: "View")?.submenu)
         XCTAssertEqual(viewMenu.item(withTitle: "Hide Project Navigator")?.keyEquivalent, "0")
@@ -186,9 +186,9 @@ final class EditorIntegrationTests: XCTestCase {
         XCTAssertEqual(app.appearancePreference, .sasStudio)
         XCTAssertEqual(app.preferences.values.theme, .sasStudio)
         XCTAssertEqual(NSApp.appearance?.name, .aqua)
-        XCTAssertEqual(app.appearancePopup.selectedItem?.title, "SAS Studio")
+        XCTAssertEqual(app.appearancePopup.selectedItem?.title, "SAS Native")
         XCTAssertFalse(app.studioBanner.isHidden)
-        XCTAssertEqual(app.explorerHeader.stringValue, "Local Files and Folders")
+        XCTAssertEqual(app.explorerHeader.stringValue, "Project Explorer")
 
         app.preferences.update { $0.theme = .native }
 

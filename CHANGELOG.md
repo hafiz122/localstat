@@ -4,6 +4,24 @@ All notable changes to LocalStat are recorded here.
 
 ## Unreleased
 
+## [0.1.2-alpha] - 2026-11-05
+
+### Changed
+
+- Name and keep SAS Native as the fresh-start workspace and editor default,
+  while preserving explicitly saved System, Light, Dark, and editor choices.
+- Refine the Project Explorer, program tabs, contextual Run toolbar, editor
+  gutter, settings, and lower results pane around a compact workbench layout.
+- Increase the default results pane height so formatted tables have more room.
+- Present supported PRINT, FREQ, and TABULATE tables with restrained blue
+  screen headers and SAS-inspired paper output: centered titles and narrow
+  tables, horizontal rules, and right-aligned numeric values.
+
+### Fixed
+
+- Keep character values containing punctuation left-aligned in printed tables.
+- Update built-in Help and verification documentation to match the current UI.
+
 ## [0.1.1-alpha] - 2026-11-05
 
 ### Added

@@ -11,6 +11,11 @@ enum SettingsSection: String {
 @MainActor final class SettingsWindowController: NSWindowController {
     private weak var app: AppDelegate?
     private var controls: [String: NSControl] = [:]
+    private var sectionTitles: [NSTextField] = []
+    private var descriptions: [NSTextField] = []
+    private var rowLabels: [NSTextField] = []
+    private var sectionContents: [NSStackView] = []
+    private var sectionScrollers: [NSScrollView] = []
     private let fontNames: [String]
     let sections = NSTabView()
 
@@ -35,7 +40,7 @@ enum SettingsSection: String {
             row("App appearance", popup("appearance", AppearancePreference.allCases.map(\.title))),
             row("Editor theme", popup("theme", EditorTheme.allCases.map(\.title))),
             row("Help reading size", popup("helpFontSize", (10...28).map { "\($0) pt" }))
-        ], explanation: "SAS Studio is the default workspace appearance. System follows your Mac; Light and Dark use Mac controls. Editor themes can be chosen separately.")
+        ], explanation: "SAS Native is the default workspace appearance and editor palette. System follows your Mac; Light and Dark use Mac controls. You can choose an editor palette separately.")
         addSection(.editor, rows: [
             row("Font", popup("editorFontName", ["System Monospaced"] + fontNames)),
             row("Font size", popup("editorFontSize", (8...40).map { "\($0) pt" })),
@@ -84,6 +89,8 @@ enum SettingsSection: String {
     private func row(_ label: String, _ control: NSControl) -> [NSView] {
         let text = NSTextField(labelWithString: label)
         text.alignment = .right
+        text.font = .systemFont(ofSize: 12)
+        rowLabels.append(text)
         control.setAccessibilityLabel(label.isEmpty ? (control as? NSButton)?.title ?? "Setting" : label)
         return [text, control]
     }
@@ -104,6 +111,10 @@ enum SettingsSection: String {
     }
     private func addSection(_ section: SettingsSection, rows: [[NSView]], explanation: String) {
         let title = section.rawValue
+        let heading = NSTextField(labelWithString: title)
+        heading.font = .systemFont(ofSize: 18, weight: .semibold)
+        heading.setAccessibilityLabel("\(title) settings")
+        sectionTitles.append(heading)
         let grid = NSGridView(views: rows)
         grid.rowSpacing = 12; grid.columnSpacing = 16
         grid.setContentHuggingPriority(.required, for: .vertical)
@@ -111,21 +122,25 @@ enum SettingsSection: String {
         grid.column(at: 1).xPlacement = .leading
         grid.yPlacement = .center
         let description = NSTextField(wrappingLabelWithString: explanation)
-        description.textColor = .labelColor
         description.font = .systemFont(ofSize: 12)
         description.widthAnchor.constraint(equalToConstant: 570).isActive = true
+        descriptions.append(description)
         let reset = NSButton(title: title == "Layout" ? "Restore Default Layout" : "Reset \(title) Defaults", target: self, action: #selector(resetSection(_:)))
         reset.identifier = NSUserInterfaceItemIdentifier(title)
         reset.bezelStyle = .rounded
         let filler = NSView()
         filler.setContentHuggingPriority(.defaultLow, for: .vertical)
-        let content = NSStackView(views: [grid, description, reset, filler])
-        content.orientation = .vertical; content.alignment = .leading; content.spacing = 22
+        let content = NSStackView(views: [heading, description, grid, reset, filler])
+        content.orientation = .vertical; content.alignment = .leading; content.spacing = 18
         content.edgeInsets = NSEdgeInsets(top: 24, left: 20, bottom: 24, right: 20)
+        content.setCustomSpacing(26, after: description)
+        content.setCustomSpacing(24, after: grid)
         description.setContentHuggingPriority(.required, for: .vertical)
         reset.setContentHuggingPriority(.required, for: .vertical)
+        sectionContents.append(content)
         let scroller = NSScrollView()
         scroller.hasVerticalScroller = true
+        sectionScrollers.append(scroller)
         scroller.documentView = content
         content.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -142,6 +157,13 @@ enum SettingsSection: String {
     func refresh() {
         guard let app else { return }
         let value = app.preferences.values
+        let sasNative = value.appearance == .sasStudio
+        window?.backgroundColor = sasNative ? .white : .windowBackgroundColor
+        sectionTitles.forEach { $0.textColor = sasNative ? StudioStyle.blue : .labelColor }
+        descriptions.forEach { $0.textColor = sasNative ? StudioStyle.muted : .secondaryLabelColor }
+        rowLabels.forEach { $0.textColor = sasNative ? StudioStyle.ink : .labelColor }
+        sectionContents.forEach { StudioStyle.background(sasNative ? .white : nil, on: $0) }
+        sectionScrollers.forEach { $0.backgroundColor = sasNative ? .white : .windowBackgroundColor }
         func choose(_ id: String, _ index: Int) {
             if let popup = controls[id] as? NSPopUpButton { popup.selectItem(at: max(0, min(index, popup.numberOfItems - 1))) }
         }

@@ -16,14 +16,18 @@ final class LineRuler: NSRulerView {
     required init(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 
     override func drawHashMarksAndLabels(in rect: NSRect) {
-        palette.background.setFill()
+        (usesStudioStyle ? StudioStyle.chrome : palette.background).setFill()
         bounds.fill()
+        if usesStudioStyle {
+            StudioStyle.line.setFill()
+            NSRect(x: bounds.maxX - 1, y: bounds.minY, width: 1, height: bounds.height).fill()
+        }
         guard let editor, let layout = editor.layoutManager, let container = editor.textContainer else { return }
         let visible = scrollView?.contentView.bounds ?? .zero
         let text = editor.string as NSString
         let attrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(ofSize: labelSize, weight: .regular),
-            .foregroundColor: usesStudioStyle ? NSColor.secondaryLabelColor : palette.comment
+            .foregroundColor: usesStudioStyle ? StudioStyle.muted : palette.comment
         ]
         var offset = 0, line = 1
         while offset < text.length {
@@ -41,7 +45,8 @@ final class LineRuler: NSRulerView {
         if text.length == 0 || text.hasSuffix("\n") {
             layout.ensureLayout(for: container)
             let y = layout.extraLineFragmentRect.minY + editor.textContainerInset.height - visible.minY
-            ("\(line)" as NSString).draw(at: NSPoint(x: ruleThickness - 24, y: y), withAttributes: attrs)
+            let label = "\(line)" as NSString
+            label.draw(at: NSPoint(x: ruleThickness - label.size(withAttributes: attrs).width - 10, y: y), withAttributes: attrs)
         }
     }
 }

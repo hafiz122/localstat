@@ -124,6 +124,19 @@ final class PreferencesIntegrationTests: XCTestCase {
         return IDEPreferences(defaults: defaults)
     }
 
+    @MainActor func testSASNativeIsStartupDefaultAndPreservesExplicitSystemChoice() throws {
+        let preferences = try isolatedPreferences()
+        XCTAssertEqual(preferences.values.appearance, .sasStudio)
+        XCTAssertEqual(preferences.values.theme, .sasStudio)
+        XCTAssertEqual(preferences.values.appearance.title, "SAS Native")
+        XCTAssertEqual(preferences.values.theme.title, "SAS Native")
+
+        preferences.update { $0.appearance = .system; $0.theme = .native }
+        let reopened = IDEPreferences(defaults: preferences.defaults)
+        XCTAssertEqual(reopened.values.appearance, .system)
+        XCTAssertEqual(reopened.values.theme, .native)
+    }
+
     @MainActor func testPreferenceMigrationPersistenceAndSectionReset() throws {
         let preferences = try isolatedPreferences()
         preferences.defaults.set("dark", forKey: "appearancePreference")
@@ -139,7 +152,7 @@ final class PreferencesIntegrationTests: XCTestCase {
         let reopened = IDEPreferences(defaults: preferences.defaults)
         XCTAssertEqual(reopened.values, preferences.values)
         reopened.reset("Layout")
-        XCTAssertEqual(reopened.values.navigatorWidth, 215)
+        XCTAssertEqual(reopened.values.navigatorWidth, 235)
         XCTAssertEqual(reopened.values.editorFontSize, 19)
         XCTAssertEqual(reopened.values.appearance, .dark)
         XCTAssertEqual(reopened.defaults.string(forKey: "projectFolder"), "/my/project")

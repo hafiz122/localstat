@@ -40,7 +40,6 @@ extension AppDelegate {
         studioBanner.isHidden = !studio
         StudioStyle.background(studio ? StudioStyle.blue : nil, on: studioBanner)
         StudioStyle.background(studio ? StudioStyle.chrome : nil, on: toolbar)
-        StudioStyle.background(studio ? .white : nil, on: codeHeader)
         StudioStyle.background(studio ? StudioStyle.chrome : nil, on: editorToolbar)
         StudioStyle.background(studio ? .white : nil, on: navigatorPane)
         StudioStyle.background(studio ? StudioStyle.chrome : nil, on: resultsHeader)
@@ -59,6 +58,9 @@ extension AppDelegate {
         fileScroll.backgroundColor = studio ? .white : .controlBackgroundColor
         diagnosticTable.backgroundColor = studio ? .white : .controlBackgroundColor
         tableScroll.backgroundColor = studio ? .white : .controlBackgroundColor
+        if let messageView = tableScroll.documentView as? NSTextView {
+            messageView.textColor = studio ? StudioStyle.muted : .secondaryLabelColor
+        }
         runButton.bezelColor = studio ? StudioStyle.blue : nil
         runButton.contentTintColor = studio ? .white : nil
         runButton.attributedTitle = studio
