@@ -75,9 +75,19 @@ final class EditorIntegrationTests: XCTestCase {
         XCTAssertLessThanOrEqual(reopenedApp.resultsSelector.frame.maxX, reopenedApp.resultsContainer.bounds.maxX)
         XCTAssertLessThanOrEqual(reopenedApp.expandResultsButton.frame.maxX, reopenedApp.resultsContainer.bounds.maxX)
 
+        reopenedApp.navigatorSplit.setPosition(500, ofDividerAt: 0)
+        reopenedApp.window.contentView?.layoutSubtreeIfNeeded()
+        XCTAssertGreaterThanOrEqual(reopenedApp.editorResultsSplit.frame.width, 510)
+        XCTAssertLessThanOrEqual(reopenedApp.expandResultsButton.frame.maxX, reopenedApp.resultsContainer.bounds.maxX)
+        reopenedApp.editorResultsSplit.setPosition(50, ofDividerAt: 0)
+        reopenedApp.window.contentView?.layoutSubtreeIfNeeded()
+        XCTAssertGreaterThanOrEqual(reopenedApp.tabs.frame.height, 160)
+
         reopenedApp.resultsSelector.selectedSegment = 2
         reopenedApp.changeResultsView()
         XCTAssertEqual(reopenedApp.results.selectedTabViewItem?.identifier as? String, "diagnostics")
+        XCTAssertFalse(reopenedApp.diagnosticsEmptyLabel.isHidden)
+        XCTAssertEqual(reopenedApp.diagnosticsEmptyLabel.stringValue, "Run a program to see diagnostics here.")
     }
 
     @MainActor func testProjectNavigatorShowsFoldersAndPreservesExpansion() throws {
@@ -224,6 +234,29 @@ final class EditorIntegrationTests: XCTestCase {
         app.changeAppearance()
         XCTAssertNil(NSApp.appearance)
         XCTAssertEqual(defaults.string(forKey: "appearancePreference"), "system")
+    }
+
+    @MainActor func testSASNativeGutterFollowsAppAppearance() throws {
+        _ = NSApplication.shared
+        let suite = "LocalStatGutter.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let originalAppearance = NSApp.appearance
+        let app = AppDelegate()
+        app.appearanceDefaults = defaults
+        app.buildWindow()
+        defer {
+            app.window.delegate = nil
+            app.window.close()
+            NSApp.appearance = originalAppearance
+        }
+        let document = EditorDocument(url: nil, source: "data sample; run;")
+        app.addDocument(document)
+        XCTAssertTrue(document.ruler.usesStudioStyle)
+        app.preferences.update { $0.appearance = .dark }
+        XCTAssertFalse(document.ruler.usesStudioStyle)
+        app.preferences.update { $0.appearance = .sasStudio }
+        XCTAssertTrue(document.ruler.usesStudioStyle)
     }
 
     @MainActor func testAppOpenSaveRunAndDiagnosticsInBothAppearances() async throws {

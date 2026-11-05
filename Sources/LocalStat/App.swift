@@ -35,7 +35,6 @@ final class ProjectNode {
     let codeLabel = NSTextField(labelWithString: "Program")
     let editorToolbar = NSStackView()
     let resultsHeader = NSStackView()
-    let resultsTitle = NSTextField(labelWithString: "Results")
     let statusBar = NSStackView()
     let folderButton = NSButton(title: "Open Project…", target: nil, action: nil)
     let fileScroll = NSScrollView()
@@ -43,6 +42,7 @@ final class ProjectNode {
     let expandResultsButton = NSButton(title: "Expand Results", target: nil, action: nil)
     let outputView = NSTextView()
     let tableScroll = NSScrollView()
+    let diagnosticsEmptyLabel = NSTextField(wrappingLabelWithString: "Run a program to see diagnostics here.")
     let statusLabel = NSTextField(labelWithString: "Open a program or create a new one.")
     let explorerHeader = NSTextField(labelWithString: "Explorer")
     let projectLabel = NSTextField(labelWithString: "Project")
@@ -67,6 +67,7 @@ final class ProjectNode {
     private(set) var resultsExpanded = false
     private var navigatorWidth: CGFloat = 235
     private var normalResultsFraction: CGFloat = 0.38
+    private let minimumWorkbenchWidth: CGFloat = 510
     private var navigatorMinimumWidth: NSLayoutConstraint?
     private var applyingLayout = false
     var appliedWorkspaceAppearance: AppearancePreference?
@@ -318,7 +319,23 @@ final class ProjectNode {
         diagnosticTable.target = self; diagnosticTable.doubleAction = #selector(goToDiagnostic)
         diagnosticTable.setAccessibilityLabel("Runtime diagnostics")
         diagnosticTable.rowHeight = 23
-        let diagItem = NSTabViewItem(identifier: "diagnostics"); diagItem.label = "Diagnostics"; diagItem.view = scroll(diagnosticTable)
+        let diagnosticsPane = NSView()
+        let diagnosticsScroll = scroll(diagnosticTable)
+        diagnosticsScroll.translatesAutoresizingMaskIntoConstraints = false
+        diagnosticsEmptyLabel.font = .systemFont(ofSize: 12)
+        diagnosticsEmptyLabel.translatesAutoresizingMaskIntoConstraints = false
+        diagnosticsPane.addSubview(diagnosticsScroll)
+        diagnosticsPane.addSubview(diagnosticsEmptyLabel)
+        NSLayoutConstraint.activate([
+            diagnosticsScroll.leadingAnchor.constraint(equalTo: diagnosticsPane.leadingAnchor),
+            diagnosticsScroll.trailingAnchor.constraint(equalTo: diagnosticsPane.trailingAnchor),
+            diagnosticsScroll.topAnchor.constraint(equalTo: diagnosticsPane.topAnchor),
+            diagnosticsScroll.bottomAnchor.constraint(equalTo: diagnosticsPane.bottomAnchor),
+            diagnosticsEmptyLabel.leadingAnchor.constraint(equalTo: diagnosticsPane.leadingAnchor, constant: 16),
+            diagnosticsEmptyLabel.trailingAnchor.constraint(lessThanOrEqualTo: diagnosticsPane.trailingAnchor, constant: -16),
+            diagnosticsEmptyLabel.topAnchor.constraint(equalTo: diagnosticsPane.topAnchor, constant: 40)
+        ])
+        let diagItem = NSTabViewItem(identifier: "diagnostics"); diagItem.label = "Diagnostics"; diagItem.view = diagnosticsPane
         results.addTabViewItem(outItem); results.addTabViewItem(tableItem); results.addTabViewItem(diagItem)
         resultsSelector.segmentCount = 3
         for (index, title) in ["Results", "Output Data (0)", "Diagnostics (0)"].enumerated() {
@@ -332,9 +349,8 @@ final class ProjectNode {
         expandResultsButton.target = self
         expandResultsButton.action = #selector(toggleResultsExpansion)
         expandResultsButton.bezelStyle = .rounded
-        resultsTitle.font = .systemFont(ofSize: 12, weight: .semibold)
         let headerSpacer = NSView(); headerSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        [resultsTitle, resultsSelector, headerSpacer, expandResultsButton].forEach { resultsHeader.addArrangedSubview($0) }
+        [resultsSelector, headerSpacer, expandResultsButton].forEach { resultsHeader.addArrangedSubview($0) }
         resultsHeader.edgeInsets = NSEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)
         resultsHeader.spacing = 8
         resultsHeader.heightAnchor.constraint(equalToConstant: 38).isActive = true
@@ -396,7 +412,7 @@ final class ProjectNode {
             navigatorPane.isHidden = false
             navigatorMinimumWidth?.isActive = true
             navigatorSplit.adjustSubviews()
-            let maximum = max(150, navigatorSplit.bounds.width - 400)
+            let maximum = max(150, navigatorSplit.bounds.width - navigatorSplit.dividerThickness - minimumWorkbenchWidth)
             navigatorSplit.setPosition(min(max(navigatorWidth, 150), maximum), ofDividerAt: 0)
         } else {
             navigatorMinimumWidth?.isActive = false
@@ -407,11 +423,33 @@ final class ProjectNode {
 
     private func applyResultsLayout() {
         let available = editorResultsSplit.bounds.height - editorResultsSplit.dividerThickness
-        let minimumEditorHeight = 160 + ProgramTabStrip.stripHeight
+        let minimumEditorHeight = 160 + ProgramTabStrip.stripHeight + 38
         guard available >= minimumEditorHeight + 140 else { return }
         let fraction = resultsExpanded ? 0.60 : normalResultsFraction
         let resultsHeight = min(max(available * fraction, 140), available - minimumEditorHeight)
         editorResultsSplit.setPosition(available - resultsHeight, ofDividerAt: 0)
+    }
+
+    func splitView(_ splitView: NSSplitView, constrainSplitPosition proposedPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
+        guard dividerIndex == 0 else { return proposedPosition }
+        if splitView === navigatorSplit {
+            let maximum = max(150, splitView.bounds.width - splitView.dividerThickness - minimumWorkbenchWidth)
+            return min(max(proposedPosition, 150), maximum)
+        }
+        if splitView === editorResultsSplit {
+            let available = splitView.bounds.height - splitView.dividerThickness
+            let minimumEditorHeight = 160 + ProgramTabStrip.stripHeight + 38
+            return min(max(proposedPosition, minimumEditorHeight), available - 140)
+        }
+        return proposedPosition
+    }
+
+    func windowDidResize(_ notification: Notification) {
+        guard !applyingLayout, navigatorSplit.superview != nil else { return }
+        applyingLayout = true
+        applyNavigatorLayout()
+        applyResultsLayout()
+        applyingLayout = false
     }
 
     func splitViewDidResizeSubviews(_ notification: Notification) {
@@ -795,6 +833,8 @@ final class ProjectNode {
         guard let doc = current, !runner.isRunning else { return }
         let request = RunRequest(source: doc.textView.string, sourceURL: doc.url, workingDirectory: projectURL)
         lastRunDocument = doc; lastResult = nil; diagnostics = []; diagnosticTable.reloadData()
+        diagnosticsEmptyLabel.stringValue = "Running locally. Diagnostics will appear when the run finishes."
+        diagnosticsEmptyLabel.isHidden = false
         outputView.string = "Running locally. Output is buffered by the runtime until execution completes."
         setTableMessage("Running locally…")
         statusLabel.stringValue = "Running \(doc.url?.lastPathComponent ?? "Untitled.sas") · fresh session"
@@ -810,6 +850,8 @@ final class ProjectNode {
                 setTableMessage(result.tableIssue ?? "This run produced no formatted PRINT, FREQ, or TABULATE tables.")
             }
             diagnosticTable.reloadData()
+            diagnosticsEmptyLabel.stringValue = "This run produced no diagnostics."
+            diagnosticsEmptyLabel.isHidden = !diagnostics.isEmpty
             applyOutputPreferences()
             resultsSelector.setLabel("Output Data (\(result.tables.count))", forSegment: 1)
             resultsSelector.setLabel("Diagnostics (\(diagnostics.count))", forSegment: 2)

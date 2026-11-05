@@ -217,7 +217,7 @@ final class EditorDocument: NSObject, NSTextViewDelegate {
         scrollView.rulersVisible = value.lineNumbers
         configureWrapping(textView, in: scrollView, enabled: value.editorWrap)
         ruler.palette = palette
-        ruler.usesStudioStyle = value.theme == .sasStudio
+        ruler.usesStudioStyle = value.theme == .sasStudio && value.appearance == .sasStudio
         ruler.labelSize = max(10, CGFloat(value.editorFontSize) - 2)
         highlight()
         textView.selectedRanges = selected

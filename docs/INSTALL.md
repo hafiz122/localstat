@@ -1,14 +1,14 @@
-# Install LocalStat 0.1.2-alpha
+# Install LocalStat 0.1.3-alpha
 
 Requires an Apple Silicon Mac and macOS 14 or later. The alpha app contains its
 runtime; Zig, Xcode, Python, and SAS are not needed to run the downloaded app.
 
-Download `LocalStat-0.1.2-alpha-arm64.zip` and its `.zip.sha256` file from the
-same [public GitHub release](https://github.com/hafiz122/localstat/releases/tag/v0.1.2-alpha).
+Download `LocalStat-0.1.3-alpha-arm64.zip` and its `.zip.sha256` file from the
+same [public GitHub release](https://github.com/hafiz122/localstat/releases/tag/v0.1.3-alpha).
 From the directory containing both files, verify:
 
 ```sh
-shasum -a 256 -c LocalStat-0.1.2-alpha-arm64.zip.sha256
+shasum -a 256 -c LocalStat-0.1.3-alpha-arm64.zip.sha256
 ```
 
 Expect `OK`. If verification fails, discard the download and download both files
