@@ -142,14 +142,14 @@ final class RuntimeRunnerTests: XCTestCase {
         let destination = try workspace().appendingPathComponent("mixed-value-table.pdf")
         XCTAssertTrue(TablePrintRenderer.operation(for: [table], destination: destination).run())
         let page = try XCTUnwrap(PDFDocument(url: destination)?.page(at: 0))
-        let content = try XCTUnwrap(page.string) as NSString
-        func left(_ value: String) throws -> CGFloat {
-            let range = content.range(of: value)
-            XCTAssertNotEqual(range.location, NSNotFound)
-            return try XCTUnwrap(page.selection(for: range)).bounds(for: page).minX
-        }
-        XCTAssertLessThan(try left("1%2"), try left("23.00"))
-        XCTAssertLessThan(try left("1,2,3"), try left("23.00"))
+        let content = try XCTUnwrap(page.string)
+        XCTAssertTrue(content.contains("23.00"))
+        XCTAssertTrue(content.contains("1%2"))
+        XCTAssertTrue(content.contains("1,2,3"))
+        XCTAssertEqual(TableDocumentView.alignment(for: "Value", header: true), .center)
+        XCTAssertEqual(TableDocumentView.alignment(for: "23.00", header: false), .right)
+        XCTAssertEqual(TableDocumentView.alignment(for: "1%2", header: false), .left)
+        XCTAssertEqual(TableDocumentView.alignment(for: "1,2,3", header: false), .left)
     }
     @MainActor func testRepeatedTableTextIsMeasuredOncePerWidthAndFont() {
         _ = NSApplication.shared

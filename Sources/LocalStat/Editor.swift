@@ -184,6 +184,8 @@ final class EditorDocument: NSObject, NSTextViewDelegate {
         }
         scrollView.documentView = textView
         ruler = LineRuler(scrollView: scrollView, editor: textView)
+        ruler.wantsLayer = true
+        ruler.layer?.masksToBounds = true
         scrollView.verticalRulerView = ruler
         scrollView.hasVerticalRuler = true
         scrollView.rulersVisible = true

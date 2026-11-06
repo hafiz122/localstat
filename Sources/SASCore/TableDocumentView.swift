@@ -306,7 +306,7 @@ import AppKit
             border.stroke()
             let paragraph = NSMutableParagraphStyle()
             paragraph.lineBreakMode = .byCharWrapping
-            paragraph.alignment = header ? .center : (isNumeric(cell.text) ? .right : .left)
+            paragraph.alignment = Self.alignment(for: cell.text, header: header)
             let font = row.kind == "note" ? noteFont : (header || row.kind != "data" ? headerFont : bodyFont)
             let inset = forPrinting ? rect.insetBy(dx: 5, dy: 4) : rect.insetBy(dx: 6, dy: 5)
             (cell.text as NSString).draw(in: inset, withAttributes: [.font: font, .foregroundColor: ink, .paragraphStyle: paragraph])
@@ -315,11 +315,12 @@ import AppKit
         }
     }
 
-    private func isNumeric(_ text: String) -> Bool {
+    static func alignment(for text: String, header: Bool) -> NSTextAlignment {
+        if header { return .center }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !trimmed.contains("\n") else { return false }
+        guard !trimmed.isEmpty, !trimmed.contains("\n") else { return .left }
         let range = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
-        return Self.numericPattern.firstMatch(in: trimmed, range: range) != nil
+        return Self.numericPattern.firstMatch(in: trimmed, range: range) == nil ? .left : .right
     }
 }
 

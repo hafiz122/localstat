@@ -21,9 +21,9 @@ Earlier source-rendered preview with synthetic regression data. It predates the 
 
 ## Project status
 
-LocalStat `0.1.4-alpha` is a public developer preview for Apple Silicon Macs. It is not a full SAS implementation. The app is ad-hoc signed and not notarized. [Download v0.1.4-alpha](https://github.com/hafiz122/localstat/releases/tag/v0.1.4-alpha) and see [installation and known issues](docs/INSTALL.md).
+LocalStat `0.1.5-alpha` is a public developer preview for Apple Silicon Macs. It is not a full SAS implementation. The app is ad-hoc signed and not notarized. [Download v0.1.5-alpha](https://github.com/hafiz122/localstat/releases/tag/v0.1.5-alpha) and see [installation and known issues](docs/INSTALL.md).
 
-This release opens a fresh SAS Native workbench with an empty Project Explorer and an untitled program. Bundled examples remain available through Help and in a separate folder. The extra top bar is removed. Supported `PROC PRINT`, `PROC FREQ`, and `PROC TABULATE` tables retain complete cell borders on screen and in print.
+This release opens a fresh SAS Native workbench with an empty Project Explorer and an untitled program. Bundled examples remain available through Help and in a separate folder. The extra top bar is removed, and the editor gutter divider stays clear of program tabs. Supported `PROC PRINT`, `PROC FREQ`, and `PROC TABULATE` tables retain complete cell borders on screen and in print.
 
 | Area | Current status |
 | --- | --- |

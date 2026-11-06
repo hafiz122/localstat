@@ -8,7 +8,7 @@ questions below are study notes, outside the five-minute script.
 
 ## Before presenting
 
-1. Open LocalStat `0.1.4-alpha` or a current source build. The original
+1. Open LocalStat `0.1.5-alpha` or a current source build. The original
    `0.1.0-alpha` predates the formatted output data view used here.
 2. Open this presentation's `demo` folder as the project folder.
 3. Open `01-regression.sas`, `02-reporting.sas`, and `03-limitation.sas`.
