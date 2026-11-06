@@ -1,14 +1,21 @@
 # Verification record
 
-## Current integration: 5 November 2026
+## Current integration: 6 November 2026
 
 The maintained suite includes the memory and PRINT optimizations below, plus
 later editor, PDF, and benchmark-auditor regressions. Run `./scripts/test.sh`
-for the current source: 973 runtime unit tests, 1,924 corpus programs, 11
-end-to-end programs, 78 Swift tests (one opt-in measurement skipped by default),
-16 packaged-runtime checks, 37 benchmark checks, 3 Help checks, and the
-repository text check. The dated records below retain the counts and source
-identity of their original runs.
+for the current source: 1,015 runtime unit tests, 1,924 corpus programs, 11
+end-to-end programs, 85 Swift tests (one opt-in measurement skipped by default),
+19 packaged-runtime checks, 37 benchmark checks, fixture and procedure-inventory
+checks, 3 Help checks, and the repository text check. The procedure parity
+workbench currently has no licensed-SAS reference fixtures; these passing tests
+do not establish SAS 9.4M9 parity. The dated records below retain the counts and
+source identity of their original runs.
+
+The new packaged-runtime plotting check runs PROC PRINT with SCATTER, SERIES,
+VBAR, and HBAR plots in one program. It checks table and graphic entries in the
+result manifest, parses each SVG, and verifies that the expected drawing marks
+are present. The app's Graphics tab also has native integration coverage.
 
 ## Performance optimization follow-up: 4 November 2026
 

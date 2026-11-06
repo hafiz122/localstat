@@ -54,8 +54,7 @@ pub fn main(init: std.process.Init) !void {
         defer gpa.free(txt_name);
 
         const expected = dir.readFileAlloc(io, txt_name, gpa, max_file) catch |e| {
-            std.debug.print("  {s}: SKIP - no expected {s} ({t})\n", .{ entry.name, txt_name, e });
-            total -= 1;
+            std.debug.print("  {s}: FAIL - no expected {s} ({t})\n", .{ entry.name, txt_name, e });
             continue;
         };
         defer gpa.free(expected);

@@ -4,6 +4,44 @@ import SASCore
 @testable import LocalStat
 
 final class EditorIntegrationTests: XCTestCase {
+    @MainActor func testGraphicsRunOpensGraphicsTabAndEnablesExport() async throws {
+        _ = NSApplication.shared
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LocalStatGraphics-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let script = folder.appendingPathComponent("plot runtime")
+        try """
+        #!/bin/sh
+        mkdir -p "$5/graphics"
+        printf '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><circle cx="50" cy="50" r="30"/></svg>' > "$5/graphics/plot-0001.svg"
+        printf 'plot produced\\n' > "$5/listing.txt"
+        : > "$5/diagnostics.txt"
+        printf '{"version":1,"tables":[]}' > "$5/tables.json"
+        printf '{"schema_version":1,"complete":true,"exit_code":0,"status":"success","objects":[{"kind":"listing","path":"listing.txt"},{"kind":"diagnostics","path":"diagnostics.txt"},{"kind":"graphic","path":"graphics/plot-0001.svg","name":"Scatter Plot","procedure":"SGPLOT","index":0}]}' > "$5/manifest.json"
+        printf 'plot produced\\n'
+        """.write(to: script, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        let app = AppDelegate()
+        app.projectURL = folder
+        app.runner = LocalRuntimeRunner(executable: script, requireResultBundle: true)
+        app.buildMenu()
+        app.buildWindow()
+        defer { app.window.delegate = nil; app.window.close() }
+        app.newDocument(nil)
+        app.current?.textView.string = "proc sgplot; scatter x=x y=y; run;"
+        app.runProgram()
+        for _ in 0..<500 {
+            if app.lastResult != nil { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertEqual(app.lastResult?.status, .success)
+        XCTAssertEqual(app.lastResult?.graphics.count, 1)
+        XCTAssertEqual(app.resultsSelector.selectedSegment, 2)
+        XCTAssertEqual(app.results.selectedTabViewItem?.identifier as? String, "graphics")
+        XCTAssertEqual(app.resultsSelector.label(forSegment: 2), "Graphics (1)")
+        let exportItem = try XCTUnwrap(NSApp.mainMenu?.item(withTitle: "File")?.submenu?.item(withTitle: "Export Graphics as SVG…"))
+        XCTAssertTrue(app.validateMenuItem(exportItem))
+    }
     @MainActor func testCodeFirstLayoutRestoresSizesAndControls() throws {
         _ = NSApplication.shared
         let suiteName = "LocalStatLayoutTests.\(UUID().uuidString)"
@@ -83,7 +121,7 @@ final class EditorIntegrationTests: XCTestCase {
         reopenedApp.window.contentView?.layoutSubtreeIfNeeded()
         XCTAssertGreaterThanOrEqual(reopenedApp.tabs.frame.height, 160)
 
-        reopenedApp.resultsSelector.selectedSegment = 2
+        reopenedApp.resultsSelector.selectedSegment = 3
         reopenedApp.changeResultsView()
         XCTAssertEqual(reopenedApp.results.selectedTabViewItem?.identifier as? String, "diagnostics")
         XCTAssertFalse(reopenedApp.diagnosticsEmptyLabel.isHidden)
@@ -399,7 +437,7 @@ final class EditorIntegrationTests: XCTestCase {
             }
             XCTAssertNotEqual(app.lastResult?.status, .success)
             XCTAssertFalse(app.diagnostics.isEmpty)
-            XCTAssertEqual(app.resultsSelector.selectedSegment, 2)
+            XCTAssertEqual(app.resultsSelector.selectedSegment, 3)
             XCTAssertEqual(app.resultsContainer.frame.height, resultsHeight, accuracy: 1)
             XCTAssertTrue(app.runButton.isEnabled)
             document.textView.string = "data _null_; do i=1 to 5000; put i; end; run;"

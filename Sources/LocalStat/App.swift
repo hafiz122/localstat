@@ -1,6 +1,7 @@
 import AppKit
 import SASCore
 import UniformTypeIdentifiers
+import WebKit
 
 final class ProjectNode {
     let url: URL
@@ -15,7 +16,7 @@ final class ProjectNode {
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     NSTableViewDataSource, NSTableViewDelegate, NSOutlineViewDataSource, NSOutlineViewDelegate,
-    NSTabViewDelegate, NSSplitViewDelegate, NSMenuItemValidation {
+    NSTabViewDelegate, NSSplitViewDelegate, NSMenuItemValidation, WKNavigationDelegate {
     var window: NSWindow!
     let preferences = IDEPreferences()
     var helpController: HelpWindowController?
@@ -41,6 +42,14 @@ final class ProjectNode {
     let expandResultsButton = NSButton(title: "Expand Results", target: nil, action: nil)
     let outputView = NSTextView()
     let tableScroll = NSScrollView()
+    lazy var graphicsView: WKWebView = {
+        let configuration = WKWebViewConfiguration()
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+        let view = WKWebView(frame: .zero, configuration: configuration)
+        view.navigationDelegate = self
+        view.setAccessibilityLabel("Program graphics")
+        return view
+    }()
     let diagnosticsEmptyLabel = NSTextField(wrappingLabelWithString: "Run a program to see diagnostics here.")
     let statusLabel = NSTextField(labelWithString: "Open a program or create a new one.")
     let explorerHeader = NSTextField(labelWithString: "Explorer")
@@ -80,7 +89,7 @@ final class ProjectNode {
     private var pendingOpenURLs: [URL] = []
     var projectURL = FileManager.default.homeDirectoryForCurrentUser
     var applicationSupportDirectoryOverride: URL?
-    lazy var runner = LocalRuntimeRunner(executable: Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/opensas"))
+    lazy var runner = LocalRuntimeRunner(executable: Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/opensas"), requireResultBundle: true)
     var current: EditorDocument? {
         guard let id = tabs.selectedTabViewItem?.identifier as? UUID else { return nil }
         return documents.first { $0.id == id }
@@ -135,6 +144,7 @@ final class ProjectNode {
         file.addItem(.separator())
         item(file, "Export Last Run as Text…", #selector(exportResult), target: self)
         item(file, "Export Report as PDF…", #selector(exportPDFReport), target: self)
+        item(file, "Export Graphics as SVG…", #selector(exportGraphics), target: self)
         item(file, "Print Tables…", #selector(printTables), "p", target: self)
         let edit = section("Edit")
         item(edit, "Undo", Selector(("undo:")), "z")
@@ -304,6 +314,8 @@ final class ProjectNode {
         tableScroll.autohidesScrollers = true
         setTableMessage("Run a program to see formatted tables here.")
         let tableItem = NSTabViewItem(identifier: "tables"); tableItem.label = "Output Data"; tableItem.view = tableScroll
+        graphicsView.loadHTMLString(GraphicsDocument.html(for: []), baseURL: nil)
+        let graphicsItem = NSTabViewItem(identifier: "graphics"); graphicsItem.label = "Graphics"; graphicsItem.view = graphicsView
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("diagnostic"))
         column.title = "Runtime diagnostics · double-click an original-source line to navigate"
         column.width = 800
@@ -329,9 +341,9 @@ final class ProjectNode {
             diagnosticsEmptyLabel.topAnchor.constraint(equalTo: diagnosticsPane.topAnchor, constant: 40)
         ])
         let diagItem = NSTabViewItem(identifier: "diagnostics"); diagItem.label = "Diagnostics"; diagItem.view = diagnosticsPane
-        results.addTabViewItem(outItem); results.addTabViewItem(tableItem); results.addTabViewItem(diagItem)
-        resultsSelector.segmentCount = 3
-        for (index, title) in ["Results", "Output Data (0)", "Diagnostics (0)"].enumerated() {
+        results.addTabViewItem(outItem); results.addTabViewItem(tableItem); results.addTabViewItem(graphicsItem); results.addTabViewItem(diagItem)
+        resultsSelector.segmentCount = 4
+        for (index, title) in ["Results", "Output Data (0)", "Graphics (0)", "Diagnostics (0)"].enumerated() {
             resultsSelector.setLabel(title, forSegment: index)
         }
         resultsSelector.trackingMode = .selectOne
@@ -491,8 +503,14 @@ final class ProjectNode {
         switch index {
         case 0: window.makeFirstResponder(outputView)
         case 1: window.makeFirstResponder(tableScroll.documentView)
+        case 2: window.makeFirstResponder(graphicsView)
         default: window.makeFirstResponder(diagnosticTable)
         }
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        decisionHandler(navigationAction.request.url?.scheme == "about" ? .allow : .cancel)
     }
 
     private func selectResults(at index: Int) {
@@ -845,6 +863,7 @@ final class ProjectNode {
         diagnosticsEmptyLabel.isHidden = false
         outputView.string = "Running locally. Output is buffered by the runtime until execution completes."
         setTableMessage("Running locally…")
+        graphicsView.loadHTMLString(GraphicsDocument.html(for: []), baseURL: nil)
         statusLabel.stringValue = "Running \(doc.url?.lastPathComponent ?? "Untitled.sas") · fresh session"
         runButton.isEnabled = false; stopButton.isEnabled = true
         Task {
@@ -857,14 +876,17 @@ final class ProjectNode {
             } else {
                 setTableMessage(result.tableIssue ?? "This run produced no formatted PRINT, FREQ, or TABULATE tables.")
             }
+            graphicsView.loadHTMLString(GraphicsDocument.html(for: result.graphics), baseURL: nil)
             diagnosticTable.reloadData()
             diagnosticsEmptyLabel.stringValue = "This run produced no diagnostics."
             diagnosticsEmptyLabel.isHidden = !diagnostics.isEmpty
             applyOutputPreferences()
             resultsSelector.setLabel("Output Data (\(result.tables.count))", forSegment: 1)
-            resultsSelector.setLabel("Diagnostics (\(diagnostics.count))", forSegment: 2)
-            if result.status != .success { selectResults(at: 2) }
+            resultsSelector.setLabel("Graphics (\(result.graphics.count))", forSegment: 2)
+            resultsSelector.setLabel("Diagnostics (\(diagnostics.count))", forSegment: 3)
+            if result.status != .success { selectResults(at: 3) }
             else if !result.tables.isEmpty { selectResults(at: 1) }
+            else if !result.graphics.isEmpty { selectResults(at: 2) }
             else { selectResults(at: 0) }
             statusLabel.stringValue = "\(result.status.description) · \(doc.url?.lastPathComponent ?? "Untitled.sas") · fresh session"
             updateControls(); refreshProject()
@@ -927,6 +949,42 @@ final class ProjectNode {
             do {
                 try PDFReportRenderer.write(report, to: url)
                 statusLabel.stringValue = "Exported PDF report to \(url.lastPathComponent)"
+            } catch { showError(error) }
+        }
+    }
+    @objc func exportGraphics() {
+        guard let graphics = lastResult?.graphics, !graphics.isEmpty else { return }
+        if graphics.count == 1 {
+            let panel = NSSavePanel()
+            panel.directoryURL = projectURL
+            panel.allowedContentTypes = [UTType(filenameExtension: "svg") ?? .data]
+            panel.nameFieldStringValue = "plot.svg"
+            panel.title = "Export Graphic"
+            if panel.runModal() == .OK, let destination = panel.url {
+                do {
+                    try graphics[0].svg.write(to: destination, options: .atomic)
+                    statusLabel.stringValue = "Exported graphic to \(destination.lastPathComponent)"
+                } catch { showError(error) }
+            }
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.directoryURL = projectURL
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Export Here"
+        panel.title = "Choose a Folder for \(graphics.count) Graphics"
+        if panel.runModal() == .OK, let folder = panel.url {
+            do {
+                let destination = folder.appendingPathComponent("LocalStat Graphics \(UUID().uuidString)")
+                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
+                for (index, graphic) in graphics.enumerated() {
+                    let filename = String(format: "plot-%04d.svg", index + 1)
+                    try graphic.svg.write(to: destination.appendingPathComponent(filename), options: .atomic)
+                }
+                statusLabel.stringValue = "Exported \(graphics.count) graphics to \(destination.lastPathComponent)"
             } catch { showError(error) }
         }
     }
@@ -1013,6 +1071,7 @@ final class ProjectNode {
         case #selector(increaseSize), #selector(decreaseSize), #selector(resetSize), #selector(findInActiveWindow(_:)):
             return settingsController == nil || NSApp.keyWindow !== settingsController?.window
         case #selector(exportResult), #selector(exportPDFReport): return lastResult != nil
+        case #selector(exportGraphics): return !(lastResult?.graphics.isEmpty ?? true)
         case #selector(printTables): return !(lastResult?.tables.isEmpty ?? true)
         default: return true
         }

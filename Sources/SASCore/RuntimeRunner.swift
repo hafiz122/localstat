@@ -15,7 +15,7 @@ public struct RunRequest {
 
 public enum RunStatus: Equatable {
     case success, programError, unsupported, cancelled
-    case exited(Int32), crashed(Int32), launchFailure(String)
+    case exited(Int32), crashed(Int32), launchFailure(String), resultFailure
 
     public var description: String {
         switch self {
@@ -26,6 +26,7 @@ public enum RunStatus: Equatable {
         case .exited(let code): return "Exited with code \(code)"
         case .crashed(let signal): return "Runtime terminated by signal \(signal)"
         case .launchFailure(let reason): return "Could not run: \(reason)"
+        case .resultFailure: return "Result transfer failed"
         }
     }
 }
@@ -59,16 +60,18 @@ public struct RunResult {
     public let status: RunStatus
     public let exitCode: Int32?
     public let tables: [ResultTable]
+    public let graphics: [ResultGraphic]
     public let tableIssue: String?
     public var diagnostics: [Diagnostic] { Diagnostic.parse(diagnosticText) }
 
-    public init(request: RunRequest, output: String, diagnosticText: String, status: RunStatus, exitCode: Int32?, tables: [ResultTable] = [], tableIssue: String? = nil) {
+    public init(request: RunRequest, output: String, diagnosticText: String, status: RunStatus, exitCode: Int32?, tables: [ResultTable] = [], graphics: [ResultGraphic] = [], tableIssue: String? = nil) {
         self.request = request
         self.output = output
         self.diagnosticText = diagnosticText
         self.status = status
         self.exitCode = exitCode
         self.tables = tables
+        self.graphics = graphics
         self.tableIssue = tableIssue
     }
 }
@@ -82,10 +85,14 @@ public struct RunResult {
 @MainActor public final class LocalRuntimeRunner: RuntimeRunner {
     public private(set) var isRunning = false
     private let executable: URL
+    private let requireResultBundle: Bool
     private var process: Process?
     private var cancelled = false
 
-    public init(executable: URL) { self.executable = executable }
+    public init(executable: URL, requireResultBundle: Bool = false) {
+        self.executable = executable
+        self.requireResultBundle = requireResultBundle
+    }
 
     public func run(_ request: RunRequest) async -> RunResult {
         guard !isRunning else {
@@ -104,10 +111,13 @@ public struct RunResult {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let snapshot = directory.appendingPathComponent("program.sas")
             let tableFile = directory.appendingPathComponent("tables.json")
+            let resultsDirectory = directory.appendingPathComponent("results")
             try request.source.write(to: snapshot, atomically: true, encoding: .utf8)
             let child = Process()
             child.executableURL = executable
-            child.arguments = [snapshot.path, "--tables-json", tableFile.path]
+            var arguments = [snapshot.path, "--tables-json", tableFile.path]
+            if requireResultBundle { arguments += ["--results-dir", resultsDirectory.path] }
+            child.arguments = arguments
             child.currentDirectoryURL = request.workingDirectory
             let stdout = Pipe(), stderr = Pipe()
             child.standardOutput = stdout
@@ -123,7 +133,7 @@ public struct RunResult {
             let termination = await Self.wait(child)
             let output = String(decoding: await outData, as: UTF8.self)
             let errors = String(decoding: await errData, as: UTF8.self)
-            let status: RunStatus
+            var status: RunStatus
             if cancelled { status = .cancelled }
             else if termination.1 == .uncaughtSignal { status = .crashed(termination.0) }
             else {
@@ -135,17 +145,36 @@ public struct RunResult {
                 }
             }
             let tables: [ResultTable]
+            let graphics: [ResultGraphic]
             let tableIssue: String?
-            do {
-                let data = try Data(contentsOf: tableFile)
-                tables = try JSONDecoder().decode(TableFile.self, from: data).validated()
-                tableIssue = nil
-            } catch {
-                tables = []
-                tableIssue = "Formatted tables are unavailable: \(error.localizedDescription)"
+            var diagnosticText = errors
+            if requireResultBundle && termination.1 != .uncaughtSignal && !cancelled {
+                do {
+                    let bundle = try ResultBundle.load(from: resultsDirectory, exitCode: termination.0)
+                    tables = bundle.tables
+                    graphics = bundle.graphics
+                    tableIssue = nil
+                } catch {
+                    status = .resultFailure
+                    let message = "Result transfer failed: \(error.localizedDescription)"
+                    diagnosticText += (diagnosticText.isEmpty || diagnosticText.hasSuffix("\n") ? "" : "\n") + message + "\n"
+                    tables = []
+                    graphics = []
+                    tableIssue = message
+                }
+            } else {
+                graphics = []
+                do {
+                    let data = try Data(contentsOf: tableFile)
+                    tables = try JSONDecoder().decode(TableFile.self, from: data).validated()
+                    tableIssue = nil
+                } catch {
+                    tables = []
+                    tableIssue = "Formatted tables are unavailable: \(error.localizedDescription)"
+                }
             }
-            return RunResult(request: request, output: output, diagnosticText: errors,
-                             status: status, exitCode: termination.0, tables: tables, tableIssue: tableIssue)
+            return RunResult(request: request, output: output, diagnosticText: diagnosticText,
+                             status: status, exitCode: termination.0, tables: tables, graphics: graphics, tableIssue: tableIssue)
         } catch {
             return RunResult(request: request, output: "", diagnosticText: error.localizedDescription,
                              status: .launchFailure(error.localizedDescription), exitCode: nil)

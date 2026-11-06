@@ -195,6 +195,99 @@ final class RuntimeRunnerTests: XCTestCase {
         XCTAssertTrue(result.tables.isEmpty)
         XCTAssertNotNil(result.tableIssue)
     }
+    @MainActor func testRequiredResultBundleFailureIsVisibleAndNextRunRecovers() async throws {
+        let folder = try workspace()
+        let script = try executable("""
+        mkdir "$5"
+        printf 'ordinary output\\n' | tee "$5/listing.txt"
+        : > "$5/diagnostics.txt"
+        printf '{"version":1,"tables":[]}' > "$5/tables.json"
+        if ! grep -q broken "$1"; then
+          printf '{"schema_version":1,"complete":true,"exit_code":0,"status":"success","objects":[{"kind":"listing","path":"listing.txt"},{"kind":"diagnostics","path":"diagnostics.txt"}]}' > "$5/manifest.json"
+        fi
+        """, in: folder)
+        let runner = LocalRuntimeRunner(executable: script, requireResultBundle: true)
+        let broken = await runner.run(RunRequest(source: "broken", sourceURL: nil, workingDirectory: folder))
+        XCTAssertEqual(broken.status, .resultFailure)
+        XCTAssertEqual(broken.exitCode, 0)
+        XCTAssertTrue(broken.diagnosticText.contains("Result transfer failed"))
+        XCTAssertNotNil(broken.tableIssue)
+
+        let good = await runner.run(RunRequest(source: "good", sourceURL: nil, workingDirectory: folder))
+        XCTAssertEqual(good.status, .success)
+        XCTAssertEqual(good.output, "ordinary output\n")
+        XCTAssertTrue(good.tables.isEmpty)
+        XCTAssertNil(good.tableIssue)
+        XCTAssertFalse(runner.isRunning)
+    }
+    func testResultBundleRejectsIncompleteOrUnrecognizedObjects() throws {
+        let folder = try workspace()
+        try "".write(to: folder.appendingPathComponent("listing.txt"), atomically: true, encoding: .utf8)
+        try "".write(to: folder.appendingPathComponent("diagnostics.txt"), atomically: true, encoding: .utf8)
+        try "{\"version\":1,\"tables\":[]}".write(to: folder.appendingPathComponent("tables.json"), atomically: true, encoding: .utf8)
+        let manifest = folder.appendingPathComponent("manifest.json")
+        try """
+        {"schema_version":1,"complete":false,"exit_code":0,"status":"success","objects":[{"kind":"listing","path":"listing.txt"},{"kind":"diagnostics","path":"diagnostics.txt"}]}
+        """.write(to: manifest, atomically: true, encoding: .utf8)
+        XCTAssertThrowsError(try ResultBundle.load(from: folder, exitCode: 0))
+        try """
+        {"schema_version":1,"complete":true,"exit_code":0,"status":"success","objects":[{"kind":"listing","path":"listing.txt"},{"kind":"diagnostics","path":"diagnostics.txt"},{"kind":"graphic","path":"../untrusted.png"}]}
+        """.write(to: manifest, atomically: true, encoding: .utf8)
+        XCTAssertThrowsError(try ResultBundle.load(from: folder, exitCode: 0))
+    }
+    func testResultBundleLoadsOrderedGraphicsAndRejectsIncompleteTransfer() throws {
+        let folder = try workspace()
+        try "".write(to: folder.appendingPathComponent("listing.txt"), atomically: true, encoding: .utf8)
+        try "".write(to: folder.appendingPathComponent("diagnostics.txt"), atomically: true, encoding: .utf8)
+        try "{\"version\":1,\"tables\":[]}".write(to: folder.appendingPathComponent("tables.json"), atomically: true, encoding: .utf8)
+        let plots = folder.appendingPathComponent("graphics")
+        try FileManager.default.createDirectory(at: plots, withIntermediateDirectories: true)
+        let first = "<svg xmlns=\"http://www.w3.org/2000/svg\"><circle r=\"2\"/></svg>"
+        let second = "<svg xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M0 0\"/></svg>"
+        try first.write(to: plots.appendingPathComponent("plot-0001.svg"), atomically: true, encoding: .utf8)
+        let manifest = folder.appendingPathComponent("manifest.json")
+        func writeManifest(_ secondPath: String) throws {
+            try """
+            {"schema_version":1,"complete":true,"exit_code":0,"status":"success","objects":[
+              {"kind":"listing","path":"listing.txt"},{"kind":"diagnostics","path":"diagnostics.txt"},
+              {"kind":"graphic","path":"\(secondPath)","name":"Second","procedure":"SGPLOT","index":1},
+              {"kind":"graphic","path":"graphics/plot-0001.svg","name":"First","procedure":"SGPLOT","index":0}
+            ]}
+            """.write(to: manifest, atomically: true, encoding: .utf8)
+        }
+        try writeManifest("graphics/plot-0002.svg")
+        XCTAssertThrowsError(try ResultBundle.load(from: folder, exitCode: 0), "Missing plot must fail the transfer")
+        try second.write(to: plots.appendingPathComponent("plot-0002.svg"), atomically: true, encoding: .utf8)
+        let bundle = try ResultBundle.load(from: folder, exitCode: 0)
+        XCTAssertEqual(bundle.graphics.map(\.name), ["First", "Second"])
+        XCTAssertEqual(String(decoding: bundle.graphics[0].svg, as: UTF8.self), first)
+        try writeManifest("../plot-0002.svg")
+        XCTAssertThrowsError(try ResultBundle.load(from: folder, exitCode: 0), "Paths outside the bundle must be rejected")
+    }
+    func testResultBundleRejectsOversizedGraphic() throws {
+        let folder = try workspace()
+        try "".write(to: folder.appendingPathComponent("listing.txt"), atomically: true, encoding: .utf8)
+        try "".write(to: folder.appendingPathComponent("diagnostics.txt"), atomically: true, encoding: .utf8)
+        try "{\"version\":1,\"tables\":[]}".write(to: folder.appendingPathComponent("tables.json"), atomically: true, encoding: .utf8)
+        let plots = folder.appendingPathComponent("graphics")
+        try FileManager.default.createDirectory(at: plots, withIntermediateDirectories: true)
+        try Data(repeating: 65, count: 8 * 1024 * 1024 + 1).write(to: plots.appendingPathComponent("plot-0001.svg"))
+        try """
+        {"schema_version":1,"complete":true,"exit_code":0,"status":"success","objects":[
+          {"kind":"listing","path":"listing.txt"},{"kind":"diagnostics","path":"diagnostics.txt"},
+          {"kind":"graphic","path":"graphics/plot-0001.svg","name":"Plot","procedure":"SGPLOT","index":0}
+        ]}
+        """.write(to: folder.appendingPathComponent("manifest.json"), atomically: true, encoding: .utf8)
+        XCTAssertThrowsError(try ResultBundle.load(from: folder, exitCode: 0))
+    }
+    func testGraphicsDocumentEscapesNamesAndBlocksNetworkResources() {
+        let svg = Data("<svg xmlns=\"http://www.w3.org/2000/svg\"/>".utf8)
+        let html = GraphicsDocument.html(for: [ResultGraphic(name: "A < B & C", procedure: "SGPLOT", svg: svg)])
+        XCTAssertTrue(html.contains("A &lt; B &amp; C"))
+        XCTAssertFalse(html.contains("A < B & C"))
+        XCTAssertTrue(html.contains("default-src 'none'; img-src data:"))
+        XCTAssertTrue(html.contains("data:image/svg+xml;base64,\(svg.base64EncodedString())"))
+    }
     func testRunReportIncludesExecutionContextAndCompleteRunContents() {
         let request = RunRequest(
             source: "data work.demo; x=1; run;\n",
@@ -335,5 +428,23 @@ final class RuntimeRunnerTests: XCTestCase {
         let next = await runner.run(RunRequest(source: "proc print data=work.local; run;", sourceURL: nil, workingDirectory: directory))
         XCTAssertEqual(next.status, .programError)
         XCTAssertTrue(next.diagnosticText.contains("PROC PRINT with no dataset"), next.diagnosticText)
+    }
+    @MainActor func testBundledRuntimeProducesRequiredResultBundle() async throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let binary = root.appendingPathComponent("dist/LocalStat.app/Contents/Helpers/opensas")
+        guard FileManager.default.isExecutableFile(atPath: binary.path) else { throw XCTSkip("Run scripts/build.sh first for packaged-runtime integration") }
+        let directory = try workspace()
+        let request = RunRequest(source: "data d; x=42; run; proc print data=d; run;", sourceURL: nil, workingDirectory: directory)
+        let result = await LocalRuntimeRunner(executable: binary, requireResultBundle: true).run(request)
+        XCTAssertEqual(result.status, .success, result.diagnosticText)
+        XCTAssertEqual(result.tables.count, 1)
+        XCTAssertTrue(result.output.contains("42"))
+        XCTAssertNil(result.tableIssue)
+
+        let unsupported = await LocalRuntimeRunner(executable: binary, requireResultBundle: true).run(
+            RunRequest(source: "proc definitely_unknown; run;", sourceURL: nil, workingDirectory: directory))
+        XCTAssertEqual(unsupported.status, .unsupported)
+        XCTAssertTrue(unsupported.diagnosticText.contains("not supported"))
+        XCTAssertNil(unsupported.tableIssue)
     }
 }

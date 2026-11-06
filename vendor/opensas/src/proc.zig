@@ -38,6 +38,7 @@ const ast = @import("ast.zig");
 const io = @import("io.zig"); // reuse the DATA-step WHERE / dataset-option evaluator
 const dsfns = @import("dsfns.zig"); // libref→dir map for on-disk member deletes
 const table_result = @import("table_result.zig");
+const plot_result = @import("plot_result.zig");
 
 const Token = lex.Token;
 
@@ -45,7 +46,7 @@ const Token = lex.Token;
 /// of `(arena, lib, diags)` threaded through all 15 run* signatures. `out` stays
 /// an explicit param on the listing PROCs - its presence self-documents "this
 /// PROC emits listing text".
-pub const ProcCtx = struct { arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, tables: ?*table_result.Collector = null };
+pub const ProcCtx = struct { arena: std.mem.Allocator, lib: *Library, diags: *diag.Diagnostics, tables: ?*table_result.Collector = null, plots: ?*plot_result.Collector = null };
 
 const SortKey = struct { idx: usize, desc: bool };
 
@@ -6513,6 +6514,217 @@ fn isUnimplRankScore(text: []const u8) bool {
 /// TIES=/GROUPS=/DESCENDING + the score transforms). Gap arm (rc 2).
 fn isRankGapOption(kw: []const u8) bool {
     return eqi(kw, "preserverawbyvalues");
+}
+
+pub fn runCorr(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.Error!void {
+    const arena = cx.arena;
+    const diags = cx.diags;
+    var in_name: ?[]const u8 = null;
+    var i: usize = 2;
+    while (i < toks.len and toks[i].tag != .semicolon) {
+        if (optAt(toks, i, "data")) |name| {
+            in_name = name;
+            i += 3;
+        } else if (optAt(toks, i, "outp") != null) {
+            return failGap(diags, toks[i].line, "PROC CORR: OUTP= is not supported", .{});
+        } else if (optAt(toks, i, "outs") != null) {
+            return failGap(diags, toks[i].line, "PROC CORR: OUTS= is not supported", .{});
+        } else if (optAt(toks, i, "outk") != null) {
+            return failGap(diags, toks[i].line, "PROC CORR: OUTK= is not supported", .{});
+        } else if (optAt(toks, i, "outh") != null) {
+            return failGap(diags, toks[i].line, "PROC CORR: OUTH= is not supported", .{});
+        } else if (toks[i].tag == .lparen) {
+            i = skipParen(toks, i);
+        } else if (tkKw(toks[i], "spearman")) {
+            return failGap(diags, toks[i].line, "PROC CORR: SPEARMAN is not supported", .{});
+        } else if (tkKw(toks[i], "kendall")) {
+            return failGap(diags, toks[i].line, "PROC CORR: KENDALL is not supported", .{});
+        } else if (tkKw(toks[i], "hoeffding")) {
+            return failGap(diags, toks[i].line, "PROC CORR: HOEFFDING is not supported", .{});
+        } else {
+            return diags.fail(error.ParseError, toks[i].line, "PROC CORR: option {s} is not supported", .{toks[i].text});
+        }
+    }
+    if (atTag(toks, i, .semicolon)) i += 1;
+
+    var vars: std.ArrayList([]const u8) = .empty;
+    var withs: std.ArrayList([]const u8) = .empty;
+    var bys: std.ArrayList([]const u8) = .empty;
+    while (i < toks.len and toks[i].tag != .eof) {
+        if (tkKw(toks[i], "run") or tkKw(toks[i], "quit")) break;
+        if (tkKw(toks[i], "by")) {
+            try parseProcBy(arena, diags, toks, &i, &bys);
+            if (atTag(toks, i, .semicolon)) i += 1;
+            continue;
+        }
+        if (tkKw(toks[i], "where")) {
+            while (i < toks.len and toks[i].tag != .semicolon) i += 1;
+            if (atTag(toks, i, .semicolon)) i += 1;
+            continue;
+        }
+        if (tkKw(toks[i], "weight"))
+            return failGap(diags, toks[i].line, "PROC CORR: WEIGHT is not supported", .{});
+        if (tkKw(toks[i], "freq"))
+            return failGap(diags, toks[i].line, "PROC CORR: FREQ is not supported", .{});
+        if (tkKw(toks[i], "partial"))
+            return failGap(diags, toks[i].line, "PROC CORR: PARTIAL is not supported", .{});
+        if (tkKw(toks[i], "id"))
+            return failGap(diags, toks[i].line, "PROC CORR: ID is not supported", .{});
+        const is_var = tkKw(toks[i], "var");
+        const is_with = tkKw(toks[i], "with");
+        if (!is_var and !is_with)
+            return diags.fail(error.ParseError, toks[i].line, "PROC CORR: statement {s} is not supported", .{toks[i].text});
+        i += 1;
+        while (i < toks.len and toks[i].tag != .semicolon) : (i += 1) {
+            if (toks[i].tag != .name)
+                return diags.fail(error.ParseError, toks[i].line, "PROC CORR: VAR/WITH requires variable names", .{});
+            try (if (is_var) &vars else &withs).append(arena, toks[i].text);
+        }
+        if (atTag(toks, i, .semicolon)) i += 1;
+    }
+
+    const raw = (if (in_name) |name| cx.lib.find(name) else lastDataset(cx.lib)) orelse
+        return diags.fail(error.ParseError, toks[1].line, "PROC CORR: input data set {s} does not exist", .{in_name orelse "_last_"});
+    const ds = try procInput(arena, raw, toks, diags);
+    const by = try decodeProcBy(arena, bys.items);
+    if (vars.items.len == 0) {
+        for (ds.columns.items) |col| {
+            if (col.type != .num) continue;
+            var excluded = false;
+            for (by.names) |name| if (eqi(col.name, name)) {
+                excluded = true;
+                break;
+            };
+            for (withs.items) |name| if (eqi(col.name, name)) {
+                excluded = true;
+                break;
+            };
+            if (!excluded) try vars.append(arena, col.name);
+        }
+    }
+    if (vars.items.len == 0)
+        return diags.fail(error.ParseError, toks[1].line, "PROC CORR: no numeric variables", .{});
+    const cols = try arena.alloc(usize, vars.items.len);
+    for (vars.items, 0..) |name, k| {
+        cols[k] = ds.indexOf(name) orelse
+            return diags.fail(error.ParseError, toks[1].line, "PROC CORR: variable {s} not found", .{name});
+        if (ds.columns.items[cols[k]].type != .num)
+            return diags.fail(error.ParseError, toks[1].line, "PROC CORR: variable {s} is not numeric", .{name});
+    }
+    const column_names = if (withs.items.len > 0) withs.items else vars.items;
+    const column_cols = if (withs.items.len > 0) blk: {
+        const indices = try arena.alloc(usize, withs.items.len);
+        for (withs.items, 0..) |name, k| {
+            indices[k] = ds.indexOf(name) orelse
+                return diags.fail(error.ParseError, toks[1].line, "PROC CORR: variable {s} not found", .{name});
+            if (ds.columns.items[indices[k]].type != .num)
+                return diags.fail(error.ParseError, toks[1].line, "PROC CORR: variable {s} is not numeric", .{name});
+        }
+        break :blk indices;
+    } else cols;
+
+    const bcols = try arena.alloc(usize, by.names.len);
+    for (by.names, 0..) |name, k| {
+        bcols[k] = ds.indexOf(name) orelse
+            return diags.fail(error.ParseError, toks[1].line, "PROC CORR: BY variable {s} not found", .{name});
+    }
+    if (bcols.len > 0 and !by.notsorted) {
+        const rows = ds.rows.items;
+        var start: usize = 0;
+        while (start < rows.len) {
+            var end = start + 1;
+            while (end < rows.len and byEqual(rows[start], rows[end], bcols)) end += 1;
+            if (end < rows.len) if (byOrderViolation(rows[end], rows[start], bcols, by.desc)) |_|
+                return diags.fail(error.ParseError, toks[1].line, "Data set {s} is not sorted for PROC CORR BY.", .{ds.name});
+            start = end;
+        }
+    }
+
+    for (try bySlices(arena, ds.rows.items, bcols)) |group| {
+        if (group.rep) |representative| try appendByLine(arena, out, ds, representative, bcols);
+
+        try out.appendSlice(arena, "The CORR Procedure\nPearson Correlation Coefficients\n");
+        var header: std.ArrayList(table_result.Cell) = .empty;
+        try header.append(arena, .{ .text = "Variable" });
+        try out.appendSlice(arena, "Variable");
+        for (column_names) |name| {
+            try header.append(arena, .{ .text = name });
+            try out.appendSlice(arena, try std.fmt.allocPrint(arena, "\t{s}", .{name}));
+        }
+        try out.append(arena, '\n');
+        var table = table_result.Table{ .procedure = "CORR", .title = "Pearson Correlation Coefficients" };
+        var ntable = table_result.Table{ .procedure = "CORR", .title = "Pairwise Observations" };
+        if (group.rep) |representative| {
+            var label: std.ArrayList(u8) = .empty;
+            for (bcols, 0..) |col, k| {
+                if (k > 0) try label.append(arena, ' ');
+                try label.appendSlice(arena, ds.columns.items[col].name);
+                try label.append(arena, '=');
+                try label.appendSlice(arena, try cellText(arena, representative[col]));
+            }
+            table.section = label.items;
+            ntable.section = label.items;
+        }
+        try table.header(arena, header.items);
+        try ntable.header(arena, header.items);
+        var nlines: std.ArrayList(u8) = .empty;
+        for (vars.items, cols) |name, xcol| {
+            var cells: std.ArrayList(table_result.Cell) = .empty;
+            var ncells: std.ArrayList(table_result.Cell) = .empty;
+            try cells.append(arena, .{ .text = name });
+            try ncells.append(arena, .{ .text = name });
+            try out.appendSlice(arena, name);
+            try nlines.appendSlice(arena, name);
+            for (column_cols) |ycol| {
+                const stat = corrPair(group.rows, xcol, ycol);
+                const rendered = if (stat.r) |v| try std.fmt.allocPrint(arena, "{d:.6}", .{v}) else ".";
+                const count = try std.fmt.allocPrint(arena, "{d}", .{stat.n});
+                try cells.append(arena, .{ .text = rendered });
+                try ncells.append(arena, .{ .text = count });
+                try out.appendSlice(arena, try std.fmt.allocPrint(arena, "\t{s}", .{rendered}));
+                try nlines.appendSlice(arena, try std.fmt.allocPrint(arena, "\t{s}", .{count}));
+            }
+            try table.row(arena, "data", cells.items);
+            try ntable.row(arena, "data", ncells.items);
+            try out.append(arena, '\n');
+            try nlines.append(arena, '\n');
+        }
+        try out.appendSlice(arena, "Pairwise Observations\nVariable");
+        for (column_names) |name| try out.appendSlice(arena, try std.fmt.allocPrint(arena, "\t{s}", .{name}));
+        try out.append(arena, '\n');
+        try out.appendSlice(arena, nlines.items);
+        if (cx.tables) |sink| {
+            try sink.add(table);
+            try sink.add(ntable);
+        }
+    }
+}
+
+const CorrPair = struct { r: ?f64, n: usize };
+
+fn corrPair(rows: []const []const Value, xcol: usize, ycol: usize) CorrPair {
+    var count: usize = 0;
+    var mean_x: f64 = 0;
+    var mean_y: f64 = 0;
+    var var_x: f64 = 0;
+    var var_y: f64 = 0;
+    var cov: f64 = 0;
+    for (rows) |row| {
+        const x = row[xcol].num;
+        const y = row[ycol].num;
+        if (!std.math.isFinite(x) or !std.math.isFinite(y)) continue;
+        count += 1;
+        const n: f64 = @floatFromInt(count);
+        const dx = x - mean_x;
+        const dy = y - mean_y;
+        mean_x += dx / n;
+        mean_y += dy / n;
+        var_x += dx * (x - mean_x);
+        var_y += dy * (y - mean_y);
+        cov += dx * (y - mean_y);
+    }
+    if (count < 2 or var_x <= 0 or var_y <= 0) return .{ .r = null, .n = count };
+    return .{ .r = std.math.clamp(cov / @sqrt(var_x * var_y), -1.0, 1.0), .n = count };
 }
 
 pub fn runRank(cx: ProcCtx, out: *std.ArrayList(u8), toks: []const Token) diag.Error!void {

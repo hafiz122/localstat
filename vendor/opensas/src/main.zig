@@ -39,6 +39,7 @@ pub fn main(init: std.process.Init) !void {
     // non-flag arg is the input `.sas`. `$SASAUTOS` is the fallback.
     var file: ?[]const u8 = null;
     var tables_path: ?[]const u8 = null;
+    var results_dir: ?[]const u8 = null;
     var sasautos: ?[]const u8 = init.environ_map.get("SASAUTOS");
     var ai: usize = 1;
     while (ai < args.len) : (ai += 1) {
@@ -47,6 +48,9 @@ pub fn main(init: std.process.Init) !void {
             ai += 1;
         } else if (std.mem.eql(u8, args[ai], "--tables-json") and ai + 1 < args.len) {
             tables_path = args[ai + 1];
+            ai += 1;
+        } else if (std.mem.eql(u8, args[ai], "--results-dir") and ai + 1 < args.len) {
+            results_dir = args[ai + 1];
             ai += 1;
         } else if (std.mem.eql(u8, args[ai], "--version") or std.mem.eql(u8, args[ai], "-V")) {
             // GH#10 ISS-versionflag: SHORT-CIRCUIT before the input file is even
@@ -71,7 +75,7 @@ pub fn main(init: std.process.Init) !void {
         }
     }
     if (file == null) {
-        std.debug.print("usage: opensas [--sasautos <dir>] <file.sas>\n", .{});
+        std.debug.print("usage: opensas [--sasautos <dir>] [--tables-json <file>] [--results-dir <new-dir>] <file.sas>\n", .{});
         std.process.exit(1);
     }
     sas.macro.setAutocallDir(sasautos);
@@ -84,7 +88,8 @@ pub fn main(init: std.process.Init) !void {
     var diags = sas.diag.Diagnostics.init(a);
     var out: std.ArrayList(u8) = .empty;
     var tables = sas.table_result.Collector{ .arena = a };
-    interpretWithTables(a, &out, &diags, src, io, if (tables_path != null) &tables else null) catch |e| {
+    var plots = sas.plot_result.Collector{ .arena = a };
+    interpretWithResults(a, &out, &diags, src, io, if (tables_path != null or results_dir != null) &tables else null, if (results_dir != null) &plots else null) catch |e| {
         // A propagated lex/parse/exec error already recorded a located diagnostic
         // via diags.fail() - render() below prints `ERROR(Ln): …`. Only emit the
         // bare error-name line when NO diagnostic carries the detail (e.g.
@@ -97,7 +102,7 @@ pub fn main(init: std.process.Init) !void {
     if (tables_path) |path| {
         const data = try tables.json();
         Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = data }) catch |e| {
-            std.debug.print("LocalStat could not write table results ({t})\n", .{e});
+            failLoud("LocalStat could not write table results ({t})", .{e});
         };
     }
 
@@ -109,7 +114,14 @@ pub fn main(init: std.process.Init) !void {
     try w.writeAll(out.items);
     try w.flush();
 
-    if (diags.count() > 0) std.debug.print("{s}", .{try diags.render()});
+    const diagnostic_text = if (diags.count() > 0) try diags.render() else "";
+    if (diagnostic_text.len > 0) std.debug.print("{s}", .{diagnostic_text});
+
+    if (results_dir) |path| {
+        sas.result_bundle.write(a, io, path, out.items, diagnostic_text, &tables, &plots, processExitCode(&diags)) catch |e| {
+            failLoud("LocalStat could not write result bundle ({t})", .{e});
+        };
+    }
 
     const rc = processExitCode(&diags);
     if (rc != 0) std.process.exit(rc);
@@ -190,10 +202,10 @@ fn userErr(diags: *sas.diag.Diagnostics, comptime fmt: []const u8, args: anytype
 /// null for the pure-in-memory path (unit tests, corpus programs); with an `Io`,
 /// CSV-backed LIBNAME datasets are read before and written after the run.
 pub fn interpret(a: std.mem.Allocator, out: *std.ArrayList(u8), diags: *sas.diag.Diagnostics, src: []const u8, io: ?Io) !void {
-    return interpretWithTables(a, out, diags, src, io, null);
+    return interpretWithResults(a, out, diags, src, io, null, null);
 }
 
-fn interpretWithTables(a: std.mem.Allocator, out: *std.ArrayList(u8), diags: *sas.diag.Diagnostics, src: []const u8, io: ?Io, tables: ?*sas.table_result.Collector) !void {
+fn interpretWithResults(a: std.mem.Allocator, out: *std.ArrayList(u8), diags: *sas.diag.Diagnostics, src: []const u8, io: ?Io, tables: ?*sas.table_result.Collector, plots: ?*sas.plot_result.Collector) !void {
     // Drop any user format catalog from a prior run - it points into that run's
     // (now-freed) arena, and `format.apply` reads the global catalog (PROC FORMAT
     // reinstalls its own this run) - plus format.zig's other run-scoped globals
@@ -279,6 +291,7 @@ fn interpretWithTables(a: std.mem.Allocator, out: *std.ArrayList(u8), diags: *sa
         .loaded_ro = &loaded_ro,
         .damaged = &damaged,
         .tables = tables,
+        .plots = plots,
     };
     // NOTE-chunkrelativelineno: chunks tile src contiguously, so track the
     // source line each chunk starts at (1 + newlines before it).
@@ -314,6 +327,7 @@ const StepCtx = struct {
     // loadLibInputs passes skip the re-read AND the re-report.
     damaged: *std.StringHashMap(void),
     tables: ?*sas.table_result.Collector = null,
+    plots: ?*sas.plot_result.Collector = null,
     ended: bool = false, // ENDSAS seen: stop reading input, exit normally (BUG-endsasexit)
     // NOTE-chunkrelativelineno (QA tick312 F3): the current raw chunk's start
     // line in src, minus 1 - tokenize restarts line numbering per chunk, so a
@@ -482,9 +496,11 @@ fn runExpanded(ctx: *StepCtx, text: []const u8, allow_anon: bool) sas.diag.Error
             const step_toks = try sas.macro.bindStepVars(a, toks[seg.start..seg.end], &ctx.lib.macro_vars, ctx.diags);
             // PROC COPY runs here, not in runProc: it needs the CURRENT libref
             // bindings and Io to write through them eagerly (GAP-proccopy).
-            if (step_toks.len > 1 and eqi(step_toks[0].text, "proc") and eqi(step_toks[1].text, "copy")) {
+            if (step_toks.len > 1 and eqi(step_toks[0].text, "proc") and
+                (if (sas.proc_registry.lookup(step_toks[1].text)) |spec| spec.kind == .copy else false))
+            {
                 try runProcCopy(ctx, step_toks);
-            } else try runStep(a, ctx.out, ctx.lib, ctx.diags, step_toks, ctx.globals, ctx.io, ctx.tables);
+            } else try runStep(a, ctx.out, ctx.lib, ctx.diags, step_toks, ctx.globals, ctx.io, ctx.tables, ctx.plots);
             // NOTE parity (GH#3 ISS-steperrhalt): real SAS ends the FAILING step
             // ITSELF with the same NOTE the later skipped steps get (Language
             // Reference: Concepts Ch.8 Examples 8.2/8.4/8.8) - opensas used to
@@ -2008,7 +2024,7 @@ fn dataName(a: std.mem.Allocator, toks: []const Token, pos: *usize) sas.diag.Err
     return name;
 }
 
-fn runStep(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library, diags: *sas.diag.Diagnostics, toks: []const Token, g: *Globals, io: ?Io, tables: ?*sas.table_result.Collector) sas.diag.Error!void {
+fn runStep(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library, diags: *sas.diag.Diagnostics, toks: []const Token, g: *Globals, io: ?Io, tables: ?*sas.table_result.Collector, plots: ?*sas.plot_result.Collector) sas.diag.Error!void {
     if (eqi(toks[0].text, "data")) {
         // header: `data [name] ;`  - a name, else an anonymous output dataset.
         var pos: usize = 1;
@@ -2077,7 +2093,7 @@ fn runStep(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
             };
         }
     } else {
-        try runProc(a, out, lib, diags, toks, g, tables);
+        try runProc(a, out, lib, diags, toks, g, tables, plots);
     }
 }
 
@@ -2600,22 +2616,21 @@ fn sortInPlaceTarget(toks: []const Token) ?[]const u8 {
 
 /// Dispatch a `proc <name> …; … run;` step by name. Each proc hand-parses its
 /// own tokens (parser.zig is A2's) - SORT lives in proc.zig; PRINT is below.
-fn runProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library, diags: *sas.diag.Diagnostics, toks: []const Token, g: *Globals, tables: ?*sas.table_result.Collector) sas.diag.Error!void {
+fn runProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library, diags: *sas.diag.Diagnostics, toks: []const Token, g: *Globals, tables: ?*sas.table_result.Collector, plots: ?*sas.plot_result.Collector) sas.diag.Error!void {
     if (toks.len < 2 or toks[1].tag != .name) {
         failLoud("PROC name missing or unrecognized", .{});
         return;
     }
     const proc = toks[1].text;
-    const pcx: sas.proc.ProcCtx = .{ .arena = a, .lib = lib, .diags = diags, .tables = tables };
+    const pcx: sas.proc.ProcCtx = .{ .arena = a, .lib = lib, .diags = diags, .tables = tables, .plots = plots };
     const first_table = if (tables) |sink| sink.tables.items.len else 0;
     // TITLE/FOOTNOTE print with the report procs (a listing), not with SORT or
     // TRANSPOSE (which produce a dataset, no page). Titles atop, footnotes below.
     // SUMMARY inverts MEANS: it lists (and so prints titles) only when PRINT is
     // given (BUG-summarydefaultprint).
-    const listing = eqi(proc, "print") or eqi(proc, "means") or
-        eqi(proc, "freq") or eqi(proc, "report") or eqi(proc, "tabulate") or eqi(proc, "compare") or
-        eqi(proc, "univariate") or eqi(proc, "contents") or eqi(proc, "reg") or
-        (eqi(proc, "summary") and procHasKw(toks, "print"));
+    const spec = sas.proc_registry.lookup(proc);
+    const listing = if (spec) |known| known.listing or
+        (known.kind == .summary and procHasKw(toks, "print")) else false;
     // BUG-byvaltitle: a TITLE/FOOTNOTE carrying #BYVAL/#BYVAR is re-resolved
     // per BY group, so PROC PRINT then owns its title/footnote emission
     // (substituted per group in printTable); otherwise titles stamp once here.
@@ -2624,58 +2639,90 @@ fn runProc(a: std.mem.Allocator, out: *std.ArrayList(u8), lib: *sas.exec.Library
     if (listing and !print_bysubst) try g.emitTitles(a, out);
     const displayed_titles = try a.dupe(u8, std.mem.trim(u8, out.items[titles_start..], " \r\n"));
 
-    if (eqi(proc, "sort")) {
-        // GH#15: PROC SORT with no OUT= (or OUT= the source) sorts the source
-        // IN PLACE - it mutates the dataset directly, never through Library.put,
-        // so guard the read-only libref here. OUT= to a distinct member routes
-        // through put and is caught there.
-        if (sortInPlaceTarget(toks)) |src| if (lib.readonlyOut(src)) return lib.failReadonly(src);
-        try sas.proc.runSort(pcx, toks);
-    } else if (eqi(proc, "print")) {
-        try printProc(a, out, lib, diags, toks, if (print_bysubst) g else null, tables);
-    } else if (eqi(proc, "reg")) {
-        try sas.reg.run(pcx, out, toks);
-    } else if (eqi(proc, "means") or eqi(proc, "summary")) {
-        try sas.proc.runMeans(pcx, out, toks);
-    } else if (eqi(proc, "freq")) {
-        try sas.proc.runFreq(pcx, out, toks);
-    } else if (eqi(proc, "transpose")) {
-        try sas.proc.runTranspose(pcx, toks);
-    } else if (eqi(proc, "sql")) {
-        try sas.sql.run(a, out, lib, diags, g, toks);
-    } else if (eqi(proc, "report")) {
-        try sas.proc.runReport(pcx, out, toks);
-    } else if (eqi(proc, "tabulate")) {
-        try sas.proc.runTabulate(pcx, out, toks);
-    } else if (eqi(proc, "univariate")) {
-        try sas.proc.runUnivariate(pcx, out, toks);
-    } else if (eqi(proc, "rank")) {
-        try sas.proc.runRank(pcx, out, toks);
-    } else if (eqi(proc, "standard")) {
-        try sas.proc.runStandard(pcx, toks);
-    } else if (eqi(proc, "contents")) {
-        try sas.proc.runContents(pcx, out, toks);
-    } else if (eqi(proc, "format")) {
-        try sas.proc.runFormat(pcx, toks);
-    } else if (eqi(proc, "datasets")) {
-        try sas.proc.runDatasets(pcx, out, toks);
-    } else if (eqi(proc, "delete")) {
-        try sas.proc.runDelete(pcx, toks);
-    } else if (eqi(proc, "compare")) {
-        try sas.proc.runCompare(pcx, out, toks);
-    } else if (eqi(proc, "export")) {
-        try sas.proc.runExport(pcx, toks);
-    } else if (eqi(proc, "import")) {
-        try sas.proc.runImport(pcx, toks);
-    } else if (eqi(proc, "append")) {
-        try sas.proc.runAppend(pcx, toks);
-    } else if (eqi(proc, "printto")) {
-        // PROC PRINTTO redirects the log/output destinations - irrelevant under
-        // this harness (the runner captures stdout/stderr). A KNOWN, NAMED no-op
-        // (both `printto log=...;` and bare `printto;`); the else below keeps
-        // fail-loud INTACT for genuinely-unsupported PROCs (D-002 / GH#67).
-        // ponytail: accepted-as-listing - opensas has one output stream, so a
-        // redirection correctly leaves output on stdout.
+    if (spec) |known| switch (known.kind) {
+        .sort => {
+            // GH#15: PROC SORT with no OUT= (or OUT= the source) sorts the source
+            // IN PLACE - it mutates the dataset directly, never through Library.put,
+            // so guard the read-only libref here. OUT= to a distinct member routes
+            // through put and is caught there.
+            if (sortInPlaceTarget(toks)) |src| if (lib.readonlyOut(src)) return lib.failReadonly(src);
+            try sas.proc.runSort(pcx, toks);
+        },
+        .print => {
+            try printProc(a, out, lib, diags, toks, if (print_bysubst) g else null, tables);
+        },
+        .reg => {
+            try sas.reg.run(pcx, out, toks);
+        },
+        .corr => {
+            try sas.proc.runCorr(pcx, out, toks);
+        },
+        .ttest => {
+            try sas.ttest.run(pcx, out, toks);
+        },
+        .sgplot => {
+            try sas.sgplot.run(pcx, out, toks);
+        },
+        .means, .summary => {
+            try sas.proc.runMeans(pcx, out, toks);
+        },
+        .freq => {
+            try sas.proc.runFreq(pcx, out, toks);
+        },
+        .transpose => {
+            try sas.proc.runTranspose(pcx, toks);
+        },
+        .sql => {
+            try sas.sql.run(a, out, lib, diags, g, toks);
+        },
+        .report => {
+            try sas.proc.runReport(pcx, out, toks);
+        },
+        .tabulate => {
+            try sas.proc.runTabulate(pcx, out, toks);
+        },
+        .univariate => {
+            try sas.proc.runUnivariate(pcx, out, toks);
+        },
+        .rank => {
+            try sas.proc.runRank(pcx, out, toks);
+        },
+        .standard => {
+            try sas.proc.runStandard(pcx, toks);
+        },
+        .contents => {
+            try sas.proc.runContents(pcx, out, toks);
+        },
+        .format => {
+            try sas.proc.runFormat(pcx, toks);
+        },
+        .datasets => {
+            try sas.proc.runDatasets(pcx, out, toks);
+        },
+        .delete => {
+            try sas.proc.runDelete(pcx, toks);
+        },
+        .compare => {
+            try sas.proc.runCompare(pcx, out, toks);
+        },
+        .@"export" => {
+            try sas.proc.runExport(pcx, toks);
+        },
+        .import => {
+            try sas.proc.runImport(pcx, toks);
+        },
+        .append => {
+            try sas.proc.runAppend(pcx, toks);
+        },
+        .printto => {
+            // PROC PRINTTO redirects the log/output destinations - irrelevant under
+            // this harness (the runner captures stdout/stderr). A KNOWN, NAMED no-op
+            // (both `printto log=...;` and bare `printto;`); the else below keeps
+            // fail-loud INTACT for genuinely-unsupported PROCs (D-002 / GH#67).
+            // ponytail: accepted-as-listing - opensas has one output stream, so a
+            // redirection correctly leaves output on stdout.
+        },
+        .copy => unreachable,
     } else {
         failLoud("PROC {s} is not supported", .{proc});
     }
@@ -6147,4 +6194,131 @@ test "BUG-dropoptfalsewarn: output dataset-option drop=/keep=/rename= of a refer
         try std.testing.expect(diagHas(&diags, "The variable TYPO in the DROP, KEEP, or RENAME list has never been referenced"));
         try std.testing.expect(!diags.hasStepErrors());
     }
+}
+
+test "PROC CORR computes Pearson coefficients for numeric VAR variables" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var out: std.ArrayList(u8) = .empty;
+    var log: []const u8 = undefined;
+    const rc = try rcOf(a, &out, "data d; input x y; datalines;\n1 3\n2 6\n3 9\n;\nrun;\n" ++
+        "proc corr data=d; var x y; run;\n", &log);
+    try std.testing.expectEqual(@as(u8, 0), rc);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "Pearson Correlation Coefficients") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "1.000000") != null);
+}
+
+test "PROC TTEST dispatches to the one-sample handler" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var out: std.ArrayList(u8) = .empty;
+    var log: []const u8 = undefined;
+    const rc = try rcOf(a, &out, "data d; input x; datalines;\n1\n2\n3\n;\nrun;\n" ++
+        "proc ttest data=d; var x; run;\n", &log);
+    try std.testing.expectEqual(@as(u8, 0), rc);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "The TTEST Procedure") != null);
+}
+
+test "PROC CORR WITH computes the rectangular correlation matrix" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var out: std.ArrayList(u8) = .empty;
+    var log: []const u8 = undefined;
+    const rc = try rcOf(a, &out, "data d; input x y; datalines;\n1 3\n2 2\n3 1\n;\nrun;\n" ++
+        "proc corr data=d; var x; with y; run;\n", &log);
+    try std.testing.expectEqual(@as(u8, 0), rc);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "Variable\ty\nx\t-1.000000") != null);
+}
+
+test "PROC CORR BY computes separate correlations in sorted groups" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var out: std.ArrayList(u8) = .empty;
+    var log: []const u8 = undefined;
+    const rc = try rcOf(a, &out, "data d; input g x y; datalines;\n1 1 1\n1 2 2\n2 1 2\n2 2 1\n;\nrun;\n" ++
+        "proc corr data=d; by g; var x; with y; run;\n", &log);
+    try std.testing.expectEqual(@as(u8, 0), rc);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "g=1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "g=2") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "1.000000") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "-1.000000") != null);
+}
+
+test "PROC CORR rejects documented unsupported methods as runtime gaps" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var out: std.ArrayList(u8) = .empty;
+    var log: []const u8 = undefined;
+    const rc = try rcOf(a, &out, "data d; x=1; y=2; output; run;\nproc corr data=d kendall; var x y; run;\n", &log);
+    try std.testing.expectEqual(@as(u8, 2), rc);
+    try std.testing.expect(std.mem.indexOf(u8, log, "KENDALL is not supported") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "Pearson Correlation Coefficients") == null);
+}
+
+test "PROC CORR WHERE filters through shared PROC input handling" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var out: std.ArrayList(u8) = .empty;
+    var log: []const u8 = undefined;
+    const rc = try rcOf(a, &out, "data d; input x y; datalines;\n1 1\n2 2\n3 100\n;\nrun;\n" ++
+        "proc corr data=d; where x < 3; var x; with y; run;\n", &log);
+    try std.testing.expectEqual(@as(u8, 0), rc);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "x\t1.000000") != null);
+}
+
+test "PROC CORR default VAR excludes BY and WITH variables" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var out: std.ArrayList(u8) = .empty;
+    var log: []const u8 = undefined;
+    const rc = try rcOf(a, &out, "data d; input g x y; datalines;\n1 1 1\n1 2 2\n;\nrun;\n" ++
+        "proc corr data=d; by g; with y; run;\n", &log);
+    try std.testing.expectEqual(@as(u8, 0), rc);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "\nx\t1.000000") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "\ng\t") == null);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "\ny\t") == null);
+}
+
+test "PROC CORR reports pairwise N and missing correlation for a constant variable" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var out: std.ArrayList(u8) = .empty;
+    var log: []const u8 = undefined;
+    const rc = try rcOf(a, &out, "data d; input x y z; datalines;\n1 1 5\n2 . 5\n3 3 5\n;\nrun;\n" ++
+        "proc corr data=d; var x; with y z; run;\n", &log);
+    try std.testing.expectEqual(@as(u8, 0), rc);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "x\t1.000000\t.") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "Pairwise Observations\nVariable\ty\tz\nx\t2\t3") != null);
+}
+
+test "PROC CORR rejects unsupported WEIGHT statement without emitting coefficients" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var out: std.ArrayList(u8) = .empty;
+    var log: []const u8 = undefined;
+    const rc = try rcOf(a, &out, "data d; input x y w; datalines;\n1 1 1\n2 2 2\n;\nrun;\n" ++
+        "proc corr data=d; var x y; weight w; run;\n", &log);
+    try std.testing.expectEqual(@as(u8, 2), rc);
+    try std.testing.expect(std.mem.indexOf(u8, log, "WEIGHT is not supported") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "Pearson Correlation Coefficients") == null);
+}
+
+test "PROC CORR rejects unsupported OUTP dataset option as a gap" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var out: std.ArrayList(u8) = .empty;
+    var log: []const u8 = undefined;
+    const rc = try rcOf(a, &out, "data d; x=1; y=2; output; run;\nproc corr data=d outp=c; var x y; run;\n", &log);
+    try std.testing.expectEqual(@as(u8, 2), rc);
+    try std.testing.expect(std.mem.indexOf(u8, log, "OUTP= is not supported") != null);
 }

@@ -2,12 +2,13 @@
 //! `tests/corpus/*.sas` diffs stdout, these run a real dataset-in → dataset-out
 //! program and diff the output *dataset*.
 //!
-//! For each `tests/programs/<name>/` that has a `program.sas`, it runs the built
-//! `sas` binary there (cwd = the fixture dir, so the program's
+//! For each `tests/programs/<name>/` that has a `program.sas`, it stages a fresh
+//! copy and runs the built `sas` binary there (cwd = the staged fixture, so the program's
 //! `libname source "inputs"` / `libname target "output"` resolve), then
 //! structurally diffs every `expected/*.csv` against the produced `output/*.csv`
 //! - column names + order, row count, and cell values (numeric-normalized, so
-//! `40` == `40.0`) - not a byte diff. Prints `programs: P/Q passing`.
+//! `40` == `40.0`) - not a byte diff. Unexpected output CSVs also fail. The
+//! checked-in input files are not exposed to the program. Prints `programs: P/Q passing`.
 //!
 //! Every `program.sas`'s exit code is checked. One that exits non-zero must
 //! declare it with an `expect-rc: N` marker in its header comment; NO MARKER
@@ -61,7 +62,7 @@ pub fn main(init: std.process.Init) !void {
         const src = pdir.readFileAlloc(io, "program.sas", gpa, max_file) catch continue;
         total += 1;
 
-        if (try runProgram(gpa, io, bin, pdir, programs_dir, entry.name, src)) |reason| {
+        if (try runProgram(gpa, io, bin, pdir, src)) |reason| {
             std.debug.print("  {s}: FAIL - {s}\n", .{ entry.name, reason });
         } else {
             pass += 1;
@@ -74,11 +75,20 @@ pub fn main(init: std.process.Init) !void {
 
 /// Run one fixture and compare its outputs. Returns null on a full match, else a
 /// human-readable failure reason.
-fn runProgram(gpa: std.mem.Allocator, io: Io, bin: []const u8, pdir: Io.Dir, programs_dir: []const u8, name: []const u8, src: []const u8) !?[]const u8 {
-    pdir.createDirPath(io, "output") catch {}; // the program writes here (DSFILE)
+fn runProgram(gpa: std.mem.Allocator, io: Io, bin: []const u8, pdir: Io.Dir, src: []const u8) !?[]const u8 {
+    const staging_root = ".zig-cache/tmp/program-fixtures";
+    try Io.Dir.cwd().createDirPath(io, staging_root);
+    var random: [16]u8 = undefined;
+    Io.random(io, &random);
+    const stage_path = try std.fmt.allocPrint(gpa, "{s}/{s}", .{ staging_root, std.fmt.bytesToHex(random, .lower) });
+    try Io.Dir.cwd().createDir(io, stage_path, .default_dir);
+    defer Io.Dir.cwd().deleteTree(io, stage_path) catch {};
+    var stage = try Io.Dir.cwd().openDir(io, stage_path, .{ .iterate = true });
+    defer stage.close(io);
+    try stageFixture(io, pdir, stage, true);
+    try stage.createDirPath(io, "output");
 
-    const dir_path = try std.fmt.allocPrint(gpa, "{s}/{s}", .{ programs_dir, name });
-    const res = runWithRetry(gpa, io, bin, dir_path) catch |e|
+    const res = runWithRetry(gpa, io, bin, stage_path) catch |e|
         return try std.fmt.allocPrint(gpa, "could not run program.sas ({t})", .{e});
 
     // Checked before the CSV diff: right outputs at the wrong exit code is a
@@ -97,7 +107,7 @@ fn runProgram(gpa: std.mem.Allocator, io: Io, bin: []const u8, pdir: Io.Dir, pro
 
         const expected = try edir.readFileAlloc(io, ef.name, gpa, max_file);
         const out_rel = try std.fmt.allocPrint(gpa, "output/{s}", .{ef.name});
-        const produced = pdir.readFileAlloc(io, out_rel, gpa, max_file) catch {
+        const produced = stage.readFileAlloc(io, out_rel, gpa, max_file) catch {
             if (firstUnsupported(res.stderr)) |feat|
                 return try std.fmt.allocPrint(gpa, "{s}: no output ({s})", .{ ef.name, feat });
             return try std.fmt.allocPrint(gpa, "{s}: no output produced", .{ef.name});
@@ -106,7 +116,34 @@ fn runProgram(gpa: std.mem.Allocator, io: Io, bin: []const u8, pdir: Io.Dir, pro
             return try std.fmt.allocPrint(gpa, "{s}: {s}", .{ ef.name, why });
     }
     if (!found) return try std.fmt.allocPrint(gpa, "expected/ has no .csv", .{});
+    var odir = try stage.openDir(io, "output", .{ .iterate = true });
+    defer odir.close(io);
+    var oi = odir.iterate();
+    while (try oi.next(io)) |of| {
+        if (of.kind != .file or !std.mem.endsWith(u8, of.name, ".csv")) continue;
+        edir.access(io, of.name, .{}) catch
+            return try std.fmt.allocPrint(gpa, "unexpected output dataset {s}", .{of.name});
+    }
     return null;
+}
+
+fn stageFixture(io: Io, source: Io.Dir, destination: Io.Dir, root: bool) !void {
+    var entries = source.iterate();
+    while (try entries.next(io)) |entry| {
+        if (root and (std.mem.eql(u8, entry.name, "expected") or std.mem.eql(u8, entry.name, "output"))) continue;
+        switch (entry.kind) {
+            .file => try source.copyFile(entry.name, destination, entry.name, io, .{}),
+            .directory => {
+                try destination.createDir(io, entry.name, .default_dir);
+                var child_source = try source.openDir(io, entry.name, .{ .iterate = true });
+                defer child_source.close(io);
+                var child_destination = try destination.openDir(io, entry.name, .{ .iterate = true });
+                defer child_destination.close(io);
+                try stageFixture(io, child_source, child_destination, false);
+            },
+            else => return error.UnsupportedFixtureEntry,
+        }
+    }
 }
 
 /// Spawn the child, retrying transient failures: on a cold cache the runner
@@ -212,6 +249,86 @@ fn firstUnsupported(stderr: []const u8) ?[]const u8 {
 }
 
 // --- tests -------------------------------------------------------------------
+
+test "program runner rejects a stale output dataset when the program writes nothing" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const dir_path = try std.fmt.allocPrint(a, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    const expected_dir = try std.fmt.allocPrint(a, "{s}/expected", .{dir_path});
+    const output_dir = try std.fmt.allocPrint(a, "{s}/output", .{dir_path});
+    try Io.Dir.cwd().createDirPath(io, expected_dir);
+    try Io.Dir.cwd().createDirPath(io, output_dir);
+    const expected_path = try std.fmt.allocPrint(a, "{s}/result.csv", .{expected_dir});
+    const stale_path = try std.fmt.allocPrint(a, "{s}/result.csv", .{output_dir});
+    try Io.Dir.cwd().writeFile(io, .{ .sub_path = expected_path, .data = "x\n1\n" });
+    try Io.Dir.cwd().writeFile(io, .{ .sub_path = stale_path, .data = "x\n1\n" });
+    var pdir = try Io.Dir.cwd().openDir(io, dir_path, .{ .iterate = true });
+    defer pdir.close(io);
+
+    // /usr/bin/true exits cleanly without producing a dataset. An old CSV must
+    // not make that run look successful.
+    const reason = try runProgram(a, io, "/usr/bin/true", pdir, "data _null_; run;");
+    try std.testing.expectEqualStrings("result.csv: no output produced", reason orelse "<unexpected success>");
+}
+
+test "program runner rejects an unreviewed output dataset" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const dir_path = try std.fmt.allocPrint(a, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    const expected_dir = try std.fmt.allocPrint(a, "{s}/expected", .{dir_path});
+    try Io.Dir.cwd().createDirPath(io, expected_dir);
+    try Io.Dir.cwd().writeFile(io, .{
+        .sub_path = try std.fmt.allocPrint(a, "{s}/program.sas", .{dir_path}),
+        .data = "printf 'x\\n1\\n' > output/result.csv\nprintf 'x\\n2\\n' > output/unexpected.csv\n",
+    });
+    try Io.Dir.cwd().writeFile(io, .{
+        .sub_path = try std.fmt.allocPrint(a, "{s}/result.csv", .{expected_dir}),
+        .data = "x\n1\n",
+    });
+    var pdir = try Io.Dir.cwd().openDir(io, dir_path, .{ .iterate = true });
+    defer pdir.close(io);
+
+    const reason = try runProgram(a, io, "/bin/sh", pdir, "");
+    try std.testing.expectEqualStrings("unexpected output dataset unexpected.csv", reason orelse "<unexpected success>");
+}
+
+test "program runner cannot mutate its checked-in inputs" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const dir_path = try std.fmt.allocPrint(a, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    try Io.Dir.cwd().createDirPath(io, try std.fmt.allocPrint(a, "{s}/inputs", .{dir_path}));
+    try Io.Dir.cwd().createDirPath(io, try std.fmt.allocPrint(a, "{s}/expected", .{dir_path}));
+    try Io.Dir.cwd().writeFile(io, .{
+        .sub_path = try std.fmt.allocPrint(a, "{s}/program.sas", .{dir_path}),
+        .data = "printf 'x\\n2\\n' > inputs/source.csv\nprintf 'x\\n1\\n' > output/result.csv\n",
+    });
+    try Io.Dir.cwd().writeFile(io, .{
+        .sub_path = try std.fmt.allocPrint(a, "{s}/inputs/source.csv", .{dir_path}),
+        .data = "x\n1\n",
+    });
+    try Io.Dir.cwd().writeFile(io, .{
+        .sub_path = try std.fmt.allocPrint(a, "{s}/expected/result.csv", .{dir_path}),
+        .data = "x\n1\n",
+    });
+    var pdir = try Io.Dir.cwd().openDir(io, dir_path, .{ .iterate = true });
+    defer pdir.close(io);
+
+    try std.testing.expect((try runProgram(a, io, "/bin/sh", pdir, "")) == null);
+    const original = try pdir.readFileAlloc(io, "inputs/source.csv", a, max_file);
+    try std.testing.expectEqualStrings("x\n1\n", original);
+}
 
 test "structDiff: identical tables match; numeric spelling is normalized" {
     const a = std.testing.allocator;

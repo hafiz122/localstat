@@ -5,6 +5,7 @@ import pathlib
 import subprocess
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 RUNTIME = ROOT / "dist/LocalStat.app/Contents/Helpers/opensas"
@@ -24,6 +25,126 @@ def table(output, name):
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_sgplot_writes_graphics_to_result_bundle(self):
+        source = ("data d; input category $ x y; datalines;\n"
+                  "A 1 2\nA 2 4\nB 3 3\nB 4 5\n;\nrun;\n"
+                  "proc print data=d; run;\n"
+                  "proc sgplot data=d; scatter x=x y=y; run;\n"
+                  "proc sgplot data=d; series x=x y=y; run;\n"
+                  "proc sgplot data=d; vbar category / response=y stat=sum; run;\n"
+                  "proc sgplot data=d; hbar category; run;\n")
+        with tempfile.TemporaryDirectory() as folder:
+            path = pathlib.Path(folder)
+            program = path / "program.sas"
+            bundle = path / "results"
+            program.write_text(source)
+            result = subprocess.run([str(RUNTIME), str(program), "--results-dir", str(bundle)],
+                                    cwd=folder, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = json.loads((bundle / "manifest.json").read_text())
+            self.assertEqual(manifest["schema_version"], 1)
+            self.assertTrue(manifest["complete"])
+            tables = [item for item in manifest["objects"] if item["kind"] == "table"]
+            self.assertEqual(len(tables), 1)
+            self.assertEqual(tables[0]["procedure"], "PRINT")
+            self.assertEqual(tables[0]["path"], "tables.json")
+            self.assertEqual(len(json.loads((bundle / "tables.json").read_text())["tables"]), 1)
+            graphics = [item for item in manifest["objects"] if item["kind"] == "graphic"]
+            self.assertEqual(len(graphics), 4)
+            for index, graphic in enumerate(graphics):
+                self.assertEqual(graphic["procedure"], "SGPLOT")
+                self.assertEqual(graphic["index"], index)
+                self.assertTrue(graphic["path"].startswith("graphics/"))
+                svg = ET.parse(bundle / graphic["path"]).getroot()
+                self.assertEqual(svg.tag, "{http://www.w3.org/2000/svg}svg")
+                self.assertGreater(float(svg.attrib["width"]), 0)
+                self.assertGreater(float(svg.attrib["height"]), 0)
+                tag = "circle" if index == 0 else "polyline" if index == 1 else "rect"
+                role = "plot-point" if index == 0 else "plot-series" if index == 1 else "plot-bar"
+                marks = [mark for mark in svg.findall(f".//{{http://www.w3.org/2000/svg}}{tag}")
+                         if mark.attrib.get("class") == role]
+                self.assertGreaterEqual(len(marks), 4 if index == 0 else 1 if index == 1 else 2)
+                if index == 0:
+                    self.assertEqual(len(marks), 4)
+                if index == 1:
+                    self.assertEqual(len(marks), 1)
+                    self.assertEqual(len(marks[0].attrib["points"].split()), 4)
+                if index == 2:
+                    self.assertEqual(len(marks), 2)
+                    self.assertAlmostEqual(float(marks[0].attrib["height"]) /
+                                           float(marks[1].attrib["height"]), 6 / 8, places=2)
+
+    def test_sgplot_sas_like_categories_width_and_series_order(self):
+        source = ("data d; input category $ x y; datalines;\n"
+                  "B 3 30\nA 1 10\nC 2 20\nA 4 .\nB 5 5\n;\nrun;\n"
+                  "proc sgplot data=d; scatter x=x y=y; run;\n"
+                  "proc sgplot data=d; series x=x y=y; run;\n"
+                  "proc sgplot data=d; vbar category / response=y stat=sum; run;\n"
+                  "proc sgplot data=d; hbar category; run;\n")
+        with tempfile.TemporaryDirectory() as folder:
+            path = pathlib.Path(folder)
+            program = path / "program.sas"
+            bundle = path / "results"
+            program.write_text(source)
+            result = subprocess.run([str(RUNTIME), str(program), "--results-dir", str(bundle)],
+                                    cwd=folder, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = json.loads((bundle / "manifest.json").read_text())
+            graphics = [obj for obj in manifest["objects"] if obj["kind"] == "graphic"]
+            self.assertEqual(len(graphics), 4)
+            svgs = [ET.parse(bundle / obj["path"]).getroot() for obj in graphics]
+            namespace = "{http://www.w3.org/2000/svg}"
+            scatter = [mark for mark in svgs[0].iter(namespace + "circle")
+                       if mark.attrib.get("class") == "plot-point"]
+            self.assertEqual(len(scatter), 4, "missing numeric pairs should not create markers")
+            lines = [mark for mark in svgs[1].iter(namespace + "polyline")
+                     if mark.attrib.get("class") == "plot-series"]
+            self.assertEqual(len(lines), 1)
+            x_coordinates = [float(point.split(",")[0]) for point in lines[0].attrib["points"].split()]
+            self.assertEqual(len(x_coordinates), 4)
+            self.assertGreater(x_coordinates[0], x_coordinates[1])
+            self.assertGreater(x_coordinates[2], x_coordinates[1])
+            self.assertGreater(x_coordinates[3], x_coordinates[0])
+            for index, svg in enumerate(svgs[2:]):
+                labels = [node for node in svg.iter(namespace + "text")
+                          if node.attrib.get("class") == "category-label"]
+                axis = "x" if index == 0 else "y"
+                ordered = sorted(labels, key=lambda node: float(node.attrib[axis]), reverse=index == 1)
+                self.assertEqual(["".join(node.itertext()) for node in ordered], ["A", "B", "C"])
+                ticks = ["".join(node.itertext()) for node in svg.iter(namespace + "text")
+                         if node.attrib.get("class") == "value-tick"]
+                self.assertIn(0.0, [float(tick) for tick in ticks])
+            vbars = [mark for mark in svgs[2].iter(namespace + "rect")
+                     if mark.attrib.get("class") == "plot-bar"]
+            self.assertEqual(len(vbars), 3)
+            vbars.sort(key=lambda bar: float(bar.attrib["x"]))
+            self.assertEqual([float(bar.attrib["data-value"]) for bar in vbars], [10, 35, 20])
+            centers = [float(bar.attrib["x"]) + float(bar.attrib["width"]) / 2 for bar in vbars]
+            slot = centers[1] - centers[0]
+            self.assertGreater(slot, 0)
+            self.assertAlmostEqual(float(vbars[0].attrib["width"]) / slot, 0.8, delta=0.05)
+            hbars = [mark for mark in svgs[3].iter(namespace + "rect")
+                     if mark.attrib.get("class") == "plot-bar"]
+            self.assertEqual(len(hbars), 3)
+            hbars.sort(key=lambda bar: float(bar.attrib["y"]), reverse=True)
+            self.assertEqual([float(bar.attrib["data-value"]) for bar in hbars], [2, 2, 1])
+
+    def test_corr_and_ttest_subsets_run_in_bundled_helper(self):
+        source = ("data d; input x y; datalines;\n1 3\n2 6\n3 9\n;\nrun;\n"
+                  "proc corr data=d; var x y; run;\n"
+                  "proc ttest data=d; var x; run;\n")
+        with tempfile.TemporaryDirectory() as folder:
+            program = pathlib.Path(folder) / "program.sas"
+            sidecar = pathlib.Path(folder) / "tables.json"
+            program.write_text(source)
+            result = subprocess.run([str(RUNTIME), str(program), "--tables-json", str(sidecar)],
+                                    cwd=folder, text=True, capture_output=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("Pearson Correlation Coefficients", result.stdout)
+            self.assertIn("The TTEST Procedure", result.stdout)
+            tables = json.loads(sidecar.read_text())["tables"]
+            self.assertIn("CORR", [item["procedure"] for item in tables])
+
     def test_formatted_table_sidecar_preserves_stdout_and_order(self):
         source = ("data d; input group $ response $ value; datalines;\n"
                   "A yes 10\nA no 20\nB yes 30\n;\nrun;\n"

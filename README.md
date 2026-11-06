@@ -30,7 +30,8 @@ This release opens a fresh SAS Native workbench with an empty Project Explorer a
 | Native IDE | SAS Native workspace by default, with a Project Explorer, compact source tabs, a contextual Run toolbar, and a lower results area. Settings, seven editor themes, separate source/output fonts, offline searchable Help, file operations, diagnostics, text output, formatted tables, printing, raw-text export and paginated PDF report export are available. |
 | Local runtime | The app bundles an ARM64 build of OpenSAS pinned to `927a2fa9f1401e365d975536bd704819ada1f1f4`. Each run starts a fresh local process. |
 | Statistical modeling | A bounded numeric ordinary-least-squares subset of `PROC REG` is implemented. |
-| Verification | Source suite: 973 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 78 Swift tests (one opt-in measurement skipped by default), 16 packaged-runtime checks, 37 benchmark checks, 3 offline Help checks and 1 repository text check. Recorded performance results are described below. |
+| Plotting | A `PROC SGPLOT` subset writes SVG scatter, series, vertical bar, and horizontal bar charts in a light HTMLBlue-inspired style. The app displays them in a Graphics results tab after execution. Public SAS 9.4 examples guide the presentation; no licensed SAS output has been used to validate parity. |
+| Verification | Current source suite: 1,015 runtime tests, 1,924 corpus programs, 11 end-to-end programs, 85 Swift tests (one opt-in measurement skipped by default), 19 packaged-runtime checks, 37 benchmark checks, 3 offline Help checks, fixture and procedure-inventory checks, and 1 repository text check. Recorded performance results are described below. |
 | Distribution | Alpha automation tests and packages each candidate. New versions produce draft prereleases; repeat runs preserve existing release assets. The app remains ad-hoc signed and unnotarized. |
 | Compatibility | Coverage is documented and intentionally limited. No feature is labeled SAS-verified without output from an installed SAS engine. |
 
@@ -95,6 +96,7 @@ Opening a project folder sets the working directory used for relative file paths
 - File > Export Last Run as Text saves complete raw output and diagnostics.
 - File > Export Report as PDF creates a searchable, paginated report containing the executed source snapshot, run metadata, output, and diagnostics. Tabular text, including REG ANOVA and parameter estimates, has aligned columns and fits within the page width. Source text, diagnostics, and raw-text exports retain their original contents.
 - Output Data shows formatted results for supported PRINT, FREQ, and TABULATE output. On screen, table headings use a restrained blue treatment and every cell has a border. File > Print Tables prints the latest tables on white pages with centered titles, complete cell borders, and right-aligned numeric cells; PDF reports include those tables and a raw-output appendix. This follows the requested table presentation for the supported subset, without claiming exact SAS ODS parity.
+- Graphics shows plots from the supported PROC SGPLOT subset after a run. The runtime saves each plot as SVG in its result bundle. Scatter, series, vertical bar, and horizontal bar statements are supported. Their light style follows a [public SAS 9.4 visual target](docs/procedures/sgplot-visual-target.md), without a claim of SAS output parity. See [the compatibility matrix](docs/COMPATIBILITY.md) for syntax and limits.
 - Help > Compatibility and Limitations opens the supported-subset document in a native read-only window.
 
 Every run starts a fresh process: WORK datasets and macro definitions do not persist between submissions. Files explicitly written by your program persist. Output is buffered by OpenSAS until the run finishes, so cancellation may lose that buffered output. Output and diagnostics are kept in memory; very large results require corresponding memory.
@@ -119,6 +121,8 @@ The local extension provides a bounded ordinary-least-squares PROC REG with nume
 ```
 
 This builds the app and runs OpenSAS unit/conformance/end-to-end suites, Swift editor/runtime/PDF integration tests, packaged-runtime regression checks, and Help/text checks. PDF tests inspect exported coordinates to catch misaligned columns, wrapped p-values, and text outside page margins in ordinary reports and raw-output appendices. Python 3 is only used by tests and development tools, never by the app or runtime. Published example checks have source citations in the test. They are not a claim of new validation against an installed SAS engine.
+
+The [procedure parity workbench](docs/procedures/README.md) tracks the SAS 9.4M9 compatibility effort. Its inventory is provisional, and no procedure is marked parity verified. The local SAS batch adapter can capture reviewed reference cases; `./scripts/test.sh` checks the inventory and runs any committed reference cases without requiring SAS in CI.
 
 The 5 November 2026 [main CI run](https://github.com/hafiz122/localstat/actions/runs/41945456267) and [alpha validation run](https://github.com/hafiz122/localstat/actions/runs/41945456385) passed for commit `42495ca`, including four-space indentation defaults and migration, packaging, signatures, ARM64 architecture, and checksums. The alpha validation preserved the existing published assets.
 

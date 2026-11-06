@@ -18,10 +18,15 @@ pub const functions = @import("functions.zig");
 pub const format = @import("format.zig");
 pub const exec = @import("exec.zig");
 pub const reg = @import("reg.zig");
+pub const ttest = @import("ttest.zig");
+pub const sgplot = @import("sgplot.zig");
 pub const proc = @import("proc.zig");
 pub const macro = @import("macro.zig");
 pub const sql = @import("sql.zig");
 pub const table_result = @import("table_result.zig");
+pub const plot_result = @import("plot_result.zig");
+pub const proc_registry = @import("proc_registry.zig");
+pub const result_bundle = @import("result_bundle.zig");
 
 test {
     // Pull every module's `test` blocks into `zig build test`. Append imports
@@ -44,7 +49,12 @@ test {
     _ = @import("exec.zig");
     _ = @import("proc.zig");
     _ = @import("reg.zig");
+    _ = @import("ttest.zig");
+    _ = @import("sgplot.zig");
     _ = @import("macro.zig");
     _ = @import("sql.zig");
     _ = @import("table_result.zig");
+    _ = @import("plot_result.zig");
+    _ = @import("proc_registry.zig");
+    _ = @import("result_bundle.zig");
 }

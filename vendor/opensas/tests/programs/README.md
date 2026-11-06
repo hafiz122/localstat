@@ -10,7 +10,7 @@ tests/programs/<name>/
   program.sas        the program (librefs point at inputs/ and output/)
   inputs/*.csv       input datasets, one CSV per dataset (filename = dataset name)
   expected/*.csv     golden output datasets
-  output/            produced at runtime (gitignored); compared to expected/
+  output/            produced in a fresh temporary copy; compared to expected/
 ```
 
 ## CSV convention
@@ -22,9 +22,10 @@ tests/programs/<name>/
 
 ## Runner
 
-`zig build programs` runs every fixture: it maps `libname source "inputs"` /
-`libname target "output"` to those dirs, runs `program.sas`, then structurally
-diffs every `output/*.csv` against `expected/*.csv` (columns, order, values).
+`zig build programs` runs every fixture in a fresh temporary copy: it maps
+`libname source "inputs"` / `libname target "output"` to those dirs, runs
+`program.sas`, then structurally diffs every `output/*.csv` against
+`expected/*.csv` (columns, order, values). Missing or extra CSVs fail.
 
 ## dm/ - CDISC SDTM Demographics
 

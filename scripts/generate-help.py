@@ -90,9 +90,8 @@ def reference():
     call_body = executor[executor.index('if (eqi(c.name, "symput")'):executor.index('if (eqi(c.name, "is8601_convert"))')]
     for name in re.findall(r'eqi\(c.name, "([a-z][a-z0-9_]*)"\)', call_body):
         entries.setdefault("CALL " + name.upper(), "Runtime CALL routine or alias; supported argument forms only.")
-    main = (ROOT / "vendor/opensas/src/main.zig").read_text()
-    dispatch = main[main.index('if (eqi(proc, "sort"))'):main.index('failLoud("PROC {s} is not supported"')]
-    procs = sorted(set(re.findall(r'eqi\(proc, "([a-z]+)"\)', dispatch)))
+    registry = (ROOT / "vendor/opensas/src/proc_registry.zig").read_text()
+    procs = sorted(set(re.findall(r'\.name = "([a-z]+)"', registry)))
     body = ['<h1>Procedure and function index</h1>',
             '<p>This index covers the pinned local runtime. An implemented name is a supported subset, not a claim of complete SAS equivalence. Unavailable names are included so searches explain the boundary. The guide provides worked examples; this index does not reproduce the full SAS function dictionary.</p>',
             '<p>SUMMARY shares the MEANS family. Additional runtime names and aliases are included below. The DATA-step SYSGET function is unavailable; the separate macro directive %SYSGET can read inherited environment variables. See <a href="localstat-help:compatibility">Compatibility and limitations</a>.</p>',
@@ -100,6 +99,9 @@ def reference():
     for name in procs:
         note = "Implemented subset; procedure options vary."
         if name == "reg": note = "Bounded numeric ordinary-least-squares subset; see the regression guide."
+        elif name == "corr": note = "Pearson numeric correlations with VAR, WITH, and BY; other methods are unsupported."
+        elif name == "ttest": note = "One-sample, paired, and two-sample numeric tests; other options are unsupported."
+        elif name == "sgplot": note = "Scatter, series, vertical bar, and horizontal bar SVG plots; see compatibility limits."
         elif name == "printto": note = "Accepted but inert: does not redirect output."
         elif name == "summary": note = "MEANS-family procedure with its own output defaults."
         body.append(f"<tr><td>PROC {name.upper()}</td><td>{note}</td></tr>")

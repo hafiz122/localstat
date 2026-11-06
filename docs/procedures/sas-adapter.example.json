@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "/absolute/path/to/sas",
+    "-sysin", "{program}",
+    "-log", "{log}",
+    "-print", "{listing}"
+  ],
+  "timeout_seconds": 120,
+  "product_tokens": ["STAT", "ETS", "OR", "QC", "GRAPH", "IML"]
+}

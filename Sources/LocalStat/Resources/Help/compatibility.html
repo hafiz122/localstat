@@ -7,6 +7,9 @@
 <tr><td>Local execution</td><td>Native macOS ARM64, offline, fresh subprocess per whole program</td></tr>
 <tr><td>DATA steps, macros, SQL and existing procedures</td><td>Inherited OpenSAS subset; upstream conformance suites run locally. Not universal SAS compatibility.</td></tr>
 <tr><td>PROC REG</td><td>One numeric response; explicit numeric predictors; intercept; one MODEL; complete-case ordinary least squares</td></tr>
+<tr><td>PROC CORR</td><td>Numeric Pearson correlations with VAR and WITH, BY groups, WHERE filtering, and pairwise counts; other methods and output options are unsupported</td></tr>
+<tr><td>PROC TTEST</td><td>Numeric one-sample tests with optional H0=, one paired variable pair, and two-sample CLASS tests with pooled and Satterthwaite results; other options are unsupported</td></tr>
+<tr><td>PROC SGPLOT</td><td>SCATTER and SERIES with X=/Y=; VBAR and HBAR with optional RESPONSE= and STAT=FREQ, SUM, or MEAN; DATA= and WHERE filtering. Other statements and options are unsupported.</td></tr>
 <tr><td>REG output</td><td>Text ANOVA, estimates, standard errors, t and F tests, Root MSE, R-square and adjusted R-square</td></tr>
 <tr><td>REG verification</td><td>Analytic and published-example checks; no new direct SAS-engine validation claimed</td></tr>
 <tr><td>Singular models</td><td>Explicit error; SAS&#x27;s generalized-inverse/aliased-coefficient behavior is not implemented</td></tr>
@@ -15,7 +18,8 @@
 <tr><td>REG options, WEIGHT, FREQ, BY, OUTPUT, selection, plots</td><td>Unsupported; explicit error</td></tr>
 <tr><td>Other modeling procedures</td><td>GLM, LOGISTIC, MIXED, GLIMMIX, PHREG, LIFETEST and others remain unsupported</td></tr>
 <tr><td>ODS</td><td>Text listing only. Other destinations and controls error; LISTING open/close are inert with a note</td></tr>
-<tr><td>Formatted tables</td><td>PROC PRINT, PROC FREQ TABLES/NLEVELS, and PROC TABULATE results in the native Tables tab; SAS-style presentation, not exact ODS rendering</td></tr>
+<tr><td>Formatted tables</td><td>PROC PRINT, PROC FREQ TABLES/NLEVELS, PROC TABULATE, and PROC CORR results in the native Tables tab; SAS-style presentation, not exact ODS rendering</td></tr>
+<tr><td>Graphics</td><td>Supported PROC SGPLOT statements produce SVG files in the result bundle and display in the Graphics tab after the run finishes. The light style follows public SAS 9.4 ODS HTML/HTMLBlue examples; it has not been compared with licensed SAS output.</td></tr>
 <tr><td>Printing</td><td>Print all formatted tables from the latest run through the macOS print dialog</td></tr>
 <tr><td>IDE report export</td><td>Searchable, paginated PDF containing run metadata, executed source, formatted tables, raw text output and diagnostics; this is an IDE report, not an ODS destination</td></tr>
 <tr><td>Datasets</td><td>OpenSAS readers/writers for CSV, SAS7BDAT and XPT; limitations remain upstream</td></tr>
@@ -31,7 +35,26 @@ run;
 quit;</code></pre>
 <p>Input variables must be numeric. Rows missing any model variable are excluded. At least one predictor and positive residual degrees of freedom are required. Duplicate predictors, unknown variables, and numerically rank-deficient designs fail visibly. Named two-level libraries are supported. Predictor lists, transformations inside MODEL, multiple responses/models and dataset options on DATA= are outside this subset. Global OBS/FIRSTOBS settings use the existing OpenSAS input machinery.</p>
 <p>The implementation uses column scaling and Householder QR with column pivoting. It rejects scaled pivots below <code>16 * machine epsilon * max(observations, parameters)</code>. Extremely ill-conditioned full-rank problems can therefore be rejected. Tests compare well-conditioned numerical results using absolute and relative tolerances, not byte-identical report formatting. Very small p-values can underflow or round to zero in text output.</p>
+<h2>Supported SGPLOT syntax</h2>
+<pre><code>data measurements;
+  input group $ x y;
+  datalines;
+A 1 2
+A 2 4
+B 3 3
+B 4 5
+;
+run;
+
+proc sgplot data=measurements;
+  scatter x=x y=y;
+run;
+
+proc sgplot data=measurements;
+  vbar group / response=y stat=sum;
+run;</code></pre>
+<p>Each PROC SGPLOT step accepts one plot statement and creates one SVG graphic. SCATTER and SERIES use numeric X and Y variables. SERIES connects observations in data order. VBAR and HBAR count categories by default; RESPONSE= selects a numeric variable for SUM or MEAN. Categories appear in ascending unformatted order, bars start at zero and occupy 80% of a category slot, and the default SVG is 640 × 480. These defaults follow the [public SAS 9.4 visual target](procedures/sgplot-visual-target.md), not a licensed output comparison. DATA= selects the input dataset, and a WHERE statement can filter rows. The current chart limits are 20,000 input rows and 100 categories. Negative bar values fail with an error. The SVG is saved in the run&#x27;s result bundle; direct command line runs must pass <code>--results-dir</code>. Overlays, grouping, axis and style options, ODS GRAPHICS controls, other SGPLOT statements such as VBOX, and graphics from statistical procedures are outside this subset.</p>
 <h2>Known inherited differences</h2>
 <p>OpenSAS implements subsets of SAS statements and procedure options. The upstream test corpus is evidence for those fixtures only. Some inherited statements are deliberately inert: for example X does not execute shell commands and PROC PRINTTO does not redirect output. Text PUT output and procedure listings share stdout. This app preserves raw stdout/stderr and the process exit code; diagnostics are not the full SAS log format. ABORT can explicitly return an exit code, including 1 or 2, so the text log remains authoritative when interpreting those statuses.</p>
-<p>No persistent interactive session, selection execution, dataset grid, HTML/RTF results, ODS PDF destination or graphics are included in the current source build. Other procedures remain in the text Output tab. A successful exit is not proof of numerical equivalence to SAS.</p>
+<p>No persistent interactive session, selection execution, dataset grid, HTML/RTF results, or ODS PDF destination is included in the current source build. Other procedures remain in the text Output tab. A successful exit is not proof of numerical equivalence to SAS.</p>
 </body></html>

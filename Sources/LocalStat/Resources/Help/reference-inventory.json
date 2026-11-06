@@ -3,6 +3,8 @@
     "append",
     "compare",
     "contents",
+    "copy",
+    "corr",
     "datasets",
     "delete",
     "export",
@@ -15,12 +17,14 @@
     "rank",
     "reg",
     "report",
+    "sgplot",
     "sort",
     "sql",
     "standard",
     "summary",
     "tabulate",
     "transpose",
+    "ttest",
     "univariate"
   ],
   "functions": [
