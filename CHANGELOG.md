@@ -10,6 +10,7 @@ All notable changes to LocalStat are recorded here.
 
 - Keep the editor gutter divider within the source area so it does not cross
   the active program tab or toolbar.
+- Move CI and alpha packaging to the supported macOS 15 runner.
 
 ## [0.1.4-alpha] - 2026-11-05
 

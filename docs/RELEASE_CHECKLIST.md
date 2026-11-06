@@ -11,7 +11,7 @@ retain these limits in the new release notes.
 - [ ] Working tree is clean and the release commit is reviewed.
 - [ ] `VERSION` is `0.1.5-alpha` and `CHANGELOG.md` has no missing alpha notes.
 - [ ] `./scripts/release-alpha.sh` passes on Apple Silicon.
-- [ ] The `macos-14` CI job passes from a fresh checkout.
+- [ ] The `macos-15` CI job passes from a fresh checkout.
 - [ ] The generated ZIP checksum verifies after downloading to another path.
 - [ ] In-app Help contains the current compatibility and security warnings.
 - [ ] No feature is described as fully SAS-compatible or SAS-verified without
