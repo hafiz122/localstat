@@ -53,7 +53,7 @@ pdflatex -interaction=nonstopmode -halt-on-error -output-directory=build \
 
 Open `demo/` as the LocalStat project folder. Run `01-regression.sas`, inspect
 the model estimates, then run `02-reporting.sas` and inspect its two tables.
-Export a report and open the compatibility document. Use `0.1.4-alpha` or a
+Export a report and open the compatibility document. Use `0.1.5-alpha` or a
 current source build for formatted output data.
 
 Expected regression: intercept 2.2, slope 0.6, R-square 0.6. Expected PRINT:
